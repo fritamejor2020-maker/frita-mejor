@@ -1,0 +1,23 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+:root {
+  /* Fondo principal de la aplicación base */
+  --color-bg: #FFD56B;
+  --color-main: #FF4040;
+}
+
+@layer utilities {
+  .bg-map-pattern {
+    background-color: #f3f4f6;
+    background-image: radial-gradient(#d1d5db 2px, transparent 2px);
+    background-size: 30px 30px;
+  }
+}
+
+/* Ocultar el ícono de ojo por defecto en navegadores como Edge */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear {
+  display: none;
+}
