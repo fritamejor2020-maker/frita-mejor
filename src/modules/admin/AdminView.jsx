@@ -1369,9 +1369,9 @@ function ProductsPresetsPanel() {
                               </div>
                             ) : (
                               <div key={idx} className="flex flex-col items-center">
-                                <div className="w-full bg-chunky-main border-2 border-chunky-secondary rounded-xl py-2 px-1 flex flex-col items-center">
-                                  <span className="font-black text-chunky-dark text-sm">{qty % 1 === 0 ? qty : qty.toFixed(1)}</span>
-                                  <span className="text-[10px] font-bold text-chunky-dark/60">{unit}</span>
+                                <div className="w-full bg-white border-2 border-gray-200 hover:border-[#FFB700] hover:bg-yellow-50 transition-colors rounded-xl py-2 px-1 flex flex-col items-center shadow-sm">
+                                  <span className="font-black text-gray-800 text-sm">{qty % 1 === 0 ? qty : qty.toFixed(1)}</span>
+                                  <span className="text-[10px] font-bold text-gray-400">{unit}</span>
                                 </div>
                                 <span className="text-[10px] text-gray-400 font-bold mt-1">{batches} lote(s)</span>
                               </div>
@@ -1995,7 +1995,7 @@ export function AdminView() {
             }}
             className={`flex-1 min-w-[200px] py-4 px-6 rounded-[24px] border-2 transition-all font-black text-lg flex items-center justify-center gap-3
               ${activeCategory === cat.id 
-                ? 'bg-chunky-main border-chunky-main text-white shadow-md transform scale-[1.02]' 
+                ? 'bg-chunky-main border-chunky-main text-white shadow-md' 
                 : `${cat.color} border-transparent opacity-70`}`}
           >
             {cat.label}
@@ -2004,7 +2004,7 @@ export function AdminView() {
       </div>
 
       {/* Tabs con Scroll */}
-      <div className="relative w-full max-w-[1400px] mb-6 flex items-center bg-white rounded-full p-2 shadow-sm border border-gray-100">
+      <div className="relative w-full max-w-[1400px] mb-6 flex items-center bg-white rounded-full p-2 shadow-sm border border-gray-100" style={{ overflow: 'visible' }}>
         <button 
           onClick={() => { if (scrollContainerRef.current) scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' }); }}
           className="z-10 w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-500 hover:bg-gray-200 transition-colors mx-1"
@@ -2014,16 +2014,16 @@ export function AdminView() {
 
         <div 
           ref={scrollContainerRef}
-          className="flex flex-1 overflow-x-auto mx-2 scroll-smooth items-center"
-          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          className="flex flex-1 mx-2 scroll-smooth items-center py-1"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overflowX: 'auto', overflowY: 'visible' }}
         >
           <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-          <div className="flex gap-2 w-max">
+          <div className="flex gap-2 w-max" style={{ overflow: 'visible' }}>
             {TABS_BY_CATEGORY[activeCategory].map((tab) => (
               <button
                 key={tab.id}
-                className={`px-5 py-2.5 rounded-full font-bold text-sm transition-all duration-300 whitespace-nowrap active:scale-95
-                  ${activeTab === tab.id ? 'bg-chunky-dark text-white shadow-sm scale-105' : 'text-gray-500 hover:bg-gray-100 hover:text-chunky-dark'}`}
+                className={`px-5 py-2.5 rounded-full font-bold text-sm transition-colors whitespace-nowrap active:scale-95
+                  ${activeTab === tab.id ? 'bg-chunky-dark text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-chunky-dark'}`}
                 onClick={() => setActiveTab(tab.id)}
               >
                 {tab.label}

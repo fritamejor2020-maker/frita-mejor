@@ -33,14 +33,14 @@ export function AdminIncomeSourcesTab() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-8 flex-1">
       
       {/* HEADER SECTION */}
-      <div className="bg-[#1e1f26] rounded-[24px] border border-gray-800 p-6">
-        <h3 className="text-xl font-black text-white mb-2">Configuración de Orígenes de Ingreso</h3>
-        <p className="text-xs font-bold text-gray-400 mb-6 max-w-2xl">
+      <div className="bg-[#FFD56B] rounded-[32px] border border-[#FFD56B] p-6 shadow-sm">
+        <h3 className="text-2xl font-black text-gray-900 mb-2">Configuración de Orígenes de Ingreso</h3>
+        <p className="text-xs font-bold text-gray-800 mb-6 max-w-2xl opacity-80">
           Aquí puedes definir las ubicaciones principales (ej. Local, Contratas), las jornadas habilitadas para cada una (ej. AM, PM) y finalmente los horarios específicos. <br/><br/>
-          <span className="text-amber-500">Nota Especial:</span> La categoría <b>Triciclo</b> tiene un comportamiento dinámico tipo tabla. Puedes configurar sus jornadas aquí, pero los horarios específicos provendrán de la lista de Vehículos.
+          <span className="text-frita-red">Nota Especial:</span> La categoría <b className="text-gray-900">Triciclo</b> tiene un comportamiento dinámico. Puedes configurar sus jornadas aquí, pero los horarios específicos provendrán de la lista de Vehículos.
         </p>
 
         {/* Add New Location */}
@@ -50,11 +50,11 @@ export function AdminIncomeSourcesTab() {
             placeholder="Nueva Ubicación General (ej. Venta Planta)"
             value={newLocation}
             onChange={(e) => setNewLocation(e.target.value)}
-            className="flex-1 bg-[#0c0d11] border border-gray-700 rounded-xl py-3 px-4 text-white font-bold focus:border-[#FFB700] outline-none max-w-sm"
+            className="flex-1 bg-white border-2 border-white rounded-xl py-3 px-4 text-gray-800 font-bold focus:border-[#FFB700] outline-none max-w-sm shadow-sm transition-colors"
           />
           <button 
             onClick={handleAddLocation}
-            className="px-6 py-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-black transition-colors"
+            className="px-6 py-3 rounded-xl bg-frita-red hover:bg-red-600 text-white font-black transition-colors shadow-sm"
           >
             Añadir Ubicación
           </button>
@@ -64,18 +64,18 @@ export function AdminIncomeSourcesTab() {
       {/* RENDER HIERARCHY */}
       <div className="space-y-6">
         {Object.entries(hierarchy).map(([location, shifts]: [string, any]) => (
-          <div key={location} className="bg-[#1e1f26] rounded-[24px] border border-gray-700/50 overflow-hidden">
+          <div key={location} className="bg-white rounded-[32px] border-2 border-gray-100 overflow-hidden shadow-sm">
             
             {/* Location Header */}
-            <div className="bg-gray-800/40 p-4 border-b border-gray-700/50 flex justify-between items-center">
-              <h4 className="text-xl font-black text-[#FFB700] uppercase tracking-wider">{location}</h4>
+            <div className="bg-gray-50 p-5 border-b-2 border-gray-100 flex justify-between items-center">
+              <h4 className="text-xl font-black text-gray-800 uppercase tracking-wider">{location}</h4>
               <button 
                 onClick={() => {
                   if (confirm(`¿Eliminar ubicación ${location} y todas sus jornadas?`)) {
                     removeLocation(location);
                   }
                 }}
-                className="text-red-400 hover:text-red-300 font-bold text-sm bg-red-900/30 px-3 py-1.5 rounded-lg"
+                className="text-red-500 hover:text-red-600 font-bold text-sm hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
               >
                 Eliminar Ubicación
               </button>
@@ -85,14 +85,14 @@ export function AdminIncomeSourcesTab() {
             <div className="p-6">
               <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
                  {Object.entries(shifts).map(([shift, timeSlots]: [string, any]) => (
-                    <div key={shift} className="bg-[#16171d] rounded-2xl border border-gray-800 p-5 relative">
+                    <div key={shift} className="bg-white rounded-2xl border border-gray-200 p-5 relative shadow-sm">
                       
                       {/* Shift Header */}
-                      <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-800/60">
-                         <span className="text-gray-200 font-bold text-lg">{shift}</span>
+                      <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+                         <span className="text-gray-800 font-black text-lg">{shift}</span>
                          <button 
                            onClick={() => removeShift(location, shift)}
-                           className="text-gray-500 hover:text-red-400 font-bold text-xs"
+                           className="text-gray-400 hover:text-red-500 font-bold text-xs transition-colors"
                          >
                            Quitar Jornada
                          </button>
@@ -103,44 +103,44 @@ export function AdminIncomeSourcesTab() {
                         <div className="space-y-3">
                            <div className="flex flex-wrap gap-2 mb-4">
                              {timeSlots.map((ts: string, idx: number) => (
-                               <div key={idx} className="bg-blue-900/30 border border-blue-800 text-blue-300 font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-2">
+                               <div key={idx} className="bg-[#FFD56B]/30 border border-[#FFD56B]/50 text-[#cc7a00] font-bold text-xs px-3 py-1.5 rounded-full flex items-center gap-2 shadow-sm">
                                  <span>{ts}</span>
-                                 <button onClick={() => removeTimeSlot(location, shift, ts)} className="hover:text-white rounded-full bg-blue-900 p-0.5">
-                                   <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                 <button onClick={() => removeTimeSlot(location, shift, ts)} className="hover:bg-red-400 hover:text-white text-red-500 transition-colors rounded-full p-0.5 ml-1">
+                                   <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                  </button>
                                </div>
                              ))}
-                             {timeSlots.length === 0 && <span className="text-gray-600 text-xs font-bold">Sin horarios definidos</span>}
+                             {timeSlots.length === 0 && <span className="text-gray-400 text-xs font-bold bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">Sin horarios definidos</span>}
                            </div>
 
                            {/* Add Time Slot Form */}
-                           <div className="flex gap-2">
+                           <div className="flex gap-2 bg-gray-50/50 p-2 rounded-xl border border-gray-100">
                              <input 
                                type="text" 
                                placeholder="Ej. 10-12 pm"
                                value={newTimeSlots[`${location}-${shift}`] || ''}
                                onChange={(e) => setNewTimeSlots({ ...newTimeSlots, [`${location}-${shift}`]: e.target.value })}
-                               className="flex-1 bg-[#0c0d11] border border-gray-800 rounded-lg py-1.5 px-3 text-sm text-gray-300 font-bold outline-none focus:border-blue-500"
+                               className="flex-1 bg-white border border-gray-200 rounded-lg py-1.5 px-3 text-sm text-gray-800 font-bold outline-none focus:border-[#FFB700] transition-colors"
                              />
                              <button
                                onClick={() => handleAddTimeSlot(location, shift)}
-                               className="px-3 py-1.5 rounded-lg bg-gray-700 hover:bg-gray-600 text-white font-bold text-xs"
+                               className="px-4 py-1.5 rounded-lg bg-[#FFB700] hover:bg-yellow-400 text-gray-900 font-bold text-xs transition-colors shadow-sm"
                              >
                                Añadir
                              </button>
                            </div>
                         </div>
                       ) : (
-                        <div className="bg-amber-900/10 border border-amber-900/20 p-4 rounded-xl text-center">
-                          <p className="text-amber-500/80 text-xs font-bold mb-1">Carga Dinámica de Triciclos</p>
-                          <p className="text-gray-500 text-[10px] font-bold">Los botones de elegir T1, T2 de esta jornada se cargarán mágicamente desde la configuración de Vehículos.</p>
+                        <div className="bg-orange-50 border-2 border-orange-200 p-4 rounded-xl text-center shadow-sm">
+                          <p className="text-frita-orange text-xs font-black mb-1 uppercase tracking-wider">Carga Dinámica</p>
+                          <p className="text-gray-600 text-[10px] font-bold">Los botones de esta jornada se cargarán automáticamente desde el panel de Flota de Vehículos.</p>
                         </div>
                       )}
                     </div>
                  ))}
                  
                  {/* Add new Shift block */}
-                 <div className="bg-[#16171d] rounded-2xl border border-dashed border-gray-700 p-5 flex flex-col justify-center items-center gap-3">
+                 <div className="bg-gray-50 rounded-2xl border-2 border-dashed border-gray-300 p-5 flex flex-col justify-center items-center gap-3 hover:bg-gray-100 transition-colors">
                    <span className="text-gray-500 font-bold text-sm">Nueva Jornada</span>
                    <div className="flex gap-2 w-full max-w-[200px]">
                       <input 
@@ -148,11 +148,11 @@ export function AdminIncomeSourcesTab() {
                          placeholder="Ej. AM, PM..."
                          value={newShifts[location] || ''}
                          onChange={(e) => setNewShifts({ ...newShifts, [location]: e.target.value })}
-                         className="flex-1 min-w-0 bg-[#0c0d11] border border-gray-800 rounded-lg py-1.5 px-3 text-sm text-gray-300 font-bold outline-none text-center focus:border-green-500"
+                         className="flex-1 min-w-0 bg-white border border-gray-200 rounded-lg py-1.5 px-3 text-sm text-gray-800 font-bold outline-none text-center focus:border-[#FFB700] transition-colors shadow-sm"
                        />
                        <button
                          onClick={() => handleAddShift(location)}
-                         className="px-3 py-1.5 rounded-lg bg-gray-800 hover:bg-gray-700 text-green-400 font-black text-xs"
+                         className="px-3 py-1.5 rounded-lg bg-[#FFB700] hover:bg-yellow-400 shadow-sm text-gray-900 font-black text-xs transition-colors"
                        >
                          +
                        </button>

@@ -72,13 +72,13 @@ function ManualModal({ product, recipe, wasteMode, onClose, onConfirm }) {
 
         <div className="flex gap-3 mb-6">
           <button
-            className={`flex-1 py-2 rounded-full font-bold text-sm transition-all ${mode === 'PRODUCE' ? 'bg-chunky-secondary text-white' : 'bg-gray-100 text-gray-500'}`}
+            className={`flex-1 py-2 rounded-full font-bold text-sm transition-all shadow-sm ${mode === 'PRODUCE' ? 'bg-[#FFB700] text-gray-900 border border-[#FFB700]' : 'bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100'}`}
             onClick={() => setMode('PRODUCE')}
           >Producir</button>
           <button
-            className={`flex-1 py-2 rounded-full font-bold text-sm transition-all ${mode === 'WASTE' ? 'bg-red-400 text-white' : 'bg-gray-100 text-gray-500'}`}
+            className={`flex-1 py-2 rounded-full font-bold text-sm transition-all shadow-sm ${mode === 'WASTE' ? 'bg-red-100 border border-red-200 text-red-700' : 'bg-gray-50 border border-gray-200 text-gray-500 hover:bg-gray-100'}`}
             onClick={() => setMode('WASTE')}
-          >Merma</button>
+          >Descarte</button>
         </div>
 
         <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">
@@ -131,10 +131,10 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
   const isDisabled  = !prod.stockOk && !wasteMode;
 
   const btnBase = wasteMode
-    ? 'bg-red-400 hover:bg-red-500 text-white border-2 border-red-500 disabled:opacity-40'
+    ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200 disabled:opacity-40 shadow-sm'
     : isDisabled
-      ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
-      : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary';
+      ? 'bg-gray-50 text-gray-300 border-2 border-gray-100 cursor-not-allowed'
+      : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm hover:shadow-md';
 
   return (
     <div className={`rounded-3xl p-7 flex flex-col gap-5 transition-all ${cardClass}`}>
@@ -163,8 +163,8 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
       </div>
 
       {wasteMode && (
-        <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-1.5 text-center">
-          <span className="text-xs font-bold text-red-500">🗑️ MODO MERMA</span>
+        <div className="bg-red-50 border border-red-100 rounded-xl px-3 py-1.5 text-center">
+          <span className="text-xs font-bold text-red-500">🗑️ MODO DESCARTE</span>
         </div>
       )}
 
@@ -244,8 +244,8 @@ function ProductionPanel({ productionPoint, onBack }) {
       const qty     = batches * (recipe?.yieldQty ?? 1);
       const invId   = product.outputInventoryId
         ?? inventory.find((i) => i.name === product.name)?.id;
-      if (invId) reportWaste(invId, qty, 'Merma en producción', productionPoint.id);
-      showToast(`🗑️ Merma registrada: ${qty} ${recipe?.yieldUnit ?? product.unit}`, 'warning');
+      if (invId) reportWaste(invId, qty, 'Descarte en producción', productionPoint.id);
+      showToast(`🗑️ Descarte registrado: ${qty} ${recipe?.yieldUnit ?? product.unit}`, 'warning');
       return;
     }
     const result = produceItem(product.id, batches, productionPoint.id);
@@ -258,8 +258,8 @@ function ProductionPanel({ productionPoint, onBack }) {
       const qty   = amount * (recipe?.yieldQty ?? 1);
       const invId = product.outputInventoryId
         ?? inventory.find((i) => i.name === product.name)?.id;
-      if (invId) reportWaste(invId, qty, 'Merma manual', productionPoint.id);
-      showToast(`🗑️ Merma: -${qty} ${recipe?.yieldUnit ?? product.unit}`, 'warning');
+      if (invId) reportWaste(invId, qty, 'Descarte manual', productionPoint.id);
+      showToast(`🗑️ Descarte: -${qty} ${recipe?.yieldUnit ?? product.unit}`, 'warning');
     } else {
       const result = produceItem(product.id, amount, productionPoint.id);
       showToast(result.message, result.ok ? 'success' : 'error');
@@ -299,7 +299,7 @@ function ProductionPanel({ productionPoint, onBack }) {
             className="text-sm rounded-full font-bold px-4 border-gray-200"
             onClick={() => setWasteMode(!wasteMode)}
           >
-            {wasteMode ? '⚠️ SALIR MERMA' : '🗑️ MODO MERMA'}
+            {wasteMode ? '⚠️ SALIR DESCARTE' : '🗑️ MODO DESCARTE'}
           </Button>
           <Button
             variant="outline"
@@ -314,7 +314,7 @@ function ProductionPanel({ productionPoint, onBack }) {
 
       {wasteMode && (
         <div className="bg-red-50 border-b border-red-200 px-4 py-2 text-center shrink-0">
-          <p className="font-bold text-red-500 text-xs">⚠️ MODO MERMA ACTIVO – Descuenta del inventario de producción terminada</p>
+          <p className="font-bold text-red-600 text-xs tracking-wide">⚠️ MODO DESCARTE ACTIVO – Registra productos dañados o rechazados</p>
         </div>
       )}
 

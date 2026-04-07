@@ -468,7 +468,7 @@ export function PosView() {
             <span className="font-black text-sm lg:text-lg bg-yellow-400 text-chunky-dark px-3 py-1 rounded-xl shadow-sm whitespace-nowrap">Caja Frita Mejor</span>
             
             <div className="relative flex-1 max-w-[400px]">
-              <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
               <input 
                 ref={searchInputRef}
                 className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2.5 pl-11 pr-4 text-sm font-bold text-white outline-none focus:border-chunky-main focus:ring-2 focus:ring-chunky-main/20 placeholder-gray-600 shadow-inner transition-all w-full"
@@ -545,15 +545,15 @@ export function PosView() {
         </div>
 
         {/* Categories / Back Nav */}
-        <div className="bg-[#121318] p-3 border-b border-[#1c1d24] flex items-center gap-3 overflow-x-auto scrollbar-hide">
+        <div className="bg-[#121318] px-4 py-4 border-b border-[#1c1d24] flex items-center gap-3 overflow-x-auto scrollbar-hide">
           <Button 
             className={`rounded-full py-2.5 px-5 border-none font-black text-sm whitespace-nowrap shadow-sm transition-transform active:scale-95 ${!currentFolder ? 'bg-chunky-main text-chunky-dark shadow-chunky-main/20' : 'bg-[#2a2d38] text-gray-400 hover:bg-[#343846]'}`}
             onClick={() => setCurrentFolder(null)}
           >
             🏠 Inicio (Todas)
           </Button>
-          <div className="w-px h-6 bg-gray-800 shrink-0"></div>
-          <div className="flex gap-3 overflow-x-auto scrollbar-hide pb-1">
+          <div className="w-px h-6 bg-gray-800 shrink-0 mx-1"></div>
+          <div className="flex gap-3 shrink-0">
             {posCategories?.map(cat => (
               <Button 
                 key={cat.id}
