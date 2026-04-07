@@ -18,7 +18,7 @@ import { formatMoney } from '../../utils/formatUtils';
 function EditableRow({ fields, values, onChange, onSave, onCancel }) {
   return (
     <div className="border-2 border-chunky-main rounded-2xl p-4 bg-yellow-50/30 space-y-3">
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap items-end gap-3">
         {fields.map((f) => (
           <div key={f.key} className={`${f.wide ? 'flex-1 min-w-[180px]' : 'w-28'}`}>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">{f.label}</label>
@@ -122,7 +122,7 @@ function WarehousesPanel() {
 
 // ─── Panel: Puntos de Producción ───────────────────────────────────────────────
 function ProductionPointsPanel() {
-  const { productionPoints, products, addProductionPoint, updateProductionPoint, deleteProductionPoint, updateProduct } = useInventoryStore();
+  const { productionPoints, products, inventory, addProductionPoint, updateProductionPoint, deleteProductionPoint, updateProduct, addProduct } = useInventoryStore();
   const [editId, setEditId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', location: '' });
@@ -200,23 +200,60 @@ function ProductionPointsPanel() {
                     </span>
                   ))}
                   {/* Asignar un producto no asignado a este punto */}
-                  {products.filter((p) => !p.productionPointIds?.includes(pp.id)).length > 0 && (
-                    <select
-                      className="bg-gray-50 border border-gray-200 text-xs font-bold px-3 py-1 rounded-full text-gray-500 outline-none max-w-[160px]"
-                      value=""
-                      onChange={(e) => { 
-                        if (e.target.value) {
-                          const pToUpdate = products.find(p => p.id === e.target.value);
-                          updateProduct(e.target.value, { productionPointIds: [...(pToUpdate.productionPointIds || []), pp.id] }); 
-                        }
-                      }}
-                    >
-                      <option value="">+ Asignar producto...</option>
-                      {products.filter((p) => !p.productionPointIds?.includes(pp.id)).map((p) => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
-                    </select>
-                  )}
+                  {(() => {
+                    const availableProducts = products.filter((p) => !p.productionPointIds?.includes(pp.id));
+                    const unlinkedInventory = inventory.filter(i => 
+                      ['PRODUCTO', 'FRITO', 'CRUDO'].includes(i.type) && 
+                      !products.some(p => p.outputInventoryId === i.id || p.name === i.name)
+                    );
+                    
+                    if (availableProducts.length === 0 && unlinkedInventory.length === 0) return null;
+                    
+                    return (
+                      <select
+                        className="bg-gray-50 border border-gray-200 text-xs font-bold px-3 py-1 rounded-full text-gray-500 outline-none max-w-[160px]"
+                        value=""
+                        onChange={(e) => { 
+                          if (e.target.value) {
+                            const val = e.target.value;
+                            if (val.startsWith('INV:')) {
+                              const invId = val.replace('INV:', '');
+                              const invItem = inventory.find(i => i.id === invId);
+                              if (invItem) {
+                                addProduct({
+                                  name: invItem.name,
+                                  recipeId: '',
+                                  unit: invItem.unit || 'kg',
+                                  outputInventoryId: invItem.id,
+                                  productionPointIds: [pp.id],
+                                  linePresets: {}
+                                });
+                              }
+                            } else {
+                              const pToUpdate = products.find(p => p.id === val);
+                              updateProduct(val, { productionPointIds: [...(pToUpdate.productionPointIds || []), pp.id] }); 
+                            }
+                          }
+                        }}
+                      >
+                        <option value="">+ Asignar producto...</option>
+                        {availableProducts.length > 0 && (
+                          <optgroup label="Ya configurados (Botones)">
+                            {availableProducts.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                        {unlinkedInventory.length > 0 && (
+                          <optgroup label="Nuevos desde Inventario">
+                            {unlinkedInventory.map((i) => (
+                              <option key={`INV:${i.id}`} value={`INV:${i.id}`}>{i.name}</option>
+                            ))}
+                          </optgroup>
+                        )}
+                      </select>
+                    );
+                  })()}
                 </div>
               </div>
             </div>
@@ -1268,11 +1305,14 @@ function UsersPanel() {
 }
 
 // ─── Panel: Presets de Producción por Producto ────────────────────────────────
-// Permite al admin editar los 5 botones de cantidad de cada producto por línea
+// Permite al admin editar los 5 botones de cantidad de cada producto por línea y crear nuevos
 function ProductsPresetsPanel() {
-  const { products, recipes, productionPoints, updateProduct } = useInventoryStore();
+  const { products, recipes, productionPoints, inventory, updateProduct, addProduct, deleteProduct } = useInventoryStore();
   const [editingKey, setEditingKey] = useState(null); // formato: 'prodId_ppId'
   const [draftPresets, setDraftPresets] = useState([]);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newProd, setNewProd] = useState({ name: '', recipeId: '', unit: 'kg', outputInventoryId: '' });
+
 
   const startEdit = (prod, ppId) => {
     setEditingKey(`${prod.id}_${ppId}`);
@@ -1296,12 +1336,45 @@ function ProductsPresetsPanel() {
 
   return (
     <div>
-      <div className="mb-5">
-        <h3 className="font-black text-chunky-dark text-lg">Botones de Cantidad por Producto</h3>
-        <p className="text-xs font-bold text-gray-400 mt-1">
-          Edita los 5 valores (en lotes). El botón mostrará lotes × rendimiento de receta = kg producidos.
-        </p>
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-5">
+        <div>
+          <h3 className="font-black text-chunky-dark text-lg">Botones de Cantidad por Producto</h3>
+          <p className="text-xs font-bold text-gray-400 mt-1">
+            Edita los 5 valores o crea un nuevo botón de producción.
+          </p>
+        </div>
+        <button className="bg-chunky-main text-white font-black py-2 px-6 rounded-full shadow-sm hover:bg-chunky-secondary transition-colors shrink-0" onClick={() => setShowAdd(!showAdd)}>
+          {showAdd ? 'Cancelar' : '+ Nuevo Botón Prod.'}
+        </button>
       </div>
+
+      {showAdd && (
+        <div className="bg-blue-50 rounded-2xl p-6 border-2 border-blue-200 mb-6 flex flex-wrap gap-4 items-end animate-fade-in">
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs font-bold text-gray-400 block mb-1">Nombre (ej. Chorizo Tradicional)</label>
+            <input className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newProd.name} onChange={(e) => setNewProd({...newProd, name: e.target.value})} />
+          </div>
+          <div className="flex-1 min-w-[200px]">
+             <label className="text-xs font-bold text-gray-400 block mb-1">Receta (Descuenta Insumos)</label>
+             <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newProd.recipeId} onChange={(e) => setNewProd({...newProd, recipeId: e.target.value})}>
+               <option value="">Sin receta (No descuenta)</option>
+               {recipes.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+             </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+             <label className="text-xs font-bold text-gray-400 block mb-1">Suma a Inventario</label>
+             <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newProd.outputInventoryId} onChange={(e) => setNewProd({...newProd, outputInventoryId: e.target.value})}>
+               <option value="">(Crear nuevo automáticamente)</option>
+               {inventory.filter(i => ['PRODUCTO', 'CRUDO', 'INSUMO'].includes(i.type)).map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+             </select>
+          </div>
+          <button className="bg-green-500 text-white font-black py-2 px-6 rounded-xl hover:bg-green-600 transition-colors w-full md:w-auto mt-2 md:mt-0 disabled:opacity-50"
+            disabled={!newProd.name}
+            onClick={() => { addProduct({ ...newProd, productionPointIds: [], linePresets: {} }); setShowAdd(false); setNewProd({ name: '', recipeId: '', unit: 'kg', outputInventoryId: '' }); }}>
+            Guardar
+          </button>
+        </div>
+      )}
 
       <div className="space-y-4">
         {products.map((prod) => {
@@ -1310,13 +1383,18 @@ function ProductsPresetsPanel() {
 
           return (
             <div key={prod.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-colors">
-              <div className="mb-4">
-                <h4 className="font-black text-chunky-dark">{prod.name}</h4>
-                {recipe && (
-                  <p className="text-xs font-bold text-gray-400 mt-0.5">
-                    Receta: <span className="text-chunky-dark">{recipe.name}</span> · Rinde {recipe.yieldQty} {recipe.yieldUnit}/lote
-                  </p>
-                )}
+              <div className="mb-4 flex justify-between items-start">
+                <div>
+                  <h4 className="font-black text-chunky-dark">{prod.name}</h4>
+                  {recipe && (
+                    <p className="text-xs font-bold text-gray-400 mt-0.5">
+                      Receta: <span className="text-chunky-dark">{recipe.name}</span> · Rinde {recipe.yieldQty} {recipe.yieldUnit}/lote
+                    </p>
+                  )}
+                </div>
+                <button className="w-8 h-8 flex items-center justify-center rounded-xl bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors shrink-0" onClick={() => deleteProduct(prod.id)} title="Eliminar Botón">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                </button>
               </div>
 
               {assignedPts.length === 0 ? (
@@ -1771,7 +1849,7 @@ function FritadoConfigPanel() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRecipe, setNewRecipe] = useState({ crudoId: '', fritoId: '', presets: [10, 20, 50, 100, 200], productionPointIds: [] });
 
-  const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO'].includes(i.type));
+  const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO'].includes(i.type));
 
   const handleStartEdit = (recipe) => {
     setEditingId(recipe.id);
