@@ -20,8 +20,9 @@ interface MockClosing {
   initials: string;
   shift: string;
   date: string;
-  theoretical: number;
-  real: number;
+  theoretical: number;  // Ventas POS calculadas (sin incluir gastos)
+  real: number;         // Cash + Transferencias entregado por el vendedor
+  expenses: number;     // Gastos declarados por el vendedor
   details: ClosingDetail[];
 }
 
@@ -33,7 +34,8 @@ const MOCK_CLOSINGS: MockClosing[] = [
     shift: 'AM',
     date: '2026-03-16',
     theoretical: 250000,
-    real: 250000,
+    real: 245000,
+    expenses: 5000,
     details: [
       { product: 'Empanada', sent: 100, returned: 0, sold: 100, unitPrice: 2500 },
       { product: 'Pastel de Pollo', sent: 50, returned: 10, sold: 40, unitPrice: 3000 },
@@ -47,7 +49,8 @@ const MOCK_CLOSINGS: MockClosing[] = [
     shift: 'AM',
     date: '2026-03-16',
     theoretical: 180000,
-    real: 175000,
+    real: 165000,
+    expenses: 10000,
     details: [
       { product: 'Empanada', sent: 80, returned: 5, sold: 75, unitPrice: 2500 },
       { product: 'Dedito de Queso', sent: 30, returned: 5, sold: 25, unitPrice: 2000 },
@@ -61,7 +64,8 @@ const MOCK_CLOSINGS: MockClosing[] = [
     shift: 'PM',
     date: '2026-03-15',
     theoretical: 320000,
-    real: 325000,
+    real: 320000,
+    expenses: 5000,
     details: [
       { product: 'Empanada', sent: 120, returned: 10, sold: 110, unitPrice: 2500 },
       { product: 'Chorizo', sent: 40, returned: 0, sold: 40, unitPrice: 3500 },
@@ -75,7 +79,8 @@ const MOCK_CLOSINGS: MockClosing[] = [
     shift: 'AM',
     date: '2026-03-16',
     theoretical: 450000,
-    real: 450000,
+    real: 440000,
+    expenses: 10000,
     details: [
       { product: 'Empanada', sent: 200, returned: 0, sold: 200, unitPrice: 2500 },
       { product: 'Pastel de Pollo', sent: 80, returned: 20, sold: 60, unitPrice: 3000 },
@@ -98,8 +103,13 @@ export const AdminFinancesTab = () => {
     return true;
   });
 
-  // ─── Render helpers ─────────────────────────────────────
-  const getDiff = (c: MockClosing) => c.real - c.theoretical;
+  // ─── Render helpers ───
+  // El Teórico (APP) = ventas POS + gastos declarados del vendedor
+  // Esto es lo que debería cuadrar contra el effective + transfer entregado
+  const getTheoreticalWithExpenses = (c: MockClosing) => c.theoretical + (c.expenses ?? 0);
+  
+  // El Real = cash + transfer (sin gastos, ya que los gastos ya se sumaron al teórico)
+  const getDiff = (c: MockClosing) => c.real - getTheoreticalWithExpenses(c);
 
   const renderBadge = (c: MockClosing) => {
     const diff = getDiff(c);
@@ -195,14 +205,22 @@ export const AdminFinancesTab = () => {
                 </div>
 
                 {/* ─── Comparison Block ────────────────── */}
-                <div className="bg-gray-50 rounded-2xl border border-gray-100 grid grid-cols-2 divide-x divide-gray-200 mb-4">
-                  <div className="py-5 px-6 text-center">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
-                    <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
-                  </div>
-                  <div className="py-5 px-6 text-center">
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
-                    <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
+                <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4">
+                  <div className="grid grid-cols-2 divide-x divide-gray-200">
+                    <div className="py-5 px-6 text-center">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
+                      <p className="text-2xl font-black text-gray-800">{fmt(getTheoreticalWithExpenses(closing))}</p>
+                      {(closing.expenses ?? 0) > 0 && (
+                        <p className="text-[10px] font-bold text-blue-400 mt-1">
+                          Ventas {fmt(closing.theoretical)} + Gastos {fmt(closing.expenses ?? 0)}
+                        </p>
+                      )}
+                    </div>
+                    <div className="py-5 px-6 text-center">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
+                      <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">Efectivo + Transferencias</p>
+                    </div>
                   </div>
                 </div>
 

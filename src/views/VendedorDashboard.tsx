@@ -309,7 +309,7 @@ export const VendedorDashboard = () => {
                <div className="text-center">
                   <span className="block text-gray-400 font-bold text-xs sm:text-sm tracking-widest uppercase mb-1">Total Venta Neta</span>
                   <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tighter">
-                    {formatMoney((parseInt(cash)||0) + (parseInt(transfer)||0) - (parseInt(expenses)||0))}
+                    {formatMoney((parseInt(cash)||0) + (parseInt(transfer)||0))}
                   </p>
                </div>
             </div>
