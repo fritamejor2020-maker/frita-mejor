@@ -62,7 +62,7 @@ export function LoginView() {
               </div>
               <div className="relative">
                 <input
-                  type="text"
+                  type="password"
                   placeholder=""
                   className="w-full bg-white border-2 border-gray-100 rounded-[28px] py-5 px-6 font-black text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors text-center"
                   value={password}

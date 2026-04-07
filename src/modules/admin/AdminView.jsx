@@ -5,7 +5,7 @@ import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
-import { AdminFinancesTab } from '../../components/admin/AdminFinancesTab';
+import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab } from '../../components/admin/AdminFinancesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
 import { AdminUsersTab } from '../../components/admin/AdminUsersTab';
 import { AdminVehiclesTab } from '../../components/admin/AdminVehiclesTab';
@@ -1947,6 +1947,8 @@ export function AdminView() {
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
     ],
     FINANZAS: [
+      { id: 'INGRESOS',   label: '💰 Ingresos' },
+      { id: 'EGRESOS',    label: '💸 Egresos' },
       { id: 'FUENTES_ING',label: '💵 Fuentes de Ingreso' },
       { id: 'PROVEEDORES',label: '🤝 Proveedores (Gastos)' },
     ],
@@ -2055,6 +2057,8 @@ export function AdminView() {
         { activeTab === 'CLIENTES'  && <AdminCustomerDiscountsTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
+        { activeTab === 'INGRESOS' && <AdminIncomesTab /> }
+        { activeTab === 'EGRESOS' && <AdminExpensesTab /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }
         { activeTab === 'EQUIPO' && <AdminUsersTab /> }
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }

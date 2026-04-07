@@ -71,9 +71,6 @@ export const useLogisticsStore = create(
     console.log("Fetched pending requests locally:", pendingRequests.length);
   },
 
-  /**
-   * Acción Crítica 'Dejador'
-   */
   commitRestock: async (requestId) => {
     // Local Mock: remove from pendingRequests and add to completedRequests
     const { pendingRequests, completedRequests } = get();
@@ -83,6 +80,15 @@ export const useLogisticsStore = create(
     set({
       pendingRequests: pendingRequests.filter(req => req.id !== requestId),
       completedRequests: [{ ...req, status: 'completed', completed_at: new Date().toISOString() }, ...completedRequests]
+    });
+  },
+
+  updatePendingRequest: (requestId, newPayload) => {
+    const { pendingRequests } = get();
+    set({
+      pendingRequests: pendingRequests.map(req => 
+        req.id === requestId ? { ...req, items_payload: newPayload } : req
+      )
     });
   },
 

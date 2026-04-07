@@ -5,9 +5,10 @@ interface NumberSelectorGroupProps {
   value: number;
   onChange: (val: number) => void;
   allowManual?: boolean;
+  themeClass?: string;
 }
 
-export function NumberSelectorGroup({ presets, value, onChange, allowManual = true }: NumberSelectorGroupProps) {
+export function NumberSelectorGroup({ presets, value, onChange, allowManual = true, themeClass = 'vendor' }: NumberSelectorGroupProps) {
   const [isManualOpen, setIsManualOpen] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -21,6 +22,20 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
   // Si el valor actual no está en presets y es mayor a 0, tratamos de mantener el input manual abierto si tiene foco, o simplemente mostrar su valor.
   const isCustomValue = value > 0 && !presets.includes(value);
 
+  const getThemeClasses = (isActive: boolean) => {
+    if (themeClass === 'carga' || themeClass === 'red') {
+      return isActive ? 'bg-red-500 text-white border-red-500' : 'bg-transparent border-red-500 text-red-500 hover:bg-red-50';
+    }
+    if (themeClass === 'recibir' || themeClass === 'indigo') {
+      return isActive ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-transparent border-indigo-600 text-indigo-600 hover:bg-indigo-50';
+    }
+    if (themeClass === 'amber') {
+       return isActive ? 'bg-amber-500 text-white border-amber-500' : 'bg-transparent border-amber-500 text-amber-500 hover:bg-amber-50';
+    }
+    // vendor defaults (red tones matching image 2)
+    return isActive ? 'bg-[#FF4040] text-white border-[#FF4040]' : 'bg-transparent border-[#FF4040] text-[#FF4040] hover:bg-red-50';
+  };
+
   return (
     <div className="flex gap-2 items-center pr-2 flex-wrap">
       {presets.map(qty => {
@@ -32,11 +47,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
               onChange(isActive ? 0 : qty); // Toggle zero si vuelven a hacer clic
               setIsManualOpen(false);
             }}
-            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 font-black text-sm sm:text-base flex items-center justify-center transition-all duration-300 active:scale-90 shadow-sm hover:shadow-chunky-lg hover:-translate-y-0.5
-              ${isActive 
-                ? 'bg-[#FFB700] text-white border-[#FFB700]' 
-                : 'bg-transparent border-[#FF4040] text-[#FF4040] hover:bg-red-50'
-              }`}
+            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 font-black text-sm sm:text-base flex items-center justify-center transition-all duration-300 active:scale-90 shadow-sm hover:shadow-chunky-lg hover:-translate-y-0.5 ${getThemeClasses(isActive)}`}
           >
             {qty}
           </button>

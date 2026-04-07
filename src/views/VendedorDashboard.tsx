@@ -198,7 +198,7 @@ export const VendedorDashboard = () => {
                {products.map(p => {
                 const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
               return (
-                <div key={p.id} className="bg-amber-100/50 rounded-full flex items-center justify-between p-2 shadow-sm border border-amber-200/50">
+                <div key={p.id} className="bg-white rounded-full flex items-center justify-between p-2 shadow-sm border border-gray-100">
                   <div className="bg-[#FF4040] text-white font-black text-sm sm:text-base px-6 py-3 rounded-full flex-shrink-0 min-w-[140px] text-center shadow-sm">
                     {p.name}
                   </div>

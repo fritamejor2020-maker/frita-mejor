@@ -7,7 +7,7 @@ import { useVehicleStore } from '../store/useVehicleStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 
 export const DejadorDashboard = () => {
-  const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception } = useLogisticsStore();
+  const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
   const { products, loadTemplates, addLoadTemplate, posSettings } = useInventoryStore();
   const { signOut } = useAuthStore();
   const getActiveTricycleAbbreviations = useVehicleStore((state) => state.getActiveTricycleAbbreviations);
@@ -23,6 +23,15 @@ export const DejadorDashboard = () => {
   
   // Custom states for manual input toggles
   const [manualInputOpen, setManualInputOpen] = useState<string | null>(null);
+  
+  const [editingReqId, setEditingReqId] = useState<string | null>(null);
+  const [editPayload, setEditPayload] = useState<any[]>([]);
+
+  const handleUpdateEditQty = (idx: number, delta: number) => {
+    const newPayload = [...editPayload];
+    newPayload[idx] = { ...newPayload[idx], qty: Math.max(0, newPayload[idx].qty + delta) };
+    setEditPayload(newPayload);
+  };
   
   const presets = posSettings?.restockPresets || [5, 10, 15, 20];
   const dejadorTemplates = loadTemplates?.filter((t: any) => t.role === 'DEJADOR') || [];
@@ -178,7 +187,7 @@ export const DejadorDashboard = () => {
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
             
-            <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar px-1 flex-1">
+            <div className="flex gap-3 overflow-x-auto py-2 no-scrollbar px-2 items-center flex-1">
               {vehicles.map((v: string) => (
                 <button
                   key={v}
@@ -217,20 +226,19 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: CARGA INICIAL & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-fade-in">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 animate-fade-in mb-8">
             {products.map((p: any) => (
-              <div key={p.id} className="bg-amber-100/60 rounded-[32px] overflow-hidden flex flex-col shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-chunky-lg">
+              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-full flex items-center justify-between p-2 shadow-sm border`}>
                 
-                {/* Red Header of the Pill */}
-                <div className={`${getThemeClass('bg')} py-4 px-6 flex justify-center`}>
-                  <span className="text-white font-black text-center text-lg">{p.name || 'Producto'}</span>
+                <div className={`${getThemeClass('bg')} text-white font-black text-sm sm:text-base px-6 py-3 rounded-full flex-shrink-0 min-w-[140px] text-center shadow-sm max-w-[140px] sm:max-w-[180px] truncate`}>
+                  {p.name || 'Producto'}
                 </div>
 
-                {/* Body controls con Componente Numérico Unificado */}
-                <div className="py-6 px-4 flex justify-center items-center gap-2 lg:gap-3 flex-wrap bg-white h-full">
+                <div className="flex gap-2 items-center pr-2">
                    <NumberSelectorGroup
                      presets={presets}
                      value={loadQuantities[p.id] || 0}
+                     themeClass={activeTab}
                      onChange={(val) => {
                        handleQtyClick(p.id, val);
                        setActivePreset(null);
@@ -272,10 +280,18 @@ export const DejadorDashboard = () => {
 
                         <div className="flex gap-3 w-full sm:w-auto">
                            <button 
-                             className="flex-1 sm:flex-none bg-gray-100 text-gray-600 font-bold px-6 py-3 rounded-full text-base border-2 border-transparent hover:border-gray-200 transition-colors active:scale-95"
-                             onClick={() => alert('Modificar vista proxima a implementar')}
+                             className={`flex-1 sm:flex-none font-bold px-6 py-3 rounded-full text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
+                             onClick={() => {
+                               if (editingReqId === req.id) {
+                                 updatePendingRequest(req.id, editPayload);
+                                 setEditingReqId(null);
+                               } else {
+                                 setEditingReqId(req.id);
+                                 setEditPayload([...req.items_payload]);
+                               }
+                             }}
                            >
-                             Modificar
+                             {editingReqId === req.id ? 'Guardar' : 'Modificar'}
                            </button>
                            <button 
                              onClick={() => handleCommit(req.id, req.requester_point_id)}
@@ -290,16 +306,31 @@ export const DejadorDashboard = () => {
                       <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Artículos solicitados:</h4>
                         <div className="flex flex-wrap gap-3">
-                           {req.items_payload?.map((item: any, idx: number) => (
-                             <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                               <div className="bg-red-500 text-white font-bold text-sm px-4 py-2.5 flex items-center whitespace-nowrap">
-                                 {item.name}
+                           {editingReqId === req.id ? (
+                             editPayload.map((item: any, idx: number) => (
+                               <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 bg-white">
+                                 <div className="bg-red-500 text-white font-bold text-sm px-4 py-2.5 flex items-center whitespace-nowrap">
+                                   {item.name}
+                                 </div>
+                                 <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
+                                 <div className="text-gray-900 font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center">
+                                   {item.qty}
+                                 </div>
+                                 <button onClick={() => handleUpdateEditQty(idx, 1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">+</button>
                                </div>
-                               <div className="bg-white text-gray-900 font-black text-base px-5 py-2.5 flex items-center min-w-[48px] justify-center border-y border-r border-gray-200">
-                                 {item.qty}
+                             ))
+                           ) : (
+                             req.items_payload?.map((item: any, idx: number) => (
+                               <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                                 <div className="bg-red-500 text-white font-bold text-sm px-4 py-2.5 flex items-center whitespace-nowrap">
+                                   {item.name}
+                                 </div>
+                                 <div className="bg-white text-gray-900 font-black text-base px-5 py-2.5 flex items-center min-w-[48px] justify-center border-y border-r border-gray-200">
+                                   {item.qty}
+                                 </div>
                                </div>
-                             </div>
-                           ))}
+                             ))
+                           )}
                         </div>
                       </div>
                     </div>
