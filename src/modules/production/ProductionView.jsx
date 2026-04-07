@@ -10,31 +10,31 @@ function SelectProductionPoint({ onSelect, signOut }) {
   const active = productionPoints.filter((p) => p.active);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6" style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-lg">
-        <div className="bg-white rounded-[40px] p-8 shadow-sm mb-6">
-          <div className="text-center mb-8">
-            <img src="/logo.png" alt="Frita Mejor" className="w-40 mx-auto object-contain mb-4" />
-            <h1 className="text-3xl font-black text-chunky-dark">Línea de Producción</h1>
-            <p className="text-gray-400 font-bold mt-2">Selecciona tu punto de trabajo</p>
+        <div className="bg-white rounded-[32px] sm:rounded-[40px] p-5 sm:p-8 shadow-sm mb-4 sm:mb-6">
+          <div className="text-center mb-5 sm:mb-8">
+            <img src="/logo.png" alt="Frita Mejor" className="w-28 sm:w-40 mx-auto object-contain mb-4" />
+            <h1 className="text-2xl sm:text-3xl font-black text-chunky-dark">Línea de Producción</h1>
+            <p className="text-gray-400 font-bold mt-2 text-sm">Selecciona tu punto de trabajo</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {active.map((pp) => (
               <button
                 key={pp.id}
-                className="w-full border-2 border-gray-100 rounded-3xl p-5 text-left hover:border-chunky-secondary hover:shadow-sm transition-all active:scale-[0.98] group"
+                className="w-full border-2 border-gray-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-left hover:border-chunky-secondary hover:shadow-sm transition-all active:scale-[0.98] group"
                 onClick={() => onSelect(pp)}
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 bg-yellow-50 rounded-2xl flex items-center justify-center text-2xl border border-yellow-100 shrink-0">
+                <div className="flex items-center gap-3 sm:gap-4">
+                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-yellow-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-yellow-100 shrink-0">
                     🏭
                   </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-black text-chunky-dark text-lg leading-tight group-hover:text-chunky-dark">{pp.name}</h3>
-                    <p className="text-gray-400 font-bold text-sm mt-0.5">{pp.location}</p>
+                    <h3 className="font-black text-chunky-dark text-base sm:text-lg leading-tight group-hover:text-chunky-dark">{pp.name}</h3>
+                    <p className="text-gray-400 font-bold text-xs sm:text-sm mt-0.5">{pp.location}</p>
                   </div>
-                  <svg className="text-gray-300 group-hover:text-chunky-secondary transition-colors shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                  <svg className="text-gray-300 group-hover:text-chunky-secondary transition-colors shrink-0" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                 </div>
               </button>
             ))}
@@ -137,11 +137,11 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
       : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm hover:shadow-md';
 
   return (
-    <div className={`rounded-3xl p-7 flex flex-col gap-5 transition-all ${cardClass}`}>
+    <div className={`rounded-2xl sm:rounded-3xl p-4 sm:p-7 flex flex-col gap-3 sm:gap-5 transition-all ${cardClass}`}>
       {/* Cabecera */}
       <div className="flex justify-between items-start">
         <div className="flex-1 min-w-0">
-          <h3 className="font-black text-chunky-dark text-xl leading-tight truncate">{prod.name}</h3>
+          <h3 className="font-black text-chunky-dark text-base sm:text-xl leading-tight truncate">{prod.name}</h3>
           {!prod.stockOk && !wasteMode ? (
             <div className="mt-1">
               <span className="text-xs font-bold text-red-500 block">⚠️ Insumos faltantes:</span>
@@ -152,12 +152,12 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
               ))}
             </div>
           ) : (
-            <span className="text-sm font-bold text-green-500 mt-1 block">✓ Insumos disponibles</span>
+            <span className="text-xs sm:text-sm font-bold text-green-500 mt-1 block">✓ Insumos disponibles</span>
           )}
         </div>
         <div className="text-right ml-3 shrink-0">
-          <span className="text-2xl font-black text-chunky-dark">{prod.currentStock}</span>
-          <span className="text-sm font-bold text-gray-400 ml-1">{prod.unit}</span>
+          <span className="text-lg sm:text-2xl font-black text-chunky-dark">{prod.currentStock}</span>
+          <span className="text-xs sm:text-sm font-bold text-gray-400 ml-1">{prod.unit}</span>
           <p className="text-xs text-gray-300 font-bold">en bodega</p>
         </div>
       </div>
@@ -172,14 +172,14 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
       <button
         disabled={isDisabled}
         onClick={() => onProduce(prod, bigPreset)}
-        className={`w-full rounded-2xl py-6 flex flex-col items-center justify-center gap-1 font-black transition-all active:scale-[0.97] select-none ${btnBase}`}
+        className={`w-full rounded-xl sm:rounded-2xl py-4 sm:py-6 flex flex-col items-center justify-center gap-1 font-black transition-all active:scale-[0.97] select-none ${btnBase}`}
       >
-        <span className="text-3xl leading-none">{bigAmount % 1 === 0 ? bigAmount : bigAmount.toFixed(1)}</span>
+        <span className="text-2xl sm:text-3xl leading-none">{bigAmount % 1 === 0 ? bigAmount : bigAmount.toFixed(1)}</span>
         <span className="text-sm font-bold opacity-80">{yieldUnit}</span>
       </button>
 
       {/* ── 4 botones secundarios (pequeños) ── */}
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
         {smallPresets.map((batches, idx) => {
           const amount = batches * yieldQty;
           return (
@@ -187,9 +187,9 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
               key={idx}
               disabled={isDisabled}
               onClick={() => onProduce(prod, batches)}
-              className={`rounded-2xl py-3 px-1 flex flex-col items-center justify-center gap-0.5 font-black transition-all active:scale-95 select-none ${btnBase}`}
+              className={`rounded-xl sm:rounded-2xl py-2 sm:py-3 px-1 flex flex-col items-center justify-center gap-0.5 font-black transition-all active:scale-95 select-none ${btnBase}`}
             >
-              <span className="text-base leading-none">{amount % 1 === 0 ? amount : amount.toFixed(1)}</span>
+              <span className="text-sm sm:text-base leading-none">{amount % 1 === 0 ? amount : amount.toFixed(1)}</span>
               <span className="text-[10px] font-bold opacity-80">{yieldUnit}</span>
             </button>
           );
@@ -199,7 +199,7 @@ function ProductCard({ prod, productionPoint, wasteMode, onProduce, onManual }) 
       {/* ── Botón Manual ── */}
       <button
         onClick={() => onManual(prod)}
-        className="w-full border-2 border-dashed border-gray-200 rounded-2xl py-3 flex items-center justify-center gap-2 text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-all active:scale-[0.98]"
+        className="w-full border-2 border-dashed border-gray-200 rounded-xl sm:rounded-2xl py-2.5 sm:py-3 flex items-center justify-center gap-2 text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-all active:scale-[0.98]"
       >
         ✏️ MANUAL
       </button>
@@ -327,7 +327,7 @@ function ProductionPanel({ productionPoint, onBack }) {
             <p className="text-gray-400 font-bold text-sm">El Admin puede asignar productos a este punto de producción.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 max-w-7xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4 max-w-7xl mx-auto">
             {enriched.map((prod) => (
               <ProductCard
                 key={prod.id}

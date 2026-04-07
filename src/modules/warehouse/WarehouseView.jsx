@@ -16,34 +16,34 @@ function SelectWarehouse({ onSelect, signOut }) {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'var(--color-bg)' }}>
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6" style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-lg">
-        <div className="bg-white rounded-[40px] p-8 shadow-sm mb-6">
-          <div className="text-center mb-8">
-            <img src="/logo.png" alt="Frita Mejor" className="w-40 mx-auto object-contain mb-4" />
-            <h1 className="text-3xl font-black text-chunky-dark">Selecciona Bodega</h1>
-            <p className="text-gray-400 font-bold mt-2">¿Desde dónde vas a trabajar?</p>
+        <div className="bg-white rounded-[32px] sm:rounded-[40px] p-5 sm:p-8 shadow-sm mb-4 sm:mb-6">
+          <div className="text-center mb-5 sm:mb-8">
+            <img src="/logo.png" alt="Frita Mejor" className="w-28 sm:w-40 mx-auto object-contain mb-4" />
+            <h1 className="text-2xl sm:text-3xl font-black text-chunky-dark">Selecciona Bodega</h1>
+            <p className="text-gray-400 font-bold mt-2 text-sm">¿Desde dónde vas a trabajar?</p>
           </div>
 
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
             {active.map((w) => {
               const { total, low } = getStats(w.id);
               return (
                 <button key={w.id}
-                  className="w-full border-2 border-gray-100 rounded-3xl p-5 text-left hover:border-chunky-secondary hover:shadow-sm transition-all active:scale-[0.98] group"
+                  className="w-full border-2 border-gray-100 rounded-2xl sm:rounded-3xl p-4 sm:p-5 text-left hover:border-chunky-secondary hover:shadow-sm transition-all active:scale-[0.98] group"
                   onClick={() => onSelect(w)}
                 >
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-blue-50 rounded-2xl flex items-center justify-center text-2xl border border-blue-100 shrink-0">📦</div>
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-50 rounded-xl sm:rounded-2xl flex items-center justify-center text-xl sm:text-2xl border border-blue-100 shrink-0">📦</div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-black text-chunky-dark text-lg leading-tight">{w.name}</h3>
-                      <p className="text-gray-400 font-bold text-sm mt-0.5">{w.location}</p>
+                      <h3 className="font-black text-chunky-dark text-base sm:text-lg leading-tight">{w.name}</h3>
+                      <p className="text-gray-400 font-bold text-xs sm:text-sm mt-0.5">{w.location}</p>
                       <div className="flex gap-2 mt-1">
                         <span className="text-xs font-bold bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full">{total} ítems</span>
                         {low > 0 && <span className="text-xs font-bold bg-red-50 text-red-400 px-2 py-0.5 rounded-full">⚠️ {low} bajo stock</span>}
                       </div>
                     </div>
-                    <svg className="text-gray-300 group-hover:text-chunky-secondary shrink-0" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
+                    <svg className="text-gray-300 group-hover:text-chunky-secondary shrink-0" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="9 18 15 12 9 6"/></svg>
                   </div>
                 </button>
               );
@@ -228,8 +228,8 @@ function PosDispatch({ warehouse }) {
       {/* Pantalla de Éxito */}
       {confirmed && (
         <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-green-400" style={{ animation: 'fadeIn 0.2s ease' }}>
-          <span className="text-8xl mb-6">✅</span>
-          <h2 className="text-4xl font-black text-white text-center px-4">¡Movimiento Registrado!</h2>
+          <span className="text-6xl sm:text-8xl mb-4 sm:mb-6">✅</span>
+          <h2 className="text-2xl sm:text-4xl font-black text-white text-center px-4">¡Movimiento Registrado!</h2>
           <p className="text-white/80 font-bold mt-2 text-center">{dispatchedCount} ítem(s) procesados</p>
         </div>
       )}
@@ -237,8 +237,8 @@ function PosDispatch({ warehouse }) {
       {/* Modal Transferencia */}
       {showTransferModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowTransferModal(false)}>
-          <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
-            <h2 className="text-2xl font-black text-chunky-dark mb-1">Transferir a</h2>
+          <div className="bg-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
+            <h2 className="text-xl sm:text-2xl font-black text-chunky-dark mb-1">Transferir a</h2>
             <p className="text-gray-400 font-bold text-sm mb-5">Selecciona la bodega destino</p>
 
             <select 
@@ -269,9 +269,9 @@ function PosDispatch({ warehouse }) {
       {/* Modal Despacho (con detalles opcionales) */}
       {showDispatchModal && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowDispatchModal(false)}>
-          <div className="bg-white rounded-[32px] p-8 w-full max-w-sm shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
+          <div className="bg-white rounded-[28px] sm:rounded-[32px] p-5 sm:p-8 w-full max-w-sm shadow-2xl space-y-4" onClick={e => e.stopPropagation()}>
             <div>
-              <h2 className="text-2xl font-black text-chunky-dark mb-1">Detalles de Despacho</h2>
+              <h2 className="text-xl sm:text-2xl font-black text-chunky-dark mb-1">Detalles de Despacho</h2>
               <p className="text-gray-400 font-bold text-sm">Ambos campos son opcionales.</p>
             </div>
 
@@ -310,7 +310,7 @@ function PosDispatch({ warehouse }) {
       {cart.length === 0 ? (
         /* ── Estado vacío: pantalla de escaneo ── */
         <div className="flex-1 flex flex-col items-center justify-center p-8 text-center">
-          <h2 className="text-2xl font-black text-chunky-dark mb-1">Listo para despachar</h2>
+          <h2 className="text-xl sm:text-2xl font-black text-chunky-dark mb-1">Listo para despachar</h2>
           <p className="text-gray-400 font-bold text-sm mb-6">Usa el lector de barras o la cámara</p>
 
           {/* Barra unificada: escaneo + nombre */}
