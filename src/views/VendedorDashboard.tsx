@@ -138,10 +138,10 @@ export const VendedorDashboard = () => {
     <div className="min-h-screen bg-[#FFD56B] pb-32 font-sans w-full flex flex-col">
       {/* HEADER */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto pt-8 pb-6 px-6 flex justify-between items-center">
+        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 flex justify-between items-center">
           <div>
-            <h1 className="text-4xl font-black text-gray-900 tracking-tight leading-none">{getHeaderTitle()}</h1>
-            <p className="text-sm font-bold text-gray-400 mt-2">{formattedDate}</p>
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 tracking-tight leading-none">{getHeaderTitle()}</h1>
+            <p className="text-xs sm:text-sm font-bold text-gray-400 mt-1 sm:mt-2">{formattedDate}</p>
           </div>
           
           <button 
@@ -157,14 +157,14 @@ export const VendedorDashboard = () => {
         
         {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
             {products.map(p => (
               <button 
                 key={p.id}
                 onClick={() => addToCart(p, 1)}
-                className="bg-white p-6 rounded-[32px] shadow-sm border border-transparent hover:border-white transition-all duration-300 active:scale-95 flex flex-col items-start justify-center text-left min-h-[140px] hover:-translate-y-1 hover:shadow-chunky-lg group"
+                className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-transparent hover:border-white transition-all duration-300 active:scale-95 flex flex-col items-start justify-center text-left min-h-[120px] sm:min-h-[140px] hover:-translate-y-1 hover:shadow-chunky-lg group"
               >
-                <span className="font-black text-gray-900 text-lg sm:text-xl leading-tight mb-1 group-hover:text-[#FF4040] transition-colors">{p.name}</span>
+                <span className="font-black text-gray-900 text-base sm:text-xl leading-tight mb-1 group-hover:text-[#FF4040] transition-colors">{p.name}</span>
                 <span className="text-[#FF4040] font-black text-sm sm:text-base">{formatMoney(p.price)}</span>
               </button>
             ))}
@@ -194,16 +194,16 @@ export const VendedorDashboard = () => {
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                {products.map(p => {
                 const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
               return (
-                <div key={p.id} className="bg-white rounded-full flex items-center justify-between p-2 shadow-sm border border-gray-100">
-                  <div className="bg-[#FF4040] text-white font-black text-sm sm:text-base px-6 py-3 rounded-full flex-shrink-0 min-w-[140px] text-center shadow-sm">
+                <div key={p.id} className="bg-white rounded-3xl sm:rounded-full flex flex-col sm:flex-row sm:items-center justify-between p-2 shadow-sm border border-gray-100 gap-2 sm:gap-0">
+                  <div className="bg-[#FF4040] text-white font-black text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 rounded-full sm:min-w-[140px] text-center shadow-sm">
                     {p.name}
                   </div>
                   
-                  <div className="flex gap-2 items-center pr-2">
+                  <div className="flex gap-2 items-center sm:pr-2 justify-center">
                      <NumberSelectorGroup
                        presets={presets}
                        value={currentQty}
@@ -218,10 +218,10 @@ export const VendedorDashboard = () => {
             })}
             </div>
              {restockCart.some((i: any) => i.qty > 0) && (
-              <div className="md:col-span-2 flex justify-center mt-8">
+              <div className="md:col-span-2 flex justify-center mt-6 sm:mt-8">
                 <button 
                   onClick={handleSendRestock}
-                  className="w-full max-w-2xl bg-[#FF4040] text-white font-black text-xl lg:text-3xl py-6 rounded-full shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95"
+                  className="w-full max-w-2xl bg-[#FF4040] text-white font-black text-lg lg:text-2xl py-4 sm:py-5 rounded-full shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95"
                 >
                   Enviar Solicitud
                 </button>
@@ -232,28 +232,28 @@ export const VendedorDashboard = () => {
 
         {/* SUBVISTA: CIERRE CAJA */}
         {activeTab === 'close' && (
-          <div className="max-w-3xl mx-auto space-y-6">
+          <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
             
             {/* INFORMACIÓN DE JORNADA (Solo lectura) */}
-            <div className="bg-amber-100/50 rounded-[40px] p-6 sm:p-8 border border-amber-200/50">
-              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Información de Jornada</h4>
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
-                 <div className="flex-1 bg-white rounded-xl shadow-sm px-6 py-4 flex items-center font-black text-gray-800 text-lg">
+            <div className="bg-amber-100/50 rounded-3xl sm:rounded-[40px] p-5 sm:p-8 border border-amber-200/50">
+              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Información de Jornada</h4>
+              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-2 sm:mb-4">
+                 <div className="flex-1 bg-white rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex items-center font-black text-gray-800 text-base sm:text-lg">
                     {pointId || 'Punto no asignado'}
                  </div>
-                 <div className="flex-1 bg-white rounded-xl shadow-sm px-6 py-4 font-bold text-gray-500 flex items-center text-lg">
+                 <div className="flex-1 bg-white rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 font-bold text-gray-500 flex items-center text-base sm:text-lg">
                     {responsibleName || 'Vendedor no asignado'}
                  </div>
               </div>
             </div>
 
             {/* FORMULARIO FINANCIERO */}
-            <div className="bg-white rounded-[40px] p-6 sm:p-10 shadow-sm border border-white">
+            <div className="bg-white rounded-3xl sm:rounded-[40px] p-5 sm:p-10 shadow-sm border border-white">
                
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mb-10">
+               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-10">
                  {/* EFECTIVO */}
                  <div className="relative pt-6">
-                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-4 py-1.5 rounded-t-lg tracking-widest flex items-center gap-2">
+                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
                        <DollarSign size={14} strokeWidth={3} /> EFECTIVO
                     </div>
                     <input 
@@ -261,13 +261,13 @@ export const VendedorDashboard = () => {
                       value={cash}
                       onChange={(e) => setCash(e.target.value)}
                       placeholder="$ 0"
-                      className="w-full bg-white border-2 border-gray-100 rounded-[28px] py-5 px-6 font-black text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
+                      className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
                     />
                  </div>
 
                  {/* TRANSFERENCIAS */}
                  <div className="relative pt-6">
-                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-4 py-1.5 rounded-t-lg tracking-widest flex items-center gap-2">
+                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
                        <Zap size={14} strokeWidth={3} fill="currentColor" /> TRANSFERENCIAS
                     </div>
                     <input 
@@ -275,40 +275,40 @@ export const VendedorDashboard = () => {
                       value={transfer}
                       onChange={(e) => setTransfer(e.target.value)}
                       placeholder="$ 0"
-                      className="w-full bg-white border-2 border-gray-100 rounded-[28px] py-5 px-6 font-black text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
+                      className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
                     />
                  </div>
                </div>
 
                {/* GASTOS */}
-               <div className="relative pt-6 mb-10">
-                  <div className="absolute top-0 left-4 bg-gray-900 text-white font-black text-[10px] sm:text-xs px-4 py-1.5 rounded-t-lg tracking-widest">
+               <div className="relative pt-6 mb-8 sm:mb-10">
+                  <div className="absolute top-0 left-4 bg-gray-900 text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest">
                      GASTOS / SALIDAS
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-4 bg-gray-50 border-2 border-gray-100 rounded-[28px] p-2">
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-gray-50 border-2 border-gray-100 rounded-[24px] sm:rounded-[28px] p-2">
                      <input 
                        type="number" 
                        value={expenses}
                        onChange={(e) => setExpenses(e.target.value)}
                        placeholder="$ Valor"
-                       className="w-full sm:w-1/3 bg-white rounded-3xl py-4 px-6 font-black text-xl text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none"
+                       className="w-full sm:w-1/3 bg-white rounded-[20px] sm:rounded-3xl py-3 px-4 sm:py-4 sm:px-6 font-black text-lg sm:text-xl text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none"
                      />
                      <input 
                        type="text" 
                        value={expensesDesc}
                        onChange={(e) => setExpensesDesc(e.target.value)}
                        placeholder="Descripción del gasto..."
-                       className="w-full sm:w-2/3 bg-transparent py-4 px-4 font-bold text-gray-500 text-base outline-none"
+                       className="w-full sm:w-2/3 bg-transparent py-3 px-4 sm:py-4 sm:px-4 font-bold text-gray-500 text-sm sm:text-base outline-none"
                      />
                   </div>
                </div>
                
-               <hr className="border-gray-100 border-dashed border-2 mb-8" />
+               <hr className="border-gray-100 border-dashed border-2 mb-6 sm:mb-8" />
 
                {/* TOTALIZADOR */}
                <div className="text-center">
-                  <span className="block text-gray-400 font-bold text-sm tracking-widest uppercase mb-1">Total Venta Neta</span>
-                  <p className="text-5xl sm:text-6xl font-black text-gray-900 tracking-tighter">
+                  <span className="block text-gray-400 font-bold text-xs sm:text-sm tracking-widest uppercase mb-1">Total Venta Neta</span>
+                  <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tighter">
                     {formatMoney((parseInt(cash)||0) + (parseInt(transfer)||0) - (parseInt(expenses)||0))}
                   </p>
                </div>
@@ -316,9 +316,11 @@ export const VendedorDashboard = () => {
 
             <button 
               onClick={handleCloseShift}
-              className="w-full flex items-center justify-center gap-3 bg-[#FF4040] text-white font-black text-xl sm:text-2xl py-6 rounded-[32px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95"
+              className="w-full flex items-center justify-center gap-2 sm:gap-3 bg-[#FF4040] text-white font-black text-lg sm:text-2xl py-4 sm:py-6 rounded-[24px] sm:rounded-[32px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95"
             >
-              <Check size={28} strokeWidth={3} /> CERRAR JORNADA
+              <Check size={24} strokeWidth={3} className="sm:hidden" /> 
+              <Check size={28} strokeWidth={3} className="hidden sm:block" /> 
+              CERRAR JORNADA
             </button>
 
           </div>

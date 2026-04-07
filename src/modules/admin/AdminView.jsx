@@ -1970,24 +1970,24 @@ export function AdminView() {
   const lowStockCount = inventory.filter((i) => i.qty <= i.alert).length;
 
   return (
-    <div className="min-h-screen p-4 md:p-8 flex flex-col items-center" style={{ background: 'var(--color-bg)' }}>
-      <header className="bg-white rounded-[32px] p-4 md:p-6 mb-6 flex flex-col md:flex-row gap-4 md:gap-0 justify-between items-start md:items-center shadow-sm w-full max-w-[1400px]">
+    <div className="min-h-screen p-3 sm:p-4 md:p-8 flex flex-col items-center" style={{ background: 'var(--color-bg)' }}>
+      <header className="bg-white rounded-[24px] sm:rounded-[32px] p-4 sm:p-6 mb-4 sm:mb-6 flex flex-col md:flex-row gap-3 md:gap-0 justify-between items-start md:items-center shadow-sm w-full max-w-[1400px]">
         <div>
-          <h1 className="text-3xl font-black text-chunky-dark leading-none">Admin</h1>
-          <p className="text-sm font-bold text-gray-400 mt-1">Panel de Control · Frita Mejor</p>
+          <h1 className="text-2xl sm:text-3xl font-black text-chunky-dark leading-none">Admin</h1>
+          <p className="text-xs sm:text-sm font-bold text-gray-400 mt-1">Panel de Control · Frita Mejor</p>
           {lowStockCount > 0 && (
             <span className="inline-block mt-2 bg-red-50 text-red-500 text-xs font-bold px-3 py-1 rounded-full">
               ⚠️ {lowStockCount} ítem{lowStockCount > 1 ? 's' : ''} bajo en stock
             </span>
           )}
         </div>
-        <Button variant="outline" className="w-12 h-12 !min-w-0 !p-0 rounded-full flex items-center justify-center text-gray-400 border-gray-100 hover:bg-red-50" onClick={signOut} title="Cerrar sesión">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        <Button variant="outline" className="w-10 h-10 sm:w-12 sm:h-12 !min-w-0 !p-0 rounded-full flex items-center justify-center text-gray-400 border-gray-100 hover:bg-red-50" onClick={signOut} title="Cerrar sesión">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
         </Button>
       </header>
 
       {/* Contenedor de Categorías */}
-      <div className="w-full max-w-[1400px] mb-4 flex flex-wrap gap-3">
+      <div className="w-full max-w-[1400px] mb-3 sm:mb-4 flex flex-wrap gap-2 sm:gap-3">
         {CATEGORIES.map(cat => (
           <button
             key={cat.id}
@@ -1995,7 +1995,7 @@ export function AdminView() {
               setActiveCategory(cat.id);
               setActiveTab(TABS_BY_CATEGORY[cat.id][0].id); // Seleccionar el primer tab de la categoría
             }}
-            className={`flex-1 min-w-[200px] py-4 px-6 rounded-[24px] border-2 transition-all font-black text-lg flex items-center justify-center gap-3
+            className={`flex-1 min-w-[140px] sm:min-w-[200px] py-3 sm:py-4 px-3 sm:px-6 rounded-[18px] sm:rounded-[24px] border-2 transition-all font-black text-sm sm:text-lg flex items-center justify-center gap-2 sm:gap-3
               ${activeCategory === cat.id 
                 ? 'bg-chunky-main border-chunky-main text-white shadow-md' 
                 : `${cat.color} border-transparent opacity-70`}`}
@@ -2006,25 +2006,25 @@ export function AdminView() {
       </div>
 
       {/* Tabs con Scroll */}
-      <div className="relative w-full max-w-[1400px] mb-6 flex items-center bg-white rounded-full p-2 shadow-sm border border-gray-100" style={{ overflow: 'visible' }}>
+      <div className="relative w-full max-w-[1400px] mb-4 sm:mb-6 flex items-center bg-white rounded-full p-1.5 sm:p-2 shadow-sm border border-gray-100" style={{ overflow: 'visible' }}>
         <button 
           onClick={() => { if (scrollContainerRef.current) scrollContainerRef.current.scrollBy({ left: -200, behavior: 'smooth' }); }}
-          className="z-10 w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-500 hover:bg-gray-200 transition-colors mx-1"
+          className="z-10 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-500 hover:bg-gray-200 transition-colors mx-0.5 sm:mx-1"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="15 18 9 12 15 6"/></svg>
         </button>
 
         <div 
           ref={scrollContainerRef}
-          className="flex flex-1 mx-2 scroll-smooth items-center py-1"
+          className="flex flex-1 mx-1 sm:mx-2 scroll-smooth items-center py-1"
           style={{ scrollbarWidth: 'none', msOverflowStyle: 'none', overflowX: 'auto', overflowY: 'visible' }}
         >
           <style>{`div::-webkit-scrollbar { display: none; }`}</style>
-          <div className="flex gap-2 w-max" style={{ overflow: 'visible' }}>
+          <div className="flex gap-1.5 sm:gap-2 w-max" style={{ overflow: 'visible' }}>
             {TABS_BY_CATEGORY[activeCategory].map((tab) => (
               <button
                 key={tab.id}
-                className={`px-5 py-2.5 rounded-full font-bold text-sm transition-colors whitespace-nowrap active:scale-95
+                className={`px-3 sm:px-5 py-2 sm:py-2.5 rounded-full font-bold text-xs sm:text-sm transition-colors whitespace-nowrap active:scale-95
                   ${activeTab === tab.id ? 'bg-chunky-dark text-white shadow-sm' : 'text-gray-500 hover:bg-gray-100 hover:text-chunky-dark'}`}
                 onClick={() => setActiveTab(tab.id)}
               >
@@ -2036,14 +2036,14 @@ export function AdminView() {
 
         <button 
           onClick={() => { if (scrollContainerRef.current) scrollContainerRef.current.scrollBy({ left: 200, behavior: 'smooth' }); }}
-          className="z-10 w-8 h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-500 hover:bg-gray-200 transition-colors mx-1"
+          className="z-10 w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center bg-gray-50 rounded-full text-gray-500 hover:bg-gray-200 transition-colors mx-0.5 sm:mx-1"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
 
       {/* Contenido */}
-      <div className="bg-white rounded-[40px] p-6 md:p-8 shadow-sm w-full max-w-[1400px] min-h-[400px] animate-fade-in">
+      <div className="bg-white rounded-[28px] sm:rounded-[40px] p-4 sm:p-6 md:p-8 shadow-sm w-full max-w-[1400px] min-h-[400px] animate-fade-in">
         {activeTab === 'BODEGAS'    && <WarehousesPanel />}
         {activeTab === 'PRODUCCION' && <ProductionPointsPanel />}
         {activeTab === 'PRODUCTOS'  && <ProductsPresetsPanel />}

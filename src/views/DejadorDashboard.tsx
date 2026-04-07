@@ -141,10 +141,10 @@ export const DejadorDashboard = () => {
       
       {/* ─── HEADER (Full Width background, constrained content) ─── */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto pt-8 pb-6 px-6 relative">
+        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 relative">
           <div className="pr-16">
-            <h1 className="text-4xl font-black text-gray-900 leading-tight">{getHeaderTitle()}</h1>
-            <p className="text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 leading-tight">{getHeaderTitle()}</h1>
+            <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
           </div>
           
           {/* Logout Circular Button */}
@@ -185,14 +185,14 @@ export const DejadorDashboard = () => {
         
         {/* ─── VEHICLE SELECTOR & PRESETS (Shown in Carga & Recibir) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
-          <div className="mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-6">
+          <div className="mb-5 sm:mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
             
-            <div className="flex gap-3 overflow-x-auto py-2 no-scrollbar px-2 items-center flex-1">
+            <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
               {vehicles.map((v: string) => (
                 <button
                   key={v}
                   onClick={() => setSelectedVehicle(v)}
-                  className={`flex-none w-[72px] h-[72px] rounded-2xl flex items-center justify-center font-black text-xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg
+                  className={`flex-none w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-base sm:text-xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg
                     ${selectedVehicle === v 
                       ? 'bg-amber-500 text-white shadow-[0_0_0_4px_white]' 
                       : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
@@ -226,15 +226,15 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: CARGA INICIAL & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 animate-fade-in mb-8">
+          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 animate-fade-in mb-8">
             {products.map((p: any) => (
-              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-full flex items-center justify-between p-2 shadow-sm border`}>
+              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-3xl sm:rounded-full flex flex-col sm:flex-row sm:items-center justify-between p-2 shadow-sm border gap-2 sm:gap-0`}>
                 
-                <div className={`${getThemeClass('bg')} text-white font-black text-sm sm:text-base px-6 py-3 rounded-full flex-shrink-0 min-w-[140px] text-center shadow-sm max-w-[140px] sm:max-w-[180px] truncate`}>
+                <div className={`${getThemeClass('bg')} text-white font-black text-sm px-4 sm:px-6 py-2 sm:py-3 rounded-full flex-shrink-0 sm:min-w-[140px] text-center shadow-sm sm:max-w-[180px] truncate`}>
                   {p.name || 'Producto'}
                 </div>
 
-                <div className="flex gap-2 items-center pr-2">
+                <div className="flex gap-2 items-center sm:pr-2 justify-center">
                    <NumberSelectorGroup
                      presets={presets}
                      value={loadQuantities[p.id] || 0}
@@ -252,35 +252,35 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: SURTIR CARROS ─── */}
         {activeTab === 'surtir' && (
-          <div className="space-y-6 mt-2">
-            <h2 className="text-gray-700 font-black tracking-wide text-lg mb-4 px-2">Solicitudes Recientes</h2>
+          <div className="space-y-4 sm:space-y-6 mt-2">
+            <h2 className="text-gray-700 font-black tracking-wide text-base sm:text-lg mb-3 sm:mb-4 px-2">Solicitudes Recientes</h2>
             
              {pendingRequests.length === 0 ? (
-                <div className="bg-white/80 rounded-[40px] p-16 text-center border-2 border-dashed border-white max-w-3xl mx-auto shadow-sm">
-                  <span className="text-6xl block mb-6 drop-shadow-sm">🙌</span>
-                  <h3 className="font-black text-2xl text-gray-800">Todo al día</h3>
-                  <p className="text-gray-500 font-bold mt-2 text-lg">No hay carros pidiendo surtido ahora.</p>
+                <div className="bg-white/80 rounded-3xl sm:rounded-[40px] p-10 sm:p-16 text-center border-2 border-dashed border-white max-w-3xl mx-auto shadow-sm">
+                  <span className="text-4xl sm:text-6xl block mb-4 sm:mb-6 drop-shadow-sm">🙌</span>
+                  <h3 className="font-black text-xl sm:text-2xl text-gray-800">Todo al día</h3>
+                  <p className="text-gray-500 font-bold mt-2 text-base">No hay carros pidiendo surtido ahora.</p>
                 </div>
              ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {pendingRequests.map((req: any) => (
-                    <div key={req.id} className="bg-white rounded-[32px] p-6 sm:p-8 shadow-sm border-2 border-dashed border-gray-300 relative overflow-hidden transition-all hover:shadow-md hover:border-gray-400">
+                    <div key={req.id} className="bg-white rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed border-gray-300 relative overflow-hidden transition-all hover:shadow-md hover:border-gray-400">
                       
-                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-6 mb-6">
-                        <div className="flex items-center gap-4">
+                      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-6 mb-4 sm:mb-6">
+                        <div className="flex items-center gap-3">
                           {/* Vehicle Circle Badge */}
-                          <div className="w-20 h-20 bg-amber-400 rounded-full flex items-center justify-center text-white font-black text-3xl shadow-sm border-4 border-amber-100">
+                          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-amber-400 rounded-full flex items-center justify-center text-white font-black text-xl sm:text-3xl shadow-sm border-4 border-amber-100">
                             {req.requester_point_id}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-gray-800 font-black text-xl">Pedido Urgente</span>
-                            <span className="text-amber-600 font-bold text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">Hace 5m</span>
+                            <span className="text-gray-800 font-black text-base sm:text-xl">Pedido Urgente</span>
+                            <span className="text-amber-600 font-bold text-xs sm:text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">Hace 5m</span>
                           </div>
                         </div>
 
-                        <div className="flex gap-3 w-full sm:w-auto">
+                        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
                            <button 
-                             className={`flex-1 sm:flex-none font-bold px-6 py-3 rounded-full text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
+                             className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
                              onClick={() => {
                                if (editingReqId === req.id) {
                                  updatePendingRequest(req.id, editPayload);
@@ -295,7 +295,7 @@ export const DejadorDashboard = () => {
                            </button>
                            <button 
                              onClick={() => handleCommit(req.id, req.requester_point_id)}
-                             className="flex-1 sm:flex-none bg-amber-500 text-white font-black px-8 py-3 rounded-full text-base shadow-lg hover:bg-amber-600 transition-all hover:shadow-xl hover:-translate-y-0.5 transform active:scale-95 active:shadow-sm"
+                             className="flex-1 sm:flex-none bg-amber-500 text-white font-black px-6 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base shadow-lg hover:bg-amber-600 transition-all hover:shadow-xl hover:-translate-y-0.5 transform active:scale-95 active:shadow-sm"
                            >
                              Surtir Ya
                            </button>
@@ -392,7 +392,7 @@ export const DejadorDashboard = () => {
 
       {/* ─── FLOATING CONFIRM BUTTON (For Carga & Recibir) ─── */}
       {(activeTab === 'carga' || activeTab === 'recibir') && (
-        <div className="fixed bottom-0 left-0 right-0 p-6 pointer-events-none z-50">
+        <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 pointer-events-none z-50">
            <div className="max-w-7xl mx-auto flex justify-center sm:justify-end">
              <button 
                 onClick={(e) => {
@@ -418,10 +418,10 @@ export const DejadorDashboard = () => {
                     showToast('⚠️ No se pudo registrar. Verifica las cantidades.');
                   }
                 }}
-                className={`w-full sm:w-auto pointer-events-auto px-12 py-5 rounded-full text-white font-black text-xl lg:text-2xl shadow-2xl transition-all transform hover:scale-105 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] flex items-center justify-center gap-3
+                className={`w-full sm:w-auto pointer-events-auto px-8 sm:px-12 py-4 sm:py-5 rounded-full text-white font-black text-base sm:text-xl lg:text-2xl shadow-2xl transition-all transform hover:scale-105 hover:shadow-[0_20px_40px_-15px_rgba(0,0,0,0.5)] flex items-center justify-center gap-2 sm:gap-3
                    ${getThemeClass('bg')}`}
              >
-               <CheckCircle2 strokeWidth={3} className="w-7 h-7" />
+               <CheckCircle2 strokeWidth={3} className="w-5 h-5 sm:w-7 sm:h-7" />
                {activeTab === 'carga' ? 'Confirmar Carga' : 'Confirmar Recepción'}
              </button>
            </div>
@@ -430,7 +430,7 @@ export const DejadorDashboard = () => {
 
       {/* ─── TOAST NOTIFICATION ─── */}
       {toast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[100] bg-gray-900 text-white font-black text-lg px-8 py-4 rounded-full shadow-2xl animate-[slideDown_0.3s_ease-out] border-2 border-white/20">
+        <div className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[100] bg-gray-900 text-white font-black text-sm sm:text-lg px-5 sm:px-8 py-3 sm:py-4 rounded-full shadow-2xl animate-[slideDown_0.3s_ease-out] border-2 border-white/20 text-center">
           {toast}
         </div>
       )}
