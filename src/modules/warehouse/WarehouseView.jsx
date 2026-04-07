@@ -227,9 +227,9 @@ function PosDispatch({ warehouse }) {
 
       {/* Pantalla de Éxito */}
       {confirmed && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-green-400" style={{ animation: 'fadeIn 0.2s ease' }}>
-          <span className="text-6xl sm:text-8xl mb-4 sm:mb-6">✅</span>
-          <h2 className="text-2xl sm:text-4xl font-black text-white text-center px-4">¡Movimiento Registrado!</h2>
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-green-400 animate-success-flash">
+          <span className="text-6xl sm:text-8xl mb-4 sm:mb-6" style={{ animation: 'pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' }}>✅</span>
+          <h2 className="text-2xl sm:text-4xl font-black text-white text-center px-4" style={{ animation: 'fadeInUp 0.35s ease 0.25s both' }}>¡Movimiento Registrado!</h2>
           <p className="text-white/80 font-bold mt-2 text-center">{dispatchedCount} ítem(s) procesados</p>
         </div>
       )}
@@ -544,8 +544,8 @@ function ReceiveMode({ warehouse }) {
       )}
 
       {confirmed && (
-        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-chunky-secondary" style={{ animation: 'fadeIn 0.2s ease' }}>
-          <span className="text-8xl mb-6">📥</span>
+        <div className="fixed inset-0 z-40 flex flex-col items-center justify-center bg-chunky-secondary animate-success-flash">
+          <span className="text-6xl sm:text-8xl mb-4 sm:mb-6" style={{ animation: 'pop-in 0.5s cubic-bezier(0.34,1.56,0.64,1) 0.1s both' }}>✅</span>
           <h2 className="text-4xl font-black text-white">¡Recepción Registrada!</h2>
           <p className="text-white/80 font-bold mt-2">{confirmedCount} producto(s) ingresados</p>
         </div>

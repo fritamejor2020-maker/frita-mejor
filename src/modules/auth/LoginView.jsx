@@ -38,7 +38,7 @@ export function LoginView() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#FFD56B] font-sans w-full">
+    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#FFD56B] font-sans w-full page-enter">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-10">
