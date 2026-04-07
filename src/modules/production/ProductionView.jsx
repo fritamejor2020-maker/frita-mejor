@@ -3,7 +3,7 @@ import { Toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 
-// ─── Hook: tamaño de pantalla reactivo ──────────────────────────────────────
+// ─── Hook: tamaño de pantalla ─────────────────────────────────────────────────
 function useScreenSize() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
@@ -67,7 +67,6 @@ function ManualModal({ product, recipe, wasteMode, onClose, onConfirm }) {
           <button className={`flex-1 py-2 rounded-full font-bold text-sm ${mode === 'PRODUCE' ? 'bg-[#FFB700] text-gray-900' : 'bg-gray-100 text-gray-500'}`} onClick={() => setMode('PRODUCE')}>Producir</button>
           <button className={`flex-1 py-2 rounded-full font-bold text-sm ${mode === 'WASTE' ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-500'}`} onClick={() => setMode('WASTE')}>Descarte</button>
         </div>
-        <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">{recipe ? `Lotes de ${recipe.yieldQty} ${recipe.yieldUnit}` : `Cantidad en ${product.unit}`}</p>
         <input type="number" min="0" step="0.5" placeholder="0" autoFocus
           className="w-full text-5xl font-black text-center border-2 border-gray-200 rounded-2xl p-4 mb-4 outline-none focus:border-chunky-main"
           value={qty} onChange={(e) => setQty(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') handleSubmit(); }} />
@@ -80,7 +79,115 @@ function ManualModal({ product, recipe, wasteMode, onClose, onConfirm }) {
   );
 }
 
-// ─── Tarjeta NORMAL (≤8 productos) ────────────────────────────────────────────
+// ─── Tarjeta MÓVIL: píldora horizontal + botones circulares ───────────────────
+function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual }) {
+  const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
+  const yieldQty  = prod.recipe?.yieldQty ?? 1;
+  const yieldUnit = (prod.recipe?.yieldUnit ?? prod.unit);
+  const shortUnit = yieldUnit.length > 3 ? yieldUnit.slice(0, 3) : yieldUnit;
+  const isDisabled = !prod.stockOk && !wasteMode;
+
+  const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/10'
+    : prod.stockOk ? 'border border-gray-200 bg-white'
+    : 'border border-red-200 bg-red-50/10';
+
+  const circleCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+    : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
+    : 'bg-[#FFB700] text-gray-900 active:scale-90 shadow-sm';
+
+  return (
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-3 ${cardCls}`}>
+      {/* Info producto */}
+      <div style={{ minWidth: 0, width: 100, flexShrink: 0 }}>
+        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{prod.name}</div>
+        <div className="flex items-baseline gap-0.5">
+          <span className="font-black text-chunky-dark text-xs">{prod.currentStock}</span>
+          <span className="text-[9px] font-bold text-gray-400">{shortUnit}</span>
+          <span className={`text-[10px] font-bold ml-1 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+        </div>
+      </div>
+
+      {/* Botones circulares */}
+      <div className="flex gap-1.5 flex-1 justify-center">
+        {presets.slice(0, 5).map((b, i) => {
+          const a = b * yieldQty;
+          const label = a % 1 === 0 ? String(a) : a.toFixed(1);
+          return (
+            <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
+              style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              className={`font-black transition-all select-none ${circleCls}`}>
+              <span style={{ fontSize: label.length > 3 ? 9 : label.length > 2 ? 11 : 14, lineHeight: 1, fontWeight: 900 }}>{label}</span>
+              {shortUnit.length <= 3 && <span style={{ fontSize: 7, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Manual — icono */}
+      <button onClick={() => onManual(prod)}
+        style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 14, cursor: 'pointer' }}
+        title="Manual">
+        ✏️
+      </button>
+    </div>
+  );
+}
+
+// ─── Tarjeta TABLET: normal con texto más grande ───────────────────────────────
+function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual }) {
+  const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
+  const yieldQty  = prod.recipe?.yieldQty ?? 1;
+  const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
+  const [big, ...smalls] = presets;
+  const bigAmt     = big * yieldQty;
+  const isDisabled = !prod.stockOk && !wasteMode;
+
+  const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
+    : prod.stockOk ? 'border border-gray-200 bg-white'
+    : 'border border-red-200 bg-red-50/20';
+  const btnCls = isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
+    : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
+    : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
+
+  return (
+    <div className={`rounded-2xl p-4 flex flex-col gap-3 h-full ${cardCls}`}>
+      <div className="text-center shrink-0">
+        <div className="font-black text-chunky-dark text-base leading-tight truncate">{prod.name}</div>
+        <div className="flex items-baseline justify-center gap-1">
+          <span className="font-black text-chunky-dark text-base">{prod.currentStock}</span>
+          <span className="text-sm font-bold text-gray-400">{prod.unit}</span>
+          <span className={`text-sm font-bold ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+        </div>
+      </div>
+
+      <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
+        className={`rounded-xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
+        <span className="text-3xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
+        <span className="text-sm font-bold opacity-70 mt-0.5">{yieldUnit}</span>
+      </button>
+
+      <div className="grid grid-cols-4 gap-2 shrink-0">
+        {smalls.slice(0, 4).map((b, i) => {
+          const a = b * yieldQty;
+          return (
+            <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
+              className={`rounded-xl py-2.5 flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
+              <span className="text-sm leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              <span className="text-[9px] font-bold opacity-70">{yieldUnit}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <button onClick={() => onManual(prod)}
+        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2 flex items-center justify-center text-gray-400 font-bold text-xs hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        ✏️ Manual
+      </button>
+    </div>
+  );
+}
+
+// ─── Tarjeta COCINA/PC: adaptativa sin scroll ─────────────────────────────────
 function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
@@ -90,101 +197,92 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual }) {
   const isDisabled = !prod.stockOk && !wasteMode;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : prod.stockOk ? 'border border-gray-200 bg-white' : 'border border-red-200 bg-red-50/20';
+    : prod.stockOk ? 'border border-gray-200 bg-white'
+    : 'border border-red-200 bg-red-50/20';
   const btnCls = isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   return (
-    <div className={`rounded-2xl p-3 flex flex-col gap-2 h-full ${cardCls}`}>
-      {/* Header */}
+    <div className={`rounded-xl p-2 flex flex-col gap-1.5 h-full ${cardCls}`} style={{ paddingBottom: 4 }}>
       <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{prod.name}</div>
-        <div className="flex items-baseline justify-center gap-1">
-          <span className="font-black text-chunky-dark text-sm">{prod.currentStock}</span>
-          <span className="text-[10px] font-bold text-gray-400">{prod.unit}</span>
-          <span className={`text-[10px] font-bold ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+        <div className="font-black text-chunky-dark text-xs leading-tight truncate">{prod.name}</div>
+        <div className="flex items-baseline justify-center gap-0.5">
+          <span className="font-black text-chunky-dark text-xs">{prod.currentStock}</span>
+          <span className="text-[9px] font-bold text-gray-400">{prod.unit}</span>
+          <span className={`text-[9px] font-bold ml-0.5 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
-      {/* Botón principal — crece en el espacio disponible */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        className={`rounded-xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
-        <span className="text-2xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
-        <span className="text-xs font-bold opacity-70">{yieldUnit}</span>
+        className={`rounded-lg flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
+        <span className="text-xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
+        <span className="text-[9px] font-bold opacity-70">{yieldUnit}</span>
       </button>
 
-      {/* 4 botones pequeños */}
-      <div className="grid grid-cols-4 gap-1 shrink-0">
+      <div className="grid grid-cols-4 shrink-0" style={{ gap: 2 }}>
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-lg py-1.5 flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
-              <span className="text-xs leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span className="text-[8px] font-bold opacity-70">{yieldUnit}</span>
+              className={`rounded-md flex flex-col items-center py-1 font-black transition-colors select-none ${btnCls}`}>
+              <span className="text-[10px] leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              <span className="text-[7px] font-bold opacity-70">{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Manual */}
       <button onClick={() => onManual(prod)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg py-1 flex items-center justify-center text-gray-400 font-bold text-[10px] hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        style={{ minHeight: 18 }}
+        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[9px] py-0.5 hover:border-chunky-main hover:text-chunky-dark transition-colors">
         ✏️ Manual
       </button>
     </div>
   );
 }
 
-// ─── Tarjeta COMPACTA (>8 productos) — layout horizontal ──────────────────────
+// ─── Tarjeta COCINA compacta (muy poco espacio) ────────────────────────────────
 function CardCompact({ prod, productionPoint, wasteMode, onProduce, onManual }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
   const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
+  const shortUnit = yieldUnit.length > 3 ? yieldUnit.slice(0, 3) + '.' : yieldUnit;
   const isDisabled = !prod.stockOk && !wasteMode;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : prod.stockOk ? 'border border-gray-200 bg-white' : 'border border-red-200 bg-red-50/20';
+    : prod.stockOk ? 'border border-gray-200 bg-white'
+    : 'border border-red-200 bg-red-50/20';
   const btnCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-    : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700'
+    : wasteMode ? 'bg-red-100 text-red-700'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 shadow-sm';
 
-  // Abreviar unidad larga para el header
-  const shortUnit = yieldUnit.length > 3 ? yieldUnit.slice(0, 3) + '.' : yieldUnit;
-
   return (
-    <div className={`rounded-xl px-2 py-1.5 flex flex-col gap-1 h-full ${cardCls}`}>
-      {/* Nombre + stock en una línea */}
-      <div className="flex items-center justify-between shrink-0 gap-1">
-        <span className="font-black text-chunky-dark text-[11px] leading-tight truncate flex-1">{prod.name}</span>
-        <span className={`text-[9px] font-bold shrink-0 whitespace-nowrap ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>
+    <div className={`rounded-xl px-2 py-1.5 flex flex-col h-full ${cardCls}`} style={{ gap: 3 }}>
+      <div className="flex items-center justify-between shrink-0">
+        <span className="font-black text-chunky-dark text-[11px] truncate flex-1">{prod.name}</span>
+        <span className={`text-[9px] font-bold shrink-0 ml-1 whitespace-nowrap ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>
           {prod.stockOk ? '✓' : '⚠️'} {prod.currentStock} {shortUnit}
         </span>
       </div>
-
-      {/* 5 botones en fila — SIN unidad dentro para no desbordar */}
-      <div className="grid grid-cols-5 gap-1 flex-1 min-h-0">
+      <div className="grid grid-cols-5 flex-1 min-h-0" style={{ gap: 2 }}>
         {presets.slice(0, 5).map((b, i) => {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-lg flex items-center justify-center font-black transition-colors select-none ${btnCls} ${i === 0 ? 'ring-2 ring-yellow-500' : ''}`}>
-              <span className="text-[12px] font-black leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              className={`rounded-lg flex items-center justify-center text-[12px] font-black transition-colors select-none ${btnCls} ${i === 0 ? 'ring-2 ring-yellow-500' : ''}`}>
+              {a % 1 === 0 ? a : a.toFixed(1)}
             </button>
           );
         })}
       </div>
-
-      {/* Manual — muy compacto */}
-      <button onClick={() => onManual(prod)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[8px] py-0.5 hover:border-chunky-main hover:text-chunky-dark transition-colors">
+      <button onClick={() => onManual(prod)} style={{ minHeight: 16, flexShrink: 0 }}
+        className="w-full border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[8px] hover:border-chunky-main transition-colors">
         ✏️ Manual
       </button>
     </div>
   );
 }
-
 
 // ─── Panel Principal ───────────────────────────────────────────────────────────
 function ProductionPanel({ productionPoint, onBack }) {
@@ -205,22 +303,29 @@ function ProductionPanel({ productionPoint, onBack }) {
     return { ...prod, stockOk: stockCheck.canProduce, currentStock: inv?.qty ?? 0, recipe };
   });
 
-  const count       = enriched.length;
-  const { width: screenWidth, height: screenHeight } = useScreenSize();
+  const count = enriched.length;
+  const { width: sw, height: sh } = useScreenSize();
+  const aspectRatio = sh / sw;
 
-  // Detectar pantalla muy vertical (celular portrait)
-  const aspectRatio  = screenHeight / screenWidth;
-  const isMobile     = screenWidth <= 600;
-  const isVeryVertical = aspectRatio > 1.4; // portrait marcado
+  // ── Breakpoints ──────────────────────────────────────────────────────────────
+  // Móvil: portrait marcado → píldoras horizontales + scroll
+  const isMobile  = aspectRatio > 1.4;
+  // Tablet: ancho medio (iPad, tablet landscape) → tarjetas normales con texto grande + sin scroll
+  const isTablet  = !isMobile && sw > 500 && sw <= 1000;
+  // Cocina/PC: pantalla grande → compacto adaptativo sin scroll
+  // const isDesktop = !isMobile && !isTablet;  // implícito
 
-  let cols, allowScroll;
-  if (isVeryVertical || isMobile) {
-    // Celular portrait: 1 columna, tarjetas normales, scroll
-    allowScroll = true;
-    cols        = 1;
+  // Columnas según dispositivo
+  let cols, allowScroll, pad, gap;
+  if (isMobile) {
+    cols = 1; allowScroll = true; pad = 8; gap = 6;
+  } else if (isTablet) {
+    allowScroll = false; pad = 10; gap = 10;
+    if      (count <= 2)  { cols = count || 1; }
+    else if (count <= 4)  { cols = 2; }
+    else                   { cols = 3; }
   } else {
-    // Tablet/PC landscape
-    allowScroll = false;
+    allowScroll = false; pad = 6; gap = 6;
     if      (count <= 2)  { cols = count || 1; }
     else if (count <= 4)  { cols = 2; }
     else if (count <= 6)  { cols = 3; }
@@ -229,16 +334,11 @@ function ProductionPanel({ productionPoint, onBack }) {
   }
   const rows = Math.ceil(count / cols);
 
-  // Calcular espacio real por tarjeta para decidir si usar layout compacto
-  const HEADER_H   = 52; // px aprox del header
-  const pad        = allowScroll ? 8 : 6;
-  const gap        = allowScroll ? 10 : 6;
-  const availableH = screenHeight - HEADER_H - 2 * pad - (rows - 1) * gap;
+  // Compacto solo en desktop cuando hay muy poco espacio por tarjeta
+  const HEADER_H   = 52;
+  const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
   const cardH      = availableH / rows;
-
-  // Compacto solo si la tarjeta tendría menos de 140px de alto
-  const compact = !allowScroll && cardH < 140;
-
+  const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
   const handleProduce = (product, batches = 1) => {
     if (wasteMode) {
@@ -266,8 +366,9 @@ function ProductionPanel({ productionPoint, onBack }) {
     }
   };
 
-
-
+  // Ancho máximo del grid cuando hay pocos productos (para que no se estiren)
+  const CARD_MAX   = isTablet ? 380 : 300;
+  const gridMaxW   = (!isMobile && count <= 4) ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg)' }}>
@@ -290,7 +391,7 @@ function ProductionPanel({ productionPoint, onBack }) {
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setWasteMode(!wasteMode)}
             style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 20, border: wasteMode ? '1px solid #fca5a5' : '1px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
-            {wasteMode ? '⚠️ SALIR DESCARTE' : '🗑️ DESCARTE'}
+            {wasteMode ? '⚠️ SALIR' : '🗑️ DESCARTE'}
           </button>
           <button onClick={signOut} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
@@ -304,8 +405,8 @@ function ProductionPanel({ productionPoint, onBack }) {
         </div>
       )}
 
-      {/* Área de tarjetas */}
-      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: count <= 4 && !isMobile ? 'center' : 'flex-start' }}>
+      {/* Grid */}
+      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && count <= 4) ? 'center' : 'flex-start' }}>
         {enriched.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <span style={{ fontSize: 40 }}>📋</span>
@@ -315,22 +416,20 @@ function ProductionPanel({ productionPoint, onBack }) {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: (isVeryVertical || isMobile)
-              ? '1fr'
-              : `repeat(${cols}, minmax(0, ${compact ? '1fr' : '300px'}))`,
+            gridTemplateColumns: isMobile ? '1fr' : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
             gridTemplateRows: !allowScroll && count > 4 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
             gap,
             width: '100%',
-            maxWidth: (!isVeryVertical && !isMobile && count <= 4) ? cols * 300 + (cols - 1) * gap : '100%',
+            maxWidth: typeof gridMaxW === 'number' ? gridMaxW : '100%',
             height: !allowScroll && count > 4 ? '100%' : 'auto',
           }}>
-            {enriched.map((prod) =>
-              compact ? (
-                <CardCompact key={prod.id} prod={prod} productionPoint={productionPoint} wasteMode={wasteMode} onProduce={handleProduce} onManual={(p) => setManualProd(p)} />
-              ) : (
-                <CardNormal key={prod.id} prod={prod} productionPoint={productionPoint} wasteMode={wasteMode} onProduce={handleProduce} onManual={(p) => setManualProd(p)} />
-              )
-            )}
+            {enriched.map((prod) => {
+              const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
+              if (isMobile)      return <CardMobile  {...props} />;
+              if (isTablet)      return <CardTablet  {...props} />;
+              if (useCompact)    return <CardCompact {...props} />;
+              return               <CardNormal  {...props} />;
+            })}
           </div>
         )}
       </div>

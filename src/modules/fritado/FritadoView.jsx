@@ -3,7 +3,6 @@ import { Toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 
-// ─── Hook: tamaño de pantalla reactivo ───────────────────────────────────────
 function useScreenSize() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
   useEffect(() => {
@@ -78,11 +77,7 @@ function ActionModal({ config, wasteMode, onClose, onConfirm }) {
           <div className="mb-4">
             <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Motivo</p>
             <select className="w-full border-2 border-gray-200 rounded-2xl p-3 font-bold text-chunky-dark outline-none focus:border-red-400 bg-white" value={reason} onChange={(e) => setReason(e.target.value)}>
-              <option>Dañado / Defectuoso</option>
-              <option>Quemado</option>
-              <option>Masa mala / Mal estado</option>
-              <option>Caída al piso</option>
-              <option>Otro</option>
+              <option>Dañado / Defectuoso</option><option>Quemado</option><option>Masa mala / Mal estado</option><option>Caída al piso</option><option>Otro</option>
             </select>
           </div>
         )}
@@ -95,78 +90,161 @@ function ActionModal({ config, wasteMode, onClose, onConfirm }) {
   );
 }
 
-// ─── Tarjeta NORMAL de Fritado (hay espacio) ───────────────────────────────────
-function FritadoCard({ pair, wasteMode, onFry, onManual }) {
-  const presets = pair.presets || [10, 20, 50, 100, 200];
-  const [bigPreset, ...smallPresets] = presets;
+// ─── Tarjeta MÓVIL: píldora horizontal + botones circulares ───────────────────
+function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
+  const presets    = pair.presets || [10, 20, 50, 100, 200];
+  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+
+  const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/10'
+    : pair.crudo.qty > 0 ? 'border border-gray-200 bg-white'
+    : 'border border-red-200 bg-red-50/10';
+
+  const circleCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+    : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
+    : 'bg-chunky-main text-chunky-dark active:scale-90 shadow-sm';
+
+  return (
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-3 ${cardCls}`}>
+      {/* Info producto */}
+      <div style={{ minWidth: 0, width: 110, flexShrink: 0 }}>
+        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{pair.frito.name}</div>
+        <div className="flex items-center gap-1">
+          <span className={`font-black text-xs ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
+          <span className="text-[8px] text-gray-400 font-bold">crudo</span>
+          <span className="text-gray-300 text-[9px]">→</span>
+          <span className="font-black text-xs text-chunky-dark">{pair.frito.qty}</span>
+          <span className="text-[8px] text-gray-400 font-bold">lista</span>
+        </div>
+      </div>
+
+      {/* Botones circulares */}
+      <div className="flex gap-1.5 flex-1 justify-center">
+        {presets.slice(0, 5).map((amount, i) => (
+          <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
+            style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            className={`font-black text-sm transition-all select-none ${circleCls}`}>
+            {amount}
+          </button>
+        ))}
+      </div>
+
+      <button onClick={() => onManual(pair)}
+        style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 14, cursor: 'pointer' }}>
+        ✏️
+      </button>
+    </div>
+  );
+}
+
+// ─── Tarjeta TABLET: normal con texto grande ──────────────────────────────────
+function FritadoCardTablet({ pair, wasteMode, onFry, onManual }) {
+  const presets    = pair.presets || [10, 20, 50, 100, 200];
+  const [big, ...smalls] = presets;
   const isDisabled = pair.crudo.qty === 0 && !wasteMode;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : pair.crudo.qty > 0 ? 'border border-gray-100 bg-white'
+    : pair.crudo.qty > 0 ? 'border border-gray-200 bg-white'
     : 'border border-red-200 bg-red-50/20';
-
   const btnCls = wasteMode ? 'bg-red-400 hover:bg-red-500 text-white border-2 border-red-500'
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
 
   return (
-    <div className={`rounded-2xl p-3 flex flex-col gap-2 h-full ${cardCls}`}>
-      {/* Nombre */}
+    <div className={`rounded-2xl p-4 flex flex-col gap-3 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{pair.frito.name}</div>
-        <div className="text-[9px] text-gray-400 font-bold truncate">Masa: {pair.crudo.name}</div>
+        <div className="font-black text-chunky-dark text-base leading-tight truncate">{pair.frito.name}</div>
+        <div className="text-xs font-bold text-gray-400 truncate">Masa: {pair.crudo.name}</div>
       </div>
 
-      {/* Crudo → Frito compacto */}
-      <div className="flex items-center gap-1 bg-gray-50 rounded-xl px-2 py-1.5 shrink-0 border border-gray-100">
+      <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 shrink-0">
         <div className="flex-1 text-center">
-          <div className="text-[8px] font-black text-gray-400 uppercase">Crudo</div>
+          <div className="text-[9px] font-black text-gray-400 uppercase">Crudo</div>
           {pair.crudo.qty === 0 && !wasteMode
-            ? <div className="text-[10px] font-black text-red-500">Agotado</div>
-            : <div className="font-black text-green-600 text-sm leading-none">{pair.crudo.qty}<span className="text-[8px] text-gray-400 ml-0.5">uds</span></div>
+            ? <div className="text-sm font-black text-red-500">Agotado</div>
+            : <div className="font-black text-green-600 text-lg leading-none">{pair.crudo.qty}<span className="text-xs text-gray-400 ml-0.5">uds</span></div>
           }
         </div>
-        <div className="text-gray-300 text-xs">➡️</div>
+        <div className="text-gray-300 text-base">➡️</div>
         <div className="flex-1 text-center">
-          <div className="text-[8px] font-black text-yellow-600 uppercase">Fritas</div>
-          <div className="font-black text-chunky-dark text-sm leading-none">{pair.frito.qty}<span className="text-[8px] text-gray-400 ml-0.5">uds</span></div>
+          <div className="text-[9px] font-black text-yellow-600 uppercase">Fritas</div>
+          <div className="font-black text-chunky-dark text-lg leading-none">{pair.frito.qty}<span className="text-xs text-gray-400 ml-0.5">uds</span></div>
         </div>
       </div>
 
-      {wasteMode && (
-        <div className="bg-red-50 border border-red-200 rounded-lg px-2 py-1 text-center shrink-0">
-          <span className="text-[9px] font-bold text-red-500">🗑️ MERMA</span>
-        </div>
-      )}
-
-      {/* Botón principal */}
-      <button disabled={isDisabled} onClick={() => onFry(pair, bigPreset)}
-        className={`w-full rounded-xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-all active:scale-[0.97] select-none ${btnCls}`}>
-        <span className="text-2xl leading-none font-black">{bigPreset}</span>
-        <span className="text-xs font-bold opacity-80">uds</span>
+      <button disabled={isDisabled} onClick={() => onFry(pair, big)}
+        className={`rounded-xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-all active:scale-[0.97] select-none ${btnCls}`}>
+        <span className="text-3xl leading-none font-black">{big}</span>
+        <span className="text-sm font-bold opacity-80 mt-0.5">uds</span>
       </button>
 
-      {/* Botones pequeños */}
-      <div className="grid grid-cols-4 gap-1 shrink-0">
-        {smallPresets.slice(0, 4).map((amount, idx) => (
+      <div className="grid grid-cols-4 gap-2 shrink-0">
+        {smalls.slice(0, 4).map((amount, idx) => (
           <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            className={`rounded-lg py-1.5 flex flex-col items-center font-black transition-all active:scale-95 select-none ${btnCls}`}>
-            <span className="text-xs leading-none">{amount}</span>
-            <span className="text-[8px] font-bold opacity-70">uds</span>
+            className={`rounded-xl py-2.5 flex flex-col items-center font-black transition-all active:scale-95 select-none ${btnCls}`}>
+            <span className="text-sm leading-none">{amount}</span>
+            <span className="text-[9px] font-bold opacity-70">uds</span>
           </button>
         ))}
       </div>
 
-      {/* Manual */}
       <button onClick={() => onManual(pair)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg py-1 flex items-center justify-center text-gray-400 font-bold text-[10px] hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2 flex items-center justify-center text-gray-400 font-bold text-xs hover:border-chunky-main transition-colors">
         ✏️ Manual
       </button>
     </div>
   );
 }
 
-// ─── Tarjeta COMPACTA de Fritado (poco espacio) ────────────────────────────────
+// ─── Tarjeta COCINA normal ────────────────────────────────────────────────────
+function FritadoCard({ pair, wasteMode, onFry, onManual }) {
+  const presets = pair.presets || [10, 20, 50, 100, 200];
+  const [big, ...smalls] = presets;
+  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+
+  const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
+    : pair.crudo.qty > 0 ? 'border border-gray-100 bg-white'
+    : 'border border-red-200 bg-red-50/20';
+  const btnCls = wasteMode ? 'bg-red-400 hover:bg-red-500 text-white border-2 border-red-500'
+    : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
+    : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
+
+  return (
+    <div className={`rounded-xl p-2 flex flex-col gap-1.5 h-full ${cardCls}`} style={{ paddingBottom: 4 }}>
+      <div className="text-center shrink-0">
+        <div className="font-black text-chunky-dark text-xs leading-tight truncate">{pair.frito.name}</div>
+        <div className="flex items-center justify-center gap-1">
+          <span className={`font-black text-xs ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
+          <span className="text-[8px] text-gray-300">→</span>
+          <span className="font-black text-xs text-chunky-dark">{pair.frito.qty}</span>
+          <span className="text-[8px] text-gray-400">uds</span>
+        </div>
+      </div>
+
+      <button disabled={isDisabled} onClick={() => onFry(pair, big)}
+        className={`rounded-lg flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-all select-none ${btnCls}`}>
+        <span className="text-xl leading-none font-black">{big}</span>
+        <span className="text-[9px] font-bold opacity-70 mt-0.5">uds</span>
+      </button>
+
+      <div className="grid grid-cols-4 shrink-0" style={{ gap: 2 }}>
+        {smalls.slice(0, 4).map((amount, idx) => (
+          <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
+            className={`rounded-md flex flex-col items-center py-1 font-black transition-all active:scale-95 select-none ${btnCls}`}>
+            <span className="text-[10px] leading-none">{amount}</span>
+            <span className="text-[7px] font-bold opacity-70">uds</span>
+          </button>
+        ))}
+      </div>
+
+      <button onClick={() => onManual(pair)} style={{ minHeight: 18 }}
+        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[9px] py-0.5 hover:border-chunky-main transition-colors">
+        ✏️ Manual
+      </button>
+    </div>
+  );
+}
+
+// ─── Tarjeta COMPACTA cocina ──────────────────────────────────────────────────
 function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
   const isDisabled = pair.crudo.qty === 0 && !wasteMode;
@@ -174,44 +252,37 @@ function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
     : pair.crudo.qty > 0 ? 'border border-gray-100 bg-white'
     : 'border border-red-200 bg-red-50/20';
-
-  const btnCls = wasteMode ? 'bg-red-400 text-white'
-    : isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+  const btnCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+    : wasteMode ? 'bg-red-100 text-red-700'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white shadow-sm';
 
   return (
-    <div className={`rounded-xl px-2 py-1.5 flex flex-col gap-1 h-full ${cardCls}`}>
-      {/* Nombre + stocks en una línea */}
-      <div className="flex items-center justify-between shrink-0 gap-1">
-        <span className="font-black text-chunky-dark text-[11px] leading-tight truncate flex-1">{pair.frito.name}</span>
-        <div className="flex items-center gap-1 shrink-0">
+    <div className={`rounded-xl px-2 py-1.5 flex flex-col h-full ${cardCls}`} style={{ gap: 3 }}>
+      <div className="flex items-center justify-between shrink-0">
+        <span className="font-black text-chunky-dark text-[11px] truncate flex-1">{pair.frito.name}</span>
+        <div className="flex items-center gap-0.5 shrink-0 ml-1">
           <span className={`text-[9px] font-black ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
-          <span className="text-gray-300 text-[8px]">➡</span>
+          <span className="text-gray-300 text-[8px]">→</span>
           <span className="text-[9px] font-black text-chunky-dark">{pair.frito.qty}</span>
-          <span className="text-[8px] font-bold text-gray-400">uds</span>
         </div>
       </div>
-
-      {/* 5 botones en fila */}
-      <div className="grid grid-cols-5 gap-1 flex-1 min-h-0">
+      <div className="grid grid-cols-5 flex-1 min-h-0" style={{ gap: 2 }}>
         {presets.slice(0, 5).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            className={`rounded-lg flex items-center justify-center font-black transition-colors select-none text-[12px] ${btnCls} ${i === 0 ? 'ring-2 ring-chunky-secondary/60' : ''}`}>
+            className={`rounded-lg flex items-center justify-center text-[12px] font-black transition-colors select-none ${btnCls} ${i === 0 ? 'ring-2 ring-chunky-secondary/60' : ''}`}>
             {amount}
           </button>
         ))}
       </div>
-
-      {/* Manual */}
-      <button onClick={() => onManual(pair)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[8px] py-0.5 hover:border-chunky-main hover:text-chunky-dark transition-colors">
+      <button onClick={() => onManual(pair)} style={{ minHeight: 16, flexShrink: 0 }}
+        className="w-full border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[8px] hover:border-chunky-main transition-colors">
         ✏️ Manual
       </button>
     </div>
   );
 }
 
-// ─── Panel Principal de Fritado ────────────────────────────────────────────────
+// ─── Panel Principal ───────────────────────────────────────────────────────────
 function FritadoPanel({ productionPoint, onBack }) {
   const { inventory, fritadoRecipes, fryItem, reportWaste } = useInventoryStore();
   const signOut = useAuthStore((s) => s.signOut);
@@ -230,33 +301,30 @@ function FritadoPanel({ productionPoint, onBack }) {
     .filter((p) => p.crudo.id && p.frito.id);
 
   const count = pairs.length;
-  const { width: screenWidth, height: screenHeight } = useScreenSize();
+  const { width: sw, height: sh } = useScreenSize();
+  const aspectRatio = sh / sw;
 
-  // Misma lógica de pantalla que Producción
-  const aspectRatio    = screenHeight / screenWidth;
-  const isMobile       = screenWidth <= 600;
-  const isVeryVertical = aspectRatio > 1.4;
+  const isMobile  = aspectRatio > 1.4;
+  const isTablet  = !isMobile && sw > 500 && sw <= 1000;
 
-  let cols, allowScroll;
-  if (isVeryVertical || isMobile) {
-    allowScroll = true;
-    cols        = 1;
+  let cols, allowScroll, pad, gap;
+  if (isMobile) {
+    cols = 1; allowScroll = true; pad = 8; gap = 6;
+  } else if (isTablet) {
+    allowScroll = false; pad = 10; gap = 10;
+    cols = count <= 2 ? (count || 1) : count <= 4 ? 2 : 3;
   } else {
-    allowScroll = false;
-    if      (count <= 2)  { cols = count || 1; }
-    else if (count <= 4)  { cols = 2; }
-    else if (count <= 6)  { cols = 3; }
-    else if (count <= 12) { cols = 4; }
-    else                   { cols = 5; }
+    allowScroll = false; pad = 6; gap = 6;
+    cols = count <= 2 ? (count || 1) : count <= 4 ? 2 : count <= 6 ? 3 : count <= 12 ? 4 : 5;
   }
   const rows = Math.ceil(count / cols);
 
   const HEADER_H   = 52;
-  const pad        = allowScroll ? 8 : 6;
-  const gap        = allowScroll ? 10 : 6;
-  const availableH = screenHeight - HEADER_H - 2 * pad - (rows - 1) * gap;
-  const cardH      = availableH / rows;
-  const compact    = !allowScroll && cardH < 140;
+  const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
+  const useCompact = !isMobile && !isTablet && !allowScroll && (availableH / rows) < 140;
+
+  const CARD_MAX = isTablet ? 380 : 300;
+  const gridMaxW = (!isMobile && count <= 4) ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 
   const handleFry = (pair, amount) => {
     if (wasteMode) { setModalConfig({ pair, amount, isWasteFast: true }); return; }
@@ -277,12 +345,8 @@ function FritadoPanel({ productionPoint, onBack }) {
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg)' }}>
-      {modalConfig && (
-        <ActionModal config={modalConfig} wasteMode={wasteMode}
-          onClose={() => setModalConfig(null)} onConfirm={handleModalConfirm} />
-      )}
+      {modalConfig && <ActionModal config={modalConfig} wasteMode={wasteMode} onClose={() => setModalConfig(null)} onConfirm={handleModalConfirm} />}
 
-      {/* Header */}
       <header style={{ background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <button onClick={onBack} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
@@ -296,7 +360,7 @@ function FritadoPanel({ productionPoint, onBack }) {
         <div style={{ display: 'flex', gap: 6 }}>
           <button onClick={() => setWasteMode(!wasteMode)}
             style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 20, border: wasteMode ? '1px solid #fca5a5' : '1px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
-            {wasteMode ? '⚠️ SALIR MERMA' : '🗑️ MERMA'}
+            {wasteMode ? '⚠️ SALIR' : '🗑️ MERMA'}
           </button>
           <button onClick={signOut} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
@@ -310,31 +374,30 @@ function FritadoPanel({ productionPoint, onBack }) {
         </div>
       )}
 
-      {/* Grid de tarjetas */}
-      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: count <= 4 && !isMobile ? 'center' : 'flex-start' }}>
+      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && count <= 4) ? 'center' : 'flex-start' }}>
         {pairs.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <span style={{ fontSize: 40 }}>🧊</span>
             <p style={{ fontWeight: 900, fontSize: 18, color: '#1f2937', marginTop: 12 }}>No hay crudos vinculados</p>
-            <p style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af' }}>Configura recetas de fritado en el panel Admin.</p>
+            <p style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af' }}>Configura recetas de fritado en Admin.</p>
           </div>
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: (isVeryVertical || isMobile) ? '1fr' : `repeat(${cols}, minmax(0, ${compact ? '1fr' : '300px'}))`,
+            gridTemplateColumns: isMobile ? '1fr' : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
             gridTemplateRows: !allowScroll && count > 4 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
             gap,
             width: '100%',
-            maxWidth: (!isVeryVertical && !isMobile && count <= 4) ? cols * 300 + (cols - 1) * gap : '100%',
+            maxWidth: typeof gridMaxW === 'number' ? gridMaxW : '100%',
             height: !allowScroll && count > 4 ? '100%' : 'auto',
           }}>
-            {pairs.map((pair, i) =>
-              compact ? (
-                <FritadoCardCompact key={i} pair={pair} wasteMode={wasteMode} onFry={handleFry} onManual={(p) => setModalConfig({ pair: p })} />
-              ) : (
-                <FritadoCard key={i} pair={pair} wasteMode={wasteMode} onFry={handleFry} onManual={(p) => setModalConfig({ pair: p })} />
-              )
-            )}
+            {pairs.map((pair, i) => {
+              const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };
+              if (isMobile)   return <FritadoCardMobile  {...props} />;
+              if (isTablet)   return <FritadoCardTablet  {...props} />;
+              if (useCompact) return <FritadoCardCompact {...props} />;
+              return              <FritadoCard        {...props} />;
+            })}
           </div>
         )}
       </div>
@@ -344,7 +407,6 @@ function FritadoPanel({ productionPoint, onBack }) {
   );
 }
 
-// ─── Export ────────────────────────────────────────────────────────────────────
 export function FritadoView() {
   const signOut = useAuthStore((s) => s.signOut);
   const [selectedPoint, setSelectedPoint] = useState(null);
