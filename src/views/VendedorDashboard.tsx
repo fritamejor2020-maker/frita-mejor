@@ -8,6 +8,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { calculateClosingStatus } from '../utils/financeUtils';
 import { formatMoney } from '../utils/formatUtils';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
+import { MoneyInput } from '../components/ui/MoneyInput';
 import { BottomNav } from '../components/ui/BottomNav';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
@@ -256,10 +257,9 @@ export const VendedorDashboard = () => {
                     <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
                        <DollarSign size={14} strokeWidth={3} /> EFECTIVO
                     </div>
-                    <input 
-                      type="number" 
+                    <MoneyInput
                       value={cash}
-                      onChange={(e) => setCash(e.target.value)}
+                      onChange={setCash}
                       placeholder="$ 0"
                       className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
                     />
@@ -270,10 +270,9 @@ export const VendedorDashboard = () => {
                     <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
                        <Zap size={14} strokeWidth={3} fill="currentColor" /> TRANSFERENCIAS
                     </div>
-                    <input 
-                      type="number" 
+                    <MoneyInput
                       value={transfer}
-                      onChange={(e) => setTransfer(e.target.value)}
+                      onChange={setTransfer}
                       placeholder="$ 0"
                       className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
                     />
@@ -286,10 +285,9 @@ export const VendedorDashboard = () => {
                      GASTOS / SALIDAS
                   </div>
                   <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-gray-50 border-2 border-gray-100 rounded-[24px] sm:rounded-[28px] p-2">
-                     <input 
-                       type="number" 
+                     <MoneyInput
                        value={expenses}
-                       onChange={(e) => setExpenses(e.target.value)}
+                       onChange={setExpenses}
                        placeholder="$ Valor"
                        className="w-full sm:w-1/3 bg-white rounded-[20px] sm:rounded-3xl py-3 px-4 sm:py-4 sm:px-6 font-black text-lg sm:text-xl text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none"
                      />

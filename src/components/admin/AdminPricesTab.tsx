@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { Edit2, Check } from 'lucide-react';
 import { formatMoney } from '../../utils/formatUtils';
+import { MoneyInput } from '../ui/MoneyInput';
 
 export const AdminPricesTab = () => {
   const { inventory, updateInventoryItem } = useInventoryStore();
@@ -33,11 +34,10 @@ export const AdminPricesTab = () => {
                 <>
                   <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-frita-orange">
                     <span className="px-3 py-2 text-gray-400 font-bold">$</span>
-                    <input 
-                      type="number" 
-                      value={editPrice}
-                      onChange={(e) => setEditPrice(parseInt(e.target.value))}
-                      className="bg-transparent outline-none font-black w-20 py-2 text-frita-red"
+                    <MoneyInput
+                      value={String(editPrice)}
+                      onChange={(v) => setEditPrice(parseInt(v) || 0)}
+                      className="bg-transparent outline-none font-black w-24 py-2 text-frita-red"
                     />
                   </div>
                   <button 

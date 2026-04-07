@@ -4,6 +4,7 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { useVehicleStore } from '../../../store/useVehicleStore';
 import { useIncomeConfigStore } from '../../../store/useIncomeConfigStore';
 import { Button } from '../../../components/ui/Button';
+import { MoneyInput } from '../../../components/ui/MoneyInput';
 import { formatMoney } from '../../../utils/formatUtils';
 
 export function IncomesModal({ onClose }) {
@@ -229,13 +230,13 @@ export function IncomesModal({ onClose }) {
                              <input type="text" placeholder="Nombre..." className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 font-bold text-white focus:border-green-500 outline-none" value={row.vendedor} onChange={(e) => updateGridRow(tipo, 'vendedor', e.target.value)} />
                            </td>
                            <td className="p-2">
-                             <input type="number" min="0" placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center font-bold text-white focus:border-green-500 outline-none" value={row.efectivo} onChange={(e) => updateGridRow(tipo, 'efectivo', e.target.value)} />
+                             <MoneyInput value={row.efectivo} onChange={(v) => updateGridRow(tipo, 'efectivo', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center font-bold text-white focus:border-green-500 outline-none" />
                            </td>
                            <td className="p-2">
-                             <input type="number" min="0" placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center font-bold text-white focus:border-green-500 outline-none" value={row.transferencias} onChange={(e) => updateGridRow(tipo, 'transferencias', e.target.value)} />
+                             <MoneyInput value={row.transferencias} onChange={(v) => updateGridRow(tipo, 'transferencias', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center font-bold text-white focus:border-green-500 outline-none" />
                            </td>
                            <td className="p-2">
-                             <input type="number" min="0" placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center text-red-300 font-bold focus:border-red-500 outline-none" value={row.salidas} onChange={(e) => updateGridRow(tipo, 'salidas', e.target.value)} />
+                             <MoneyInput value={row.salidas} onChange={(v) => updateGridRow(tipo, 'salidas', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center text-red-300 font-bold focus:border-red-500 outline-none" />
                            </td>
                            <td className="p-3 font-black text-right text-green-400 text-xl">
                              {formatMoney(rowTotal)}
@@ -265,17 +266,17 @@ export function IncomesModal({ onClose }) {
                   <input type="text" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-lg font-bold text-white outline-none" placeholder="Nombre completo" value={vendedor} onChange={e => setVendedor(e.target.value)} />
                </div>
                <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Efectivo ($)</label>
-                  <input type="number" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" placeholder="0" value={efectivo} onChange={e => setEfectivo(e.target.value)} />
-               </div>
-               <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
-                  <input type="number" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" placeholder="0" value={transferencias} onChange={e => setTransferencias(e.target.value)} />
-               </div>
-               <div>
-                  <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) - Opcional</label>
-                  <input type="number" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-gray-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" placeholder="0" value={salidas} onChange={e => setSalidas(e.target.value)} />
-               </div>
+                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Efectivo ($)</label>
+                 <MoneyInput value={efectivo} onChange={setEfectivo} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
+              </div>
+              <div>
+                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
+                 <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
+              </div>
+              <div>
+                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) - Opcional</label>
+                 <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-gray-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+              </div>
 
                <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 mt-4 flex justify-between items-center shadow-inner">
                   <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>

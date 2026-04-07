@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useFinanceStore } from '../../../store/useFinanceStore';
 import { useSupplierStore } from '../../../store/useSupplierStore';
 import { Button } from '../../../components/ui/Button';
+import { MoneyInput } from '../../../components/ui/MoneyInput';
 
 export function ExpensesModal({ onClose }) {
   const { addExpense } = useFinanceStore();
@@ -113,12 +114,11 @@ export function ExpensesModal({ onClose }) {
              </div>
              <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Valor ($)</label>
-                <input 
-                  type="number" 
-                  className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-red-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none text-right" 
-                  placeholder="0" 
-                  value={valor} 
-                  onChange={e => setValor(e.target.value)} 
+                <MoneyInput
+                  value={valor}
+                  onChange={setValor}
+                  placeholder="0"
+                  className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-red-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none text-right"
                 />
              </div>
            </div>
