@@ -104,24 +104,24 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
     : 'bg-chunky-main text-chunky-dark active:scale-90 shadow-sm';
 
   return (
-    <div className={`rounded-2xl px-3 py-3 flex items-center gap-3 ${cardCls}`}>
-      {/* Info producto */}
-      <div style={{ minWidth: 0, width: 110, flexShrink: 0 }}>
-        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{pair.frito.name}</div>
-        <div className="flex items-center gap-1">
+    <div className={`rounded-2xl px-2 py-2.5 flex items-center gap-2 ${cardCls}`}>
+      {/* Info producto — ancho reducido */}
+      <div style={{ minWidth: 0, width: 90, flexShrink: 0 }}>
+        <div className="font-black text-chunky-dark text-[13px] leading-tight truncate">{pair.frito.name}</div>
+        <div className="flex items-center gap-0.5">
           <span className={`font-black text-xs ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
-          <span className="text-[8px] text-gray-400 font-bold">crudo</span>
+          <span className="text-[7px] text-gray-400 font-bold">cr</span>
           <span className="text-gray-300 text-[9px]">→</span>
           <span className="font-black text-xs text-chunky-dark">{pair.frito.qty}</span>
-          <span className="text-[8px] text-gray-400 font-bold">lista</span>
+          <span className="text-[7px] text-gray-400 font-bold">fr</span>
         </div>
       </div>
 
-      {/* Botones circulares */}
-      <div className="flex gap-1.5 flex-1 justify-center">
+      {/* Botones circulares — 38px */}
+      <div className="flex gap-1 flex-1 justify-center">
         {presets.slice(0, 5).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+            style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
             className={`font-black text-sm transition-all select-none ${circleCls}`}>
             {amount}
           </button>
@@ -129,7 +129,7 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
       </div>
 
       <button onClick={() => onManual(pair)}
-        style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 14, cursor: 'pointer' }}>
+        style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 12, cursor: 'pointer' }}>
         ✏️
       </button>
     </div>

@@ -96,36 +96,36 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual }) {
     : 'bg-[#FFB700] text-gray-900 active:scale-90 shadow-sm';
 
   return (
-    <div className={`rounded-2xl px-3 py-3 flex items-center gap-3 ${cardCls}`}>
-      {/* Info producto */}
-      <div style={{ minWidth: 0, width: 100, flexShrink: 0 }}>
-        <div className="font-black text-chunky-dark text-sm leading-tight truncate">{prod.name}</div>
+    <div className={`rounded-2xl px-2 py-2.5 flex items-center gap-2 ${cardCls}`}>
+      {/* Info producto — ancho fijo reducido */}
+      <div style={{ minWidth: 0, width: 82, flexShrink: 0 }}>
+        <div className="font-black text-chunky-dark text-[13px] leading-tight truncate">{prod.name}</div>
         <div className="flex items-baseline gap-0.5">
           <span className="font-black text-chunky-dark text-xs">{prod.currentStock}</span>
           <span className="text-[9px] font-bold text-gray-400">{shortUnit}</span>
-          <span className={`text-[10px] font-bold ml-1 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+          <span className={`text-[9px] font-bold ml-0.5 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
-      {/* Botones circulares */}
-      <div className="flex gap-1.5 flex-1 justify-center">
+      {/* Botones circulares — 38px, gap reducido */}
+      <div className="flex gap-1 flex-1 justify-center">
         {presets.slice(0, 5).map((b, i) => {
           const a = b * yieldQty;
           const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              style={{ width: 44, height: 44, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               className={`font-black transition-all select-none ${circleCls}`}>
-              <span style={{ fontSize: label.length > 3 ? 9 : label.length > 2 ? 11 : 14, lineHeight: 1, fontWeight: 900 }}>{label}</span>
-              {shortUnit.length <= 3 && <span style={{ fontSize: 7, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>}
+              <span style={{ fontSize: label.length > 3 ? 8 : label.length > 2 ? 10 : 13, lineHeight: 1, fontWeight: 900 }}>{label}</span>
+              <span style={{ fontSize: 6, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Manual — icono */}
+      {/* Manual — icono pequeño */}
       <button onClick={() => onManual(prod)}
-        style={{ width: 36, height: 36, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 14, cursor: 'pointer' }}
+        style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 12, cursor: 'pointer' }}
         title="Manual">
         ✏️
       </button>
