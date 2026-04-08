@@ -103,15 +103,17 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-chunky-main text-chunky-dark active:scale-90 shadow-sm';
 
-  const nameW   = size === 'md' ? 140 : 90;
+  const nameW   = size === 'md' ? 120 : 90;
   const circleD = size === 'md' ? 46  : 38;
-  const manualD = size === 'md' ? 38  : 30;
-  const nameSz  = size === 'md' ? 15  : 13;
-  const stockSz = size === 'md' ? 12  : 10;
-  const btnSz   = size === 'md' ? 15  : 12;
+  const manualD = size === 'md' ? 36  : 30;
+  const nameSz  = size === 'md' ? 14  : 13;
+  const stockSz = size === 'md' ? 11  : 10;
+  const btnSz   = size === 'md' ? 14  : 12;
+  const maxCircles = size === 'md' ? 4 : 5;
 
   return (
-    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}>
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}
+         style={{ overflow: 'hidden', minWidth: 0 }}>
       {/* Info */}
       <div style={{ minWidth: 0, width: nameW, flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
@@ -124,11 +126,11 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
         </div>
       </div>
 
-      {/* Botones circulares */}
-      <div className="flex gap-1.5 flex-1 justify-center">
-        {presets.slice(0, 5).map((amount, i) => (
+      {/* Botones circulares — máx 4 en tablet para que no desborden */}
+      <div style={{ display: 'flex', gap: 5, flex: 1, justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
+        {presets.slice(0, maxCircles).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            style={{ width: circleD, height: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
+            style={{ width: circleD, height: circleD, minWidth: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
             className={`transition-all select-none ${circleCls}`}>
             {amount}
           </button>
@@ -136,7 +138,7 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
       </div>
 
       <button onClick={() => onManual(pair)}
-        style={{ width: manualD, height: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}>
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 15 : 12, cursor: 'pointer' }}>
         ✏️
       </button>
     </div>
@@ -338,10 +340,15 @@ function FritadoPanel({ productionPoint, onBack }) {
   const isTablet  = !isMobile && sw > 500 && sw <= 1200;
   const isTabletLandscape = isTablet && sw > sh;
 
+  const isTabletFewProds = isTablet && count <= 3;
+  const isTabletPills    = isTablet && count > 3;
+
   let cols, allowScroll, pad, gap;
   if (isMobile) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
-  } else if (isTablet) {
+  } else if (isTabletFewProds) {
+    cols = count || 1; allowScroll = false; pad = 16; gap = 12;
+  } else if (isTabletPills) {
     cols = isTabletLandscape ? 2 : 1;
     allowScroll = true; pad = 10; gap = 8;
   } else {
@@ -352,10 +359,14 @@ function FritadoPanel({ productionPoint, onBack }) {
 
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
-  const useCompact = !isMobile && !isTablet && !allowScroll && (availableH / rows) < 140;
+  const cardH      = availableH / rows;
+  const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
-  const CARD_MAX = isTablet ? 380 : 300;
-  const gridMaxW = (!isMobile && count <= 4) ? cols * CARD_MAX + (cols - 1) * gap : '100%';
+  const CARD_MAX = count <= 2 ? 500 : count <= 4 ? 360 : 270;
+  const gridMaxW = isTabletFewProds ? '100%'
+    : allowScroll ? '100%'
+    : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
+
 
   const handleFry = (pair, amount) => {
     if (wasteMode) { setModalConfig({ pair, amount, isWasteFast: true }); return; }
@@ -405,7 +416,7 @@ function FritadoPanel({ productionPoint, onBack }) {
         </div>
       )}
 
-      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && count <= 4) ? 'center' : 'flex-start' }}>
+      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && !allowScroll) ? 'center' : 'flex-start' }}>
         {pairs.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <span style={{ fontSize: 40 }}>🧊</span>
@@ -415,19 +426,20 @@ function FritadoPanel({ productionPoint, onBack }) {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
-            gridTemplateRows: !allowScroll && count > 4 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
+            gridTemplateColumns: (isMobile || isTabletPills) ? `repeat(${cols}, 1fr)` : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
+            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
             gap,
             width: '100%',
-            maxWidth: typeof gridMaxW === 'number' ? gridMaxW : '100%',
-            height: !allowScroll && count > 4 ? '100%' : 'auto',
+            maxWidth: gridMaxW,
+            height: !allowScroll ? '100%' : 'auto',
           }}>
             {pairs.map((pair, i) => {
               const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };
-              if (isMobile)   return <FritadoCardMobile  {...props} size="sm" />;
-              if (isTablet)   return <FritadoCardMobile  {...props} size="md" />;
-              if (useCompact) return <FritadoCardCompact {...props} />;
-              return              <FritadoCard        {...props} cardH={cardH} />;
+              if (isMobile)          return <FritadoCardMobile  {...props} size="sm" />;
+              if (isTabletPills)     return <FritadoCardMobile  {...props} size="md" />;
+              if (isTabletFewProds)  return <FritadoCardTablet  {...props} cardH={cardH} />;
+              if (useCompact)        return <FritadoCardCompact {...props} />;
+              return                        <FritadoCard        {...props} cardH={cardH} />;
             })}
           </div>
         )}

@@ -104,7 +104,8 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
   const unitSzS = size === 'md' ? 8   : 6;
 
   return (
-    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}>
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}
+         style={{ overflow: 'hidden', minWidth: 0 }}>
       {/* Info producto */}
       <div style={{ minWidth: 0, width: nameW, flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{prod.name}</div>
@@ -115,15 +116,15 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
         </div>
       </div>
 
-      {/* Botones circulares */}
-      <div className="flex gap-1.5 flex-1 justify-center">
-        {presets.slice(0, 5).map((b, i) => {
+      {/* Botones circulares — flex:1 en cada círculo para que nunca desborden */}
+      <div style={{ display: 'flex', gap: 5, flex: 1, justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
+        {presets.slice(0, size === 'md' ? 4 : 5).map((b, i) => {
           const a = b * yieldQty;
           const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           const fSize = label.length > 3 ? (circleD * 0.2) : label.length > 2 ? (circleD * 0.26) : (circleD * 0.34);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              style={{ width: circleD, height: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: circleD, height: circleD, minWidth: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               className={`font-black transition-all select-none ${circleCls}`}>
               <span style={{ fontSize: fSize, lineHeight: 1, fontWeight: 900 }}>{label}</span>
               <span style={{ fontSize: unitSzS, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>
@@ -134,7 +135,7 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ width: manualD, height: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
         title="Manual">
         ✏️
       </button>
@@ -347,20 +348,27 @@ function ProductionPanel({ productionPoint, onBack }) {
 
   // ── Breakpoints ──────────────────────────────────────────────────────────────
   const isMobile  = aspectRatio > 1.4;
-  // Tablet: hasta 1200px (iPad mini landscape=1024, Air=1180)
   const isTablet  = !isMobile && sw > 500 && sw <= 1200;
-  // En tablet, landscape = 2 columnas de píldoras; portrait = 1
   const isTabletLandscape = isTablet && sw > sh;
+
+  // En tablet: ≤3 productos → tarjeta grande centrada (no píldoras)
+  //            >3 productos → píldoras con scroll
+  const isTabletFewProds = isTablet && count <= 3;
+  const isTabletPills    = isTablet && count > 3;
 
   // Columnas según dispositivo
   let cols, allowScroll, pad, gap;
   if (isMobile) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
-  } else if (isTablet) {
-    // Píldoras con scroll, 2 cols en landscape / 1 en portrait
+  } else if (isTabletFewProds) {
+    // Tarjeta grande centrada — sin scroll, 1 col por producto
+    cols = count || 1; allowScroll = false; pad = 16; gap = 12;
+  } else if (isTabletPills) {
+    // Píldoras con scroll
     cols = isTabletLandscape ? 2 : 1;
     allowScroll = true; pad = 10; gap = 8;
   } else {
+    // PC/Cocina
     allowScroll = false; pad = 6; gap = 6;
     if      (count <= 2)  { cols = count || 1; }
     else if (count <= 4)  { cols = 2; }
@@ -370,11 +378,17 @@ function ProductionPanel({ productionPoint, onBack }) {
   }
   const rows = Math.ceil(count / cols);
 
-  // Compacto solo en desktop (kitchen) cuando hay muy poco espacio
+  // Compacto solo en PC cuando hay muy poco espacio
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
   const cardH      = availableH / rows;
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
+
+  // Ancho máximo por tarjeta — en PC con pocos productos, tarjetas más grandes
+  const CARD_MAX  = count <= 2 ? 500 : count <= 4 ? 360 : 270;
+  const gridMaxW  = isTabletFewProds ? '100%'
+    : allowScroll ? '100%'
+    : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 
 
   const handleProduce = (product, batches = 1) => {
@@ -403,9 +417,7 @@ function ProductionPanel({ productionPoint, onBack }) {
     }
   };
 
-  // Ancho máximo del grid cuando hay pocos productos (para que no se estiren)
-  const CARD_MAX   = isTablet ? 380 : 300;
-  const gridMaxW   = (!isMobile && count <= 4) ? cols * CARD_MAX + (cols - 1) * gap : '100%';
+
 
   return (
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg)' }}>
@@ -443,7 +455,7 @@ function ProductionPanel({ productionPoint, onBack }) {
       )}
 
       {/* Grid */}
-      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && count <= 4) ? 'center' : 'flex-start' }}>
+      <div style={{ flex: 1, overflow: allowScroll ? 'auto' : 'hidden', padding: pad, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: (!isMobile && !allowScroll) ? 'center' : 'flex-start' }}>
         {enriched.length === 0 ? (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
             <span style={{ fontSize: 40 }}>📋</span>
@@ -453,19 +465,20 @@ function ProductionPanel({ productionPoint, onBack }) {
         ) : (
           <div style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
-            gridTemplateRows: !allowScroll && count > 4 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
+            gridTemplateColumns: (isMobile || isTabletPills) ? `repeat(${cols}, 1fr)` : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
+            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
             gap,
             width: '100%',
-            maxWidth: typeof gridMaxW === 'number' ? gridMaxW : '100%',
-            height: !allowScroll && count > 4 ? '100%' : 'auto',
+            maxWidth: gridMaxW,
+            height: !allowScroll ? '100%' : 'auto',
           }}>
             {enriched.map((prod) => {
               const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
-              if (isMobile)      return <CardMobile  {...props} size="sm" />;
-              if (isTablet)      return <CardMobile  {...props} size="md" />;
-              if (useCompact)    return <CardCompact {...props} />;
-              return               <CardNormal  {...props} cardH={cardH} />;
+              if (isMobile)          return <CardMobile  {...props} size="sm" />;
+              if (isTabletPills)     return <CardMobile  {...props} size="md" />;
+              if (isTabletFewProds)  return <CardTablet  {...props} cardH={cardH} />;
+              if (useCompact)        return <CardCompact {...props} />;
+              return                        <CardNormal  {...props} cardH={cardH} />;
             })}
           </div>
         )}
