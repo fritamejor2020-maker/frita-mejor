@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { push } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
+
+function syncSuppliers(suppliers) {
+  markLocalWrite('suppliers');
+  push('suppliers', suppliers).catch(err => console.warn('[Sync] suppliers:', err.message));
+}
 
 /**
  * Global store to manage Suppliers and the common products/descriptions they sell.
@@ -25,6 +32,7 @@ export const useSupplierStore = create(
           newSupplier.commonProducts = newSupplier.commonProducts.map(p => p.toLowerCase().trim());
         }
         set((state) => ({ suppliers: [...state.suppliers, newSupplier] }));
+        syncSuppliers(useSupplierStore.getState().suppliers);
         return newSupplier; // Return so the UI can auto-select it if created on the fly
       },
 
@@ -42,12 +50,14 @@ export const useSupplierStore = create(
           });
           return { suppliers: newSuppliers };
         });
+        syncSuppliers(useSupplierStore.getState().suppliers);
       },
 
       removeSupplier: (id) => {
         set((state) => ({
           suppliers: state.suppliers.filter(s => s.id !== id)
         }));
+        syncSuppliers(useSupplierStore.getState().suppliers);
       },
 
       /**

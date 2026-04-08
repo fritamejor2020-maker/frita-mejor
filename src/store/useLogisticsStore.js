@@ -1,6 +1,13 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
+import { push } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
+
+function syncKey(key, value) {
+  markLocalWrite(key);
+  push(key, value).catch(err => console.warn('[Sync]', key, err.message));
+}
 
 /**
  * Store global para administrar flujos Logísticos y de Surtido
@@ -57,8 +64,10 @@ export const useLogisticsStore = create(
       created_at: new Date().toISOString()
     };
 
-    set({ pendingRequests: [...pendingRequests, newRequest] });
+    const updated = [...pendingRequests, newRequest];
+    set({ pendingRequests: updated });
     get().clearRestockCart();
+    syncKey('pendingRequests', updated);
   },
 
   // ===============================
@@ -77,19 +86,22 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const newPending = pendingRequests.filter(req => req.id !== requestId);
+    const newCompleted = [{ ...req, status: 'completed', completed_at: new Date().toISOString() }, ...completedRequests];
     set({
-      pendingRequests: pendingRequests.filter(req => req.id !== requestId),
-      completedRequests: [{ ...req, status: 'completed', completed_at: new Date().toISOString() }, ...completedRequests]
+      pendingRequests: newPending,
+      completedRequests: newCompleted
     });
+    syncKey('pendingRequests', newPending);
   },
 
   updatePendingRequest: (requestId, newPayload) => {
     const { pendingRequests } = get();
-    set({
-      pendingRequests: pendingRequests.map(req => 
-        req.id === requestId ? { ...req, items_payload: newPayload } : req
-      )
-    });
+    const updated = pendingRequests.map(req => 
+      req.id === requestId ? { ...req, items_payload: newPayload } : req
+    );
+    set({ pendingRequests: updated });
+    syncKey('pendingRequests', updated);
   },
 
   // ===============================
@@ -117,6 +129,7 @@ export const useLogisticsStore = create(
       timestamp: new Date().toISOString()
     };
     set(state => ({ loadHistory: [entry, ...state.loadHistory] }));
+    syncKey('loadHistory', [entry, ...get().loadHistory]);
     return true;
   },
 
@@ -140,6 +153,7 @@ export const useLogisticsStore = create(
       timestamp: new Date().toISOString()
     };
     set(state => ({ loadHistory: [entry, ...state.loadHistory] }));
+    syncKey('loadHistory', [entry, ...get().loadHistory]);
     return true;
   }
 

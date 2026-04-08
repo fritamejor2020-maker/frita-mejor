@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Frita Mejor - Documentación Completa</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap');
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+      background: #f8f8f5;
+      color: #1a1a2e;
+      padding: 40px 20px;
+    }
+
+    .doc {
+      max-width: 900px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 24px;
+      box-shadow: 0 4px 40px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    /* ── Portada ── */
+    .cover {
+      background: linear-gradient(135deg, #FFD56B 0%, #FF9A3C 60%, #FF4040 100%);
+      padding: 80px 60px;
+      text-align: center;
+      color: white;
+    }
+    .cover .logo-box {
+      width: 100px; height: 100px;
+      background: rgba(255,255,255,0.25);
+      border-radius: 32px;
+      display: flex; align-items: center; justify-content: center;
+      margin: 0 auto 24px;
+      font-size: 52px;
+      backdrop-filter: blur(8px);
+      border: 2px solid rgba(255,255,255,0.3);
+    }
+    .cover h1 { font-size: 52px; font-weight: 900; letter-spacing: -2px; margin-bottom: 8px; }
+    .cover .subtitle { font-size: 20px; opacity: 0.85; font-weight: 600; margin-bottom: 32px; }
+    .cover .meta {
+      display: inline-flex; gap: 32px;
+      background: rgba(255,255,255,0.2); border-radius: 100px;
+      padding: 14px 32px; font-size: 14px; font-weight: 700;
+    }
+    .cover .meta span { opacity: 0.9; }
+
+    /* ── Contenido ── */
+    .content { padding: 60px; }
+
+    h2 {
+      font-size: 28px; font-weight: 900; color: #FF4040;
+      padding-bottom: 12px; border-bottom: 3px solid #FFD56B;
+      margin: 48px 0 20px;
+    }
+    h2:first-child { margin-top: 0; }
+
+    h3 {
+      font-size: 19px; font-weight: 800; color: #1a1a2e;
+      margin: 28px 0 10px;
+    }
+
+    h4 {
+      font-size: 15px; font-weight: 700; color: #FF4040;
+      margin: 18px 0 6px; text-transform: uppercase; letter-spacing: 0.5px;
+    }
+
+    p { font-size: 15px; line-height: 1.8; color: #333; margin-bottom: 12px; }
+
+    ul, ol { padding-left: 22px; margin-bottom: 14px; }
+    li { font-size: 15px; line-height: 1.7; color: #333; margin-bottom: 4px; }
+
+    /* ── Módulos cards ── */
+    .module-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 20px; margin: 24px 0;
+    }
+    .module-card {
+      border-radius: 20px; padding: 24px;
+      border: 2px solid #f0f0f0;
+      transition: transform 0.2s;
+    }
+    .module-card .icon { font-size: 36px; margin-bottom: 12px; display: block; }
+    .module-card h3 { margin: 0 0 8px; font-size: 17px; }
+    .module-card p { font-size: 13px; margin: 0; line-height: 1.6; }
+    .mod-admin    { background: #fff5f5; border-color: #ffd6d6; }
+    .mod-vendor   { background: #fffbf0; border-color: #FFD56B; }
+    .mod-dejador  { background: #f0f9ff; border-color: #bae6fd; }
+    .mod-prod     { background: #f0fdf4; border-color: #bbf7d0; }
+    .mod-frito    { background: #fff7ed; border-color: #fed7aa; }
+    .mod-bodega   { background: #f5f3ff; border-color: #ddd6fe; }
+    .mod-pos      { background: #f0fdf4; border-color: #6ee7b7; }
+    .mod-fin      { background: #faf5ff; border-color: #e9d5ff; }
+
+    /* ── Roles table ── */
+    table {
+      width: 100%; border-collapse: collapse; margin: 20px 0; font-size: 14px;
+    }
+    th {
+      background: #FF4040; color: white; padding: 12px 16px;
+      text-align: left; font-weight: 800;
+    }
+    td { padding: 10px 16px; border-bottom: 1px solid #f0f0f0; vertical-align: top; }
+    tr:nth-child(even) td { background: #fafafa; }
+    tr:hover td { background: #fff9f0; }
+
+    /* ── Tech stack ── */
+    .tech-grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 14px; margin: 20px 0;
+    }
+    .tech-item {
+      background: #f8f8f5; border-radius: 16px; padding: 18px;
+      display: flex; align-items: flex-start; gap: 12px;
+      border: 1px solid #eee;
+    }
+    .tech-item .tech-icon { font-size: 28px; flex-shrink: 0; }
+    .tech-item h4 { margin: 0 0 4px; font-size: 14px; color: #1a1a2e; }
+    .tech-item p { font-size: 12px; margin: 0; color: #666; }
+
+    /* ── Design tokens ── */
+    .color-row { display: flex; gap: 16px; flex-wrap: wrap; margin: 16px 0; }
+    .color-chip {
+      border-radius: 14px; padding: 14px 20px;
+      display: flex; flex-direction: column; align-items: center;
+      min-width: 120px; text-align: center;
+    }
+    .color-chip .chip-name { font-size: 12px; font-weight: 800; margin-top: 6px; }
+    .color-chip .chip-hex  { font-size: 11px; opacity: 0.7; font-family: monospace; }
+
+    /* ── Flow ── */
+    .flow {
+      display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 16px 0;
+    }
+    .flow-step {
+      background: #FFD56B; border-radius: 100px;
+      padding: 8px 18px; font-size: 13px; font-weight: 800; color: #1a1a2e;
+    }
+    .flow-arrow { font-size: 18px; color: #FF4040; font-weight: 900; }
+
+    /* ── Logros ── */
+    .achievement {
+      display: flex; gap: 16px; align-items: flex-start;
+      background: #f8f8f5; border-radius: 16px; padding: 18px;
+      margin-bottom: 14px; border-left: 4px solid #FF4040;
+    }
+    .achievement .ach-icon { font-size: 28px; flex-shrink: 0; }
+    .achievement h4 { font-size: 15px; color: #FF4040; margin: 0 0 4px; }
+    .achievement p  { font-size: 14px; color: #555; margin: 0; line-height: 1.6; }
+
+    /* ── Callout ── */
+    .callout {
+      background: linear-gradient(135deg, #fff9ec, #fff3d0);
+      border: 2px solid #FFD56B; border-radius: 20px;
+      padding: 24px 28px; margin: 24px 0;
+    }
+    .callout p { margin: 0; font-size: 15px; line-height: 1.7; }
+    .callout strong { color: #FF4040; }
+
+    /* ── Anim list ── */
+    .anim-list { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+    .anim-item {
+      background: #f5f5f5; border-radius: 12px; padding: 14px 16px;
+      font-size: 13px; border-left: 3px solid #FFB700;
+    }
+    .anim-item strong { display: block; font-size: 14px; color: #1a1a2e; margin-bottom: 2px; }
+
+    /* ── TOC ── */
+    .toc { background: #f8f8f5; border-radius: 20px; padding: 28px 32px; margin-bottom: 40px; }
+    .toc h3 { margin: 0 0 16px; color: #FF4040; font-size: 18px; }
+    .toc ol { margin: 0; }
+    .toc li { padding: 5px 0; font-size: 15px; color: #333; }
+    .toc a { color: #FF4040; text-decoration: none; font-weight: 700; }
+
+    /* ── Footer ── */
+    footer {
+      background: #1a1a2e; color: white;
+      padding: 40px 60px; text-align: center;
+    }
+    footer p { font-size: 14px; opacity: 0.6; margin: 4px 0; }
+    footer strong { opacity: 1; color: #FFD56B; font-size: 18px; display: block; margin-bottom: 8px; }
+
+    @media print {
+      body { background: white; }
+      .doc { box-shadow: none; border-radius: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="doc">
+
+  <!-- ════════════════════════════════════════ PORTADA ═══════════ -->
+  <div class="cover">
+    <div class="logo-box">🍽️</div>
+    <h1>FRITA MEJOR</h1>
+    <p class="subtitle">Sistema Operativo de Gestión para Puntos de Venta de Comida Rápida</p>
+    <div class="meta">
+      <span>📄 Documentación Técnica y Funcional</span>
+      <span>📅 Abril 2026</span>
+      <span>📦 v1.0.0</span>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════ CONTENIDO ═════════ -->
+  <div class="content">
+
+    <!-- ── 0. TOC ──────────────────────────── -->
+    <div class="toc">
+      <h3>📑 Tabla de Contenido</h3>
+      <ol>
+        <li><a href="#vision">1. Visión General del Proyecto</a></li>
+        <li><a href="#modulos">2. Módulos del Sistema</a></li>
+        <li><a href="#roles">3. Roles de Usuario</a></li>
+        <li><a href="#flujo">4. Flujo Operativo Completo</a></li>
+        <li><a href="#disenio">5. Lenguaje de Diseño Visual (Chunky UI)</a></li>
+        <li><a href="#animaciones">6. Sistema de Animaciones</a></li>
+        <li><a href="#tech">7. Stack Tecnológico</a></li>
+        <li><a href="#arquitectura">8. Arquitectura del Software</a></li>
+        <li><a href="#logros">9. Logros Consolidados</a></li>
+        <li><a href="#futuro">10. Estado Actual y Próximos Pasos</a></li>
+      </ol>
+    </div>
+
+    <!-- ── 1. VISIÓN ───────────────────────── -->
+    <h2 id="vision">1. Visión General del Proyecto</h2>
+
+    <p><strong>Frita Mejor</strong> es una <strong>aplicación web progresiva (PWA)</strong> diseñada para digitalizar y optimizar la operación completa de un negocio de comida rápida con múltiples puntos de venta móviles (triciclos) y un local fijo. El sistema reemplaza los cuadernos de control, las hojas de cálculo manuales y la comunicación informal por un sistema centralizado, en tiempo real, accesible desde cualquier dispositivo con navegador.</p>
+
+    <div class="callout">
+      <p><strong>Problema que resuelve:</strong> En operaciones de food-service con vendedores móviles, el control de inventario, la trazabilidad de ventas, el registro de gastos y la conciliación de cuentas diarias son procesos lentos, propensos a errores y difíciles de auditar. Frita Mejor centraliza toda esa información en una sola plataforma accesible en tiempo real, desde un celular.</p>
+    </div>
+
+    <h3>¿A quién está dirigida?</h3>
+    <p>El sistema está diseñado para negocios de comida rápida de escala mediana que operan con:</p>
+    <ul>
+      <li>Una <strong>cocina central</strong> que prepara (frita) los productos</li>
+      <li>Una <strong>bodega de distribución</strong> que despacha a los puntos</li>
+      <li>Múltiples <strong>vendedores en campo</strong> (triciclos, locales)</li>
+      <li>Un <strong>equipo administrativo</strong> que supervisa finanzas, inventario y logística</li>
+      <li>Un <strong>punto de venta fijo (local)</strong> con caja POS completa</li>
+    </ul>
+
+    <!-- ── 2. MÓDULOS ──────────────────────── -->
+    <h2 id="modulos">2. Módulos del Sistema</h2>
+    <p>La aplicación está estructurada en <strong>8 módulos funcionales independientes</strong>, cada uno diseñado para un rol específico y accesible únicamente con los permisos correspondientes:</p>
+
+    <div class="module-grid">
+      <div class="module-card mod-admin">
+        <span class="icon">⚙️</span>
+        <h3>Panel Administrador</h3>
+        <p>Centro de control total. Gestiona inventario, precios, recetas, usuarios, vehículos, logística, finanzas y configuraciones globales del sistema.</p>
+      </div>
+      <div class="module-card mod-vendor">
+        <span class="icon">🛒</span>
+        <h3>Módulo Vendedor</h3>
+        <p>Dashboard del vendedor en campo. Permite realizar ventas en POS, solicitar surtidos (cargas), y cerrar la jornada con conteo de efectivo y transferencias.</p>
+      </div>
+      <div class="module-card mod-dejador">
+        <span class="icon">🚲</span>
+        <h3>Módulo Dejador</h3>
+        <p>Para el "dejador" (distribuidor en triciclo). Gestiona la carga de productos a llevar, los surtidos de campo a vendedores, y el cierre de su jornada.</p>
+      </div>
+      <div class="module-card mod-prod">
+        <span class="icon">📦</span>
+        <h3>Módulo Producción</h3>
+        <p>Control del operario de cocina. Registra las unidades de producto ensambladas (ej: empanadas armadas), despachadas y devueltas por punto de producción.</p>
+      </div>
+      <div class="module-card mod-frito">
+        <span class="icon">🍳</span>
+        <h3>Módulo Fritado</h3>
+        <p>Panel del fritador. Convierte crudos en fritos con presets de cantidad configurables. Incluye modo merma para registrar pérdidas por quemado, daños u otros motivos.</p>
+      </div>
+      <div class="module-card mod-bodega">
+        <span class="icon">📦</span>
+        <h3>Módulo Bodega</h3>
+        <p>Gestión del bodeguero. Despacha productos a puntos de venta, registra recepciones de mercancía, transfiere stock entre bodegas y realiza inventario físico.</p>
+      </div>
+      <div class="module-card mod-pos">
+        <span class="icon">🖥️</span>
+        <h3>Módulo POS (Caja)</h3>
+        <p>Punto de venta completo para el local fijo. Carrito de compras, cobro en efectivo/transferencia, registro de ingresos y egresos, y panel de finanzas del cajero.</p>
+      </div>
+      <div class="module-card mod-fin">
+        <span class="icon">💰</span>
+        <h3>Módulo Finanzas</h3>
+        <p>Dashboard de conciliación para el rol de Finanzas o Admin. Visualiza cierres de vendedores, compara teórico vs real, registra ingresos/gastos y exporta a Excel.</p>
+      </div>
+    </div>
+
+    <!-- ── 2.1 Admin ── -->
+    <h3>2.1 Panel Administrador — Detalle</h3>
+    <p>Es el módulo más complejo del sistema. Funciona como el "cerebro" de la operación con las siguientes secciones:</p>
+    <ul>
+      <li><strong>📦 Inventario:</strong> Lista completa de todos los ítems (productos, materias primas, empaques). Permite crear, editar, ajustar stock manualmente.</li>
+      <li><strong>⚖️ Precios Maestros:</strong> Tabla de precios de venta de todos los productos vendibles, con edición en línea.</li>
+      <li><strong>🍲 Recetas:</strong> Definición de ingredientes y cantidades por receta de producción para calcular costos y controlar materias primas.</li>
+      <li><strong>🔥 Fritado:</strong> Configura qué crudos se convierten en qué fritos, con presets de cantidades personalizables por punto de producción.</li>
+      <li><strong>🏭 Producción:</strong> Define los puntos de ensamblaje/producción activos.</li>
+      <li><strong>🚲 Logística y Equipo:</strong> Gestión de triciclos (vehículos), rutas y estado operativo de cada vehículo.</li>
+      <li><strong>👥 Usuarios:</strong> Alta, baja y modificación de usuarios con roles específicos.</li>
+      <li><strong>💵 Cierres y Finanzas:</strong> Conciliación de cierres de jornada, comparación teórico APP vs real de caja, e historial de ingresos y egresos.</li>
+      <li><strong>🎟️ Descuentos:</strong> Configuración de descuentos para clientes especiales o grupos.</li>
+      <li><strong>⚙️ Configuración POS:</strong> Presets de cantidades para el surtido de vendedores.</li>
+    </ul>
+
+    <!-- ── 2.2 Vendedor ── -->
+    <h3>2.2 Módulo Vendedor — Detalle</h3>
+    <p>El vendedor es el rol de campo más importante. Su flujo de trabajo es:</p>
+    <ul>
+      <li><strong>Setup inicial:</strong> Selecciona tipo de punto (triciclo/local), turno (AM/MD/PM) y su nombre. La app lo identifica para el resto de la jornada.</li>
+      <li><strong>POS de ventas:</strong> Registra cada venta con un carrito de productos. El sistema acumula el teórico de ventas en tiempo real.</li>
+      <li><strong>Pedido de surtido:</strong> Solicita reabastecimiento de productos con cantidades preset. Puede guardar plantillas de carga para reutilizarlas.</li>
+      <li><strong>Cierre de jornada:</strong> Al terminar, ingresa efectivo y transferencias cobradas. El sistema muestra el Total Venta Neta (efectivo + transferencias) y registra los gastos/salidas por separado.</li>
+    </ul>
+
+    <!-- ── 2.3 Bodega ── -->
+    <h3>2.3 Módulo Bodega — Detalle</h3>
+    <p>El bodeguero maneja tres modos principales:</p>
+    <ul>
+      <li><strong>Modo Despacho:</strong> Escanea o selecciona productos y los despacha a un punto de venta específico. Puede agregar destinatario y número de factura. El inventario se actualiza en tiempo real.</li>
+      <li><strong>Modo Recepción:</strong> Registra el ingreso de mercancía de proveedores o de cocina. Cada ítem recibido incrementa el stock automáticamente.</li>
+      <li><strong>Inventario Físico:</strong> El bodeguero puede ingresar el conteo real del stock y el sistema calcula las diferencias vs el stock teórico del sistema.</li>
+    </ul>
+
+    <!-- ── 2.4 Fritado ── -->
+    <h3>2.4 Módulo Fritado — Detalle</h3>
+    <p>El fritador transforma materias primas (crudos) en productos terminados (fritos). El flujo es:</p>
+    <ul>
+      <li>Selecciona su puesto de fritado.</li>
+      <li>Ve en tiempo real cuántas unidades de crudo tiene disponibles y cuántas fritas ya hay listas.</li>
+      <li>Usa <strong>botones de presets</strong> (ej: fritar 50, 100, 200 unidades) para registrar rapidamente la producción.</li>
+      <li>En <strong>Modo Merma</strong>, registra las pérdidas por quemado, daño u otros motivos con su motivo específico.</li>
+    </ul>
+
+    <!-- ── 3. ROLES ─────────────────────────── -->
+    <h2 id="roles">3. Roles de Usuario y Permisos</h2>
+    <p>El sistema implementa <strong>control de acceso basado en roles (RBAC)</strong>. Cada usuario tiene exactamente un rol que determina a qué módulo accede:</p>
+
+    <table>
+      <thead><tr><th>Rol</th><th>Módulo</th><th>Descripción del perfil</th></tr></thead>
+      <tbody>
+        <tr><td><strong>ADMIN</strong></td><td>/admin</td><td>Acceso total a todos los módulos. Gestiona el sistema completo.</td></tr>
+        <tr><td><strong>OPERARIO</strong></td><td>/produccion</td><td>Personal de cocina. Registra unidades ensambladas por punto de producción.</td></tr>
+        <tr><td><strong>FRITADOR</strong></td><td>/fritado</td><td>Responsable de la línea de fritado. Convierte crudos en fritos.</td></tr>
+        <tr><td><strong>BODEGUERO</strong></td><td>/bodega</td><td>Controla la bodega: despachos, recepciones e inventario físico.</td></tr>
+        <tr><td><strong>CAJERO</strong></td><td>/pos</td><td>Opera el punto de venta fijo (local). Gestiona cobros y registro financiero.</td></tr>
+        <tr><td><strong>VENDEDOR</strong></td><td>/vendedor</td><td>Vendedor de campo. Vende, solicita surtidos y cierra su jornada.</td></tr>
+        <tr><td><strong>DEJADOR</strong></td><td>/dejador</td><td>Distribuidor móvil. Lleva cargas a vendedores y registra surtidos.</td></tr>
+        <tr><td><strong>FINANZAS</strong></td><td>/finanzas</td><td>Área financiera. Visualiza y concilia los cierres y las finanzas del negocio.</td></tr>
+      </tbody>
+    </table>
+
+    <p>El sistema redirige automáticamente a cada usuario a su módulo correspondiente al iniciar sesión, sin necesidad de que conozca las rutas del sistema.</p>
+
+    <!-- ── 4. FLUJO OPERATIVO ──────────────── -->
+    <h2 id="flujo">4. Flujo Operativo Completo</h2>
+    <p>La operación diaria de Frita Mejor sigue un flujo circular y trazable de principio a fin:</p>
+
+    <h3>4.1 Cadena de Inventario</h3>
+    <div class="flow">
+      <div class="flow-step">🥩 Materia Prima en Bodega</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🍳 Fritado (Crudo → Frito)</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">📦 Despacho Bodega</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🚲 Vendedor Recibe Carga</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🛒 Venta al Cliente</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">💰 Cierre Caja</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">📊 Conciliación Admin</div>
+    </div>
+
+    <h3>4.2 Flujo Financiero</h3>
+    <ol>
+      <li>El vendedor realiza ventas y el sistema acumula un <strong>teórico de ventas POS</strong>.</li>
+      <li>Al cierre, el vendedor reporta: <strong>efectivo</strong> + <strong>transferencias</strong> + <strong>gastos</strong>.</li>
+      <li>El <strong>Total Venta Neta</strong> mostrado al vendedor = Efectivo + Transferencias (sin restar gastos).</li>
+      <li>En el módulo Admin/Finanzas, el <strong>Teórico (APP)</strong> = Ventas POS + Gastos declarados. Esto permite compararlo con el Real (Caja) = Efectivo + Transferencias entregado.</li>
+      <li>El sistema indica si hubo <strong>cuadre perfecto ✅</strong>, <strong>faltante 🔴</strong> o <strong>sobrante 🟢</strong>.</li>
+    </ol>
+
+    <h3>4.3 Flujo de Surtido de Campo</h3>
+    <div class="flow">
+      <div class="flow-step">📱 Vendedor solicita surtido</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🚲 Dejador recibe solicitud</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">📦 Dejador entrega en campo</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">✅ Inventario actualizado</div>
+    </div>
+
+    <!-- ── 5. DISEÑO ───────────────────────── -->
+    <h2 id="disenio">5. Lenguaje de Diseño Visual — "Chunky UI"</h2>
+
+    <div class="callout">
+      <p>El sistema usa un lenguaje de diseño propio denominado <strong>"Chunky UI"</strong>: diseño audaz, con bordes muy redondeados, tipografía negrita, colores vibrantes y una experiencia táctil optimizada para personas que trabajan en campo con las manos ocupadas. Cada elemento está diseñado para ser presionable fácilmente con el dedo pulgar en pantallas pequeñas.</p>
+    </div>
+
+    <h3>5.1 Paleta de Colores</h3>
+    <div class="color-row">
+      <div class="color-chip" style="background:#FFD56B; color:#1a1a2e;">
+        <div class="chip-name">Amarillo Principal</div>
+        <div class="chip-hex">#FFD56B</div>
+      </div>
+      <div class="color-chip" style="background:#FF4040; color:white;">
+        <div class="chip-name">Rojo Acción</div>
+        <div class="chip-hex">#FF4040</div>
+      </div>
+      <div class="color-chip" style="background:#FFB700; color:white;">
+        <div class="chip-name">Naranja Foco</div>
+        <div class="chip-hex">#FFB700</div>
+      </div>
+      <div class="color-chip" style="background:#2D3748; color:white;">
+        <div class="chip-name">Texto Oscuro</div>
+        <div class="chip-hex">#2D3748</div>
+      </div>
+      <div class="color-chip" style="background:#1e1f26; color:white;">
+        <div class="chip-name">Dark Mode POS</div>
+        <div class="chip-hex">#1e1f26</div>
+      </div>
+      <div class="color-chip" style="background:#f8f8f5; color:#1a1a2e; border:1px solid #eee;">
+        <div class="chip-name">Fondo Neutro</div>
+        <div class="chip-hex">#f8f8f5</div>
+      </div>
+    </div>
+
+    <h3>5.2 Tipografía</h3>
+    <p>Se usa la fuente <strong>Nunito</strong> (sans-serif) como tipografía sans-serif del sistema. Esta fuente tiene terminaciones redondeadas que complementan el estilo "chunky" del diseño. Los títulos usan <code>font-black</code> (peso 900) para máxima legibilidad y carácter. Los valores monetarios se muestran siempre con tamaños grandes y en negrita.</p>
+
+    <h3>5.3 Principios de Diseño</h3>
+    <ul>
+      <li><strong>🎯 Bordes ultrarredondeados:</strong> Las tarjetas usan <code>border-radius</code> de 32px a 48px ("border-radius: 3xl"). Los botones y píldoras van hasta <code>border-radius: full</code>.</li>
+      <li><strong>✋ Táctil primero:</strong> Todos los botones tienen mínimo 44px de alto (estándar táctil). Los botones de acción principal miden 56px o más.</li>
+      <li><strong>📱 Mobile first:</strong> Todas las vistas usan clases <code>sm:</code> de Tailwind para escalar progresivamente desde un celular de 360px hasta pantallas de escritorio.</li>
+      <li><strong>🔥 Feedback instantáneo:</strong> cada tap en un botón produce un efecto <code>scale(0.96)</code> inmediato mediante CSS global, dando sensación de respuesta física.</li>
+      <li><strong>🎨 Jerarquía visual clara:</strong> Fondo amarillo brillante para pantallas de selección/login. Tarjetas blancas con sombra suave para el contenido de datos. Overlay oscuro para modales.</li>
+      <li><strong>♿ Contraste accesible:</strong> Texto oscuro (#2D3748) sobre fondo amarillo, cumpliendo estándares WCAG de contraste mínimo 4.5:1.</li>
+    </ul>
+
+    <h3>5.4 Componentes Clave de UI</h3>
+    <ul>
+      <li><strong>BottomNav:</strong> Barra de navegación inferior flotante con el tab activo elevado y con sombra amarilla. Usa efecto glassmorphism (<code>backdrop-blur</code>).</li>
+      <li><strong>MoneyInput:</strong> Input de dinero personalizado que formatea automáticamente los números con puntos de miles (2000 → 2.000) mientras el usuario escribe.</li>
+      <li><strong>HangingInput:</strong> Input con etiqueta "colgante" (posicionada encima del borde superior del input) para los flujos de cierre.</li>
+      <li><strong>NumberSelectorGroup:</strong> Selector de cantidades con botones +/- y entrada manual, diseñado para operar con guantes o dedos grandes.</li>
+      <li><strong>FusedPill:</strong> Botón tipo píldora fusionada para acciones agrupadas.</li>
+      <li><strong>Toast notifications:</strong> Notificaciones emergentes que aparecen en la parte inferior con animación spring.</li>
+    </ul>
+
+    <!-- ── 6. ANIMACIONES ──────────────────── -->
+    <h2 id="animaciones">6. Sistema de Animaciones</h2>
+    <p>El sistema de animaciones está centralizado en <code>index.css</code> y <code>tailwind.config.js</code>, usando curvas de tiempo propias:</p>
+
+    <table style="margin-bottom:20px;">
+      <thead><tr><th>Curva</th><th>Variable CSS</th><th>Uso</th></tr></thead>
+      <tbody>
+        <tr><td><code>cubic-bezier(0.34, 1.56, 0.64, 1)</code></td><td><code>--ease-spring</code></td><td>Botones, tabs, elementos interactivos</td></tr>
+        <tr><td><code>cubic-bezier(0.16, 1, 0.3, 1)</code></td><td><code>--ease-out-expo</code></td><td>Entradas de modales, tarjetas</td></tr>
+        <tr><td><code>cubic-bezier(0.4, 0, 0.2, 1)</code></td><td><code>--ease-in-out-smooth</code></td><td>Transiciones de estado, toggles</td></tr>
+      </tbody>
+    </table>
+
+    <div class="anim-list">
+      <div class="anim-item"><strong>.animate-modal-in</strong>Modal entra desde abajo con spring suave (translateY + scale)</div>
+      <div class="anim-item"><strong>.animate-success-flash</strong>Pantalla de confirmación verde con efecto zoom de entrada</div>
+      <div class="anim-item"><strong>.animate-shake</strong>Vibración horizontal para indicar error de validación</div>
+      <div class="anim-item"><strong>.animate-badge-pulse</strong>Pulso de anillo para notificaciones y alertas de bajo stock</div>
+      <div class="anim-item"><strong>.page-enter</strong>Transición suave de entrada al navegar entre vistas</div>
+      <div class="anim-item"><strong>.card-hover</strong>Elevación suave de tarjetas al hacer hover</div>
+      <div class="anim-item"><strong>.animate-pop-in</strong>Aparición con escala "pop" para íconos de éxito</div>
+      <div class="anim-item"><strong>.skeleton</strong>Shimmer de carga para estados de espera de datos</div>
+      <div class="anim-item"><strong>button:active scale(0.96)</strong>Feedback táctil global en todos los botones de la app</div>
+      <div class="anim-item"><strong>BottomNav spring</strong>Tab activo sube con muelle y sombra amarilla animada</div>
+    </div>
+
+    <!-- ── 7. TECH STACK ───────────────────── -->
+    <h2 id="tech">7. Stack Tecnológico</h2>
+
+    <div class="tech-grid">
+      <div class="tech-item">
+        <div class="tech-icon">⚛️</div>
+        <div>
+          <h4>React 18</h4>
+          <p>Librería de UI. Componentes funcionales con hooks modernos. SPA con routing del lado del cliente.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">⚡</div>
+        <div>
+          <h4>Vite</h4>
+          <p>Bundler ultrarrápido. HMR instantáneo para desarrollo. Build en segundos para producción.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🎨</div>
+        <div>
+          <h4>Tailwind CSS v3</h4>
+          <p>Framework de utilidades CSS. Configurado con paleta personalizada, sombras, radios y animaciones propias.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🐻</div>
+        <div>
+          <h4>Zustand</h4>
+          <p>Gestión de estado global ultra-ligero. 9 stores independientes para cada dominio de negocio.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🗄️</div>
+        <div>
+          <h4>Supabase</h4>
+          <p>Backend como servicio. PostgreSQL en la nube con autenticación, tiempo real y almacenamiento. Reemplaza un servidor propio.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🔀</div>
+        <div>
+          <h4>React Router v6</h4>
+          <p>Enrutamiento declarativo con rutas protegidas por rol. Redirección automática según usuario autenticado.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">📊</div>
+        <div>
+          <h4>SheetJS (XLSX)</h4>
+          <p>Exportación de reportes de ingresos y gastos directamente a Excel sin backend.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🔔</div>
+        <div>
+          <h4>React Hot Toast</h4>
+          <p>Sistema de notificaciones (toasts) contextual. Usa animaciones personalizadas integradas al sistema de diseño.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🌐</div>
+        <div>
+          <h4>Vercel</h4>
+          <p>Plataforma de despliegue en la nube. CI/CD automático con cada push a GitHub. URL pública siempre actualizada.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">📂</div>
+        <div>
+          <h4>GitHub</h4>
+          <p>Control de versiones. Historial completo de todos los cambios. Base para el despliegue continuo a Vercel.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🔷</div>
+        <div>
+          <h4>TypeScript</h4>
+          <p>Usado en los componentes de UI críticos (BottomNav, MoneyInput, etc.) para tipado estricto y autocompletado.</p>
+        </div>
+      </div>
+      <div class="tech-item">
+        <div class="tech-icon">🏹</div>
+        <div>
+          <h4>Lucide React</h4>
+          <p>Librería de íconos SVG consistentes y ligeros. Complementa el lenguaje visual "Chunky UI".</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── 8. ARQUITECTURA ─────────────────── -->
+    <h2 id="arquitectura">8. Arquitectura del Software</h2>
+
+    <h3>8.1 Estructura de carpetas</h3>
+    <pre style="background:#f8f8f5; border-radius:16px; padding:20px; font-size:13px; line-height:1.8; overflow-x:auto; border:1px solid #eee;">
+src/
+ ├── modules/           ← Módulos funcionales por rol
+ │    ├── admin/        ← Panel administrador (AdminView.jsx + tabs)
+ │    ├── auth/         ← Login y autenticación
+ │    ├── fritado/      ← Módulo de fritado
+ │    ├── pos/          ← Punto de venta fijo
+ │    ├── production/   ← Módulo de producción
+ │    └── warehouse/    ← Módulo de bodega
+ ├── views/             ← Vistas de rol de campo
+ │    ├── VendedorDashboard.tsx
+ │    ├── DejadorDashboard.tsx
+ │    ├── SellerSetupView.tsx
+ │    └── MapTrackingView.tsx
+ ├── store/             ← Estado global (Zustand)
+ │    ├── useAuthStore.js
+ │    ├── useInventoryStore.js   ← Store más grande (30KB)
+ │    ├── useFinanceStore.js
+ │    ├── usePosStore.js
+ │    ├── useLogisticsStore.js
+ │    ├── useSellerSessionStore.js
+ │    ├── useVehicleStore.js
+ │    ├── useSupplierStore.js
+ │    └── useIncomeConfigStore.js
+ ├── components/        ← Componentes UI reutilizables
+ │    ├── admin/        ← Tabs del admin (Finances, Prices, etc.)
+ │    ├── auth/         ← ProtectedRoute
+ │    └── ui/           ← MoneyInput, BottomNav, Button, etc.
+ ├── utils/             ← Funciones puras de cálculo
+ │    ├── financeUtils.ts
+ │    └── formatUtils.ts
+ └── types/             ← Tipos TypeScript compartidos
+    </pre>
+
+    <h3>8.2 Gestión de Estado (Zustand)</h3>
+    <p>Cada dominio de negocio tiene su propio store independiente. Los stores se sincronizan con Supabase en sus métodos <code>fetch</code>. Usan actualizaciones optimistas (la UI se actualiza inmediatamente antes de confirmar con la base de datos) para lograr una experiencia percibida sin latencia.</p>
+
+    <h3>8.3 Seguridad y Autenticación</h3>
+    <ul>
+      <li>Autenticación manejada por <strong>Supabase Auth</strong> (email + password).</li>
+      <li>El token de sesión se gestiona automáticamente por el SDK de Supabase.</li>
+      <li>Cada ruta tiene un <strong>ProtectedRoute</strong> que valida el rol del usuario. Si accede a una ruta no permitida, se redirige a <code>/unauthorized</code>.</li>
+      <li>Hay un <strong>ErrorBoundary</strong> global que captura errores inesperados y muestra un mensaje de error en lugar de romper la app.</li>
+    </ul>
+
+    <!-- ── 9. LOGROS ────────────────────────── -->
+    <h2 id="logros">9. Logros Consolidados</h2>
+
+    <div class="achievement">
+      <div class="ach-icon">☁️</div>
+      <div>
+        <h4>Migración a la Nube</h4>
+        <p>La aplicación pasó de ser un proyecto local a estar desplegada en <strong>Vercel</strong> (frontend) + <strong>Supabase</strong> (base de datos y autenticación en la nube). Cualquier persona del equipo puede acceder desde su celular con solo tener la URL.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">📱</div>
+      <div>
+        <h4>Diseño 100% Responsivo</h4>
+        <p>Todos los módulos están optimizados para celulares (desde 360px) y tablets de 8 pulgadas. Los menús tienen scroll horizontal, los modales son compactos, y los textos se adaptan con clases <code>sm:</code> de Tailwind. Los botones cumplen el estándar táctil de 44px mínimo.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">💰</div>
+      <div>
+        <h4>Lógica Financiera Correcta</h4>
+        <p>El Total Venta Neta del vendedor muestra Efectivo + Transferencias (sin restar gastos). El Teórico APP en finanzas suma los gastos para una comparación correcta con el efectivo entregado. Los inputs de dinero muestran formato colombiano (2.000) mientras el usuario escribe.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">📸</div>
+      <div>
+        <h4>Captura de Facturas en Android</h4>
+        <p>El módulo de gastos ofrece dos botones separados: uno que abre la cámara directamente (con <code>capture="environment"</code>) y otro para la galería. Muestra previsualización de la imagen capturada antes de guardar.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">🎬</div>
+      <div>
+        <h4>Sistema de Animaciones Premium</h4>
+        <p>La aplicación cuenta con animaciones Spring CSS propias, transiciones de página, feedback táctil en todos los botones, pantallas de éxito animadas, skeleton loaders, badge pulse y BottomNav con elevación spring. Todo centralizado en <code>index.css</code> para consistencia global.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">🔐</div>
+      <div>
+        <h4>Control de Acceso por Roles (RBAC)</h4>
+        <p>8 roles distintos con acceso estrictamente acotado. Cada usuario ve únicamente su módulo. La redirección automática post-login elimina la necesidad de que los operarios conozcan la URL de su módulo.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">📊</div>
+      <div>
+        <h4>Exportación a Excel</h4>
+        <p>Los reportes de ingresos y gastos se pueden exportar directamente a archivos <code>.xlsx</code> (Excel) desde el módulo de Finanzas y POS, sin necesidad de backend adicional.</p>
+      </div>
+    </div>
+
+    <div class="achievement">
+      <div class="ach-icon">🚲</div>
+      <div>
+        <h4>Gestión de Flota de Triciclos</h4>
+        <p>El sistema gestiona dinámicamente los vehículos (triciclos) activos del negocio, permite activar/desactivar triciclos, y asigna vendedores a rutas. El módulo de ingresos tiene una vista de grilla especial para registrar múltiples triciclos simultáneamente.</p>
+      </div>
+    </div>
+
+    <!-- ── 10. FUTURO ───────────────────────── -->
+    <h2 id="futuro">10. Estado Actual y Próximos Pasos</h2>
+
+    <h3>Estado Actual</h3>
+    <ul>
+      <li>✅ Todos los módulos operativos y accesibles en producción (Vercel)</li>
+      <li>✅ Base de datos en la nube (Supabase) conectada y funcional</li>
+      <li>✅ Sistema responsivo para móviles y tablets de 8"</li>
+      <li>✅ Sistema de animaciones premium implementado globalmente</li>
+      <li>✅ Lógica financiera correcta en vendedor y admin</li>
+      <li>✅ Captura de fotos de facturas directa desde cámara Android</li>
+      <li>✅ Formato de dinero colombiano en todos los inputs</li>
+      <li>✅ Control de versiones en GitHub con historial completo</li>
+    </ul>
+
+    <h3>Próximos Pasos Recomendados</h3>
+    <ul>
+      <li>📲 <strong>Modo PWA offline:</strong> Que la app funcione sin internet y sincronice al reconectarse (Service Worker).</li>
+      <li>📡 <strong>Actualizaciones en tiempo real:</strong> Usar Supabase Realtime para que los despachos de bodega aparezcan instantáneamente en el vendedor.</li>
+      <li>📈 <strong>Dashboard de KPIs:</strong> Panel de gráficas de ventas, productos más vendidos, mermas y rendimiento por triciclo.</li>
+      <li>🗺️ <strong>Tracking GPS:</strong> El módulo de mapa ya existe (<code>MapTrackingView</code>); integrarlo con GPS real de los dispositivos.</li>
+      <li>📱 <strong>App nativa (Capacitor):</strong> Empaquetar la PWA como app Android/iOS para distribución por Play Store.</li>
+      <li>🤖 <strong>Alertas automáticas:</strong> Notificaciones push cuando el stock llega al nivel de alerta configurado.</li>
+      <li>🧾 <strong>Facturas electrónicas:</strong> Integración con sistema de facturación electrónica DIAN (Colombia).</li>
+    </ul>
+
+  </div>
+
+  <!-- ════════════════════════════════════════ FOOTER ════════════ -->
+  <footer>
+    <strong>🍽️ FRITA MEJOR</strong>
+    <p>Sistema Operativo de Gestión — Documentación Técnica y Funcional</p>
+    <p>Versión 1.0.0 — Abril 2026</p>
+    <p style="margin-top:12px; font-size:12px;">Desarrollado con React + Vite + Supabase + Vercel</p>
+  </footer>
+
+</div>
+</body>
+</html>

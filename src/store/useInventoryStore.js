@@ -1,6 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
+import { push, pullAll } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
+
+// Helper: sincroniza una sección del store con Supabase
+function syncKey(key, value) {
+  markLocalWrite(key);
+  push(key, value).catch(err => console.warn('[Sync]', key, err.message));
+}
 
 // =============================================================================
 // DATOS INICIALES — BODEGAS Y PUNTOS DE PRODUCCIÓN
@@ -180,6 +188,38 @@ export const useInventoryStore = create(
       posExpenses:      [],
       loadTemplates:    INITIAL_LOAD_TEMPLATES,
 
+      // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
+      // Descarga el estado de Supabase y lo aplica encima del caché local.
+      // Si Supabase tiene datos más recientes, los usa; si está vacío, queda el local.
+      loadFromRemote: async () => {
+        try {
+          const remote = await pullAll();
+          const SYNC_KEYS = [
+            'warehouses', 'inventory', 'movements', 'products', 'recipes',
+            'fritadoRecipes', 'posCategories', 'posSettings', 'posShifts',
+            'posSales', 'posExpenses', 'customers', 'customerTypes', 'loadTemplates',
+          ];
+          const updates = {};
+          for (const key of SYNC_KEYS) {
+            if (remote[key] !== undefined && remote[key] !== null) {
+              // Solo overwrite si el remoto tiene datos (no vacío)
+              const isNonEmpty = Array.isArray(remote[key])
+                ? remote[key].length > 0
+                : Object.keys(remote[key]).length > 0;
+              if (isNonEmpty) {
+                updates[key] = remote[key];
+              }
+            }
+          }
+          if (Object.keys(updates).length > 0) {
+            set(updates);
+            console.log('[Store] Estado cargado desde Supabase:', Object.keys(updates));
+          }
+        } catch (err) {
+          console.warn('[Store] No se pudo cargar estado remoto:', err.message);
+        }
+      },
+
       // ─── GETTERS ──────────────────────────────────────────────────────────────
 
       getInventoryByWarehouse: (warehouseId) =>
@@ -288,6 +328,10 @@ export const useInventoryStore = create(
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
 
+        // Sync remoto
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
+
         return {
           ok: true,
           message: `✔ ${produced} ${recipe.yieldUnit} de ${recipe.name} producidos.`,
@@ -325,6 +369,8 @@ export const useInventoryStore = create(
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
 
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
         return { ok: true, message: `✔ ${qty} unidades fritas registradas de ${fritoItem.name}.` };
       },
 
@@ -342,6 +388,8 @@ export const useInventoryStore = create(
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
         return { ok: true };
       },
 
@@ -358,6 +406,8 @@ export const useInventoryStore = create(
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
         return { ok: true };
       },
 
@@ -377,6 +427,8 @@ export const useInventoryStore = create(
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
         return { ok: true, message: `Despachado: -${qty} ${item.unit}` };
       },
 
@@ -413,6 +465,8 @@ export const useInventoryStore = create(
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
         return { ok: true, message: `Transferencia completada: ${qty} ${item.unit} de ${item.name}` };
       },
 
@@ -437,6 +491,8 @@ export const useInventoryStore = create(
           
           return { inventory: newInventory, movements: [movement, ...state.movements] };
         });
+        syncKey('inventory', get().inventory);
+        syncKey('movements', get().movements);
       },
 
       updateMovement: (id, updates) => {
@@ -493,20 +549,16 @@ export const useInventoryStore = create(
           }
           return { movements: newMovements };
         });
+        syncKey('movements', get().movements);
+        syncKey('inventory', get().inventory);
       },
 
       // ─── ADMIN CRUD ────────────────────────────────────────────────────────────
 
       // Bodegas
-      addWarehouse: (w) => set((s) => ({
-        warehouses: [...s.warehouses, { ...w, id: `BOD-${Date.now()}`, active: true }],
-      })),
-      updateWarehouse: (id, data) => set((s) => ({
-        warehouses: s.warehouses.map((w) => w.id === id ? { ...w, ...data } : w),
-      })),
-      deleteWarehouse: (id) => set((s) => ({
-        warehouses: s.warehouses.filter((w) => w.id !== id),
-      })),
+      addWarehouse: (w) => { set((s) => ({ warehouses: [...s.warehouses, { ...w, id: `BOD-${Date.now()}`, active: true }] })); syncKey('warehouses', useInventoryStore.getState().warehouses); },
+      updateWarehouse: (id, data) => { set((s) => ({ warehouses: s.warehouses.map((w) => w.id === id ? { ...w, ...data } : w) })); syncKey('warehouses', useInventoryStore.getState().warehouses); },
+      deleteWarehouse: (id) => { set((s) => ({ warehouses: s.warehouses.filter((w) => w.id !== id) })); syncKey('warehouses', useInventoryStore.getState().warehouses); },
 
       // Puntos de Producción
       addProductionPoint: (pp) => set((s) => ({
@@ -531,37 +583,19 @@ export const useInventoryStore = create(
       })),
 
       // Inventario
-      addInventoryItem: (item) => set((s) => ({
-        inventory: [...s.inventory, { ...item, id: `INS-${Date.now()}`, qty: parseFloat(item.qty) }],
-      })),
-      updateInventoryItem: (id, data) => set((s) => ({
-        inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i),
-      })),
-      deleteInventoryItem: (id) => set((s) => ({
-        inventory: s.inventory.filter((i) => i.id !== id),
-      })),
+      addInventoryItem: (item) => { set((s) => ({ inventory: [...s.inventory, { ...item, id: `INS-${Date.now()}`, qty: parseFloat(item.qty) }] })); syncKey('inventory', useInventoryStore.getState().inventory); },
+      updateInventoryItem: (id, data) => { set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) })); syncKey('inventory', useInventoryStore.getState().inventory); },
+      deleteInventoryItem: (id) => { set((s) => ({ inventory: s.inventory.filter((i) => i.id !== id) })); syncKey('inventory', useInventoryStore.getState().inventory); },
 
       // Productos
-      addProduct: (p) => set((s) => ({
-        products: [...s.products, { ...p, id: `P-${Date.now()}` }],
-      })),
-      updateProduct: (id, data) => set((s) => ({
-        products: s.products.map((p) => p.id === id ? { ...p, ...data } : p),
-      })),
-      deleteProduct: (id) => set((s) => ({
-        products: s.products.filter((p) => p.id !== id),
-      })),
+      addProduct: (p) => { set((s) => ({ products: [...s.products, { ...p, id: `P-${Date.now()}` }] })); syncKey('products', useInventoryStore.getState().products); },
+      updateProduct: (id, data) => { set((s) => ({ products: s.products.map((p) => p.id === id ? { ...p, ...data } : p) })); syncKey('products', useInventoryStore.getState().products); },
+      deleteProduct: (id) => { set((s) => ({ products: s.products.filter((p) => p.id !== id) })); syncKey('products', useInventoryStore.getState().products); },
 
       // Recetas
-      addRecipe: (r) => set((s) => ({
-        recipes: [...s.recipes, { ...r, id: `R-${Date.now()}` }],
-      })),
-      updateRecipe: (id, data) => set((s) => ({
-        recipes: s.recipes.map((r) => r.id === id ? { ...r, ...data } : r),
-      })),
-      deleteRecipe: (id) => set((s) => ({
-        recipes: s.recipes.filter((r) => r.id !== id),
-      })),
+      addRecipe: (r) => { set((s) => ({ recipes: [...s.recipes, { ...r, id: `R-${Date.now()}` }] })); syncKey('recipes', useInventoryStore.getState().recipes); },
+      updateRecipe: (id, data) => { set((s) => ({ recipes: s.recipes.map((r) => r.id === id ? { ...r, ...data } : r) })); syncKey('recipes', useInventoryStore.getState().recipes); },
+      deleteRecipe: (id) => { set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) })); syncKey('recipes', useInventoryStore.getState().recipes); },
 
       // POS Categorías
       addPosCategory: (c) => set((s) => ({
@@ -598,9 +632,7 @@ export const useInventoryStore = create(
       })),
 
       // Configuración POS y Global settings
-      updatePosSettings: (data) => set((s) => ({
-        posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data }
-      })),
+      updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
 
       // Fritado Recipes
       addFritadoRecipe: (recipe) => set((s) => ({
@@ -625,23 +657,13 @@ export const useInventoryStore = create(
       })),
 
       // Ventas / Caja
-      addPosSale: (sale) => set((s) => ({
-        posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])],
-      })),
-      updatePosSale: (id, data) => set((s) => ({
-        posSales: (s.posSales || []).map((sale) => sale.id === id ? { ...sale, ...data } : sale)
-      })),
-      
-      addPosShift: (shift) => set((s) => ({
-        posShifts: [{ ...shift, id: `SHIFT-${Date.now()}` }, ...(s.posShifts || [])],
-      })),
-      updatePosShift: (id, data) => set((s) => ({
-        posShifts: (s.posShifts || []).map((shift) => shift.id === id ? { ...shift, ...data } : shift)
-      })),
+      addPosSale: (sale) => { set((s) => ({ posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])] })); syncKey('posSales', useInventoryStore.getState().posSales); },
+      updatePosSale: (id, data) => { set((s) => ({ posSales: (s.posSales || []).map((sale) => sale.id === id ? { ...sale, ...data } : sale) })); syncKey('posSales', useInventoryStore.getState().posSales); },
 
-      addPosExpense: (expense) => set((s) => ({
-        posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])],
-      }))
+      addPosShift: (shift) => { set((s) => ({ posShifts: [{ ...shift, id: `SHIFT-${Date.now()}` }, ...(s.posShifts || [])] })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
+      updatePosShift: (id, data) => { set((s) => ({ posShifts: (s.posShifts || []).map((shift) => shift.id === id ? { ...shift, ...data } : shift) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
+
+      addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
     }),
     {
       name: 'frita-mejor-inventory', // clave en localStorage

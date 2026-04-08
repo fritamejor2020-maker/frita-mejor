@@ -1,5 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { push } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
+
+function syncVehicles(vehicles) {
+  markLocalWrite('vehicles');
+  push('vehicles', vehicles).catch(err => console.warn('[Sync] vehicles:', err.message));
+}
 
 /**
  * Global store to manage points of sale/vehicles (Tricycles)
@@ -25,18 +32,21 @@ export const useVehicleStore = create(
           ...vehicleData
         };
         set((state) => ({ vehicles: [...state.vehicles, newVehicle] }));
+        syncVehicles(useVehicleStore.getState().vehicles);
       },
 
       updateVehicle: (id, updatedData) => {
         set((state) => ({
           vehicles: state.vehicles.map(v => v.id === id ? { ...v, ...updatedData } : v)
         }));
+        syncVehicles(useVehicleStore.getState().vehicles);
       },
 
       removeVehicle: (id) => {
         set((state) => ({
           vehicles: state.vehicles.filter(v => v.id !== id)
         }));
+        syncVehicles(useVehicleStore.getState().vehicles);
       },
 
       // Use this selector to get the abbreviations for the Income tables

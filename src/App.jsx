@@ -1,7 +1,11 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { Toaster } from 'react-hot-toast';
+import { useRealtimeSync } from './lib/useRealtimeSync';
+import { useInventoryStore } from './store/useInventoryStore';
+import { flushQueue } from './lib/syncManager';
+import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
 
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -83,8 +87,18 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
+  // Suscripción a cambios remotos en tiempo real
+  useRealtimeSync();
+
+  // Al arrancar la app: cargar estado de Supabase y vaciar cola pendiente
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote();
+    flushQueue();
+  }, []);
+
   return (
     <ErrorBoundary>
+      <SyncStatusIndicator />
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
         <Routes>
