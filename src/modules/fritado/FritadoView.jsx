@@ -359,7 +359,7 @@ function FritadoPanel({ productionPoint, onBack }) {
 
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
-  const cardH      = availableH / rows;
+  const cardH      = Math.min(availableH / rows, 400);
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
   const CARD_MAX = count <= 2 ? 500 : count <= 4 ? 360 : 270;
@@ -427,11 +427,11 @@ function FritadoPanel({ productionPoint, onBack }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: (isMobile || isTabletPills) ? `repeat(${cols}, 1fr)` : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
-            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
+            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, ${cardH}px)` : 'auto',
             gap,
             width: '100%',
             maxWidth: gridMaxW,
-            height: !allowScroll ? '100%' : 'auto',
+            height: 'auto',
           }}>
             {pairs.map((pair, i) => {
               const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };

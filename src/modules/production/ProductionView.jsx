@@ -381,7 +381,8 @@ function ProductionPanel({ productionPoint, onBack }) {
   // Compacto solo en PC cuando hay muy poco espacio
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
-  const cardH      = availableH / rows;
+  // Limitamos cardH a máximo 400px para no crear tarjetas "monstruosas" si hay solo 1-2 productos
+  const cardH      = Math.min(availableH / rows, 400); 
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
   // Ancho máximo por tarjeta — en PC con pocos productos, tarjetas más grandes
@@ -466,11 +467,11 @@ function ProductionPanel({ productionPoint, onBack }) {
           <div style={{
             display: 'grid',
             gridTemplateColumns: (isMobile || isTabletPills) ? `repeat(${cols}, 1fr)` : `repeat(${cols}, minmax(0, ${CARD_MAX}px))`,
-            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, minmax(0, 1fr))` : 'auto',
+            gridTemplateRows: !allowScroll && count > 0 ? `repeat(${rows}, ${cardH}px)` : 'auto',
             gap,
             width: '100%',
             maxWidth: gridMaxW,
-            height: !allowScroll ? '100%' : 'auto',
+            height: 'auto', // Auto permite que las tarjetas se centren verticalmente en el contenedor si maxH hizo efecto
           }}>
             {enriched.map((prod) => {
               const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
