@@ -264,6 +264,79 @@ function ProductionPointsPanel() {
   );
 }
 
+// ─── Panel: Cocinas de Fritado ────────────────────────────────────────────────
+function FryKitchensPanel() {
+  const { fryKitchens = [], addFryKitchen, updateFryKitchen, deleteFryKitchen } = useInventoryStore();
+  const [editId, setEditId] = useState(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [form, setForm] = useState({ name: '', location: '' });
+
+  const fields = [
+    { key: 'name',     label: 'Nombre de la Cocina', wide: true },
+    { key: 'location', label: 'Ubicación/Zona',  wide: true },
+  ];
+  const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <div>
+      <div className="flex justify-between items-center mb-4">
+        <h3 className="font-black text-chunky-dark text-lg">Cocinas de Fritado ({(fryKitchens || []).length})</h3>
+        <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: '', location: '' }); }}>
+          + Nueva Cocina
+        </Button>
+      </div>
+
+      {showAdd && (
+        <div className="mb-4">
+          <EditableRow fields={fields} values={form} onChange={change}
+            onSave={() => { addFryKitchen(form); setShowAdd(false); }}
+            onCancel={() => setShowAdd(false)} />
+        </div>
+      )}
+
+      {(fryKitchens || []).map((fk) => {
+        const isEditing = editId === fk.id;
+        return (
+          <div key={fk.id} className="bg-white border border-gray-100 rounded-2xl p-4 mb-3 hover:border-gray-200 transition-colors shadow-sm flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <div className="flex-1">
+              {isEditing ? (
+                <EditableRow fields={fields} values={form} onChange={change}
+                  onSave={() => { updateFryKitchen(fk.id, form); setEditId(null); }}
+                  onCancel={() => setEditId(null)} />
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-black text-gray-800 text-lg">🍳 {fk.name}</h4>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${fk.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      {fk.active ? 'ACTIVO' : 'INACTIVO'}
+                    </span>
+                  </div>
+                  <p className="text-sm font-bold text-gray-400 mt-1 flex items-center gap-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+                    {fk.location}
+                  </p>
+                </>
+              )}
+            </div>
+            {!isEditing && (
+              <div className="flex items-center gap-2">
+                <button className="px-3 py-1.5 rounded-lg font-bold text-xs border border-gray-200 hover:border-chunky-main text-gray-500 hover:text-chunky-main transition-colors"
+                  onClick={() => { setEditId(fk.id); setForm({ name: fk.name, location: fk.location }); }}>
+                  Editar
+                </button>
+                <button className="px-3 py-1.5 rounded-lg font-bold text-xs bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                  onClick={() => deleteFryKitchen(fk.id)}>
+                  Eliminar
+                </button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ─── Panel: Inventario General ────────────────────────────────────────────────
 function InventoryPanel() {
   const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useInventoryStore();
@@ -1861,10 +1934,10 @@ function FritadoConfigPanel() {
     setEditingId(null);
   };
 
-  const toggleProductionPoint = (recipeId, pointId, currentPointIds) => {
-    const list = currentPointIds || [];
-    const newList = list.includes(pointId) ? list.filter(id => id !== pointId) : [...list, pointId];
-    updateFritadoRecipe(recipeId, { productionPointIds: newList });
+  const toggleFryKitchen = (recipeId, kitchenId, currentKitchenIds) => {
+    const list = currentKitchenIds || [];
+    const newList = list.includes(kitchenId) ? list.filter(id => id !== kitchenId) : [...list, kitchenId];
+    updateFritadoRecipe(recipeId, { fryKitchenIds: newList });
   };
 
   return (
@@ -1909,7 +1982,6 @@ function FritadoConfigPanel() {
           const crudo = inventory.find(i => i.id === recipe.crudoId);
           const frito = inventory.find(i => i.id === recipe.fritoId);
           const presets = recipe.presets || [10, 20, 50, 100, 200];
-          const activePointIds = recipe.productionPointIds || [];
 
           return (
             <div key={recipe.id} className="border border-gray-100 rounded-3xl p-5 hover:border-gray-200 bg-white transition-colors shadow-sm">
@@ -1933,22 +2005,22 @@ function FritadoConfigPanel() {
 
               {/* Fritado Line Assignments */}
               <div className="mb-4">
-                <span className="font-bold text-xs text-gray-400 uppercase tracking-wide block mb-2">Asignado a las líneas formadoras/fritadoras:</span>
+                <span className="font-bold text-xs text-gray-400 uppercase tracking-wide block mb-2">Asignado a las cocinas de fritado:</span>
                 <div className="flex flex-wrap gap-2">
-                  {productionPoints.map(pp => (
+                  {(useInventoryStore.getState().fryKitchens || []).map(fk => (
                     <button
-                      key={pp.id}
-                      onClick={() => toggleProductionPoint(recipe.id, pp.id, activePointIds)}
+                      key={fk.id}
+                      onClick={() => toggleFryKitchen(recipe.id, fk.id, recipe.fryKitchenIds || [])}
                       className={`px-3 py-1.5 rounded-full text-[11px] font-bold border-2 transition-all
-                        ${activePointIds.length === 0 || activePointIds.includes(pp.id)
+                        ${(recipe.fryKitchenIds || []).length === 0 || (recipe.fryKitchenIds || []).includes(fk.id)
                           ? 'bg-chunky-dark text-white border-chunky-dark'
                           : 'bg-white text-gray-400 border-gray-200 hover:border-gray-300'}`}
                     >
-                      {activePointIds.length === 0 ? `✓ ${pp.name}` : (activePointIds.includes(pp.id) ? `✓ ${pp.name}` : `+ ${pp.name}`)}
+                      {(recipe.fryKitchenIds || []).length === 0 ? `✓ ${fk.name}` : ((recipe.fryKitchenIds || []).includes(fk.id) ? `✓ ${fk.name}` : `+ ${fk.name}`)}
                     </button>
                   ))}
                 </div>
-                {activePointIds.length === 0 && <p className="text-[10px] items-center italic text-gray-400 mt-1">Al no seleccionar ninguna, el sistema asume que la receta está disponible en <span className="font-bold">todas</span> las líneas de fritado.</p>}
+                {(recipe.fryKitchenIds || []).length === 0 && <p className="text-[10px] items-center italic text-gray-400 mt-1">Al no seleccionar ninguna, el sistema asume que la receta está disponible en <span className="font-bold">todas</span> las cocinas de fritado.</p>}
               </div>
 
               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
@@ -2006,6 +2078,7 @@ export function AdminView() {
     INVENTARIO: [
       { id: 'BODEGAS',    label: '📦 Bodegas'    },
       { id: 'PRODUCCION', label: '🏭 Producción'  },
+      { id: 'COCINAS_FRITADO', label: '🍳 Cocinas Fritado' },
       { id: 'PRODUCTOS',  label: '🔢 Botones Prod.' },
       { id: 'FRITADO',    label: '🍳 Recetas Fritado' },
       { id: 'INVENTARIO', label: '📋 Inventario'  },
@@ -2124,6 +2197,7 @@ export function AdminView() {
       <div className="bg-white rounded-[28px] sm:rounded-[40px] p-4 sm:p-6 md:p-8 shadow-sm w-full max-w-[1400px] min-h-[400px] animate-fade-in">
         {activeTab === 'BODEGAS'    && <WarehousesPanel />}
         {activeTab === 'PRODUCCION' && <ProductionPointsPanel />}
+        {activeTab === 'COCINAS_FRITADO' && <FryKitchensPanel />}
         {activeTab === 'PRODUCTOS'  && <ProductsPresetsPanel />}
         {activeTab === 'FRITADO'    && <FritadoConfigPanel />}
         {activeTab === 'INVENTARIO' && <InventoryPanel />}

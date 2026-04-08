@@ -14,9 +14,9 @@ function useScreenSize() {
 }
 
 // ─── Selección de Punto ────────────────────────────────────────────────────────
-function SelectFritadoPoint({ onSelect, signOut }) {
-  const { productionPoints } = useInventoryStore();
-  const active = productionPoints.filter((p) => p.active);
+function SelectFryKitchen({ onSelect, signOut }) {
+  const { fryKitchens = [] } = useInventoryStore();
+  const active = fryKitchens.filter((p) => p.active);
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-6" style={{ background: 'var(--color-bg)' }}>
       <div className="w-full max-w-lg">
@@ -315,7 +315,7 @@ function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
 }
 
 // ─── Panel Principal ───────────────────────────────────────────────────────────
-function FritadoPanel({ productionPoint, onBack }) {
+function FritadoPanel({ fryKitchen, onBack }) {
   const { inventory, fritadoRecipes, fryItem, reportWaste } = useInventoryStore();
   const signOut = useAuthStore((s) => s.signOut);
   const [toast, setToast]         = useState({ visible: false, message: '', type: 'success' });
@@ -324,7 +324,7 @@ function FritadoPanel({ productionPoint, onBack }) {
   const showToast = (msg, type = 'success') => setToast({ visible: true, message: msg, type });
 
   const pairs = (fritadoRecipes || [])
-    .filter((r) => !r.productionPointIds?.length || r.productionPointIds.includes(productionPoint.id))
+    .filter((r) => !r.fryKitchenIds?.length || r.fryKitchenIds.includes(fryKitchen.id))
     .map((recipe) => {
       const crudo = inventory.find((i) => i.id === recipe.crudoId) || { id: null, qty: 0, name: 'Inválido' };
       const frito = inventory.find((i) => i.id === recipe.fritoId) || { id: null, qty: 0, name: 'Inválido' };
@@ -370,17 +370,17 @@ function FritadoPanel({ productionPoint, onBack }) {
 
   const handleFry = (pair, amount) => {
     if (wasteMode) { setModalConfig({ pair, amount, isWasteFast: true }); return; }
-    const result = fryItem(pair.crudo.id, pair.frito.id, amount, productionPoint.id);
+    const result = fryItem(pair.crudo.id, pair.frito.id, amount, fryKitchen.id);
     showToast(result.message, result.ok ? 'success' : 'error');
   };
 
   const handleModalConfirm = (amount, mode, reason) => {
     const pair = modalConfig.pair;
     if (mode === 'WASTE') {
-      if (pair.crudo.id) reportWaste(pair.crudo.id, amount, `Merma en fritado: ${reason}`, productionPoint.id);
+      if (pair.crudo.id) reportWaste(pair.crudo.id, amount, `Merma en fritado: ${reason}`, fryKitchen.id);
       showToast(`🗑️ Merma: -${amount} de ${pair.crudo.name} (${reason})`, 'warning');
     } else {
-      const result = fryItem(pair.crudo.id, pair.frito.id, amount, productionPoint.id);
+      const result = fryItem(pair.crudo.id, pair.frito.id, amount, fryKitchen.id);
       showToast(result.message, result.ok ? 'success' : 'error');
     }
   };
@@ -395,7 +395,7 @@ function FritadoPanel({ productionPoint, onBack }) {
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 15, color: '#1f2937', lineHeight: 1 }}>🍳 {productionPoint.name}</div>
+            <div style={{ fontWeight: 900, fontSize: 15, color: '#1f2937', lineHeight: 1 }}>🍳 {fryKitchen.name}</div>
             <div style={{ fontWeight: 700, fontSize: 10, color: '#9ca3af' }}>Panel de Fritado · Operario</div>
           </div>
         </div>
@@ -453,6 +453,6 @@ function FritadoPanel({ productionPoint, onBack }) {
 export function FritadoView() {
   const signOut = useAuthStore((s) => s.signOut);
   const [selectedPoint, setSelectedPoint] = useState(null);
-  if (!selectedPoint) return <SelectFritadoPoint onSelect={setSelectedPoint} signOut={signOut} />;
-  return <FritadoPanel productionPoint={selectedPoint} onBack={() => setSelectedPoint(null)} />;
+  if (!selectedPoint) return <SelectFryKitchen onSelect={setSelectedPoint} signOut={signOut} />;
+  return <FritadoPanel fryKitchen={selectedPoint} onBack={() => setSelectedPoint(null)} />;
 }

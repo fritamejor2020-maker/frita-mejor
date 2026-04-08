@@ -15,7 +15,11 @@ const INITIAL_PRODUCTION_POINTS = [
   { id: 'PP-001', name: 'Línea 1 – Chorizos', location: 'Sala A', active: true },
   { id: 'PP-002', name: 'Línea 2 – Embutidos', location: 'Sala B', active: true },
   { id: 'PP-003', name: 'Línea 3 – Jamones',  location: 'Sala C', active: true },
-  { id: 'PP-004', name: 'Puesto de Fritado',  location: 'Cocina', active: true },
+];
+
+const INITIAL_FRY_KITCHENS = [
+  { id: 'FK-001', name: 'Cocina Principal', location: 'Zona Norte', active: true },
+  { id: 'FK-002', name: 'Cocina Apoyo',     location: 'Zona Sur',   active: true },
 ];
 
 const INITIAL_INVENTORY = [
@@ -67,8 +71,8 @@ const INITIAL_PRODUCTS = [
 ];
 
 const INITIAL_FRITADO_RECIPES = [
-  { id: 'FR-001', crudoId: 'PRD-RAW-005', fritoId: 'PRD-005', presets: [10, 20, 50, 100, 200], productionPointIds: [] },
-  { id: 'FR-002', crudoId: 'PRD-RAW-006', fritoId: 'PRD-006', presets: [10, 20, 50, 100, 200], productionPointIds: [] },
+  { id: 'FR-001', crudoId: 'PRD-RAW-005', fritoId: 'PRD-005', presets: [10, 20, 50, 100, 200], fryKitchenIds: ['FK-001'] },
+  { id: 'FR-002', crudoId: 'PRD-RAW-006', fritoId: 'PRD-006', presets: [10, 20, 50, 100, 200], fryKitchenIds: ['FK-001'] },
 ];
 
 const INITIAL_RECIPES = [
@@ -160,6 +164,7 @@ export const useInventoryStore = create(
     (set, get) => ({
       warehouses:       INITIAL_WAREHOUSES,
       productionPoints: INITIAL_PRODUCTION_POINTS,
+      fryKitchens:      INITIAL_FRY_KITCHENS,
       inventory:        INITIAL_INVENTORY,
       products:         INITIAL_PRODUCTS,
       recipes:          INITIAL_RECIPES,
@@ -510,6 +515,17 @@ export const useInventoryStore = create(
         productionPoints: s.productionPoints.filter((p) => p.id !== id),
       })),
 
+      // Cocinas de Fritado
+      addFryKitchen: (fk) => set((s) => ({
+        fryKitchens: [...(s.fryKitchens || []), { ...fk, id: `FK-${Date.now()}`, active: true }],
+      })),
+      updateFryKitchen: (id, data) => set((s) => ({
+        fryKitchens: (s.fryKitchens || []).map((k) => k.id === id ? { ...k, ...data } : k),
+      })),
+      deleteFryKitchen: (id) => set((s) => ({
+        fryKitchens: (s.fryKitchens || []).filter((k) => k.id !== id),
+      })),
+
       // Inventario
       addInventoryItem: (item) => set((s) => ({
         inventory: [...s.inventory, { ...item, id: `INS-${Date.now()}`, qty: parseFloat(item.qty) }],
@@ -630,6 +646,7 @@ export const useInventoryStore = create(
       partialize: (state) => ({
         warehouses:       state.warehouses,
         productionPoints: state.productionPoints,
+        fryKitchens:      state.fryKitchens || [],
         inventory:        state.inventory,
         products:         state.products,
         recipes:          state.recipes,
