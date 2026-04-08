@@ -847,6 +847,7 @@ function ReportsPanel() {
                     {movements.slice(0, 50).map((mv) => {
                       const item = inventory.find(i => i.id === mv.inventoryId);
                       const pp = productionPoints.find(p => p.id === mv.productionPointId);
+                      const fk = (fryKitchens || []).find((f) => f.id === mv.productionPointId || f.id === mv.fryKitchenId);
                       const wh = warehouses.find(w => w.id === (mv.warehouseId || mv.fromWarehouseId));
                       const sign = (mv.type === 'RECEPCION' || mv.type === 'PRODUCCION' || mv.type === 'FRITADO') ? '+' : '-';
                       return (
@@ -855,7 +856,7 @@ function ReportsPanel() {
                           <td className="py-3 px-4"><span className={`text-xs font-bold px-2 py-1 rounded-full ${typeColors[mv.type] || 'bg-gray-100 text-gray-500'}`}>{typeLabels[mv.type] || mv.type}</span></td>
                           <td className="py-3 px-4 font-bold text-chunky-dark">{item?.name ?? (mv.type === 'PRODUCCION' || mv.type === 'FRITADO' ? `Prod. x${mv.batches || 1} lote(s)` : '—')}</td>
                           <td className="py-3 px-4 font-black">{sign}{mv.qty || mv.produced} <span className="text-gray-400 text-xs font-bold">{item?.unit ?? 'kg'}</span></td>
-                          <td className="py-3 px-4 text-gray-500 font-bold text-xs">{pp?.name || wh?.name || '—'}</td>
+                          <td className="py-3 px-4 text-gray-500 font-bold text-xs">{pp?.name || fk?.name || wh?.name || '—'}</td>
                           <td className="py-3 px-4 text-gray-500 font-bold text-xs">{mv.person || '—'}</td>
                         </tr>
                       );

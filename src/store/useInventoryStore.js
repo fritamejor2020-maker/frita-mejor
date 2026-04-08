@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { useAuthStore } from './useAuthStore';
 
 // =============================================================================
 // DATOS INICIALES — BODEGAS Y PUNTOS DE PRODUCCIÓN
@@ -280,6 +281,7 @@ export const useInventoryStore = create(
             batches,
             produced,
             productionPointId,
+            person: useAuthStore.getState().user?.name || 'Sistema',
             timestamp: new Date().toISOString(),
           };
 
@@ -293,7 +295,7 @@ export const useInventoryStore = create(
         };
       },
 
-      fryItem: (rawInventoryId, fritoInventoryId, qty, productionPointId = null) => {
+      fryItem: (rawInventoryId, fritoInventoryId, qty, fryKitchenId = null) => {
         const rawItem = get().inventory.find(i => i.id === rawInventoryId);
         const fritoItem = get().inventory.find(i => i.id === fritoInventoryId);
 
@@ -316,7 +318,8 @@ export const useInventoryStore = create(
             inventoryId: fritoInventoryId,
             rawInventoryId,
             qty,
-            productionPointId,
+            fryKitchenId,
+            person: useAuthStore.getState().user?.name || 'Operario',
             timestamp: new Date().toISOString(),
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
@@ -325,7 +328,7 @@ export const useInventoryStore = create(
         return { ok: true, message: `✔ ${qty} unidades fritas registradas de ${fritoItem.name}.` };
       },
 
-      reportWaste: (inventoryId, qty, reason = '', productionPointId = null) => {
+      reportWaste: (inventoryId, qty, reason = '', locationId = null) => {
         set((state) => {
           const newInventory = state.inventory.map((item) =>
             item.id === inventoryId
@@ -333,7 +336,8 @@ export const useInventoryStore = create(
               : item
           );
           const movement = {
-            id: Date.now(), type: 'MERMA', inventoryId, qty, reason, productionPointId,
+            id: Date.now(), type: 'MERMA', inventoryId, qty, reason, productionPointId: locationId, fryKitchenId: locationId, 
+            person: useAuthStore.getState().user?.name || 'Operario',
             timestamp: new Date().toISOString(),
           };
           return { inventory: newInventory, movements: [movement, ...state.movements] };
