@@ -596,7 +596,7 @@ function EditMovementModal({ movement, onClose, onSave }) {
 // ─── Panel: Centro de Reportes Completo ──────────────────────────────────────
 function ReportsPanel() {
   const {
-    movements: rawMovements, inventory, warehouses, productionPoints, products,
+    movements: rawMovements, inventory, warehouses, productionPoints, fryKitchens, products,
     posSales: rawPosSales, posShifts: rawPosShifts, posExpenses: rawPosExpenses,
     updateMovement
   } = useInventoryStore();
@@ -651,11 +651,12 @@ function ReportsPanel() {
       const wh = warehouses.find((w) => w.id === (mv.warehouseId || mv.fromWarehouseId));
       const destWh = warehouses.find((w) => w.id === mv.toWarehouseId);
       const pp = productionPoints.find((p) => p.id === mv.productionPointId);
+      const fk = (fryKitchens || []).find((f) => f.id === mv.productionPointId || f.id === mv.fryKitchenId);
       return {
         Fecha: fmtDate(mv.timestamp), Hora: fmtTime(mv.timestamp), Tipo: mv.type,
         'Ítem/Producto': item?.name ?? product?.name ?? '—', Cantidad: mv.qty ?? mv.produced ?? 0,
         Unidad: item?.unit ?? 'kg', Lotes: mv.batches ?? '—',
-        'Punto Producción': pp?.name ?? '—', 'Bodega Origen': wh?.name ?? '—',
+        'Línea/Cocina': pp?.name ?? fk?.name ?? '—', 'Bodega Origen': wh?.name ?? '—',
         'Bodega Destino': destWh?.name ?? '—', Persona: mv.person || '—', Razón: mv.reason || '—',
       };
     });
