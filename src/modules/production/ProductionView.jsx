@@ -150,20 +150,20 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual }) {
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   return (
-    <div className={`rounded-2xl p-4 flex flex-col gap-3 h-full ${cardCls}`}>
+    <div className={`rounded-2xl p-5 flex flex-col gap-3 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-base leading-tight truncate">{prod.name}</div>
-        <div className="flex items-baseline justify-center gap-1">
-          <span className="font-black text-chunky-dark text-base">{prod.currentStock}</span>
-          <span className="text-sm font-bold text-gray-400">{prod.unit}</span>
-          <span className={`text-sm font-bold ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+        <div className="font-black text-chunky-dark text-xl leading-tight truncate">{prod.name}</div>
+        <div className="flex items-baseline justify-center gap-1 mt-0.5">
+          <span className="font-black text-chunky-dark text-2xl">{prod.currentStock}</span>
+          <span className="text-base font-bold text-gray-400">{prod.unit}</span>
+          <span className={`text-base font-bold ml-1 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        className={`rounded-xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
-        <span className="text-3xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
-        <span className="text-sm font-bold opacity-70 mt-0.5">{yieldUnit}</span>
+        className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
+        <span className="text-5xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
+        <span className="text-base font-bold opacity-70 mt-1">{yieldUnit}</span>
       </button>
 
       <div className="grid grid-cols-4 gap-2 shrink-0">
@@ -171,21 +171,22 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual }) {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-xl py-2.5 flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
-              <span className="text-sm leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span className="text-[9px] font-bold opacity-70">{yieldUnit}</span>
+              className={`rounded-xl py-3 flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
+              <span className="text-lg leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              <span className="text-xs font-bold opacity-70">{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
       <button onClick={() => onManual(prod)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2 flex items-center justify-center text-gray-400 font-bold text-xs hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2.5 flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors">
         ✏️ Manual
       </button>
     </div>
   );
 }
+
 
 // ─── Tarjeta COCINA/PC: adaptativa sin scroll ─────────────────────────────────
 function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual }) {
@@ -310,8 +311,8 @@ function ProductionPanel({ productionPoint, onBack }) {
   // ── Breakpoints ──────────────────────────────────────────────────────────────
   // Móvil: portrait marcado → píldoras horizontales + scroll
   const isMobile  = aspectRatio > 1.4;
-  // Tablet: ancho medio (iPad, tablet landscape) → tarjetas normales con texto grande + sin scroll
-  const isTablet  = !isMobile && sw > 500 && sw <= 1000;
+  // Tablet: hasta 1200px captura iPads landscape (mini=1024, Air=1180, etc)
+  const isTablet  = !isMobile && sw > 500 && sw <= 1200;
   // Cocina/PC: pantalla grande → compacto adaptativo sin scroll
   // const isDesktop = !isMobile && !isTablet;  // implícito
 
