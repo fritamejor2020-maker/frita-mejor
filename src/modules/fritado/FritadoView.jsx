@@ -225,17 +225,17 @@ function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
 
-  const tier = cardH >= 260 ? 'xl' : cardH >= 180 ? 'md' : 'sm';
-  const nameSz  = tier === 'xl' ? 15 : tier === 'md' ? 12 : 10;
-  const stockSz = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
-  const bigSz   = tier === 'xl' ? 48 : tier === 'md' ? 32 : 20;
-  const unitSz  = tier === 'xl' ? 12 : tier === 'md' ? 10 : 8;
-  const smSz    = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
-  const pad     = tier === 'xl' ? 10 : 6;
-  const smPy    = tier === 'xl' ? 6  : 4;
+  const bigSz  = Math.max(18, Math.min(60, Math.round(cardH * 0.34)));
+  const smSz   = Math.max(9,  Math.min(15, Math.round(cardH * 0.08)));
+  const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
+  const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
+  const unitSz = Math.max(7,  Math.min(12, Math.round(cardH * 0.06)));
+  const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
+  const smPy   = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
+  const gap    = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
 
   return (
-    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap: tier === 'xl' ? 6 : 4, height: '100%', paddingBottom: tier === 'xl' ? pad : 4 }}
+    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
          className={cardCls}>
       <div style={{ textAlign: 'center', flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
