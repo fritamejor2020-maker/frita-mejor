@@ -79,8 +79,8 @@ function ManualModal({ product, recipe, wasteMode, onClose, onConfirm }) {
   );
 }
 
-// ─── Tarjeta MÓVIL: píldora horizontal + botones circulares ───────────────────
-function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual }) {
+// ─── Tarjeta PÍLDORA: móvil (sm) y tablet (md) ────────────────────────────────
+function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, size = 'sm' }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
   const yieldUnit = (prod.recipe?.yieldUnit ?? prod.unit);
@@ -95,43 +95,53 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual }) {
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-[#FFB700] text-gray-900 active:scale-90 shadow-sm';
 
+  // Tamaños según dispositivo
+  const nameW   = size === 'md' ? 130 : 82;
+  const circleD = size === 'md' ? 46  : 38;
+  const manualD = size === 'md' ? 38  : 30;
+  const nameSz  = size === 'md' ? 15  : 13;
+  const stockSz = size === 'md' ? 13  : 11;
+  const unitSzS = size === 'md' ? 8   : 6;
+
   return (
-    <div className={`rounded-2xl px-2 py-2.5 flex items-center gap-2 ${cardCls}`}>
-      {/* Info producto — ancho fijo reducido */}
-      <div style={{ minWidth: 0, width: 82, flexShrink: 0 }}>
-        <div className="font-black text-chunky-dark text-[13px] leading-tight truncate">{prod.name}</div>
-        <div className="flex items-baseline gap-0.5">
-          <span className="font-black text-chunky-dark text-xs">{prod.currentStock}</span>
-          <span className="text-[9px] font-bold text-gray-400">{shortUnit}</span>
-          <span className={`text-[9px] font-bold ml-0.5 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}>
+      {/* Info producto */}
+      <div style={{ minWidth: 0, width: nameW, flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{prod.name}</div>
+        <div className="flex items-baseline gap-0.5 mt-0.5">
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{prod.currentStock}</span>
+          <span style={{ fontWeight: 700, fontSize: unitSzS + 1, color: '#9ca3af' }}>{shortUnit}</span>
+          <span style={{ fontWeight: 700, fontSize: unitSzS + 1, marginLeft: 2, color: prod.stockOk ? '#22c55e' : '#ef4444' }}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
-      {/* Botones circulares — 38px, gap reducido */}
-      <div className="flex gap-1 flex-1 justify-center">
+      {/* Botones circulares */}
+      <div className="flex gap-1.5 flex-1 justify-center">
         {presets.slice(0, 5).map((b, i) => {
           const a = b * yieldQty;
           const label = a % 1 === 0 ? String(a) : a.toFixed(1);
+          const fSize = label.length > 3 ? (circleD * 0.2) : label.length > 2 ? (circleD * 0.26) : (circleD * 0.34);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
+              style={{ width: circleD, height: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
               className={`font-black transition-all select-none ${circleCls}`}>
-              <span style={{ fontSize: label.length > 3 ? 8 : label.length > 2 ? 10 : 13, lineHeight: 1, fontWeight: 900 }}>{label}</span>
-              <span style={{ fontSize: 6, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>
+              <span style={{ fontSize: fSize, lineHeight: 1, fontWeight: 900 }}>{label}</span>
+              <span style={{ fontSize: unitSzS, opacity: 0.65, fontWeight: 700 }}>{shortUnit}</span>
             </button>
           );
         })}
       </div>
 
-      {/* Manual — icono pequeño */}
+      {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 12, cursor: 'pointer' }}
+        style={{ width: manualD, height: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
         title="Manual">
         ✏️
       </button>
     </div>
   );
 }
+
 
 // ─── Tarjeta TABLET: escala fuentes según espacio disponible ──────────────────
 function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 300 }) {
@@ -319,22 +329,20 @@ function ProductionPanel({ productionPoint, onBack }) {
   const aspectRatio = sh / sw;
 
   // ── Breakpoints ──────────────────────────────────────────────────────────────
-  // Móvil: portrait marcado → píldoras horizontales + scroll
   const isMobile  = aspectRatio > 1.4;
-  // Tablet: hasta 1200px captura iPads landscape (mini=1024, Air=1180, etc)
+  // Tablet: hasta 1200px (iPad mini landscape=1024, Air=1180)
   const isTablet  = !isMobile && sw > 500 && sw <= 1200;
-  // Cocina/PC: pantalla grande → compacto adaptativo sin scroll
-  // const isDesktop = !isMobile && !isTablet;  // implícito
+  // En tablet, landscape = 2 columnas de píldoras; portrait = 1
+  const isTabletLandscape = isTablet && sw > sh;
 
   // Columnas según dispositivo
   let cols, allowScroll, pad, gap;
   if (isMobile) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
   } else if (isTablet) {
-    allowScroll = false; pad = 10; gap = 10;
-    if      (count <= 2)  { cols = count || 1; }
-    else if (count <= 4)  { cols = 2; }
-    else                   { cols = 3; }
+    // Píldoras con scroll, 2 cols en landscape / 1 en portrait
+    cols = isTabletLandscape ? 2 : 1;
+    allowScroll = true; pad = 10; gap = 8;
   } else {
     allowScroll = false; pad = 6; gap = 6;
     if      (count <= 2)  { cols = count || 1; }
@@ -345,11 +353,12 @@ function ProductionPanel({ productionPoint, onBack }) {
   }
   const rows = Math.ceil(count / cols);
 
-  // Compacto solo en desktop cuando hay muy poco espacio por tarjeta
+  // Compacto solo en desktop (kitchen) cuando hay muy poco espacio
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
   const cardH      = availableH / rows;
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
+
 
   const handleProduce = (product, batches = 1) => {
     if (wasteMode) {
@@ -436,8 +445,8 @@ function ProductionPanel({ productionPoint, onBack }) {
           }}>
             {enriched.map((prod) => {
               const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
-              if (isMobile)      return <CardMobile  {...props} />;
-              if (isTablet)      return <CardTablet  {...props} cardH={cardH} />;
+              if (isMobile)      return <CardMobile  {...props} size="sm" />;
+              if (isTablet)      return <CardMobile  {...props} size="md" />;
               if (useCompact)    return <CardCompact {...props} />;
               return               <CardNormal  {...props} />;
             })}

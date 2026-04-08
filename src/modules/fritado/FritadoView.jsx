@@ -90,8 +90,8 @@ function ActionModal({ config, wasteMode, onClose, onConfirm }) {
   );
 }
 
-// ─── Tarjeta MÓVIL: píldora horizontal + botones circulares ───────────────────
-function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
+// ─── Tarjeta PÍLDORA Fritado: móvil (sm) y tablet (md) ────────────────────────
+function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
   const isDisabled = pair.crudo.qty === 0 && !wasteMode;
 
@@ -103,33 +103,40 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-chunky-main text-chunky-dark active:scale-90 shadow-sm';
 
+  const nameW   = size === 'md' ? 140 : 90;
+  const circleD = size === 'md' ? 46  : 38;
+  const manualD = size === 'md' ? 38  : 30;
+  const nameSz  = size === 'md' ? 15  : 13;
+  const stockSz = size === 'md' ? 12  : 10;
+  const btnSz   = size === 'md' ? 15  : 12;
+
   return (
-    <div className={`rounded-2xl px-2 py-2.5 flex items-center gap-2 ${cardCls}`}>
-      {/* Info producto — ancho reducido */}
-      <div style={{ minWidth: 0, width: 90, flexShrink: 0 }}>
-        <div className="font-black text-chunky-dark text-[13px] leading-tight truncate">{pair.frito.name}</div>
-        <div className="flex items-center gap-0.5">
-          <span className={`font-black text-xs ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
-          <span className="text-[7px] text-gray-400 font-bold">cr</span>
-          <span className="text-gray-300 text-[9px]">→</span>
-          <span className="font-black text-xs text-chunky-dark">{pair.frito.qty}</span>
-          <span className="text-[7px] text-gray-400 font-bold">fr</span>
+    <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}>
+      {/* Info */}
+      <div style={{ minWidth: 0, width: nameW, flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
+        <div className="flex items-center gap-0.5 mt-0.5">
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: pair.crudo.qty > 0 ? '#16a34a' : '#ef4444' }}>{pair.crudo.qty}</span>
+          <span style={{ fontSize: stockSz - 2, color: '#9ca3af', fontWeight: 700 }}>cr</span>
+          <span style={{ fontSize: stockSz, color: '#d1d5db' }}>→</span>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{pair.frito.qty}</span>
+          <span style={{ fontSize: stockSz - 2, color: '#9ca3af', fontWeight: 700 }}>fr</span>
         </div>
       </div>
 
-      {/* Botones circulares — 38px */}
-      <div className="flex gap-1 flex-1 justify-center">
+      {/* Botones circulares */}
+      <div className="flex gap-1.5 flex-1 justify-center">
         {presets.slice(0, 5).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            style={{ width: 38, height: 38, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-            className={`font-black text-sm transition-all select-none ${circleCls}`}>
+            style={{ width: circleD, height: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
+            className={`transition-all select-none ${circleCls}`}>
             {amount}
           </button>
         ))}
       </div>
 
       <button onClick={() => onManual(pair)}
-        style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: 12, cursor: 'pointer' }}>
+        style={{ width: manualD, height: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}>
         ✏️
       </button>
     </div>
@@ -315,14 +322,15 @@ function FritadoPanel({ productionPoint, onBack }) {
   const aspectRatio = sh / sw;
 
   const isMobile  = aspectRatio > 1.4;
-  const isTablet  = !isMobile && sw > 500 && sw <= 1200; // captura iPads landscape
+  const isTablet  = !isMobile && sw > 500 && sw <= 1200;
+  const isTabletLandscape = isTablet && sw > sh;
 
   let cols, allowScroll, pad, gap;
   if (isMobile) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
   } else if (isTablet) {
-    allowScroll = false; pad = 10; gap = 10;
-    cols = count <= 2 ? (count || 1) : count <= 4 ? 2 : 3;
+    cols = isTabletLandscape ? 2 : 1;
+    allowScroll = true; pad = 10; gap = 8;
   } else {
     allowScroll = false; pad = 6; gap = 6;
     cols = count <= 2 ? (count || 1) : count <= 4 ? 2 : count <= 6 ? 3 : count <= 12 ? 4 : 5;
@@ -403,8 +411,8 @@ function FritadoPanel({ productionPoint, onBack }) {
           }}>
             {pairs.map((pair, i) => {
               const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };
-              if (isMobile)   return <FritadoCardMobile  {...props} />;
-              if (isTablet)   return <FritadoCardTablet  {...props} cardH={cardH} />;
+              if (isMobile)   return <FritadoCardMobile  {...props} size="sm" />;
+              if (isTablet)   return <FritadoCardMobile  {...props} size="md" />;
               if (useCompact) return <FritadoCardCompact {...props} />;
               return              <FritadoCard        {...props} />;
             })}
