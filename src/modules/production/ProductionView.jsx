@@ -133,8 +133,8 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual }) {
   );
 }
 
-// ─── Tarjeta TABLET: normal con texto más grande ───────────────────────────────
-function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual }) {
+// ─── Tarjeta TABLET: escala fuentes según espacio disponible ──────────────────
+function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 300 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
   const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
@@ -149,38 +149,48 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual }) {
     : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
+  // Escalar según espacio real por tarjeta
+  const big3  = cardH >= 260;  // suficiente para fuentes grandes
+  const nameSz  = big3 ? 'text-xl'   : 'text-base';
+  const stockSz = big3 ? 'text-xl'   : 'text-base';
+  const bigSz   = big3 ? 'text-4xl'  : 'text-2xl';
+  const unitSz  = big3 ? 'text-sm'   : 'text-xs';
+  const smSz    = big3 ? 'text-base' : 'text-sm';
+  const pad     = big3 ? 'p-4'       : 'p-3';
+  const smPy    = big3 ? 'py-3'      : 'py-2';
+
   return (
-    <div className={`rounded-2xl p-5 flex flex-col gap-3 h-full ${cardCls}`}>
+    <div className={`rounded-2xl ${pad} flex flex-col gap-2 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-xl leading-tight truncate">{prod.name}</div>
-        <div className="flex items-baseline justify-center gap-1 mt-0.5">
-          <span className="font-black text-chunky-dark text-2xl">{prod.currentStock}</span>
-          <span className="text-base font-bold text-gray-400">{prod.unit}</span>
-          <span className={`text-base font-bold ml-1 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+        <div className={`font-black text-chunky-dark leading-tight truncate ${nameSz}`}>{prod.name}</div>
+        <div className="flex items-baseline justify-center gap-1">
+          <span className={`font-black text-chunky-dark ${stockSz}`}>{prod.currentStock}</span>
+          <span className={`font-bold text-gray-400 ${unitSz}`}>{prod.unit}</span>
+          <span className={`font-bold ml-1 ${unitSz} ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
         className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
-        <span className="text-5xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
-        <span className="text-base font-bold opacity-70 mt-1">{yieldUnit}</span>
+        <span className={`font-black leading-none ${bigSz}`}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
+        <span className={`font-bold opacity-70 ${unitSz}`}>{yieldUnit}</span>
       </button>
 
-      <div className="grid grid-cols-4 gap-2 shrink-0">
+      <div className="grid grid-cols-4 gap-1.5 shrink-0">
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-xl py-3 flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
-              <span className="text-lg leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span className="text-xs font-bold opacity-70">{yieldUnit}</span>
+              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
+              <span className={`leading-none ${smSz}`}>{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              <span className={`font-bold opacity-70 text-[9px]`}>{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
       <button onClick={() => onManual(prod)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2.5 flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold ${unitSz} hover:border-chunky-main hover:text-chunky-dark transition-colors ${smPy}`}>
         ✏️ Manual
       </button>
     </div>
@@ -427,7 +437,7 @@ function ProductionPanel({ productionPoint, onBack }) {
             {enriched.map((prod) => {
               const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
               if (isMobile)      return <CardMobile  {...props} />;
-              if (isTablet)      return <CardTablet  {...props} />;
+              if (isTablet)      return <CardTablet  {...props} cardH={cardH} />;
               if (useCompact)    return <CardCompact {...props} />;
               return               <CardNormal  {...props} />;
             })}

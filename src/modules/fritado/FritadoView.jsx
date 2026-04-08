@@ -136,8 +136,8 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual }) {
   );
 }
 
-// ─── Tarjeta TABLET: normal con texto grande ──────────────────────────────────
-function FritadoCardTablet({ pair, wasteMode, onFry, onManual }) {
+// ─── Tarjeta TABLET: escala fuentes según espacio disponible ──────────────────
+function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
   const [big, ...smalls] = presets;
   const isDisabled = pair.crudo.qty === 0 && !wasteMode;
@@ -149,46 +149,56 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual }) {
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
 
+  const big3  = cardH >= 260;
+  const nameSz  = big3 ? 'text-xl'  : 'text-base';
+  const stockSz = big3 ? 'text-xl'  : 'text-base';
+  const bigSz   = big3 ? 'text-4xl' : 'text-2xl';
+  const unitSz  = big3 ? 'text-sm'  : 'text-xs';
+  const smSz    = big3 ? 'text-base': 'text-sm';
+  const pad     = big3 ? 'p-4'      : 'p-3';
+  const smPy    = big3 ? 'py-3'     : 'py-2';
+  const boxPy   = big3 ? 'py-3 px-4': 'py-2 px-3';
+
   return (
-    <div className={`rounded-2xl p-5 flex flex-col gap-3 h-full ${cardCls}`}>
+    <div className={`rounded-2xl ${pad} flex flex-col gap-2 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-xl leading-tight truncate">{pair.frito.name}</div>
-        <div className="text-sm font-bold text-gray-400 truncate mt-0.5">Masa: {pair.crudo.name}</div>
+        <div className={`font-black text-chunky-dark leading-tight truncate ${nameSz}`}>{pair.frito.name}</div>
+        <div className={`font-bold text-gray-400 truncate ${unitSz}`}>Masa: {pair.crudo.name}</div>
       </div>
 
-      <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 shrink-0">
+      <div className={`flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl shrink-0 ${boxPy}`}>
         <div className="flex-1 text-center">
-          <div className="text-xs font-black text-gray-400 uppercase">Crudo</div>
+          <div className="text-[9px] font-black text-gray-400 uppercase">Crudo</div>
           {pair.crudo.qty === 0 && !wasteMode
-            ? <div className="text-lg font-black text-red-500">Agotado</div>
-            : <div className="font-black text-green-600 text-2xl leading-none">{pair.crudo.qty}<span className="text-sm text-gray-400 ml-0.5">uds</span></div>
+            ? <div className={`font-black text-red-500 ${stockSz}`}>Agotado</div>
+            : <div className={`font-black text-green-600 leading-none ${stockSz}`}>{pair.crudo.qty}<span className={`text-gray-400 ml-0.5 ${unitSz}`}>uds</span></div>
           }
         </div>
-        <div className="text-gray-300 text-xl">➡️</div>
+        <div className="text-gray-300">➡️</div>
         <div className="flex-1 text-center">
-          <div className="text-xs font-black text-yellow-600 uppercase">Fritas</div>
-          <div className="font-black text-chunky-dark text-2xl leading-none">{pair.frito.qty}<span className="text-sm text-gray-400 ml-0.5">uds</span></div>
+          <div className="text-[9px] font-black text-yellow-600 uppercase">Fritas</div>
+          <div className={`font-black text-chunky-dark leading-none ${stockSz}`}>{pair.frito.qty}<span className={`text-gray-400 ml-0.5 ${unitSz}`}>uds</span></div>
         </div>
       </div>
 
       <button disabled={isDisabled} onClick={() => onFry(pair, big)}
         className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-all active:scale-[0.97] select-none ${btnCls}`}>
-        <span className="text-5xl leading-none font-black">{big}</span>
-        <span className="text-base font-bold opacity-80 mt-1">uds</span>
+        <span className={`leading-none font-black ${bigSz}`}>{big}</span>
+        <span className={`font-bold opacity-80 ${unitSz}`}>uds</span>
       </button>
 
-      <div className="grid grid-cols-4 gap-2 shrink-0">
+      <div className="grid grid-cols-4 gap-1.5 shrink-0">
         {smalls.slice(0, 4).map((amount, idx) => (
           <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            className={`rounded-xl py-3 flex flex-col items-center font-black transition-all active:scale-95 select-none ${btnCls}`}>
-            <span className="text-lg leading-none">{amount}</span>
-            <span className="text-xs font-bold opacity-70">uds</span>
+            className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-all active:scale-95 select-none ${btnCls}`}>
+            <span className={`leading-none ${smSz}`}>{amount}</span>
+            <span className="text-[9px] font-bold opacity-70">uds</span>
           </button>
         ))}
       </div>
 
       <button onClick={() => onManual(pair)}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-xl py-2.5 flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main transition-colors">
+        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold ${unitSz} hover:border-chunky-main transition-colors ${smPy}`}>
         ✏️ Manual
       </button>
     </div>
@@ -394,7 +404,7 @@ function FritadoPanel({ productionPoint, onBack }) {
             {pairs.map((pair, i) => {
               const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };
               if (isMobile)   return <FritadoCardMobile  {...props} />;
-              if (isTablet)   return <FritadoCardTablet  {...props} />;
+              if (isTablet)   return <FritadoCardTablet  {...props} cardH={cardH} />;
               if (useCompact) return <FritadoCardCompact {...props} />;
               return              <FritadoCard        {...props} />;
             })}
