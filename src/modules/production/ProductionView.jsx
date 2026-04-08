@@ -208,8 +208,8 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
 }
 
 
-// ─── Tarjeta COCINA/PC: adaptativa sin scroll ─────────────────────────────────
-function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual }) {
+// ─── Tarjeta COCINA/PC: fuentes proporcionales a cardH ────────────────────────
+function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 180 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
   const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
@@ -224,44 +224,61 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual }) {
     : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
+  // Escalar fuentes según espacio disponible por tarjeta
+  const tier = cardH >= 260 ? 'xl' : cardH >= 180 ? 'md' : 'sm';
+  const nameSz  = tier === 'xl' ? 15 : tier === 'md' ? 12 : 10;
+  const stockSz = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
+  const bigSz   = tier === 'xl' ? 48 : tier === 'md' ? 32 : 20;
+  const unitSz  = tier === 'xl' ? 12 : tier === 'md' ? 10 : 8;
+  const smSz    = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
+  const pad     = tier === 'xl' ? 10 : 6;
+  const smPy    = tier === 'xl' ? 6  : 4;
+
   return (
-    <div className={`rounded-xl p-2 flex flex-col gap-1.5 h-full ${cardCls}`} style={{ paddingBottom: 4 }}>
-      <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-xs leading-tight truncate">{prod.name}</div>
-        <div className="flex items-baseline justify-center gap-0.5">
-          <span className="font-black text-chunky-dark text-xs">{prod.currentStock}</span>
-          <span className="text-[9px] font-bold text-gray-400">{prod.unit}</span>
-          <span className={`text-[9px] font-bold ml-0.5 ${prod.stockOk ? 'text-green-500' : 'text-red-500'}`}>{prod.stockOk ? '✓' : '⚠️'}</span>
+    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap: tier === 'xl' ? 6 : 4, height: '100%', paddingBottom: tier === 'xl' ? pad : 4 }}
+         className={cardCls}>
+      {/* Nombre + stock */}
+      <div style={{ textAlign: 'center', flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{prod.name}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'center', gap: 2 }}>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{prod.currentStock}</span>
+          <span style={{ fontWeight: 700, fontSize: stockSz - 1, color: '#9ca3af' }}>{prod.unit}</span>
+          <span style={{ fontWeight: 700, fontSize: stockSz - 1, marginLeft: 2, color: prod.stockOk ? '#22c55e' : '#ef4444' }}>{prod.stockOk ? '✓' : '⚠️'}</span>
         </div>
       </div>
 
+      {/* Botón principal — número grande proporcional */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        className={`rounded-lg flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
-        <span className="text-xl font-black leading-none">{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
-        <span className="text-[9px] font-bold opacity-70">{yieldUnit}</span>
+        style={{ borderRadius: 10, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+        className={`font-black transition-colors select-none ${btnCls}`}>
+        <span style={{ fontSize: bigSz, fontWeight: 900, lineHeight: 1 }}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
+        <span style={{ fontSize: unitSz, fontWeight: 700, opacity: 0.75, marginTop: 2 }}>{yieldUnit}</span>
       </button>
 
-      <div className="grid grid-cols-4 shrink-0" style={{ gap: 2 }}>
+      {/* Botones pequeños */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, flexShrink: 0 }}>
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-md flex flex-col items-center py-1 font-black transition-colors select-none ${btnCls}`}>
-              <span className="text-[10px] leading-none">{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span className="text-[7px] font-bold opacity-70">{yieldUnit}</span>
+              style={{ borderRadius: 8, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+              className={`font-black transition-colors select-none ${btnCls}`}>
+              <span style={{ fontSize: smSz, fontWeight: 900, lineHeight: 1 }}>{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              <span style={{ fontSize: unitSz - 2, fontWeight: 700, opacity: 0.7 }}>{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
+      {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ minHeight: 18 }}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[9px] py-0.5 hover:border-chunky-main hover:text-chunky-dark transition-colors">
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
         ✏️ Manual
       </button>
     </div>
   );
 }
+
 
 // ─── Tarjeta COCINA compacta (muy poco espacio) ────────────────────────────────
 function CardCompact({ prod, productionPoint, wasteMode, onProduce, onManual }) {
@@ -448,7 +465,7 @@ function ProductionPanel({ productionPoint, onBack }) {
               if (isMobile)      return <CardMobile  {...props} size="sm" />;
               if (isTablet)      return <CardMobile  {...props} size="md" />;
               if (useCompact)    return <CardCompact {...props} />;
-              return               <CardNormal  {...props} />;
+              return               <CardNormal  {...props} cardH={cardH} />;
             })}
           </div>
         )}

@@ -212,8 +212,8 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
   );
 }
 
-// ─── Tarjeta COCINA normal ────────────────────────────────────────────────────
-function FritadoCard({ pair, wasteMode, onFry, onManual }) {
+// ─── Tarjeta COCINA normal: fuentes proporcionales a cardH ────────────────────
+function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
   const presets = pair.presets || [10, 20, 50, 100, 200];
   const [big, ...smalls] = presets;
   const isDisabled = pair.crudo.qty === 0 && !wasteMode;
@@ -225,41 +225,54 @@ function FritadoCard({ pair, wasteMode, onFry, onManual }) {
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
 
+  const tier = cardH >= 260 ? 'xl' : cardH >= 180 ? 'md' : 'sm';
+  const nameSz  = tier === 'xl' ? 15 : tier === 'md' ? 12 : 10;
+  const stockSz = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
+  const bigSz   = tier === 'xl' ? 48 : tier === 'md' ? 32 : 20;
+  const unitSz  = tier === 'xl' ? 12 : tier === 'md' ? 10 : 8;
+  const smSz    = tier === 'xl' ? 13 : tier === 'md' ? 11 : 9;
+  const pad     = tier === 'xl' ? 10 : 6;
+  const smPy    = tier === 'xl' ? 6  : 4;
+
   return (
-    <div className={`rounded-xl p-2 flex flex-col gap-1.5 h-full ${cardCls}`} style={{ paddingBottom: 4 }}>
-      <div className="text-center shrink-0">
-        <div className="font-black text-chunky-dark text-xs leading-tight truncate">{pair.frito.name}</div>
-        <div className="flex items-center justify-center gap-1">
-          <span className={`font-black text-xs ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
-          <span className="text-[8px] text-gray-300">→</span>
-          <span className="font-black text-xs text-chunky-dark">{pair.frito.qty}</span>
-          <span className="text-[8px] text-gray-400">uds</span>
+    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap: tier === 'xl' ? 6 : 4, height: '100%', paddingBottom: tier === 'xl' ? pad : 4 }}
+         className={cardCls}>
+      <div style={{ textAlign: 'center', flexShrink: 0 }}>
+        <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: pair.crudo.qty > 0 ? '#16a34a' : '#ef4444' }}>{pair.crudo.qty}</span>
+          <span style={{ fontSize: stockSz - 1, color: '#d1d5db' }}>→</span>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{pair.frito.qty}</span>
+          <span style={{ fontSize: stockSz - 2, color: '#9ca3af', fontWeight: 700 }}>uds</span>
         </div>
       </div>
 
       <button disabled={isDisabled} onClick={() => onFry(pair, big)}
-        className={`rounded-lg flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-all select-none ${btnCls}`}>
-        <span className="text-xl leading-none font-black">{big}</span>
-        <span className="text-[9px] font-bold opacity-70 mt-0.5">uds</span>
+        style={{ borderRadius: 10, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+        className={`font-black transition-all select-none ${btnCls}`}>
+        <span style={{ fontSize: bigSz, fontWeight: 900, lineHeight: 1 }}>{big}</span>
+        <span style={{ fontSize: unitSz, fontWeight: 700, opacity: 0.75, marginTop: 2 }}>uds</span>
       </button>
 
-      <div className="grid grid-cols-4 shrink-0" style={{ gap: 2 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, flexShrink: 0 }}>
         {smalls.slice(0, 4).map((amount, idx) => (
           <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            className={`rounded-md flex flex-col items-center py-1 font-black transition-all active:scale-95 select-none ${btnCls}`}>
-            <span className="text-[10px] leading-none">{amount}</span>
-            <span className="text-[7px] font-bold opacity-70">uds</span>
+            style={{ borderRadius: 8, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+            className={`font-black transition-all active:scale-95 select-none ${btnCls}`}>
+            <span style={{ fontSize: smSz, fontWeight: 900, lineHeight: 1 }}>{amount}</span>
+            <span style={{ fontSize: unitSz - 2, fontWeight: 700, opacity: 0.7 }}>uds</span>
           </button>
         ))}
       </div>
 
-      <button onClick={() => onManual(pair)} style={{ minHeight: 18 }}
-        className="w-full shrink-0 border border-dashed border-gray-300 rounded-lg flex items-center justify-center text-gray-400 font-bold text-[9px] py-0.5 hover:border-chunky-main transition-colors">
+      <button onClick={() => onManual(pair)}
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
         ✏️ Manual
       </button>
     </div>
   );
 }
+
 
 // ─── Tarjeta COMPACTA cocina ──────────────────────────────────────────────────
 function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
@@ -414,7 +427,7 @@ function FritadoPanel({ productionPoint, onBack }) {
               if (isMobile)   return <FritadoCardMobile  {...props} size="sm" />;
               if (isTablet)   return <FritadoCardMobile  {...props} size="md" />;
               if (useCompact) return <FritadoCardCompact {...props} />;
-              return              <FritadoCard        {...props} />;
+              return              <FritadoCard        {...props} cardH={cardH} />;
             })}
           </div>
         )}
