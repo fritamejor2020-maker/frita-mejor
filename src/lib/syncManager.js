@@ -15,7 +15,9 @@ const SYNC_LISTENERS = new Set();
 // ─── Estado interno ────────────────────────────────────────────────────────────
 
 let isSyncing = false;
-let isOnline = navigator.onLine;
+// Asumimos online=true al inicio. navigator.onLine es poco confiable en móviles
+// (puede reportar false aunque haya conexión). Lo validamos con un probe real.
+let isOnline = true;
 
 // ─── Listeners de estado ──────────────────────────────────────────────────────
 
@@ -78,18 +80,21 @@ export async function flushQueue() {
   notifyListeners({ online: true, pendingCount: queue.length, syncing: true });
 
   const remaining = [];
-  for (const item of queue) {
-    try {
-      await writeToSupabase(item.key, item.value);
-    } catch (err) {
-      console.warn(`[SyncManager] Error syncing "${item.key}":`, err.message);
-      remaining.push(item);
+  try {
+    for (const item of queue) {
+      try {
+        await writeToSupabase(item.key, item.value);
+      } catch (err) {
+        console.warn(`[SyncManager] Error syncing "${item.key}":`, err.message);
+        remaining.push(item);
+      }
     }
+  } finally {
+    // SIEMPRE reseteamos isSyncing, aunque ocurra un error inesperado
+    saveQueue(remaining);
+    isSyncing = false;
+    notifyListeners({ online: isOnline, pendingCount: remaining.length, syncing: false });
   }
-
-  saveQueue(remaining);
-  isSyncing = false;
-  notifyListeners({ online: true, pendingCount: remaining.length, syncing: false });
 }
 
 // ─── API pública de escritura ─────────────────────────────────────────────────
@@ -111,7 +116,15 @@ export async function push(key, value) {
     notifyListeners({ online: true, pendingCount: getQueue().length, syncing: false });
   } catch (err) {
     console.warn(`[SyncManager] Falló sync de "${key}", encolando:`, err.message);
-    isOnline = false;
+    // Solo marcamos offline si es un error de red real, no un error de Supabase (RLS, etc.)
+    const isNetworkError = err.message?.includes('fetch') ||
+      err.message?.includes('network') ||
+      err.message?.includes('Failed to fetch') ||
+      err.name === 'TypeError';
+    if (isNetworkError) {
+      isOnline = false;
+      notifyListeners({ online: false, pendingCount: getQueue().length + 1, syncing: false });
+    }
     enqueue(key, value);
   }
 }
@@ -148,7 +161,8 @@ export async function pullAll() {
 window.addEventListener('online', () => {
   isOnline = true;
   console.log('[SyncManager] Conexión restaurada. Sincronizando cola...');
-  flushQueue();
+  // Pequeño delay para que la red realmente esté disponible antes de intentar sync
+  setTimeout(() => flushQueue(), 1000);
 });
 
 window.addEventListener('offline', () => {
@@ -157,6 +171,31 @@ window.addEventListener('offline', () => {
   notifyListeners({ online: false, pendingCount: queue.length, syncing: false });
   console.log('[SyncManager] Sin conexión. Los cambios se guardarán localmente.');
 });
+
+// Probe de conectividad: verifica la conexión real con Supabase al arrancar.
+// Resuelve el problema de navigator.onLine = false en móviles aunque haya internet.
+async function probeConnectivity() {
+  try {
+    const { error } = await supabase.from('app_state').select('key').limit(1);
+    if (!error) {
+      if (!isOnline) {
+        isOnline = true;
+        notifyListeners({ online: true, pendingCount: getQueue().length, syncing: false });
+      }
+      // Si hay cola pendiente, vaciarla
+      flushQueue();
+    }
+  } catch {
+    // Si el probe falla, confiamos en navigator.onLine
+    isOnline = navigator.onLine;
+  }
+}
+
+// Ejecutar probe al cargar
+probeConnectivity();
+
+// Re-probar cada 30 segundos para recuperarse de falsos negativos
+setInterval(probeConnectivity, 30_000);
 
 export function getSyncStatus() {
   return {
