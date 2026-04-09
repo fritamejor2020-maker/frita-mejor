@@ -10,6 +10,7 @@ import { supabase } from './supabase';
 // ==============================================================================
 
 const QUEUE_KEY = 'frita-sync-queue';
+const MAX_RETRIES = 3;
 const SYNC_LISTENERS = new Set();
 
 // ─── Estado interno ────────────────────────────────────────────────────────────
@@ -49,17 +50,25 @@ function enqueue(key, value) {
   // Si ya hay un item pendiente para esta key, reemplazarlo (solo el último importa)
   const existingIndex = queue.findIndex(item => item.key === key);
   if (existingIndex !== -1) {
-    queue[existingIndex] = { key, value, timestamp: Date.now() };
+    queue[existingIndex] = { key, value, timestamp: Date.now(), retries: 0 };
   } else {
-    queue.push({ key, value, timestamp: Date.now() });
+    queue.push({ key, value, timestamp: Date.now(), retries: 0 });
   }
   saveQueue(queue);
-  notifyListeners({ online: false, pendingCount: queue.length, syncing: false });
+  notifyListeners({ online: isOnline, pendingCount: queue.length, syncing: false });
 }
 
 // ─── Escritura a Supabase ─────────────────────────────────────────────────────
 
+function isSupabaseConfigured() {
+  const url = import.meta.env.VITE_SUPABASE_URL || '';
+  return url.length > 0 && !url.includes('placeholder');
+}
+
 async function writeToSupabase(key, value) {
+  if (!isSupabaseConfigured()) {
+    throw new Error('Supabase no configurado: faltan variables de entorno VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY');
+  }
   const { error } = await supabase
     .from('app_state')
     .upsert({ key, value }, { onConflict: 'key' });
@@ -85,8 +94,14 @@ export async function flushQueue() {
       try {
         await writeToSupabase(item.key, item.value);
       } catch (err) {
-        console.warn(`[SyncManager] Error syncing "${item.key}":`, err.message);
-        remaining.push(item);
+        const retries = (item.retries || 0) + 1;
+        if (retries >= MAX_RETRIES) {
+          console.warn(`[SyncManager] "${item.key}" descartado tras ${MAX_RETRIES} intentos fallidos:`, err.message);
+          // No lo agregamos a remaining → se descarta
+        } else {
+          console.warn(`[SyncManager] Error syncing "${item.key}" (intento ${retries}/${MAX_RETRIES}):`, err.message);
+          remaining.push({ ...item, retries });
+        }
       }
     }
   } finally {
