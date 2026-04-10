@@ -5,7 +5,6 @@ import { useVehicleStore } from '../store/useVehicleStore';
 
 export const SellerSetupView = () => {
   const startShift = useSellerSessionStore((state) => state.startShift);
-  const getActiveTricycleAbbreviations = useVehicleStore((state) => state.getActiveTricycleAbbreviations);
   
   const [pointType, setPointType] = useState('fija');
   const [pointId, setPointId] = useState('');
@@ -13,15 +12,16 @@ export const SellerSetupView = () => {
   const [responsibleName, setResponsibleName] = useState('');
 
   const pointTypes = [
-    { id: 'fija', label: 'Local' },
-    { id: 'variable', label: 'Triciclo' },
-    { id: 'local', label: 'Carrito' }
+    { id: 'fija',     label: 'Local',    vehicleType: 'Local'    },
+    { id: 'variable', label: 'Triciclo', vehicleType: 'Triciclo' },
+    { id: 'local',    label: 'Carrito',  vehicleType: 'Carrito'  }
   ];
 
-  const pointIds = getActiveTricycleAbbreviations(); // Dynamically load from Vehicle Store
-  // If the user selects something else than 'Triciclo', it should probably have other IDs. 
-  // For now we will append some static ones to keep the prototype working for Local.
-  const allPointIds = pointType === 'variable' ? pointIds : ['L1', 'L2', 'C1'];
+  const vehicles = useVehicleStore((state) => state.vehicles);
+  const selectedTypeObj = pointTypes.find(pt => pt.id === pointType);
+  const allPointIds = vehicles
+    .filter((v: any) => v.active && v.type === selectedTypeObj?.vehicleType)
+    .map((v: any) => v.abbreviation || v.name);
 
   const navigate = useNavigate();
 

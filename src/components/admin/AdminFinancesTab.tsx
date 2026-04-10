@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { useInventoryStore } from '../../store/useInventoryStore';
+import { useLogisticsStore } from '../../store/useLogisticsStore';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -91,27 +93,102 @@ const MOCK_CLOSINGS: MockClosing[] = [
 
 // ─── Component: Cierres ──────────────────────────────────────────────
 export const AdminFinancesTab = () => {
+  const { posShifts, posSales, posExpenses, updatePosShift } = useInventoryStore();
+
   // Cierres filters
   const [filterDate, setFilterDate] = useState('');
   const [filterShift, setFilterShift] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [editingClosing, setEditingClosing] = useState<any | null>(null);
+  const [editCash, setEditCash] = useState('');
+  const [editTransfer, setEditTransfer] = useState('');
+  const [editExpenses, setEditExpenses] = useState('');
+  const [editExpensesDesc, setEditExpensesDesc] = useState('');
+  const [editDetails, setEditDetails] = useState<any[]>([]);
+
+  const updateEditDetail = (idx: number, field: string, value: string) => {
+    setEditDetails(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d));
+  };
 
   // Filter logic
-  const filteredClosings = MOCK_CLOSINGS.filter((c) => {
+  const mappedShifts = (posShifts || []).filter((s: any) => s.closedAt).map((s: any) => {
+     let details: ClosingDetail[] = [];
+     let theoretical = 0;
+     let real = 0;
+     let expenses = 0;
+
+     if (s.type === 'VENDEDOR') {
+         // Recalculate live from logistics for accurate details
+         const priceMap: Record<string, { price: number, name: string }> = {};
+         (useInventoryStore.getState().getPosItems() || []).forEach((p: any) => {
+           priceMap[p.id] = { price: p.price || 0, name: p.name };
+         });
+         const { soldItems: liveSold, theoretical: liveTheoretical } =
+           useLogisticsStore.getState().calcSoldByVehicle(s.pointId, priceMap, s.openedAt);
+         // Fall back to stored soldItems if logistics has no record (e.g. old shifts)
+         const soldSource = Object.keys(liveSold).length > 0 ? liveSold : (s.soldItems || {});
+         theoretical = Object.keys(liveSold).length > 0 ? liveTheoretical : (s.theorySales || 0);
+         real = s.realAmount || 0;
+         expenses = s.expensesAmount || s.expenses || 0;
+         details = Object.values(soldSource).map((i: any) => ({
+             product: i.name,
+             sent: i.qty,
+             returned: 0,
+             sold: i.qty,
+             unitPrice: i.price || priceMap[i.id]?.price || 0
+         }));
+     } else {
+         // POS Shift
+         const shiftSales = (posSales || []).filter((sale: any) => sale.shiftId === s.id && sale.status === 'PAID');
+         theoretical = shiftSales.reduce((acc: number, sale: any) => acc + sale.total, 0);
+         expenses = (posExpenses || []).filter((e: any) => e.shiftId === s.id).reduce((acc: number, e: any) => acc + e.amount, 0); 
+         
+         const transferSales = shiftSales.filter((sale: any) => sale.paymentMethod !== 'EFECTIVO').reduce((acc: number, sale: any) => acc + sale.total, 0);
+         real = (s.realAmount || 0) + transferSales; // realAmount in POS is just cash in drawer. Total real is cash + transfer
+         
+         const itemsMap: Record<string, any> = {};
+         shiftSales.forEach((sale: any) => {
+             sale.items.forEach((item: any) => {
+                 if (!itemsMap[item.name]) itemsMap[item.name] = { product: item.name, sold: 0, sent: 0, returned: 0, unitPrice: item.price };
+                 itemsMap[item.name].sold += item.qty;
+                 itemsMap[item.name].sent += item.qty;
+             });
+         });
+         details = Object.values(itemsMap);
+     }
+
+     // prioritize the vendor's real name, fall back to pointId
+     const vendorName = s.userName || s.responsibleName || s.pointId || 'Caja Frita Mejor';
+     const pointLabel = s.pointId && s.pointId !== vendorName ? s.pointId : null;
+
+     return {
+        id: s.id,
+        _raw: s, // keep raw shift for editing
+        pointName: vendorName,
+        pointLabel,
+        initials: (s.pointId || vendorName || 'CA').substring(0, 2).toUpperCase(),
+        shift: s.shift || 'TD',
+        date: new Date(s.closedAt).toISOString().split('T')[0],
+        theoretical,
+        real,
+        expenses,
+        details
+     };
+  });
+
+  const filteredClosings = [...mappedShifts, ...MOCK_CLOSINGS].filter((c: any) => {
     if (filterDate && c.date !== filterDate) return false;
     if (filterShift && c.shift !== filterShift) return false;
     return true;
   });
 
-  // ─── Render helpers ───
-  // El Teórico (APP) = ventas POS + gastos declarados del vendedor
-  // Esto es lo que debería cuadrar contra el effective + transfer entregado
-  const getTheoreticalWithExpenses = (c: MockClosing) => c.theoretical + (c.expenses ?? 0);
+  // El Teórico (APP) = ventas POS + gastos
+  const getTheoreticalWithExpenses = (c: any) => c.theoretical + (c.expenses || 0);
   
-  // El Real = cash + transfer (sin gastos, ya que los gastos ya se sumaron al teórico)
-  const getDiff = (c: MockClosing) => c.real - getTheoreticalWithExpenses(c);
+  // Diff = Real - (Theoretical + Expenses)
+  const getDiff = (c: any) => c.real - getTheoreticalWithExpenses(c);
 
-  const renderBadge = (c: MockClosing) => {
+  const renderBadge = (c: any) => {
     const diff = getDiff(c);
     if (diff === 0) {
       return (
@@ -176,7 +253,7 @@ export const AdminFinancesTab = () => {
           {filteredClosings.map((closing) => {
             const isExpanded = expandedId === closing.id;
             const calculatedTheoretical = closing.details.reduce(
-              (sum, d) => sum + d.sold * d.unitPrice,
+              (sum: number, d: any) => sum + d.sold * d.unitPrice,
               0
             );
 
@@ -192,16 +269,32 @@ export const AdminFinancesTab = () => {
                     <div>
                       <div className="flex items-center gap-2">
                         <span className="font-black text-gray-800 text-base">{closing.pointName}</span>
+                        {closing.pointLabel && (
+                          <span className="bg-red-50 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.pointLabel}</span>
+                        )}
                         <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.shift}</span>
                       </div>
                       <p className="text-xs text-gray-400 font-bold mt-0.5">{closing.date}</p>
                     </div>
                   </div>
 
-                  {/* Edit icon */}
-                  <button className="text-gray-300 hover:text-gray-500 transition-colors p-1 mt-1">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                  </button>
+                  {/* Edit icon — only for real shifts (not mock) */}
+                  {closing._raw && (
+                    <button
+                      className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 mt-0.5 hover:bg-red-50 rounded-lg"
+                      title="Editar cierre"
+                      onClick={() => {
+                        setEditingClosing(closing);
+                        setEditCash(String(closing._raw.cashAmount || closing.real || 0));
+                        setEditTransfer(String(closing._raw.transferAmount || 0));
+                        setEditExpenses(String(closing.expenses || 0));
+                        setEditExpensesDesc(closing._raw.expensesDesc || '');
+                        setEditDetails(closing.details.map((d: any) => ({ ...d })));
+                      }}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
+                    </button>
+                  )}
                 </div>
 
                 {/* ─── Comparison Block ────────────────── */}
@@ -286,6 +379,163 @@ export const AdminFinancesTab = () => {
           })}
         </div>
       </div>
+
+      {/* ─── Edit Closing Modal ────────────────────────────────── */}
+      {editingClosing && (
+        <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 shadow-2xl w-full max-w-md flex flex-col gap-6 animate-[fadeIn_0.2s_ease-out]">
+            <div className="flex items-start justify-between">
+              <div>
+                <h3 className="text-xl font-black text-gray-800">Editar Cierre</h3>
+                <p className="text-sm font-bold text-gray-400 mt-0.5">{editingClosing.pointName} · {editingClosing.shift} · {editingClosing.date}</p>
+              </div>
+              <button onClick={() => setEditingClosing(null)} className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Efectivo</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">$</span>
+                  <input type="number" value={editCash} onChange={e => setEditCash(e.target.value)}
+                    className="w-full border-2 border-gray-100 focus:border-[#FF4040] rounded-xl py-3 pl-8 pr-4 text-lg font-black text-gray-800 outline-none transition-colors bg-gray-50" />
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Transferencias</label>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">$</span>
+                  <input type="number" value={editTransfer} onChange={e => setEditTransfer(e.target.value)}
+                    className="w-full border-2 border-gray-100 focus:border-[#FF4040] rounded-xl py-3 pl-8 pr-4 text-lg font-black text-gray-800 outline-none transition-colors bg-gray-50" />
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">Gastos / Salidas</label>
+              <div className="flex gap-2">
+                <div className="relative w-1/3">
+                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 font-bold text-sm">$</span>
+                  <input type="number" value={editExpenses} onChange={e => setEditExpenses(e.target.value)}
+                    className="w-full border-2 border-gray-100 focus:border-[#FF4040] rounded-xl py-3 pl-8 pr-3 text-lg font-black text-gray-800 outline-none transition-colors bg-gray-50" />
+                </div>
+                <input type="text" value={editExpensesDesc} onChange={e => setEditExpensesDesc(e.target.value)}
+                  placeholder="Descripción del gasto..."
+                  className="flex-1 border-2 border-gray-100 focus:border-[#FF4040] rounded-xl py-3 px-4 text-sm font-bold text-gray-600 outline-none transition-colors bg-gray-50" />
+              </div>
+            </div>
+
+            {/* Editable details table */}
+            {editDetails.length > 0 && (
+              <div>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Detalle de Productos</label>
+                <div className="border border-gray-100 rounded-2xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="py-2.5 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Producto</th>
+                        <th className="py-2.5 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Enviado</th>
+                        <th className="py-2.5 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Quedó</th>
+                        <th className="py-2.5 px-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Vendido</th>
+                        <th className="py-2.5 px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-right">Price</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {editDetails.map((d: any, i: number) => (
+                        <tr key={i} className="hover:bg-gray-50/50">
+                          <td className="py-2 px-4 font-bold text-gray-700 text-xs max-w-[90px] truncate">{d.product}</td>
+                          {(['sent','returned','sold'] as const).map(field => (
+                            <td key={field} className="py-1.5 px-1 text-center">
+                              <input
+                                type="number" min="0"
+                                value={d[field]}
+                                onChange={e => updateEditDetail(i, field, e.target.value)}
+                                className="w-14 text-center border border-gray-200 focus:border-[#FF4040] rounded-lg py-1 text-sm font-black text-gray-800 outline-none bg-white transition-colors"
+                              />
+                            </td>
+                          ))}
+                          <td className="py-1.5 px-2">
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
+                              <input
+                                type="number" min="0"
+                                value={d.unitPrice}
+                                onChange={e => updateEditDetail(i, 'unitPrice', e.target.value)}
+                                className="w-20 border border-gray-200 focus:border-[#FF4040] rounded-lg py-1 pl-5 pr-1 text-xs font-black text-gray-800 outline-none bg-white transition-colors text-right"
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <div className="bg-gray-50 border-t border-gray-100 px-4 py-2.5 flex justify-between items-center">
+                    <span className="text-xs font-bold text-gray-400">Total Calculado por Productos:</span>
+                    <span className="text-sm font-black text-[#FF4040]">
+                      {fmt(editDetails.reduce((sum: number, d: any) => sum + (parseInt(d.sold) || 0) * (parseInt(d.unitPrice) || 0), 0))}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Preview diff */}
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Diferencia Corregida</p>
+              {(() => {
+                const newReal = (parseInt(editCash) || 0) + (parseInt(editTransfer) || 0);
+                const newTheoretical = editingClosing.theoretical + (parseInt(editExpenses) || 0);
+                const diff = newReal - newTheoretical;
+                return (
+                  <p className={`text-2xl font-black ${diff === 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-green-600'}`}>
+                    {diff === 0 ? '✅ Cuadrado' : diff > 0 ? `Sobrante ${fmt(diff)}` : `Faltante ${fmt(Math.abs(diff))}`}
+                  </p>
+                );
+              })()}
+            </div>
+
+            <div className="flex gap-3 pt-1">
+              <button onClick={() => setEditingClosing(null)}
+                className="flex-1 py-3 rounded-xl bg-gray-100 text-gray-600 font-bold hover:bg-gray-200 transition-colors active:scale-95">
+                Cancelar
+              </button>
+              <button
+                onClick={() => {
+                  const newCash = parseInt(editCash) || 0;
+                  const newTransfer = parseInt(editTransfer) || 0;
+                  const newExpenses = parseInt(editExpenses) || 0;
+                  const parsedDetails = editDetails.map((d: any) => ({
+                    ...d,
+                    sent: parseInt(d.sent) || 0,
+                    returned: parseInt(d.returned) || 0,
+                    sold: parseInt(d.sold) || 0,
+                    unitPrice: parseInt(d.unitPrice) || 0,
+                  }));
+                  // Recalculate soldItems map for VENDEDOR type
+                  const soldItems: Record<string, any> = {};
+                  parsedDetails.forEach((d: any) => {
+                    soldItems[d.product] = { name: d.product, qty: d.sold, price: d.unitPrice };
+                  });
+                  updatePosShift(editingClosing.id, {
+                    cashAmount: newCash,
+                    transferAmount: newTransfer,
+                    realAmount: newCash + newTransfer,
+                    expenses: newExpenses,
+                    expensesDesc: editExpensesDesc,
+                    soldItems,
+                  });
+                  setEditingClosing(null);
+                }}
+                className="flex-[2] py-3 rounded-xl bg-[#FF4040] text-white font-black hover:bg-red-500 transition-colors shadow-lg shadow-red-100 active:scale-95"
+              >
+                Guardar Corrección
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

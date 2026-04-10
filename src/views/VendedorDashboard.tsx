@@ -14,24 +14,35 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 export const VendedorDashboard = () => {
-  const { isSetupComplete, pointId, responsibleName, endShift } = useSellerSessionStore();
+  const { isSetupComplete, pointId, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
-  const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart } = useLogisticsStore();
-  const { inventory, loadTemplates, addLoadTemplate } = useInventoryStore();
+  const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
+  const { getPosItems, loadTemplates, addLoadTemplate, addPosShift } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
+  const products = getPosItems(); // unified POS product list (same IDs as Dejador & POS)
 
   const [activeTab, setActiveTab] = useState('pos');
-  const [products, setProducts] = useState<any[]>([]);
 
   // Cierre state
   const [cash, setCash] = useState('');
   const [transfer, setTransfer] = useState('');
   const [expenses, setExpenses] = useState('');
   const [expensesDesc, setExpensesDesc] = useState('');
-  const [theorySales, setTheorySales] = useState(0);
+
+  // Build product price map for calcSoldByVehicle
+  const productPriceMap = products.reduce((acc: any, p: any) => {
+    acc[p.id] = { price: p.price || 0, name: p.name };
+    return acc;
+  }, {});
+
+  // Auto-calculated from logistics: (carga + surtidos) - sobrantes
+  const getLogisticsCalc = () => {
+    if (!pointId) return { soldItems: {}, theoretical: 0 };
+    return calcSoldByVehicle(pointId, productPriceMap, openedAt || undefined);
+  };
 
   // Modal edición de presets por producto
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -64,20 +75,25 @@ export const VendedorDashboard = () => {
   const [variablePriceProduct, setVariablePriceProduct] = useState<any>(null);
   const [variablePriceInput, setVariablePriceInput] = useState('');
 
-  useEffect(() => {
-    const sellable = inventory.filter((i: any) => i.type === 'FRITO' || i.type === 'PRODUCTO');
-    setProducts(sellable);
-  }, [inventory]);
 
-  if (!isSetupComplete) {
+
+  // Hydration guard: Zustand persist loads async, so read localStorage directly
+  // to avoid a false redirect during the brief window before rehydration.
+  const hasActiveSession = isSetupComplete || (() => {
+    try {
+      const raw = localStorage.getItem('frita-seller-session');
+      if (!raw) return false;
+      return JSON.parse(raw)?.state?.isSetupComplete === true;
+    } catch { return false; }
+  })();
+
+  if (!hasActiveSession) {
     return <Navigate to="/vendedor-setup" replace />;
   }
 
   const handleCheckout = async () => {
     try {
-      const saleTotal = await checkout(pointId as string);
-      // alert(`Venta registrada exitosamente. Cobrar: $${saleTotal}`);
-      setTheorySales(prev => prev + saleTotal);
+      await checkout(pointId as string);
     } catch (err: any) {
       alert("Error al vender: " + err.message);
     }
@@ -136,9 +152,34 @@ export const VendedorDashboard = () => {
     const cashVal = parseInt(cash) || 0;
     const transferVal = parseInt(transfer) || 0;
     const expensesVal = parseInt(expenses) || 0;
-    const { difference, status } = calculateClosingStatus(theorySales, cashVal, transferVal, expensesVal);
+
+    const { soldItems, theoretical: theorySalesVal } = getLogisticsCalc();
+    const { difference, status } = calculateClosingStatus(theorySalesVal, cashVal, transferVal, expensesVal);
 
     try {
+      const shiftData = useSellerSessionStore.getState();
+      const finalShift = {
+          openedAt: shiftData.openedAt || new Date().toISOString(),
+          closedAt: new Date().toISOString(),
+          userId: (user as any)?.id,
+          userName: responsibleName,
+          pointId: pointId,
+          shift: shiftData.shift,
+          pointType: shiftData.pointType,
+          theorySales: theorySalesVal,
+          realAmount: cashVal + transferVal,
+          cashAmount: cashVal,
+          transferAmount: transferVal,
+          expenses: expensesVal,
+          expensesDesc: expensesDesc,
+          status: status,
+          difference: difference,
+          type: 'VENDEDOR',
+          soldItems
+      };
+      
+      addPosShift(finalShift);
+
       alert(`Cierre exitoso. Diferencia: ${formatMoney(difference)} (${status})`);
       endShift();
       signOut();
@@ -279,97 +320,80 @@ export const VendedorDashboard = () => {
         )}
 
         {/* SUBVISTA: CIERRE CAJA */}
-        {activeTab === 'close' && (
+        {activeTab === 'close' && (() => {
+          const { soldItems: logSoldItems, theoretical: logTheoretical } = getLogisticsCalc();
+          const cashVal = parseInt(cash) || 0;
+          const transferVal = parseInt(transfer) || 0;
+          const expensesVal = parseInt(expenses) || 0;
+          const realTotal = cashVal + transferVal + expensesVal;
+          const diff = realTotal - logTheoretical;
+
+          return (
           <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
             
-            {/* INFORMACIÓN DE JORNADA (Solo lectura) */}
-            <div className="bg-amber-100/50 rounded-3xl sm:rounded-[40px] p-5 sm:p-8 border border-amber-200/50">
-              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3 sm:mb-4">Información de Jornada</h4>
-              <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-2 sm:mb-4">
-                 <div className="flex-1 bg-white rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 flex items-center font-black text-gray-800 text-base sm:text-lg">
-                    {pointId || 'Punto no asignado'}
-                 </div>
-                 <div className="flex-1 bg-white rounded-xl shadow-sm px-4 sm:px-6 py-3 sm:py-4 font-bold text-gray-500 flex items-center text-base sm:text-lg">
-                    {responsibleName || 'Vendedor no asignado'}
-                 </div>
+            {/* INFO DE JORNADA */}
+            <div className="bg-amber-100/50 rounded-3xl p-5 border border-amber-200/50">
+              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Jornada Activa</h4>
+              <div className="flex gap-3">
+                <div className="flex-1 bg-white rounded-xl shadow-sm px-4 py-3 font-black text-gray-800">{pointId || '—'}</div>
+                <div className="flex-1 bg-white rounded-xl shadow-sm px-4 py-3 font-bold text-gray-500">{responsibleName || '—'}</div>
               </div>
             </div>
 
-            {/* FORMULARIO FINANCIERO */}
-            <div className="bg-white rounded-3xl sm:rounded-[40px] p-5 sm:p-10 shadow-sm border border-white">
-               
-               <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 sm:gap-8 mb-8 sm:mb-10">
-                 {/* EFECTIVO */}
-                 <div className="relative pt-6">
-                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
-                       <DollarSign size={14} strokeWidth={3} /> EFECTIVO
-                    </div>
-                    <MoneyInput
-                      value={cash}
-                      onChange={setCash}
-                      placeholder="$ 0"
-                      className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
-                    />
-                 </div>
 
-                 {/* TRANSFERENCIAS */}
+            {/* FORMULARIO FINANCIERO */}
+
+            <div className="bg-white rounded-3xl p-5 sm:p-10 shadow-sm border border-white">
+               <div className="grid grid-cols-2 gap-4 mb-6">
                  <div className="relative pt-6">
-                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest flex items-center gap-1 sm:gap-2">
-                       <Zap size={14} strokeWidth={3} fill="currentColor" /> TRANSFERENCIAS
+                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest flex items-center gap-1">
+                       <DollarSign size={12} strokeWidth={3} /> EFECTIVO
                     </div>
-                    <MoneyInput
-                      value={transfer}
-                      onChange={setTransfer}
-                      placeholder="$ 0"
-                      className="w-full bg-white border-2 border-gray-100 rounded-2xl sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-xl sm:text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
-                    />
+                    <MoneyInput value={cash} onChange={setCash} placeholder="$ 0"
+                      className="w-full bg-white border-2 border-gray-100 rounded-2xl py-4 px-5 font-black text-xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors" />
+                 </div>
+                 <div className="relative pt-6">
+                    <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest flex items-center gap-1">
+                       <Zap size={12} strokeWidth={3} fill="currentColor" /> TRANSFERENCIAS
+                    </div>
+                    <MoneyInput value={transfer} onChange={setTransfer} placeholder="$ 0"
+                      className="w-full bg-white border-2 border-gray-100 rounded-2xl py-4 px-5 font-black text-xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors" />
                  </div>
                </div>
 
-               {/* GASTOS */}
-               <div className="relative pt-6 mb-8 sm:mb-10">
-                  <div className="absolute top-0 left-4 bg-gray-900 text-white font-black text-[10px] sm:text-xs px-3 sm:px-4 py-1 sm:py-1.5 rounded-t-lg tracking-widest">
+               <div className="relative pt-6 mb-6">
+                  <div className="absolute top-0 left-4 bg-gray-900 text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest">
                      GASTOS / SALIDAS
                   </div>
-                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 bg-gray-50 border-2 border-gray-100 rounded-[24px] sm:rounded-[28px] p-2">
-                     <MoneyInput
-                       value={expenses}
-                       onChange={setExpenses}
-                       placeholder="$ Valor"
-                       className="w-full sm:w-1/3 bg-white rounded-[20px] sm:rounded-3xl py-3 px-4 sm:py-4 sm:px-6 font-black text-lg sm:text-xl text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none"
-                     />
-                     <input 
-                       type="text" 
-                       value={expensesDesc}
-                       onChange={(e) => setExpensesDesc(e.target.value)}
-                       placeholder="Descripción del gasto..."
-                       className="w-full sm:w-2/3 bg-transparent py-3 px-4 sm:py-4 sm:px-4 font-bold text-gray-500 text-sm sm:text-base outline-none"
-                     />
+                  <div className="flex gap-2 bg-gray-50 border-2 border-gray-100 rounded-2xl p-2">
+                     <MoneyInput value={expenses} onChange={setExpenses} placeholder="$ Valor"
+                       className="w-1/3 bg-white rounded-xl py-3 px-4 font-black text-lg text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none" />
+                     <input type="text" value={expensesDesc} onChange={(e) => setExpensesDesc(e.target.value)}
+                       placeholder="Descripción..."
+                       className="flex-1 bg-transparent py-3 px-3 font-bold text-gray-500 text-sm outline-none" />
                   </div>
                </div>
-               
-               <hr className="border-gray-100 border-dashed border-2 mb-6 sm:mb-8" />
 
-               {/* TOTALIZADOR */}
-               <div className="text-center">
-                  <span className="block text-gray-400 font-bold text-xs sm:text-sm tracking-widest uppercase mb-1">Total Venta Neta</span>
-                  <p className="text-3xl sm:text-5xl font-black text-gray-900 tracking-tighter">
-                    {formatMoney((parseInt(cash)||0) + (parseInt(transfer)||0))}
-                  </p>
-               </div>
             </div>
 
-            <button 
-              onClick={handleCloseShift}
-              className="w-full flex items-center justify-center gap-2 sm:gap-3 bg-[#FF4040] text-white font-black text-lg sm:text-2xl py-4 sm:py-6 rounded-[24px] sm:rounded-[32px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95"
-            >
-              <Check size={24} strokeWidth={3} className="sm:hidden" /> 
-              <Check size={28} strokeWidth={3} className="hidden sm:block" /> 
+            {/* TOTAL DECLARADO */}
+            <div className="bg-gray-50 rounded-3xl px-6 py-5 flex items-center justify-between border border-gray-100">
+              <div>
+                <span className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Total Ventas</span>
+                <span className="text-xs font-bold text-gray-300">Efectivo + Transferencias</span>
+              </div>
+              <span className="text-3xl font-black text-gray-900">{formatMoney(cashVal + transferVal)}</span>
+            </div>
+
+            <button onClick={handleCloseShift}
+              className="w-full flex items-center justify-center gap-3 bg-[#FF4040] text-white font-black text-lg sm:text-2xl py-5 rounded-[28px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95">
+              <Check size={26} strokeWidth={3} />
               CERRAR JORNADA
             </button>
 
           </div>
-        )}
+          );
+        })()}
 
       </div>
 

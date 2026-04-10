@@ -231,6 +231,17 @@ export const useInventoryStore = create(
       getRecipeByProductId: (productId) =>
         get().recipes.find((r) => r.productId === productId),
 
+      /**
+       * Lista unificada de productos del POS / campo.
+       * Todos los módulos (Dejador, Vendedor, POS) deben usar ESTE selector
+       * para que los productIds coincidan en cargas, surtidos, pedidos y cierres.
+       * Filtra inventory por tipo FRITO o PRODUCTO y que tenga precio definido.
+       */
+      getPosItems: () =>
+        get().inventory.filter(
+          (i) => (i.type === 'FRITO' || i.type === 'PRODUCTO') && i.price != null
+        ),
+
       // Verifica si hay stock para producir [batches] lotes
       checkStock: (recipeId, batches = 1) => {
         const recipe = get().recipes.find((r) => r.id === recipeId);

@@ -46,14 +46,27 @@ const UnauthorizedView = () => {
 function RoleRedirect() {
   const { user } = useAuthStore();
   if (!user) return <Navigate to="/login" replace />;
+
+  // If vendor, check if there's already an active session before sending to setup
+  if (user.role === 'VENDEDOR' || user.role === 'vendedor') {
+    try {
+      const raw = localStorage.getItem('frita-seller-session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.state?.isSetupComplete) {
+          return <Navigate to="/vendedor" replace />;
+        }
+      }
+    } catch (_) {}
+    return <Navigate to="/vendedor-setup" replace />;
+  }
+
   const routes = { 
     ADMIN: '/admin', 
     BODEGUERO: '/bodega', 
     OPERARIO: '/produccion', 
     FRITADOR: '/fritado',
     CAJERO: '/pos',
-    VENDEDOR: '/vendedor-setup',
-    vendedor: '/vendedor-setup',
     DEJADOR: '/dejador',
     dejador: '/dejador',
     FINANZAS: '/finanzas'

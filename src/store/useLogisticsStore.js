@@ -156,6 +156,70 @@ export const useLogisticsStore = create(
     set(state => ({ loadHistory: [entry, ...state.loadHistory] }));
     syncKey('loadHistory', [entry, ...get().loadHistory]);
     return true;
+  },
+
+  /**
+   * Calcula las unidades vendidas por vehículo usando el modelo de inventario:
+   * Vendido = (Carga Inicial + Surtidos Entregados) - Sobrantes al Cierre
+   *
+   * @param {string} vehicleId - ej. 'T2'
+   * @param {object} productPrices - { [productId]: price } mapa de precios
+   * @param {string} [sinceTimestamp] - Filtrar solo desde esta fecha (ISO)
+   * @returns {{ soldItems: Record<string, {qty, name, price}>, theoretical: number }}
+   */
+  calcSoldByVehicle: (vehicleId, productPrices, sinceTimestamp = null) => {
+    const { loadHistory, completedRequests } = get();
+    
+    // Filter by START OF DAY so loads made before the vendor opens their session
+    // (which is the normal workflow) are still counted.
+    let since = null;
+    if (sinceTimestamp) {
+      const d = new Date(sinceTimestamp);
+      since = new Date(d.getFullYear(), d.getMonth(), d.getDate()); // midnight local
+    }
+    const inRange = ts => !since || new Date(ts) >= since;
+
+    // Acumula cantidades { [productId]: qty }
+    const totals = {};
+
+    // 1. Carga inicial
+    loadHistory
+      .filter(e => e.type === 'carga' && e.vehicleId === vehicleId && inRange(e.timestamp))
+      .forEach(e => {
+        e.items.forEach(({ productId, qty }) => {
+          totals[productId] = (totals[productId] || 0) + qty;
+        });
+      });
+
+    // 2. Surtidos entregados durante el día
+    completedRequests
+      .filter(r => r.requester_point_id === vehicleId && inRange(r.completed_at || r.created_at))
+      .forEach(r => {
+        (r.items_payload || []).forEach(({ productId, qty }) => {
+          totals[productId] = (totals[productId] || 0) + qty;
+        });
+      });
+
+    // 3. Restar sobrantes (recepciones del dejador al cierre)
+    loadHistory
+      .filter(e => e.type === 'recepcion' && e.vehicleId === vehicleId && inRange(e.timestamp))
+      .forEach(e => {
+        e.items.forEach(({ productId, qty }) => {
+          totals[productId] = (totals[productId] || 0) - qty;
+        });
+      });
+
+    // 4. Calcular monto y estructurar soldItems
+    const soldItems = {};
+    let theoretical = 0;
+    Object.entries(totals).forEach(([productId, qty]) => {
+      if (qty <= 0) return;
+      const { price = 0, name = productId } = productPrices[productId] || {};
+      soldItems[productId] = { qty, name, price };
+      theoretical += qty * price;
+    });
+
+    return { soldItems, theoretical };
   }
 
     }),

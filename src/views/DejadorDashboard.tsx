@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2, Pencil, Save } from 'lucide-react';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -7,13 +7,36 @@ import { useVehicleStore } from '../store/useVehicleStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 
+// ─── Hook: Relative time that auto-refreshes ─────────────────────────────
+const useRelativeTime = () => {
+  const [now, setNow] = useState(Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 30_000); // refresh every 30s
+    return () => clearInterval(id);
+  }, []);
+
+  return useCallback((isoDate: string) => {
+    const diffMs = Date.now() - new Date(isoDate).getTime();
+    const diffSec = Math.floor(diffMs / 1000);
+    if (diffSec < 60) return 'Ahora';
+    const diffMin = Math.floor(diffSec / 60);
+    if (diffMin < 60) return `Hace ${diffMin}m`;
+    const diffHr = Math.floor(diffMin / 60);
+    if (diffHr < 24) return `Hace ${diffHr}h`;
+    const diffDay = Math.floor(diffHr / 24);
+    return `Hace ${diffDay}d`;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [now]);
+};
+
 export const DejadorDashboard = () => {
+  const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
-  const { products, loadTemplates, addLoadTemplate, posSettings } = useInventoryStore();
+  const { loadTemplates, addLoadTemplate, posSettings, getPosItems } = useInventoryStore();
+  const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
-  const getActiveTricycleAbbreviations = useVehicleStore((state) => state.getActiveTricycleAbbreviations);
-  
-  const vehicles = getActiveTricycleAbbreviations();
+  const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
+  const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
@@ -318,7 +341,9 @@ export const DejadorDashboard = () => {
                             {req.requester_name && (
                               <span className="text-gray-600 font-bold text-sm leading-tight mt-0.5" title="Vendedor que solicitó">{req.requester_name}</span>
                             )}
-                            <span className="text-amber-600 font-bold text-xs sm:text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">Hace 5m</span>
+                            <span className="text-amber-600 font-bold text-xs sm:text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">
+                              {req.created_at ? timeAgo(req.created_at) : 'Pendiente'}
+                            </span>
                           </div>
                         </div>
 
