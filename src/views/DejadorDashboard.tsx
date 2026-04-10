@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2 } from 'lucide-react';
+import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2, Pencil, Save } from 'lucide-react';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
+import { getProductAbbreviation } from '../utils/formatUtils';
 
 export const DejadorDashboard = () => {
   const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
   const { products, loadTemplates, addLoadTemplate, posSettings } = useInventoryStore();
-  const { signOut } = useAuthStore();
+  const { user, signOut, updateUserPresets } = useAuthStore();
   const getActiveTricycleAbbreviations = useVehicleStore((state) => state.getActiveTricycleAbbreviations);
   
   const vehicles = getActiveTricycleAbbreviations();
@@ -33,7 +34,31 @@ export const DejadorDashboard = () => {
     setEditPayload(newPayload);
   };
   
-  const presets = posSettings?.restockPresets || [5, 10, 15, 20];
+  const productPresets = (user as any)?.productPresets || {};
+  const DEFAULT_PRESETS = [5, 10, 15, 20];
+
+  const getPresetsForProduct = (productId: string): number[] =>
+    productPresets[productId] || DEFAULT_PRESETS;
+
+  // Modal edición de presets
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [draftPresets, setDraftPresets] = useState<string[]>([]);
+
+  const openProductPresets = (productId: string) => {
+    setDraftPresets(getPresetsForProduct(productId).map(String));
+    setEditingProductId(productId);
+  };
+
+  const saveProductPresets = () => {
+    if (!editingProductId) return;
+    const parsed = draftPresets.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
+    if (parsed.length < 1) { showToast('⚠️ Ingresa al menos un valor'); return; }
+    const newProductPresets = { ...productPresets, [editingProductId]: parsed };
+    updateUserPresets((user as any).id, newProductPresets);
+    showToast('✔ Botones actualizados');
+    setEditingProductId(null);
+  };
+
   const dejadorTemplates = loadTemplates?.filter((t: any) => t.role === 'DEJADOR') || [];
 
   // Toast for success feedback
@@ -226,17 +251,33 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: CARGA INICIAL & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
-          <div className="grid grid-cols-1 xl:grid-cols-2 gap-3 sm:gap-4 animate-fade-in mb-8">
-            {products.map((p: any) => (
-              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-3xl sm:rounded-full flex flex-col sm:flex-row sm:items-center justify-between p-2 shadow-sm border gap-2 sm:gap-0`}>
-                
-                <div className={`${getThemeClass('bg')} text-white font-black text-sm px-4 sm:px-6 py-2 sm:py-3 rounded-full flex-shrink-0 sm:min-w-[140px] text-center shadow-sm sm:max-w-[180px] truncate`}>
-                  {p.name || 'Producto'}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in mb-8">
+            {products.map((p: any) => {
+              const productPresetValues = getPresetsForProduct(p.id);
+              return (
+              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-full flex flex-row items-center justify-between p-2 shadow-sm border`}>
+
+                {/* Cápsula izquierda + editar */}
+                <div className="flex items-center gap-1 flex-shrink-0">
+                  <div
+                    className={`${getThemeClass('bg')} text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none`}
+                    title={p.name || 'Producto'}
+                  >
+                    {getProductAbbreviation(p.name || 'Producto')}
+                  </div>
+                  <button
+                    onClick={() => openProductPresets(p.id)}
+                    className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors active:scale-90"
+                    title={`Editar botones de ${p.name}`}
+                  >
+                    <Pencil size={13} />
+                  </button>
                 </div>
 
-                <div className="flex gap-2 items-center sm:pr-2 justify-center">
+                {/* Botones de cantidad */}
+                <div className="flex gap-1.5 items-center pr-1">
                    <NumberSelectorGroup
-                     presets={presets}
+                     presets={productPresetValues}
                      value={loadQuantities[p.id] || 0}
                      themeClass={activeTab}
                      onChange={(val) => {
@@ -246,7 +287,7 @@ export const DejadorDashboard = () => {
                    />
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         )}
 
@@ -428,9 +469,64 @@ export const DejadorDashboard = () => {
         </div>
       )}
 
-      {/* ─── TOAST NOTIFICATION ─── */}
+      {/* MODAL EDITAR PRESETS POR PRODUCTO (Dejador) */}
+      {editingProductId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm">
+            <div className="flex items-center gap-3 mb-1">
+              <div className={`${getThemeClass('bg')} text-white font-black text-sm px-3 py-1.5 rounded-full`}>
+                {getProductAbbreviation(products.find((p: any) => p.id === editingProductId)?.name || '')}
+              </div>
+              <h3 className="font-black text-xl text-gray-900">Botones de cantidad</h3>
+            </div>
+            <p className="text-gray-400 font-bold text-sm mb-5">Valores rápidos para este producto. Se guardan solo para ti.</p>
+
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {draftPresets.map((val, idx) => (
+                <input
+                  key={idx}
+                  type="number"
+                  min="1"
+                  value={val}
+                  onChange={(e) => {
+                    const next = [...draftPresets];
+                    next[idx] = e.target.value;
+                    setDraftPresets(next);
+                  }}
+                  className="w-16 h-14 rounded-2xl border-2 border-[#FF4040] text-center font-black text-gray-900 text-lg outline-none focus:border-[#FFB700] transition-colors shadow-sm"
+                />
+              ))}
+              {draftPresets.length < 6 && (
+                <button onClick={() => setDraftPresets(p => [...p, ''])}
+                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 font-bold text-2xl flex items-center justify-center hover:border-gray-400 transition-colors">
+                  +
+                </button>
+              )}
+              {draftPresets.length > 1 && (
+                <button onClick={() => setDraftPresets(p => p.slice(0, -1))}
+                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-red-200 text-red-300 font-bold text-2xl flex items-center justify-center hover:border-red-400 hover:text-red-500 transition-colors">
+                  −
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setEditingProductId(null)}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-base hover:bg-gray-200 transition-colors active:scale-95">
+                Cancelar
+              </button>
+              <button onClick={saveProductPresets}
+                className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-base shadow-lg shadow-red-200 hover:bg-red-500 transition-colors active:scale-95 flex items-center justify-center gap-2">
+                <Save size={16} /> Guardar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* TOAST */}
       {toast && (
-        <div className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[100] bg-gray-900 text-white font-black text-sm sm:text-lg px-5 sm:px-8 py-3 sm:py-4 rounded-full shadow-2xl animate-[slideDown_0.3s_ease-out] border-2 border-white/20 text-center">
+        <div className="fixed top-4 sm:top-6 left-4 right-4 sm:left-1/2 sm:right-auto sm:-translate-x-1/2 z-[100] bg-gray-900 text-white font-black text-sm sm:text-lg px-5 sm:px-8 py-3 sm:py-4 rounded-full shadow-2xl border-2 border-white/20 text-center">
           {toast}
         </div>
       )}

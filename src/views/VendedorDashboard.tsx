@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check } from 'lucide-react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { calculateClosingStatus } from '../utils/financeUtils';
-import { formatMoney } from '../utils/formatUtils';
+import { formatMoney, getProductAbbreviation } from '../utils/formatUtils';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { BottomNav } from '../components/ui/BottomNav';
@@ -17,10 +17,10 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, responsibleName, endShift } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart } = useLogisticsStore();
-  const { inventory, loadTemplates, addLoadTemplate, posSettings } = useInventoryStore();
-  const { signOut } = useAuthStore();
+  const { inventory, loadTemplates, addLoadTemplate } = useInventoryStore();
+  const { user, signOut, updateUserPresets } = useAuthStore();
   
-  const presets = posSettings?.restockPresets || [5, 10, 15, 20];
+  const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
 
   const [activeTab, setActiveTab] = useState('pos');
@@ -31,8 +31,33 @@ export const VendedorDashboard = () => {
   const [transfer, setTransfer] = useState('');
   const [expenses, setExpenses] = useState('');
   const [expensesDesc, setExpensesDesc] = useState('');
-  const [theorySales, setTheorySales] = useState(0); 
-  
+  const [theorySales, setTheorySales] = useState(0);
+
+  // Modal edición de presets por producto
+  const [editingProductId, setEditingProductId] = useState<string | null>(null);
+  const [draftPresets, setDraftPresets] = useState<string[]>([]);
+
+  const productPresets = (user as any)?.productPresets || {};
+  const DEFAULT_PRESETS = [5, 10, 15, 20];
+
+  const getPresetsForProduct = (productId: string): number[] =>
+    productPresets[productId] || DEFAULT_PRESETS;
+
+  const openProductPresets = (productId: string) => {
+    setDraftPresets(getPresetsForProduct(productId).map(String));
+    setEditingProductId(productId);
+  };
+
+  const saveProductPresets = () => {
+    if (!editingProductId) return;
+    const parsed = draftPresets.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
+    if (parsed.length < 1) { toast.error('Ingresa al menos un valor'); return; }
+    const newProductPresets = { ...productPresets, [editingProductId]: parsed };
+    updateUserPresets((user as any).id, newProductPresets);
+    toast.success('Botones actualizados ✔');
+    setEditingProductId(null);
+  };
+
   // Custom states for manual input toggles
   const [manualInputOpen, setManualInputOpen] = useState<string | null>(null);
 
@@ -136,7 +161,7 @@ export const VendedorDashboard = () => {
   const formattedDate = currentDate.charAt(0).toUpperCase() + currentDate.slice(1);
 
   return (
-    <div className="min-h-screen bg-[#FFD56B] pb-32 font-sans w-full flex flex-col">
+    <div className="min-h-screen bg-[#FFD56B] font-sans w-full flex flex-col" style={{ paddingBottom: activeTab === 'pos' ? '240px' : '160px' }}>
       {/* HEADER */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 flex justify-between items-center">
@@ -158,15 +183,19 @@ export const VendedorDashboard = () => {
         
         {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
             {products.map(p => (
-              <button 
+              <button
                 key={p.id}
                 onClick={() => addToCart(p, 1)}
-                className="bg-white p-4 sm:p-6 rounded-3xl shadow-sm border border-transparent hover:border-white transition-all duration-300 active:scale-95 flex flex-col items-start justify-center text-left min-h-[120px] sm:min-h-[140px] hover:-translate-y-1 hover:shadow-chunky-lg group"
+                className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-2 sm:p-5 min-h-[80px] sm:min-h-[120px] hover:-translate-y-0.5 hover:shadow-md group gap-0.5"
               >
-                <span className="font-black text-gray-900 text-base sm:text-xl leading-tight mb-1 group-hover:text-[#FF4040] transition-colors">{p.name}</span>
-                <span className="text-[#FF4040] font-black text-sm sm:text-base">{formatMoney(p.price)}</span>
+                <span className="font-black text-gray-900 text-lg sm:text-2xl tracking-wide group-hover:text-[#FF4040] transition-colors leading-none">
+                  {getProductAbbreviation(p.name)}
+                </span>
+                <span className="text-[#FF4040] font-black text-[11px] sm:text-sm leading-tight">
+                  {formatMoney(p.price)}
+                </span>
               </button>
             ))}
           </div>
@@ -195,18 +224,35 @@ export const VendedorDashboard = () => {
               </button>
             </div>
 
+
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
                {products.map(p => {
                 const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
+                const productPresetValues = getPresetsForProduct(p.id);
               return (
-                <div key={p.id} className="bg-white rounded-3xl sm:rounded-full flex flex-col sm:flex-row sm:items-center justify-between p-2 shadow-sm border border-gray-100 gap-2 sm:gap-0">
-                  <div className="bg-[#FF4040] text-white font-black text-sm sm:text-base px-4 sm:px-6 py-2 sm:py-3 rounded-full sm:min-w-[140px] text-center shadow-sm">
-                    {p.name}
+                <div key={p.id} className="bg-white rounded-full flex flex-row items-center justify-between p-2 shadow-sm border border-gray-100">
+                  {/* Cápsula izquierda: abreviación + editar */}
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    <div
+                      className="bg-[#FF4040] text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none"
+                      title={p.name}
+                    >
+                      {getProductAbbreviation(p.name)}
+                    </div>
+                    <button
+                      onClick={() => openProductPresets(p.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors active:scale-90"
+                      title={`Editar botones de ${p.name}`}
+                    >
+                      <Pencil size={13} />
+                    </button>
                   </div>
-                  
-                  <div className="flex gap-2 items-center sm:pr-2 justify-center">
+
+                  {/* Botones de cantidad */}
+                  <div className="flex gap-1.5 items-center pr-1">
                      <NumberSelectorGroup
-                       presets={presets}
+                       presets={productPresetValues}
                        value={currentQty}
                        onChange={(qty) => {
                           const diff = qty - currentQty;
@@ -218,16 +264,8 @@ export const VendedorDashboard = () => {
               );
             })}
             </div>
-             {restockCart.some((i: any) => i.qty > 0) && (
-              <div className="md:col-span-2 flex justify-center mt-6 sm:mt-8">
-                <button 
-                  onClick={handleSendRestock}
-                  className="w-full max-w-2xl bg-[#FF4040] text-white font-black text-lg lg:text-2xl py-4 sm:py-5 rounded-full shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95"
-                >
-                  Enviar Solicitud
-                </button>
-              </div>
-            )}
+            {/* Espaciador para que el último producto no quede detrás del botón flotante */}
+            <div style={{ height: '80px' }} aria-hidden="true" />
           </div>
         )}
 
@@ -326,34 +364,123 @@ export const VendedorDashboard = () => {
 
       </div>
 
-      {/* MODAL CARRITO POS (Flotante) */}
-      {activeTab === 'pos' && cart.length > 0 && (
-        <div className="fixed bottom-28 left-4 right-4 max-w-lg mx-auto bg-white rounded-[40px] p-6 shadow-[0_20px_40px_-10px_rgba(0,0,0,0.2)] z-40 animate-slide-up border-2 border-gray-50">
-          <div className="flex justify-between max-h-40 overflow-y-auto mb-6 text-sm font-bold text-gray-500 pr-2">
-            <div className="flex flex-col gap-3 w-full">
-              {cart.map((c: any) => (
-                <div key={c.productId} className="flex justify-between items-center bg-gray-50 px-4 py-3 rounded-2xl">
-                  <span className="text-gray-900 font-black">{c.qty}x {c.name}</span>
-                  <span className="text-[#FF4040] font-black">{formatMoney(c.price * c.qty)}</span>
+      {/* BOTÓN FLOTANTE: ENVIAR SOLICITUD (siempre visible si hay items) */}
+      {activeTab === 'restock' && restockCart.some((i: any) => i.qty > 0) && (
+        <div className="fixed bottom-[72px] left-4 right-4 z-40 flex justify-center pointer-events-none">
+          <button
+            onClick={handleSendRestock}
+            className="pointer-events-auto w-full max-w-lg bg-[#FF4040] text-white font-black text-lg py-4 rounded-full shadow-[0_15px_40px_-10px_rgba(255,64,64,0.6)] transition-all active:scale-95 hover:bg-red-500"
+          >
+            Enviar Solicitud
+          </button>
+        </div>
+      )}
+
+      {/* MODAL EDITAR PRESETS POR PRODUCTO */}
+      {editingProductId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm animate-slide-up">
+            {/* Título con abreviación del producto */}
+            <div className="flex items-center gap-3 mb-1">
+              <div className="bg-[#FF4040] text-white font-black text-sm px-3 py-1.5 rounded-full">
+                {getProductAbbreviation(products.find(p => p.id === editingProductId)?.name || '')}
+              </div>
+              <h3 className="font-black text-xl text-gray-900">Botones de cantidad</h3>
+            </div>
+            <p className="text-gray-400 font-bold text-sm mb-5">Valores de acceso rápido para este producto. Se guardan solo para ti.</p>
+
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {draftPresets.map((val, idx) => (
+                <div key={idx} className="flex flex-col items-center gap-1">
+                  <input
+                    type="number"
+                    min="1"
+                    value={val}
+                    onChange={(e) => {
+                      const next = [...draftPresets];
+                      next[idx] = e.target.value;
+                      setDraftPresets(next);
+                    }}
+                    className="w-16 h-14 rounded-2xl border-2 border-[#FF4040] text-center font-black text-gray-900 text-lg outline-none focus:border-[#FFB700] transition-colors shadow-sm"
+                  />
                 </div>
               ))}
+              {draftPresets.length < 6 && (
+                <button
+                  onClick={() => setDraftPresets(prev => [...prev, ''])}
+                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 font-bold text-2xl flex items-center justify-center hover:border-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  +
+                </button>
+              )}
+              {draftPresets.length > 1 && (
+                <button
+                  onClick={() => setDraftPresets(prev => prev.slice(0, -1))}
+                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-red-200 text-red-300 font-bold text-2xl flex items-center justify-center hover:border-red-400 hover:text-red-500 transition-colors"
+                >
+                  −
+                </button>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setEditingProductId(null)}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-base hover:bg-gray-200 transition-colors active:scale-95"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={saveProductPresets}
+                className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-base shadow-lg shadow-red-200 hover:bg-red-500 transition-colors active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Save size={16} /> Guardar
+              </button>
             </div>
           </div>
-          <div className="flex gap-4">
-            <button 
-              onClick={clearCart}
-              className="w-16 h-16 sm:w-20 sm:h-20 bg-gray-100 rounded-3xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0"
-            >
-              <X size={28} strokeWidth={3} />
-            </button>
-            <button 
-              onClick={handleCheckout}
-              className="flex-1 bg-[#FF4040] rounded-3xl flex items-center justify-between px-6 sm:px-8 font-black text-2xl text-white shadow-[0_10px_20px_-5px_rgba(255,64,64,0.4)] hover:scale-[1.02] transition-transform active:scale-95"
-            >
-              <span>COBRAR</span>
-              <span>{formatMoney(total)}</span>
-            </button>
-          </div>
+        </div>
+      )}
+
+      {/* PANEL FIJO CARRITO POS (30% inferior) */}
+      {activeTab === 'pos' && (
+        <div className="fixed bottom-0 left-0 right-0 z-40 bg-white rounded-t-[28px] shadow-[0_-6px_24px_-4px_rgba(0,0,0,0.10)] border-t border-gray-100 pb-16">
+          {cart.length === 0 ? (
+            /* Estado vacío: panel colapsado */
+            <div className="flex items-center justify-center py-4 gap-2 text-gray-400">
+              <span className="font-bold text-sm">Toca un producto para agregar al pedido</span>
+            </div>
+          ) : (
+            <div className="px-4 pt-3 pb-3">
+              {/* Lista de items (scrollable) */}
+              <div className="flex flex-col gap-1.5 max-h-[110px] overflow-y-auto mb-3 pr-1">
+                {cart.map((c: any) => (
+                  <div key={c.productId} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-2xl">
+                    <span className="text-gray-900 font-black text-sm">
+                      <span className="inline-block bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full mr-2">{c.qty}x</span>
+                      {c.name}
+                    </span>
+                    <span className="text-[#FF4040] font-black text-sm">{formatMoney(c.price * c.qty)}</span>
+                  </div>
+                ))}
+              </div>
+              {/* Acciones */}
+              <div className="flex gap-3">
+                <button
+                  onClick={clearCart}
+                  className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-gray-400 hover:bg-red-50 hover:text-red-500 transition-colors flex-shrink-0 active:scale-95"
+                >
+                  <X size={22} strokeWidth={3} />
+                </button>
+                <button
+                  onClick={handleCheckout}
+                  className="flex-1 h-12 bg-[#FF4040] rounded-2xl flex items-center justify-between px-5 font-black text-xl text-white shadow-[0_6px_16px_-4px_rgba(255,64,64,0.5)] hover:scale-[1.01] transition-transform active:scale-95"
+                >
+                  <span>COBRAR</span>
+                  <span>{formatMoney(total)}</span>
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
