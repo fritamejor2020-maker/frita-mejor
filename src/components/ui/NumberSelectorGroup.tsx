@@ -37,7 +37,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
   };
 
   return (
-    <div className="flex gap-2 items-center pr-2 flex-wrap">
+    <div className="flex gap-1.5 sm:gap-2 items-center overflow-x-auto scrollbar-hide flex-nowrap pr-1 py-1 w-full justify-end">
       {presets.map(qty => {
         const isActive = value === qty;
         return (
@@ -47,7 +47,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
               onChange(isActive ? 0 : qty); // Toggle zero si vuelven a hacer clic
               setIsManualOpen(false);
             }}
-            className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full border-2 font-black text-sm sm:text-base flex items-center justify-center transition-all duration-300 active:scale-90 shadow-sm hover:shadow-chunky-lg hover:-translate-y-0.5 ${getThemeClasses(isActive)}`}
+            className={`w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-full border-[1.5px] font-black text-xs sm:text-base flex items-center justify-center transition-all duration-300 active:scale-90 shadow-sm hover:shadow-chunky-lg hover:-translate-y-0.5 ${getThemeClasses(isActive)}`}
           >
             {qty}
           </button>
@@ -55,7 +55,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
       })}
 
       {allowManual && (
-        <div className="relative">
+        <div className="relative shrink-0 flex items-center justify-center">
           {isManualOpen || isCustomValue ? (
             <input
               ref={inputRef}
@@ -69,13 +69,13 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
               onBlur={() => {
                 if (!isCustomValue) setIsManualOpen(false);
               }}
-              className="w-14 h-10 sm:w-16 sm:h-12 rounded-full border-2 border-[#FFB700] bg-yellow-50 text-center font-black text-gray-800 outline-none focus:border-[#FFB700] shadow-inner text-sm sm:text-base animate-slide-in-right"
+              className="w-12 h-9 sm:w-16 sm:h-11 rounded-full border-[1.5px] border-[#FFB700] bg-yellow-50 text-center font-black text-gray-800 outline-none focus:border-[#FFB700] shadow-inner text-xs sm:text-base animate-slide-in-right"
               placeholder="..."
             />
           ) : (
             <button
               onClick={() => setIsManualOpen(true)}
-              className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-white border-2 border-gray-200 text-gray-400 font-bold flex items-center justify-center hover:bg-gray-50 hover:border-gray-300 hover:text-gray-600 transition-colors shadow-sm"
+              className="w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-full bg-white border-[1.5px] border-gray-200 text-gray-400 font-bold flex items-center justify-center hover:bg-gray-50 hover:border-gray-300 hover:text-gray-600 transition-colors shadow-sm"
             >
               ...
             </button>

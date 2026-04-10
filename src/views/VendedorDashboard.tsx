@@ -61,6 +61,9 @@ export const VendedorDashboard = () => {
   // Custom states for manual input toggles
   const [manualInputOpen, setManualInputOpen] = useState<string | null>(null);
 
+  const [variablePriceProduct, setVariablePriceProduct] = useState<any>(null);
+  const [variablePriceInput, setVariablePriceInput] = useState('');
+
   useEffect(() => {
     const sellable = inventory.filter((i: any) => i.type === 'FRITO' || i.type === 'PRODUCTO');
     setProducts(sellable);
@@ -82,11 +85,11 @@ export const VendedorDashboard = () => {
 
   const handleSendRestock = async () => {
     try {
-      await sendRestockRequest(pointId as string);
-      alert("Solicitud de surtido enviada exitosamente");
+      await sendRestockRequest(pointId as string, responsibleName as string);
+      toast.success("Solicitud de surtido enviada exitosamente");
       clearRestockCart();
     } catch (err: any) {
-      alert("Error al pedir surtido: " + err.message);
+      toast.error("Error al pedir surtido: " + err.message);
     }
   };
 
@@ -187,7 +190,13 @@ export const VendedorDashboard = () => {
             {products.map(p => (
               <button
                 key={p.id}
-                onClick={() => addToCart(p, 1)}
+                onClick={() => {
+                  if (!p.price || p.price <= 0) {
+                     setVariablePriceProduct(p);
+                  } else {
+                     addToCart(p, 1);
+                  }
+                }}
                 className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-2 sm:p-5 min-h-[80px] sm:min-h-[120px] hover:-translate-y-0.5 hover:shadow-md group gap-0.5"
               >
                 <span className="font-black text-gray-900 text-lg sm:text-2xl tracking-wide group-hover:text-[#FF4040] transition-colors leading-none">
@@ -231,7 +240,7 @@ export const VendedorDashboard = () => {
                 const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
                 const productPresetValues = getPresetsForProduct(p.id);
               return (
-                <div key={p.id} className="bg-white rounded-full flex flex-row items-center justify-between p-2 shadow-sm border border-gray-100">
+                <div key={p.id} className="bg-white rounded-[28px] flex flex-row items-center justify-between p-2 shadow-sm border border-gray-100">
                   {/* Cápsula izquierda: abreviación + editar */}
                   <div className="flex items-center gap-1 flex-shrink-0">
                     <div
@@ -437,6 +446,58 @@ export const VendedorDashboard = () => {
                 <Save size={16} /> Guardar
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL PRECIO VARIABLE */}
+      {variablePriceProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm animate-slide-up text-center">
+             <h3 className="font-black text-2xl text-gray-900 mb-2">{variablePriceProduct.name}</h3>
+             <p className="text-gray-500 font-bold mb-6">Ingresa el precio de venta (Precio Variable).</p>
+             
+             <div className="relative mb-6">
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">$</span>
+                <input 
+                  autoFocus 
+                  type="number"
+                  value={variablePriceInput}
+                  onChange={e => setVariablePriceInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                       const price = parseInt(variablePriceInput);
+                       if (isNaN(price) || price <= 0) {
+                           toast.error('Ingresa un precio válido');
+                           return;
+                       }
+                       addToCart(variablePriceProduct, 1, price);
+                       setVariablePriceProduct(null);
+                       setVariablePriceInput('');
+                    }
+                  }}
+                  className="w-full bg-gray-50 border-2 border-gray-200 focus:border-[#FF4040] rounded-[24px] py-4 pl-12 pr-6 text-3xl font-black text-gray-900 outline-none text-center transition-colors"
+                  placeholder="0"
+                />
+             </div>
+
+             <div className="flex gap-3">
+                <button onClick={() => { setVariablePriceProduct(null); setVariablePriceInput(''); }} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 transition-colors active:scale-95">
+                  Cancelar
+                </button>
+                <button onClick={() => {
+                  const price = parseInt(variablePriceInput);
+                  if (isNaN(price) || price <= 0) {
+                       toast.error('Ingresa un precio válido');
+                       return;
+                  }
+                  addToCart(variablePriceProduct, 1, price);
+                  setVariablePriceProduct(null);
+                  setVariablePriceInput('');
+                }} className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-lg shadow-lg hover:bg-red-500 transition-colors active:scale-95">
+                  Confirmar
+                </button>
+             </div>
           </div>
         </div>
       )}

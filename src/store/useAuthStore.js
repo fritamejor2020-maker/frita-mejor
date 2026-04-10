@@ -204,14 +204,14 @@ export const useAuthStore = create(
         return { ok: true };
       },
 
-      // ─── Presets de cantidad por usuario (Vendedor) ──────────────
+      // ─── Presets de cantidad por usuario ──────────────
       updateUserPresets: (id, presets) => {
         set((state) => {
           const updatedUsers = state.users.map((u) =>
-            u.id === id ? { ...u, restockPresets: presets } : u
+            u.id === id ? { ...u, productPresets: presets } : u
           );
           const updatedSelf = state.user?.id === id
-            ? { ...state.user, restockPresets: presets }
+            ? { ...state.user, productPresets: presets }
             : state.user;
           return { users: updatedUsers, user: updatedSelf };
         });

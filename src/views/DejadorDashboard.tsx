@@ -255,7 +255,7 @@ export const DejadorDashboard = () => {
             {products.map((p: any) => {
               const productPresetValues = getPresetsForProduct(p.id);
               return (
-              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-full flex flex-row items-center justify-between p-2 shadow-sm border`}>
+              <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-[28px] flex flex-row items-center justify-between p-2 shadow-sm border`}>
 
                 {/* Cápsula izquierda + editar */}
                 <div className="flex items-center gap-1 flex-shrink-0">
@@ -314,7 +314,10 @@ export const DejadorDashboard = () => {
                             {req.requester_point_id}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-gray-800 font-black text-base sm:text-xl">Pedido Urgente</span>
+                            <span className="text-gray-800 font-black text-base sm:text-xl leading-tight">Pedido Urgente</span>
+                            {req.requester_name && (
+                              <span className="text-gray-600 font-bold text-sm leading-tight mt-0.5" title="Vendedor que solicitó">{req.requester_name}</span>
+                            )}
                             <span className="text-amber-600 font-bold text-xs sm:text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">Hace 5m</span>
                           </div>
                         </div>
@@ -350,8 +353,8 @@ export const DejadorDashboard = () => {
                            {editingReqId === req.id ? (
                              editPayload.map((item: any, idx: number) => (
                                <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 bg-white">
-                                 <div className="bg-red-500 text-white font-bold text-sm px-4 py-2.5 flex items-center whitespace-nowrap">
-                                   {item.name}
+                                 <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
+                                   {getProductAbbreviation(item.name || '')}
                                  </div>
                                  <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
                                  <div className="text-gray-900 font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center">
@@ -363,8 +366,8 @@ export const DejadorDashboard = () => {
                            ) : (
                              req.items_payload?.map((item: any, idx: number) => (
                                <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                 <div className="bg-red-500 text-white font-bold text-sm px-4 py-2.5 flex items-center whitespace-nowrap">
-                                   {item.name}
+                                 <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
+                                   {getProductAbbreviation(item.name || '')}
                                  </div>
                                  <div className="bg-white text-gray-900 font-black text-base px-5 py-2.5 flex items-center min-w-[48px] justify-center border-y border-r border-gray-200">
                                    {item.qty}
@@ -412,8 +415,8 @@ export const DejadorDashboard = () => {
                         <div className="flex flex-wrap gap-2">
                            {req.items_payload?.map((item: any, idx: number) => (
                              <div key={idx} className="flex rounded-lg overflow-hidden border border-amber-200/50">
-                               <div className="bg-gray-200/50 text-gray-500 font-bold text-xs px-3 py-1.5 flex items-center whitespace-nowrap">
-                                 {item.name}
+                               <div className="bg-gray-200/50 text-gray-500 font-black text-xs px-3 py-1.5 flex items-center min-w-[40px] justify-center whitespace-nowrap" title={item.name}>
+                                 {getProductAbbreviation(item.name || '')}
                                </div>
                                <div className="bg-white/80 text-gray-500 font-black text-xs px-3 py-1.5 flex items-center min-w-[36px] justify-center border-l border-amber-200/50">
                                  {item.qty}

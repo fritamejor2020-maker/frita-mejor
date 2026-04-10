@@ -49,6 +49,9 @@ export function PosView() {
   const [lastSale, setLastSale] = useState(null); // Used for printing the receipt
   const [lastClosedShift, setLastClosedShift] = useState(null); // Used for printing Z Report
 
+  const [variablePriceProduct, setVariablePriceProduct] = useState(null);
+  const [variablePriceInput, setVariablePriceInput] = useState('');
+
   // Auto-open shift modal if none is active when component mounts
   useEffect(() => {
     if (!activeShift) {
@@ -178,18 +181,24 @@ export function PosView() {
   };
 
   // -- ACTIONS --
-  const handleItemAdd = (item) => {
+  const handleItemAdd = (item, overridePrice = null) => {
     if (!activeShift) {
       alert("Debes abrir turno (caja) antes de vender.");
       setShowShiftModal(true);
       return;
     }
 
+    // Si el precio es 0 o indefinido y no hay override, abrimos modal
+    if (overridePrice === null && (!item.price || item.price <= 0)) {
+       setVariablePriceProduct(item);
+       return;
+    }
+
     // Check for custom VIP price based on Customer Type
-    let finalPrice = item.price;
-    let isCustomPrice = false;
+    let finalPrice = overridePrice !== null ? overridePrice : item.price;
+    let isCustomPrice = overridePrice !== null;
     
-    if (customer && customer.typeId) {
+    if (overridePrice === null && customer && customer.typeId) {
       const cType = customerTypes.find(t => t.id === customer.typeId);
       if (cType && cType.productDiscounts && cType.productDiscounts.length > 0) {
         const discountRule = cType.productDiscounts.find(d => d.productId === item.id);
@@ -201,14 +210,12 @@ export function PosView() {
     }
 
     setTicketItems(prev => {
-      const existing = prev.find(i => i.id === item.id);
+      const ticketItemId = overridePrice !== null ? `${item.id}-var-${overridePrice}` : item.id;
+      const existing = prev.find(i => i.id === ticketItemId);
       if (existing) {
-        // If they already have it, just update qty. 
-        // We assume the price is already the final price from when they added it,
-        // but it's safer to ensure it matches the current calculation just in case.
-        return prev.map(i => i.id === item.id ? { ...i, qty: i.qty + 1, price: finalPrice, isCustomPrice } : i);
+        return prev.map(i => i.id === ticketItemId ? { ...i, qty: i.qty + 1, price: finalPrice, isCustomPrice } : i);
       }
-      return [{ ...item, qty: 1, price: finalPrice, originalPrice: item.price, isCustomPrice }, ...prev];
+      return [{ ...item, realId: item.id, id: ticketItemId, qty: 1, price: finalPrice, originalPrice: item.price, isCustomPrice }, ...prev];
     });
     setSearchTerm(''); // Clear scanner
     setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -230,11 +237,7 @@ export function PosView() {
       // Find matching item by barcode or name
       const found = inventory.find(i => (i.barcode === term) || i.name.toLowerCase().includes(term));
       if (found) {
-        if (!found.price || found.price <= 0) {
-          alert(`El producto ${found.name} no tiene precio configurado.`);
-        } else {
-          handleItemAdd(found);
-        }
+        handleItemAdd(found);
       } else {
         alert('Producto no encontrado');
       }
@@ -339,9 +342,9 @@ export function PosView() {
     }, 100);
   };
 
-  // -- GRID RENDER LOGIC --
-  // Filters out items without price (unless we explicitly want to sell them at 0)
-  const sellableItems = inventory.filter(i => i.price && i.price > 0);
+  // GRID RENDER LOGIC --
+  // Include all items that are products or fritos, regardless of price (variable price)
+  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
   
   // If in root, show folders + unassigned items. If in folder, show items assigned to that folder.
   const displayedFolders = currentFolder ? [] : posCategories;
@@ -621,6 +624,50 @@ export function PosView() {
       </div>
 
       {/* ─── MODALS ───────────────────────────────────────── */}
+      {variablePriceProduct && (
+        <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
+             <h3 className="font-black text-2xl text-white mb-2 text-center">{variablePriceProduct.name}</h3>
+             <p className="text-gray-400 font-bold mb-6 text-center text-sm">Ingresa el precio de venta (Precio Variable).</p>
+             
+             <div className="relative mb-6 w-full">
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-gray-500">$</span>
+                <input 
+                  autoFocus 
+                  type="number"
+                  value={variablePriceInput}
+                  onChange={e => setVariablePriceInput(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                       const price = parseInt(variablePriceInput);
+                       if (isNaN(price) || price <= 0) return alert('Ingresa un precio válido');
+                       handleItemAdd(variablePriceProduct, price);
+                       setVariablePriceProduct(null);
+                       setVariablePriceInput('');
+                    }
+                  }}
+                  className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-4 pl-14 pr-6 text-4xl font-black text-white outline-none text-center shadow-inner transition-colors"
+                  placeholder="0"
+                />
+             </div>
+
+             <div className="flex gap-3 w-full">
+                <button onClick={() => { setVariablePriceProduct(null); setVariablePriceInput(''); }} className="flex-1 py-4 rounded-[20px] bg-gray-800 text-gray-300 font-bold text-lg hover:bg-gray-700 transition-colors active:scale-95">
+                  Cancelar
+                </button>
+                <button onClick={() => {
+                  const price = parseInt(variablePriceInput);
+                  if (isNaN(price) || price <= 0) return alert('Ingresa un precio válido');
+                  handleItemAdd(variablePriceProduct, price);
+                  setVariablePriceProduct(null);
+                  setVariablePriceInput('');
+                }} className="flex-1 py-4 rounded-[20px] bg-chunky-main text-chunky-dark font-black text-lg shadow-lg hover:scale-105 transition-all active:scale-95">
+                  Confirmar
+                </button>
+             </div>
+          </div>
+        </div>
+      )}
       {showIncomesModal && <IncomesModal onClose={() => setShowIncomesModal(false)} />}
       {showExpensesModal && <ExpensesModal onClose={() => setShowExpensesModal(false)} />}
 

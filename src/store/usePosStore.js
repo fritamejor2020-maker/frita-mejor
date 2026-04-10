@@ -10,11 +10,13 @@ export const usePosStore = create((set, get) => ({
   /**
    * Añade un producto al carrito
    */
-  addToCart: (product, qty = 1) => {
+  addToCart: (product, qty = 1, customPrice = null) => {
     const currentCart = get().cart;
-    // Asumiendo que `product` viene de catalog con `id`
-    const productId = product.id || product.productId;
-    const existingIndex = currentCart.findIndex(p => p.productId === productId);
+    const baseProductId = product.id || product.productId;
+    const price = customPrice !== null ? customPrice : product.price;
+    const cartItemId = customPrice !== null ? `${baseProductId}-var-${price}` : baseProductId;
+
+    const existingIndex = currentCart.findIndex(p => (p.cartItemId || p.productId) === cartItemId);
     let newCart = [...currentCart];
 
     if (existingIndex >= 0) {
@@ -24,9 +26,10 @@ export const usePosStore = create((set, get) => ({
       };
     } else {
       newCart.push({ 
-        productId: productId, 
+        productId: baseProductId,
+        cartItemId: cartItemId,
         name: product.name, 
-        price: product.price, 
+        price: price, 
         qty 
       });
     }
@@ -35,10 +38,10 @@ export const usePosStore = create((set, get) => ({
   },
 
   /**
-   * Remueve totalmente el producto por su productId
+   * Remueve totalmente el producto por su cartItemId o productId
    */
-  removeFromCart: (productId) => {
-    const newCart = get().cart.filter(item => item.productId !== productId);
+  removeFromCart: (id) => {
+    const newCart = get().cart.filter(item => (item.cartItemId || item.productId) !== id);
     set({ cart: newCart, total: calculateCartTotal(newCart) });
   },
 
