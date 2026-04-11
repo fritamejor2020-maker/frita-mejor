@@ -14,7 +14,7 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 
 export const VendedorDashboard = () => {
-  const { isSetupComplete, pointId, responsibleName, endShift, openedAt } = useSellerSessionStore();
+  const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
   const { getPosItems, loadTemplates, addLoadTemplate, addPosShift } = useInventoryStore();
@@ -180,7 +180,6 @@ export const VendedorDashboard = () => {
       
       addPosShift(finalShift);
 
-      alert(`Cierre exitoso. Diferencia: ${formatMoney(difference)} (${status})`);
       endShift();
       signOut();
     } catch (err: any) {
@@ -208,19 +207,31 @@ export const VendedorDashboard = () => {
     <div className="min-h-screen bg-[#FFD56B] font-sans w-full flex flex-col" style={{ paddingBottom: activeTab === 'pos' ? '240px' : '160px' }}>
       {/* HEADER */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 flex justify-between items-center">
-          <div>
-            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 tracking-tight leading-none">{getHeaderTitle()}</h1>
-            <p className="text-xs sm:text-sm font-bold text-gray-400 mt-1 sm:mt-2">{formattedDate}</p>
+        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 relative">
+          <div className="pr-16">
+            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 tracking-tight leading-tight">{getHeaderTitle()}</h1>
+            <p className="text-xs sm:text-sm font-bold text-gray-400 mt-1">{formattedDate}</p>
           </div>
-          
-          <button 
-             onClick={() => signOut()}
-             title="Salir (el turno sigue activo)"
-             className="w-12 h-12 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95"
-          >
-            <LogOut size={20} strokeWidth={2.5} className="ml-1" />
-          </button>
+
+          {/* Botón salir */}
+          <div className="absolute top-5 sm:top-8 right-4">
+            <button
+               onClick={() => signOut()}
+               title="Salir (el turno sigue activo)"
+               className="w-10 h-10 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95"
+            >
+              <LogOut size={18} strokeWidth={2.5} className="ml-0.5" />
+            </button>
+          </div>
+
+          {/* Turno + punto + nombre badge */}
+          {(shift || pointId || responsibleName) && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              {pointId && <span className="bg-amber-400 text-white font-black text-xs px-2.5 py-1 rounded-full tracking-widest">{pointId}</span>}
+              {shift && <span className="bg-[#FF4040] text-white font-black text-xs px-2.5 py-1 rounded-full tracking-widest">{shift}</span>}
+              {responsibleName && <span className="bg-gray-900 text-white font-bold text-xs px-2.5 py-1 rounded-full">👤 {responsibleName.split(' ')[0]}</span>}
+            </div>
+          )}
         </div>
       </div>
 
