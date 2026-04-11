@@ -17,7 +17,7 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
-  const { getPosItems, loadTemplates, addLoadTemplate, addPosShift } = useInventoryStore();
+  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
@@ -152,9 +152,13 @@ export const VendedorDashboard = () => {
     const cashVal = parseInt(cash) || 0;
     const transferVal = parseInt(transfer) || 0;
     const expensesVal = parseInt(expenses) || 0;
+    // Real total = everything the vendor handled (cash + transfers + expenses)
+    const realTotal = cashVal + transferVal + expensesVal;
 
     const { soldItems, theoretical: theorySalesVal } = getLogisticsCalc();
-    const { difference, status } = calculateClosingStatus(theorySalesVal, cashVal, transferVal, expensesVal);
+    // diff > 0 → faltante (vendor owes more), diff < 0 → sobrante
+    const difference = theorySalesVal - realTotal;
+    const status = difference === 0 ? 'CUADRADO' : difference > 0 ? 'FALTANTE' : 'SOBRANTE';
 
     try {
       const shiftData = useSellerSessionStore.getState();
@@ -167,7 +171,7 @@ export const VendedorDashboard = () => {
           shift: shiftData.shift,
           pointType: shiftData.pointType,
           theorySales: theorySalesVal,
-          realAmount: cashVal + transferVal,
+          realAmount: realTotal,        // efectivo + transf + gastos
           cashAmount: cashVal,
           transferAmount: transferVal,
           expenses: expensesVal,
@@ -270,13 +274,21 @@ export const VendedorDashboard = () => {
             <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide items-center border-b border-amber-200/50 mb-2">
               <span className="text-gray-500 font-bold text-sm shrink-0 uppercase tracking-wide">Cargas Listas:</span>
               {vendedorTemplates.map((tpl: any) => (
-                <button 
-                  key={tpl.id}
-                  onClick={() => loadTemplateItems(tpl.id)}
-                  className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-full bg-white border-2 border-amber-400 font-bold text-amber-500 text-sm whitespace-nowrap active:scale-95 shadow-sm hover:bg-amber-50 transition-colors"
-                >
-                  <Zap size={14} /> {tpl.name}
-                </button>
+                <div key={tpl.id} className="flex items-center shrink-0">
+                  <button
+                    onClick={() => loadTemplateItems(tpl.id)}
+                    className="flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-l-full bg-white border-2 border-r-0 border-amber-400 font-bold text-amber-500 text-sm whitespace-nowrap active:scale-95 shadow-sm hover:bg-amber-50 transition-colors"
+                  >
+                    <Zap size={14} /> {tpl.name}
+                  </button>
+                  <button
+                    onClick={() => { if(window.confirm(`¿Eliminar "${tpl.name}"?`)) deleteLoadTemplate(tpl.id); }}
+                    className="flex items-center justify-center py-1.5 px-2 rounded-r-full bg-white border-2 border-amber-400 text-amber-400 text-sm whitespace-nowrap active:scale-95 shadow-sm hover:bg-red-50 hover:text-red-500 hover:border-red-400 transition-colors"
+                    title="Eliminar plantilla"
+                  >
+                    ✕
+                  </button>
+                </div>
               ))}
               <button 
                 onClick={handleSaveTemplate}
@@ -377,12 +389,12 @@ export const VendedorDashboard = () => {
                   <div className="absolute top-0 left-4 bg-gray-900 text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest">
                      GASTOS / SALIDAS
                   </div>
-                  <div className="flex gap-2 bg-gray-50 border-2 border-gray-100 rounded-2xl p-2">
+                  <div className="flex flex-col gap-2 bg-gray-50 border-2 border-gray-100 rounded-2xl p-3">
                      <MoneyInput value={expenses} onChange={setExpenses} placeholder="$ Valor"
-                       className="w-1/3 bg-white rounded-xl py-3 px-4 font-black text-lg text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none" />
+                       className="w-full bg-white rounded-xl py-4 px-5 font-black text-xl text-gray-800 outline-none shadow-sm focus:ring-2 ring-[#FFB700] border-none" />
                      <input type="text" value={expensesDesc} onChange={(e) => setExpensesDesc(e.target.value)}
-                       placeholder="Descripción..."
-                       className="flex-1 bg-transparent py-3 px-3 font-bold text-gray-500 text-sm outline-none" />
+                       placeholder="Descripción del gasto..."
+                       className="w-full bg-white rounded-xl py-3 px-5 font-bold text-gray-500 text-sm outline-none shadow-sm border-none focus:ring-2 ring-[#FFB700]" />
                   </div>
                </div>
 

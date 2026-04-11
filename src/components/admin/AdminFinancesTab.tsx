@@ -596,11 +596,12 @@ export const AdminFinancesTab = () => {
     return true;
   });
 
-  // El Teórico (APP) = ventas POS + gastos
-  const getTheoreticalWithExpenses = (c: any) => c.theoretical + (c.expenses || 0);
-  
-  // Diff = Real - (Theoretical + Expenses)
-  const getDiff = (c: any) => c.real - getTheoreticalWithExpenses(c);
+  // Teórico = solo el valor calculado por logística (productos)
+  // Real     = efectivo + transferencias + gastos (todo lo que el vendedor manejó)
+  // Diferencia = Real - Teórico
+  //   > 0 → Sobrante (el vendedor entregó más de lo esperado)
+  //   < 0 → Faltante (el vendedor entregó menos)
+  const getDiff = (c: any) => c.real - c.theoretical;
 
   const renderBadge = (c: any) => {
     const diff = getDiff(c);
@@ -613,6 +614,7 @@ export const AdminFinancesTab = () => {
       );
     }
     if (diff < 0) {
+      // Real < Teórico → Faltante
       return (
         <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-500 text-xs font-bold px-3 py-1.5 rounded-full">
           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
@@ -620,6 +622,7 @@ export const AdminFinancesTab = () => {
         </span>
       );
     }
+    // Real > Teórico → Sobrante
     return (
       <span className="inline-flex items-center gap-1.5 bg-green-50 text-green-600 text-xs font-bold px-3 py-1.5 rounded-full">
         <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
@@ -722,18 +725,14 @@ export const AdminFinancesTab = () => {
                 <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4">
                   <div className="grid grid-cols-2 divide-x divide-gray-200">
                     <div className="py-5 px-6 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
-                      <p className="text-2xl font-black text-gray-800">{fmt(getTheoreticalWithExpenses(closing))}</p>
-                      {(closing.expenses ?? 0) > 0 && (
-                        <p className="text-[10px] font-bold text-blue-400 mt-1">
-                          Ventas {fmt(closing.theoretical)} + Gastos {fmt(closing.expenses ?? 0)}
-                        </p>
-                      )}
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Te&#xF3;rico (APP)</p>
+                      <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">Calc. por logística</p>
                     </div>
                     <div className="py-5 px-6 text-center">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
                       <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
-                      <p className="text-[10px] font-bold text-gray-300 mt-1">Efectivo + Transferencias</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">Efectivo + Transf. + Salidas</p>
                     </div>
                   </div>
                 </div>
