@@ -193,8 +193,18 @@ export const DejadorDashboard = () => {
     return 'Logística';
   };
 
+  const { addPosShift } = useInventoryStore();
+
   const handleEndShift = () => {
     if (!window.confirm('¿Cerrar jornada del Dejador?')) return;
+    // Guardar registro del cierre para el admin
+    addPosShift({
+      type: 'DEJADOR',
+      shift,
+      anotadorName,
+      dejadorName,
+      closedAt: new Date().toISOString(),
+    });
     endShift();
     signOut();
     navigate('/login');

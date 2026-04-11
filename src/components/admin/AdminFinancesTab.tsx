@@ -107,11 +107,20 @@ export const ResumenOperativoTab = () => {
     const responsibleName = latestShift?.responsibleName || latestShift?.userName || '—';
     const diff = realAmount - theoreticalTotal;
 
+    // Anotador / Dejador: guardado en la entrada de carga inicial de este vehículo
+    const firstCarga = loadHistory
+      .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId)
+      .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0];
+    const anotadorName = firstCarga?.anotadorName || null;
+    const dejadorName = firstCarga?.dejadorName || null;
+
     return {
       vehicleId,
       shiftDate,
       shiftTurno,
       responsibleName,
+      anotadorName,
+      dejadorName,
       productLines,
       theoreticalTotal,
       realAmount,
@@ -120,12 +129,6 @@ export const ResumenOperativoTab = () => {
       expenses,
       diff,
       hasCierre: !!latestShift,
-      // Dejador info from the DEJADOR posShift of same date/turno
-      dejadorShift: (posShifts || []).find((s: any) =>
-        s.type === 'DEJADOR' &&
-        s.shift === shiftTurno &&
-        dateOf(s.closedAt) === shiftDate
-      ) || null,
     };
   }).filter(Boolean);
 
@@ -399,6 +402,7 @@ export const AdminFinancesTab = () => {
   const [filterDate, setFilterDate] = useState('');
   const [filterShift, setFilterShift] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [expandedHistorialId, setExpandedHistorialId] = useState<string | null>(null);
   const [editingClosing, setEditingClosing] = useState<any | null>(null);
   const [editCash, setEditCash] = useState('');
   const [editTransfer, setEditTransfer] = useState('');
@@ -692,6 +696,21 @@ export const AdminFinancesTab = () => {
                          <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.shift}</span>
                        </div>
                        <p className="text-xs text-gray-400 font-bold mt-0.5">{closing.date}</p>
+                       {/* Anotador / Dejador badges */}
+                       {(closing.anotadorName || closing.dejadorName) && (
+                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                           {closing.anotadorName && (
+                             <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100">
+                               📋 {closing.anotadorName}
+                             </span>
+                           )}
+                           {closing.dejadorName && (
+                             <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                               🛵 {closing.dejadorName}
+                             </span>
+                           )}
+                         </div>
+                       )}
                      </div>
                   </div>
 
@@ -781,46 +800,63 @@ export const AdminFinancesTab = () => {
                       </div>
                     )}
 
-                     {/* ── Historial de Envíos (timeline) ── */}
+                     {/* ── Historial de Envíos (colapsable) ── */}
                      {closing._raw?.pointId && (() => {
                        const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
                        if (timeline.length === 0) return null;
+                       const isHistorialOpen = expandedHistorialId === closing.id;
                        let surtidoCount = 0;
                        return (
-                         <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/30">
-                           <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-3">📋 Historial de Envíos</p>
-                           <div className="flex flex-col gap-2.5">
-                             {timeline.map((entry: any, idx: number) => {
-                               if (entry.type === 'surtido') surtidoCount++;
-                               const icon = entry.type === 'carga' ? '📦' : entry.type === 'surtido' ? '🔄' : '📬';
-                               const label = entry.type === 'carga' ? 'Carga Inicial'
-                                 : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
-                                 : 'Productos Recibidos';
-                               const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
-                                 : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
-                                 : 'bg-indigo-50 border-indigo-100';
-                               const textColor = entry.type === 'carga' ? 'text-red-600'
-                                 : entry.type === 'surtido' ? 'text-amber-700' : 'text-indigo-600';
-                               const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-                               return (
-                                 <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
-                                   <div className="flex items-center gap-2 mb-2">
-                                     <span>{icon}</span>
-                                     <span className={`font-black text-sm ${textColor}`}>{label}</span>
-                                     <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
-                                   </div>
-                                   <div className="flex flex-wrap gap-2">
-                                     {(entry.items || []).map((item: any, ii: number) => (
-                                       <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
-                                         <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
-                                         <span className="text-gray-900">{item.qty}</span>
-                                       </span>
-                                     ))}
-                                   </div>
-                                 </div>
-                               );
-                             })}
-                           </div>
+                         <div className="border-b border-gray-100">
+                           {/* Toggle button */}
+                           <button
+                             onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
+                             className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
+                           >
+                             <span>📋 Historial de Envíos ({timeline.length})</span>
+                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                               className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
+                               <polyline points="6 9 12 15 18 9" />
+                             </svg>
+                           </button>
+
+                           {/* Content (collapsed by default) */}
+                           {isHistorialOpen && (
+                             <div className="px-5 pb-4 bg-gray-50/30">
+                               <div className="flex flex-col gap-2.5">
+                                 {timeline.map((entry: any, idx: number) => {
+                                   if (entry.type === 'surtido') surtidoCount++;
+                                   const icon = entry.type === 'carga' ? '📦' : entry.type === 'surtido' ? '🔄' : '📬';
+                                   const label = entry.type === 'carga' ? 'Carga Inicial'
+                                     : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
+                                     : 'Productos Recibidos';
+                                   const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
+                                     : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
+                                     : 'bg-indigo-50 border-indigo-100';
+                                   const textColor = entry.type === 'carga' ? 'text-red-600'
+                                     : entry.type === 'surtido' ? 'text-amber-700' : 'text-indigo-600';
+                                   const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                                   return (
+                                     <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
+                                       <div className="flex items-center gap-2 mb-2">
+                                         <span>{icon}</span>
+                                         <span className={`font-black text-sm ${textColor}`}>{label}</span>
+                                         <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
+                                       </div>
+                                       <div className="flex flex-wrap gap-2">
+                                         {(entry.items || []).map((item: any, ii: number) => (
+                                           <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
+                                             <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
+                                             <span className="text-gray-900">{item.qty}</span>
+                                           </span>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                             </div>
+                           )}
                          </div>
                        );
                      })()}

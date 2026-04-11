@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { useDejadorSessionStore } from './useDejadorSessionStore';
 
 function syncKey(key, value) {
   markLocalWrite(key);
@@ -138,11 +139,14 @@ export const useLogisticsStore = create(
       });
     if (items.length === 0) return false;
 
+    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const entry = {
       id: `LOAD-${Date.now()}`,
       type: 'carga',
       vehicleId,
       items,
+      anotadorName: anotadorName || null,
+      dejadorName: dejadorName || null,
       timestamp: new Date().toISOString()
     };
     const newHistory = [entry, ...get().loadHistory];
