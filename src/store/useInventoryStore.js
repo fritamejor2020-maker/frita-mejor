@@ -187,6 +187,7 @@ export const useInventoryStore = create(
       posSales:         [],
       posExpenses:      [],
       loadTemplates:    INITIAL_LOAD_TEMPLATES,
+      deletedShiftIds:  [],  // tombstone: IDs de cierres eliminados por el admin
 
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
@@ -202,12 +203,17 @@ export const useInventoryStore = create(
           const updates = {};
           for (const key of SYNC_KEYS) {
             if (remote[key] !== undefined && remote[key] !== null) {
-              // Solo overwrite si el remoto tiene datos (no vacío)
               const isNonEmpty = Array.isArray(remote[key])
                 ? remote[key].length > 0
                 : Object.keys(remote[key]).length > 0;
               if (isNonEmpty) {
-                updates[key] = remote[key];
+                let val = remote[key];
+                // Filtrar tombstones de posShifts remotos
+                if (key === 'posShifts') {
+                  const deleted = get().deletedShiftIds || [];
+                  val = val.filter(s => !deleted.includes(s.id));
+                }
+                updates[key] = val;
               }
             }
           }
@@ -671,9 +677,28 @@ export const useInventoryStore = create(
       addPosSale: (sale) => { set((s) => ({ posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])] })); syncKey('posSales', useInventoryStore.getState().posSales); },
       updatePosSale: (id, data) => { set((s) => ({ posSales: (s.posSales || []).map((sale) => sale.id === id ? { ...sale, ...data } : sale) })); syncKey('posSales', useInventoryStore.getState().posSales); },
 
-      addPosShift: (shift) => { set((s) => ({ posShifts: [{ ...shift, id: `SHIFT-${Date.now()}` }, ...(s.posShifts || [])] })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
+      addPosShift: (shift) => {
+        const deleted = useInventoryStore.getState().deletedShiftIds || [];
+        const newShift = { ...shift, id: `SHIFT-${Date.now()}` };
+        // Solo agregar si no está en la lista de eliminados (por IDs previos)
+        set((s) => ({
+          posShifts: [
+            newShift,
+            ...(s.posShifts || []).filter(sh => !deleted.includes(sh.id))
+          ]
+        }));
+        syncKey('posShifts', useInventoryStore.getState().posShifts);
+      },
       updatePosShift: (id, data) => { set((s) => ({ posShifts: (s.posShifts || []).map((shift) => shift.id === id ? { ...shift, ...data } : shift) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
-      deletePosShift: (id) => { set((s) => ({ posShifts: (s.posShifts || []).filter((shift) => shift.id !== id) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
+      deletePosShift: (id) => {
+        // Agregar al tombstone para que otras tabs no lo restauren
+        set((s) => ({
+          posShifts: (s.posShifts || []).filter((shift) => shift.id !== id),
+          deletedShiftIds: [...new Set([...(s.deletedShiftIds || []), id])]
+        }));
+        syncKey('posShifts', useInventoryStore.getState().posShifts);
+        syncKey('deletedShiftIds', useInventoryStore.getState().deletedShiftIds);
+      },
 
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
     }),
