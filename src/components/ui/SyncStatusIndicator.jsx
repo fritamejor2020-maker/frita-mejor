@@ -22,14 +22,9 @@ export default function SyncStatusIndicator() {
     return unsub;
   }, []);
 
-  // Supabase no configurado → error silencioso en producción
+  // Supabase no configurado → silencioso, no mostrar nada
   if (!isSupabaseConfigured()) {
-    return (
-      <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 flex items-center gap-2 px-4 py-2 rounded-full shadow-lg backdrop-blur-sm text-sm font-medium bg-red-500/90 text-white">
-        <span>⚠️</span>
-        <span>Sin conexión a base de datos</span>
-      </div>
-    );
+    return null;
   }
 
   // No mostrar nada si está online y sin pendientes (estado normal silencioso)

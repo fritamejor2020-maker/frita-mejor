@@ -4,7 +4,9 @@ import { useAuthStore } from './store/useAuthStore';
 import { Toaster } from 'react-hot-toast';
 import { useRealtimeSync } from './lib/useRealtimeSync';
 import { useInventoryStore } from './store/useInventoryStore';
+import { useLogisticsStore } from './store/useLogisticsStore';
 import { flushQueue } from './lib/syncManager';
+import { initCrossTabSync, registerStore, broadcastState } from './lib/crossTabSync';
 import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
 
 import { LoginView }      from './modules/auth/LoginView';
@@ -115,13 +117,41 @@ class ErrorBoundary extends React.Component {
 }
 
 function App() {
-  // Suscripción a cambios remotos en tiempo real
+  // Suscripción a cambios remotos en tiempo real (Supabase)
   useRealtimeSync();
 
-  // Al arrancar la app: cargar estado de Supabase y vaciar cola pendiente
   useEffect(() => {
+    // 1. Cargar estado remoto y vaciar cola Supabase
     useInventoryStore.getState().loadFromRemote();
     flushQueue();
+
+    // 2. Inicializar sincronización entre pestañas (BroadcastChannel)
+    initCrossTabSync();
+
+    // Registrar stores que deben sincronizarse entre pestañas
+    registerStore(
+      'frita-mejor-logistics',
+      (s) => useLogisticsStore.setState(s),
+      () => useLogisticsStore.getState()
+    );
+    registerStore(
+      'frita-mejor-inventory',
+      (s) => useInventoryStore.setState(s),
+      () => useInventoryStore.getState()
+    );
+
+    // Suscribir: cuando logistics cambia en ESTA pestaña → emitir a otras
+    const unsubLogistics = useLogisticsStore.subscribe((state) => {
+      broadcastState('frita-mejor-logistics', state);
+    });
+    const unsubInventory = useInventoryStore.subscribe((state) => {
+      broadcastState('frita-mejor-inventory', state);
+    });
+
+    return () => {
+      unsubLogistics();
+      unsubInventory();
+    };
   }, []);
 
   return (

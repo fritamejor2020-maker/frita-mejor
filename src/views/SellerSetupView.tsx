@@ -34,7 +34,15 @@ export const SellerSetupView = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#FFD56B] font-sans w-full page-enter">
+    <div className="relative min-h-screen flex flex-col items-center justify-center p-4 bg-[#FFD56B] font-sans w-full page-enter">
+      {/* Volver al login */}
+      <button
+        onClick={() => navigate('/login')}
+        className="absolute top-5 left-5 flex items-center gap-2 bg-white/80 hover:bg-white text-gray-700 font-bold text-sm px-4 py-2 rounded-full shadow-sm transition-all active:scale-95"
+      >
+        ← Volver
+      </button>
+
       <div className="text-center mb-5 sm:mb-8">
         <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">¡Hola! 👋</h1>
         <p className="text-amber-900/60 font-black mt-1 sm:mt-2 text-xs sm:text-sm tracking-widest uppercase">CONFIGURA TU TURNO</p>

@@ -1,9 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2, Pencil, Save } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useVehicleStore } from '../store/useVehicleStore';
+import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 
@@ -30,14 +32,21 @@ const useRelativeTime = () => {
 };
 
 export const DejadorDashboard = () => {
+  const navigate = useNavigate();
   const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getPosItems } = useInventoryStore();
   const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
+  const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
   const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
+
+  // Guard: if no session, redirect to setup
+  useEffect(() => {
+    if (!isSetupComplete) navigate('/dejador-setup', { replace: true });
+  }, [isSetupComplete]);
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
   const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
@@ -184,27 +193,58 @@ export const DejadorDashboard = () => {
     return 'Logística';
   };
 
+  const handleEndShift = () => {
+    if (!window.confirm('¿Cerrar jornada del Dejador?')) return;
+    endShift();
+    signOut();
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen pb-32 font-sans w-full bg-[#FFD56B] flex flex-col">
       
-      {/* ─── HEADER (Full Width background, constrained content) ─── */}
+      {/* ─── HEADER ─── */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
-        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 relative">
-          <div className="pr-16">
-            <h1 className="text-2xl sm:text-4xl font-black text-gray-900 leading-tight">{getHeaderTitle()}</h1>
-            <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
+        <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6">
+
+          {/* Top row: title + CERRAR JORNADA */}
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-2xl sm:text-4xl font-black text-gray-900 leading-tight">{getHeaderTitle()}</h1>
+              <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleEndShift}
+                className="flex items-center gap-2 bg-[#FF4040] text-white font-black text-xs sm:text-sm px-4 py-2.5 rounded-full shadow-md hover:bg-red-600 transition-all active:scale-95"
+              >
+                <LogOut size={15} strokeWidth={2.5} />
+                CERRAR JORNADA
+              </button>
+            </div>
           </div>
-          
-          {/* Logout Circular Button */}
-          <button 
-             onClick={signOut}
-             className="absolute top-8 right-6 w-12 h-12 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-red-500 hover:bg-red-50 transition-colors active:scale-95"
-          >
-            <LogOut size={20} strokeWidth={2.5} className="ml-1" />
-          </button>
+
+          {/* Session badges: turno · anotador · dejador */}
+          {isSetupComplete && (
+            <div className="flex items-center gap-2 mt-3 flex-wrap">
+              <span className="bg-amber-500 text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest">
+                {shift}
+              </span>
+              {anotadorName && (
+                <span className="flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-3 py-1 rounded-full">
+                  📋 {anotadorName}
+                </span>
+              )}
+              {dejadorName && (
+                <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-3 py-1 rounded-full">
+                  🛵 {dejadorName}
+                </span>
+              )}
+            </div>
+          )}
 
           {/* ─── TABS ─── */}
-          <div className="bg-amber-100/50 rounded-2xl p-1 mt-6 flex max-w-lg">
+          <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-lg">
             {[
               { id: 'carga', label: 'Carga Inicial' },
               { id: 'surtir', label: 'Surtir' },
@@ -214,7 +254,7 @@ export const DejadorDashboard = () => {
                 key={tab.id}
                 onClick={() => {
                   setActiveTab(tab.id);
-                  setLoadQuantities({}); // reset quantities on switch
+                  setLoadQuantities({});
                   setActivePreset(null);
                 }}
                 className={`flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 ${
