@@ -703,9 +703,8 @@ export const useInventoryStore = create(
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
     }),
     {
-      name: 'frita-mejor-inventory', // clave en localStorage
-      version: 8,                    // incrementar versión fuerza reinicialización con datos frescos
-      // Persistir todo excepto funciones (las funciones no se serializan)
+      name: 'frita-mejor-inventory',
+      version: 8,
       partialize: (state) => ({
         warehouses:       state.warehouses,
         productionPoints: state.productionPoints,
@@ -723,7 +722,16 @@ export const useInventoryStore = create(
         posSales:         state.posSales,
         posExpenses:      state.posExpenses,
         loadTemplates:    state.loadTemplates,
+        deletedShiftIds:  state.deletedShiftIds || [],  // persistir tombstones
       }),
+      // Al rehidratar desde localStorage, filtrar posShifts borrados
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        const deleted = state.deletedShiftIds || [];
+        if (deleted.length > 0 && state.posShifts?.length > 0) {
+          state.posShifts = state.posShifts.filter(s => !deleted.includes(s.id));
+        }
+      },
     }
   )
 );
