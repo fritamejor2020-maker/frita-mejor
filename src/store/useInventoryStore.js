@@ -673,6 +673,7 @@ export const useInventoryStore = create(
 
       addPosShift: (shift) => { set((s) => ({ posShifts: [{ ...shift, id: `SHIFT-${Date.now()}` }, ...(s.posShifts || [])] })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
       updatePosShift: (id, data) => { set((s) => ({ posShifts: (s.posShifts || []).map((shift) => shift.id === id ? { ...shift, ...data } : shift) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
+      deletePosShift: (id) => { set((s) => ({ posShifts: (s.posShifts || []).filter((shift) => shift.id !== id) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
 
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
     }),

@@ -325,7 +325,7 @@ interface ClosingDetail {
 
 // ─── Component: Cierres ──────────────────────────────────────────────
 export const AdminFinancesTab = () => {
-  const { posShifts, posSales, posExpenses, updatePosShift } = useInventoryStore();
+  const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
 
   // Cierres filters
@@ -670,29 +670,40 @@ export const AdminFinancesTab = () => {
                      </div>
                   </div>
 
-                  {/* Edit icon — only for real shifts (not mock) */}
+                  {/* Edit + Delete buttons */}
                   {closing._raw && (
-                    <button
-                      className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 mt-0.5 hover:bg-red-50 rounded-lg"
-                      title="Editar cierre"
-                      onClick={() => {
-                        setEditingClosing(closing);
-                        setEditCash(String(closing._raw.cashAmount || closing.real || 0));
-                        setEditTransfer(String(closing._raw.transferAmount || 0));
-                        setEditExpenses(String(closing.expenses || 0));
-                        setEditExpensesDesc(closing._raw.expensesDesc || '');
-                        setEditDetails(closing.details.map((d: any) => ({ ...d })));
-                        // Cargar historial logístico editable
-                        const vehicleId = closing._raw?.pointId;
-                        if (vehicleId) {
-                          setEditLogistics(buildLogisticsTimeline(vehicleId, closing.date));
-                        } else {
-                          setEditLogistics([]);
-                        }
-                      }}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>
-                    </button>
+                    <div className="flex items-center gap-1">
+                      <button
+                        className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                        title="Editar cierre"
+                        onClick={() => {
+                          setEditingClosing(closing);
+                          setEditCash(String(closing._raw.cashAmount || closing.real || 0));
+                          setEditTransfer(String(closing._raw.transferAmount || 0));
+                          setEditExpenses(String(closing.expenses || 0));
+                          setEditExpensesDesc(closing._raw.expensesDesc || "");
+                          setEditDetails(closing.details.map((d: any) => ({ ...d })));
+                          const vehicleId = closing._raw?.pointId;
+                          setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      <button
+                        className="text-gray-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                        title="Eliminar conciliacion"
+                        onClick={() => {
+                          if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
+                          deletePosShift(closing._raw.id);
+                          const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
+                          const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
+                          const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
+                          useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                      </button>
+                    </div>
                   )}
                 </div>
 
