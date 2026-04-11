@@ -23,8 +23,12 @@ export const ResumenOperativoTab = () => {
   const priceMap: Record<string, { price: number; name: string }> = {};
   products.forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
 
-  // Fecha para filtro
-  const dateOf = (iso: string) => iso ? new Date(iso).toISOString().split('T')[0] : '';
+  // Fecha para filtro — usa fecha LOCAL (UTC-5 Colombia)
+  const dateOf = (iso: string) => {
+    if (!iso) return '';
+    const d = new Date(iso);
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  };
 
   // Filtrar entries por fecha y turno usando el posShift del vendedor de ese vehículo
   const vendedorShifts = (posShifts || []).filter((s: any) => s.type === 'VENDEDOR' && s.closedAt);
@@ -425,7 +429,15 @@ export const AdminFinancesTab = () => {
   };
 
   // Helper reutilizable
-  const dateOf = (ts: string) => ts ? new Date(ts).toISOString().split('T')[0] : '';
+  // Helper reutilizable — usa fecha LOCAL para evitar desfases con UTC-5
+  const dateOf = (ts: string) => {
+    if (!ts) return '';
+    const d = new Date(ts);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
 
   // Carga el historial logístico de un vehículo en una fecha dada
   const buildLogisticsTimeline = (vehicleId: string, shiftDate: string) => {
