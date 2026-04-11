@@ -109,6 +109,11 @@ export const DejadorDashboard = () => {
   }, []);
 
   const handleCommit = async (id: string, point: string) => {
+    // Si hay una edición en curso para ESTE pedido, guardarla primero
+    if (editingReqId === id) {
+      updatePendingRequest(id, editPayload);
+      setEditingReqId(null);
+    }
     try {
       await commitRestock(id);
       showToast(`✅ Entrega a ${point} confirmada y descontada`);

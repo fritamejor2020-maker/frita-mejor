@@ -98,6 +98,7 @@ export const useLogisticsStore = create(
     }, ...completedRequests];
     set({ pendingRequests: newPending, completedRequests: newCompleted });
     syncKey('pendingRequests', newPending);
+    syncKey('completedRequests', newCompleted);
   },
 
   updatePendingRequest: (requestId, newPayload) => {
