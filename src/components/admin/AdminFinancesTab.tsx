@@ -574,14 +574,25 @@ export const AdminFinancesTab = () => {
        new Date(ds.closedAt).toISOString().split('T')[0] === shiftDate
      );
 
-     // Fallback: buscar en la primera entrada de carga del vehículo en esa fecha
-     const firstCargaEntry = loadHistory
-       .filter((e: any) => e.type === 'carga' && e.vehicleId === s.pointId
-         && new Date(e.timestamp).toISOString().split('T')[0] === shiftDate)
-       .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0];
+     // Fallback: buscar en cualquier entrada del vehículo en esa fecha
+     // (carga, recepcion, o completedRequest surtido)
+     const anyEntry = [
+       // loadHistory entries (carga / recepcion)
+       ...loadHistory.filter((e: any) => e.vehicleId === s.pointId
+         && new Date(e.timestamp).toISOString().split('T')[0] === shiftDate
+         && (e.anotadorName || e.dejadorName)),
+       // completedRequests (surtidos entregados por el dejador)
+       ...completedRequests.filter((r: any) => r.requester_point_id === s.pointId
+         && new Date(r.completed_at || r.created_at).toISOString().split('T')[0] === shiftDate
+         && (r.anotadorName || r.dejadorName)),
+     ].sort((a: any, b: any) => {
+       const ta = a.timestamp || a.completed_at || a.created_at || '';
+       const tb = b.timestamp || b.completed_at || b.created_at || '';
+       return new Date(ta).getTime() - new Date(tb).getTime();
+     })[0];
 
-     const anotadorName = matchingDejadorShift?.anotadorName || firstCargaEntry?.anotadorName || null;
-     const dejadorName  = matchingDejadorShift?.dejadorName  || firstCargaEntry?.dejadorName  || null;
+     const anotadorName = matchingDejadorShift?.anotadorName || anyEntry?.anotadorName || null;
+     const dejadorName  = matchingDejadorShift?.dejadorName  || anyEntry?.dejadorName  || null;
 
      return {
         id: s.id,

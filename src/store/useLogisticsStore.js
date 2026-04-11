@@ -83,17 +83,20 @@ export const useLogisticsStore = create(
   },
 
   commitRestock: async (requestId) => {
-    // Local Mock: remove from pendingRequests and add to completedRequests
     const { pendingRequests, completedRequests } = get();
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const newPending = pendingRequests.filter(req => req.id !== requestId);
-    const newCompleted = [{ ...req, status: 'completed', completed_at: new Date().toISOString() }, ...completedRequests];
-    set({
-      pendingRequests: newPending,
-      completedRequests: newCompleted
-    });
+    const newCompleted = [{
+      ...req,
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      anotadorName: anotadorName || null,
+      dejadorName: dejadorName || null,
+    }, ...completedRequests];
+    set({ pendingRequests: newPending, completedRequests: newCompleted });
     syncKey('pendingRequests', newPending);
   },
 
@@ -167,11 +170,14 @@ export const useLogisticsStore = create(
       });
     if (items.length === 0) return false;
 
+    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const entry = {
       id: `RECV-${Date.now()}`,
       type: 'recepcion',
       vehicleId,
       items,
+      anotadorName: anotadorName || null,
+      dejadorName: dejadorName || null,
       timestamp: new Date().toISOString()
     };
     const newHistory = [entry, ...get().loadHistory];
