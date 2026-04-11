@@ -322,80 +322,6 @@ interface ClosingDetail {
   unitPrice: number;
 }
 
-interface MockClosing {
-  id: string;
-  pointName: string;
-  initials: string;
-  shift: string;
-  date: string;
-  theoretical: number;  // Ventas POS calculadas (sin incluir gastos)
-  real: number;         // Cash + Transferencias entregado por el vendedor
-  expenses: number;     // Gastos declarados por el vendedor
-  details: ClosingDetail[];
-}
-
-const MOCK_CLOSINGS: MockClosing[] = [
-  {
-    id: 'CL-001',
-    pointName: 'Triciclo 01',
-    initials: 'Tr',
-    shift: 'AM',
-    date: '2026-03-16',
-    theoretical: 250000,
-    real: 245000,
-    expenses: 5000,
-    details: [
-      { product: 'Empanada', sent: 100, returned: 0, sold: 100, unitPrice: 2500 },
-      { product: 'Pastel de Pollo', sent: 50, returned: 10, sold: 40, unitPrice: 3000 },
-      { product: 'Vaso 7oz', sent: 200, returned: 50, sold: 150, unitPrice: 500 },
-    ],
-  },
-  {
-    id: 'CL-002',
-    pointName: 'Triciclo 02',
-    initials: 'Tr',
-    shift: 'AM',
-    date: '2026-03-16',
-    theoretical: 180000,
-    real: 165000,
-    expenses: 10000,
-    details: [
-      { product: 'Empanada', sent: 80, returned: 5, sold: 75, unitPrice: 2500 },
-      { product: 'Dedito de Queso', sent: 30, returned: 5, sold: 25, unitPrice: 2000 },
-      { product: 'Vaso 7oz', sent: 100, returned: 30, sold: 70, unitPrice: 500 },
-    ],
-  },
-  {
-    id: 'CL-003',
-    pointName: 'Triciclo 01',
-    initials: 'Tr',
-    shift: 'PM',
-    date: '2026-03-15',
-    theoretical: 320000,
-    real: 320000,
-    expenses: 5000,
-    details: [
-      { product: 'Empanada', sent: 120, returned: 10, sold: 110, unitPrice: 2500 },
-      { product: 'Chorizo', sent: 40, returned: 0, sold: 40, unitPrice: 3500 },
-      { product: 'Papas Rellenas', sent: 60, returned: 15, sold: 45, unitPrice: 2000 },
-    ],
-  },
-  {
-    id: 'CL-004',
-    pointName: 'Local 01',
-    initials: 'Lo',
-    shift: 'AM',
-    date: '2026-03-16',
-    theoretical: 450000,
-    real: 440000,
-    expenses: 10000,
-    details: [
-      { product: 'Empanada', sent: 200, returned: 0, sold: 200, unitPrice: 2500 },
-      { product: 'Pastel de Pollo', sent: 80, returned: 20, sold: 60, unitPrice: 3000 },
-      { product: 'Dedito de Queso', sent: 50, returned: 10, sold: 40, unitPrice: 2000 },
-    ],
-  },
-];
 
 // ─── Component: Cierres ──────────────────────────────────────────────
 export const AdminFinancesTab = () => {
@@ -624,7 +550,7 @@ export const AdminFinancesTab = () => {
      };
   });
 
-  const filteredClosings = [...mappedShifts, ...MOCK_CLOSINGS].filter((c: any) => {
+  const filteredClosings = [...mappedShifts].filter((c: any) => {
     if (filterDate && c.date !== filterDate) return false;
     if (filterShift && c.shift !== filterShift) return false;
     return true;
