@@ -567,7 +567,6 @@ export const AdminFinancesTab = () => {
      const pointLabel = s.pointId && s.pointId !== vendorName ? s.pointId : null;
 
      // Buscar el cierre del DEJADOR de la misma jornada (mismo turno y fecha)
-     // para mostrar quién fue el anotador y el dejador que trabajaron con este vendedor
      const matchingDejadorShift = (posShifts || []).find((ds: any) =>
        ds.type === 'DEJADOR' &&
        ds.shift === (s.shift || '') &&
@@ -575,18 +574,26 @@ export const AdminFinancesTab = () => {
        new Date(ds.closedAt).toISOString().split('T')[0] === shiftDate
      );
 
+     // Fallback: buscar en la primera entrada de carga del vehículo en esa fecha
+     const firstCargaEntry = loadHistory
+       .filter((e: any) => e.type === 'carga' && e.vehicleId === s.pointId
+         && new Date(e.timestamp).toISOString().split('T')[0] === shiftDate)
+       .sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())[0];
+
+     const anotadorName = matchingDejadorShift?.anotadorName || firstCargaEntry?.anotadorName || null;
+     const dejadorName  = matchingDejadorShift?.dejadorName  || firstCargaEntry?.dejadorName  || null;
+
      return {
         id: s.id,
-        _raw: s, // keep raw shift for editing
+        _raw: s,
         pointName: vendorName,
         pointLabel,
         initials: (s.pointId || vendorName || 'CA').substring(0, 2).toUpperCase(),
         shift: s.shift || 'TD',
         date: shiftDate,
         type: s.type || '',
-        // Anotador y Dejador vienen del cierre del DEJADOR de la misma jornada
-        anotadorName: matchingDejadorShift?.anotadorName || null,
-        dejadorName: matchingDejadorShift?.dejadorName || null,
+        anotadorName,
+        dejadorName,
         theoretical,
         real,
         expenses,
