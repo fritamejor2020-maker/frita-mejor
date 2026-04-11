@@ -215,7 +215,8 @@ export const VendedorDashboard = () => {
           </div>
           
           <button 
-             onClick={() => { endShift(); signOut(); }}
+             onClick={() => signOut()}
+             title="Salir (el turno sigue activo)"
              className="w-12 h-12 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95"
           >
             <LogOut size={20} strokeWidth={2.5} className="ml-1" />

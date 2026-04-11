@@ -4,8 +4,10 @@ import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useVehicleStore } from '../store/useVehicleStore';
+import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
+import { Navigate } from 'react-router-dom';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -32,12 +34,26 @@ const useRelativeTime = () => {
 export const DejadorDashboard = () => {
   const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
-  const { loadTemplates, addLoadTemplate, posSettings, getPosItems } = useInventoryStore();
+  const { loadTemplates, addLoadTemplate, posSettings, getPosItems, addPosShift } = useInventoryStore();
   const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
+  const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
   const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
+
+  // Hydration guard: read localStorage directly to avoid false redirect during rehydration
+  const hasActiveSession = isSetupComplete || (() => {
+    try {
+      const raw = localStorage.getItem('frita-dejador-session');
+      if (!raw) return false;
+      return JSON.parse(raw)?.state?.isSetupComplete === true;
+    } catch { return false; }
+  })();
+
+  if (!hasActiveSession) {
+    return <Navigate to="/dejador-setup" replace />;
+  }
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
   const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
@@ -195,13 +211,58 @@ export const DejadorDashboard = () => {
             <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
           </div>
           
-          {/* Logout Circular Button */}
-          <button 
-             onClick={signOut}
-             className="absolute top-8 right-6 w-12 h-12 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-red-500 hover:bg-red-50 transition-colors active:scale-95"
-          >
-            <LogOut size={20} strokeWidth={2.5} className="ml-1" />
-          </button>
+          {/* Action buttons: Cerrar Jornada + Salir */}
+          <div className="absolute top-6 right-4 flex items-center gap-2">
+            {/* Cerrar Jornada */}
+            <button
+              onClick={() => {
+                if (window.confirm('¿Cerrar la jornada? Tendrás que configurarla de nuevo al entrar.')) {
+                  const session = useDejadorSessionStore.getState();
+                  addPosShift({
+                    openedAt: session.openedAt || new Date().toISOString(),
+                    closedAt: new Date().toISOString(),
+                    userId: (user as any)?.id,
+                    userName: session.anotadorName,
+                    anotadorName: session.anotadorName,
+                    dejadorName: session.dejadorName,
+                    shift: session.shift,
+                    type: 'DEJADOR',
+                    realAmount: 0,
+                    cashAmount: 0,
+                    transferAmount: 0,
+                    expenses: 0,
+                    theorySales: 0,
+                    soldItems: {},
+                    status: 'OK',
+                    difference: 0,
+                  });
+                  endShift();
+                  signOut();
+                }
+              }}
+              className="flex items-center gap-1.5 bg-red-500 text-white font-black text-xs px-3 py-2 rounded-full shadow-md hover:bg-red-600 transition-all active:scale-95"
+            >
+              <LogOut size={13} strokeWidth={3} />
+              CERRAR JORNADA
+            </button>
+            {/* Solo salir (jornada sigue activa) */}
+            <button
+              onClick={signOut}
+              title="Salir (la jornada sigue activa)"
+              className="w-10 h-10 bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-red-400 hover:bg-red-50 transition-colors active:scale-95"
+            >
+              <LogOut size={16} strokeWidth={2.5} className="ml-0.5" />
+            </button>
+          </div>
+
+          {/* Turno + nombres badge */}
+          {shift && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <span className="bg-amber-400 text-white font-black text-xs px-2.5 py-1 rounded-full tracking-widest">{shift}</span>
+              {anotadorName && <span className="bg-amber-100 text-amber-700 font-bold text-xs px-2.5 py-1 rounded-full">📋 {anotadorName.split(' ')[0]}</span>}
+              {dejadorName && <span className="bg-gray-900 text-white font-bold text-xs px-2.5 py-1 rounded-full">🛵 {dejadorName.split(' ')[0]}</span>}
+            </div>
+          )}
 
           {/* ─── TABS ─── */}
           <div className="bg-amber-100/50 rounded-2xl p-1 mt-6 flex max-w-lg">

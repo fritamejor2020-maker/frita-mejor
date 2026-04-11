@@ -6,13 +6,12 @@ import { useVehicleStore } from '../store/useVehicleStore';
 export const SellerSetupView = () => {
   const startShift = useSellerSessionStore((state) => state.startShift);
   
-  const [pointType, setPointType] = useState('fija');
+  const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
   const [shift, setShift] = useState('AM');
   const [responsibleName, setResponsibleName] = useState('');
 
   const pointTypes = [
-    { id: 'fija',     label: 'Local',    vehicleType: 'Local'    },
     { id: 'variable', label: 'Triciclo', vehicleType: 'Triciclo' },
     { id: 'local',    label: 'Carrito',  vehicleType: 'Carrito'  }
   ];
@@ -87,7 +86,7 @@ export const SellerSetupView = () => {
         <div className="mb-5 sm:mb-8">
           <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block mb-3 sm:mb-4">Turno</label>
           <div className="flex gap-2 sm:gap-3">
-            {['AM', 'PM'].map(t => (
+            {['AM', 'MD', 'PM'].map(t => (
               <button
                 key={t}
                 onClick={() => setShift(t)}

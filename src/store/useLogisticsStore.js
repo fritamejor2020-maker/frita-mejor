@@ -105,6 +105,22 @@ export const useLogisticsStore = create(
     syncKey('pendingRequests', updated);
   },
 
+  // Editar items de una entrada del historial de cargas/recepciones
+  updateLoadEntry: (id, items) => {
+    const { loadHistory } = get();
+    const updated = loadHistory.map(e => e.id === id ? { ...e, items } : e);
+    set({ loadHistory: updated });
+    syncKey('loadHistory', updated);
+  },
+
+  // Editar items de un surtido completado
+  updateCompletedRequestItems: (id, items_payload) => {
+    const { completedRequests } = get();
+    const updated = completedRequests.map(r => r.id === id ? { ...r, items_payload } : r);
+    set({ completedRequests: updated });
+    syncKey('completedRequests', updated);
+  },
+
   // ===============================
   // CARGAS Y RECEPCIONES (DEJADOR)
   // ===============================
@@ -129,8 +145,9 @@ export const useLogisticsStore = create(
       items,
       timestamp: new Date().toISOString()
     };
-    set(state => ({ loadHistory: [entry, ...state.loadHistory] }));
-    syncKey('loadHistory', [entry, ...get().loadHistory]);
+    const newHistory = [entry, ...get().loadHistory];
+    set({ loadHistory: newHistory });
+    syncKey('loadHistory', newHistory);
     return true;
   },
 
@@ -153,8 +170,9 @@ export const useLogisticsStore = create(
       items,
       timestamp: new Date().toISOString()
     };
-    set(state => ({ loadHistory: [entry, ...state.loadHistory] }));
-    syncKey('loadHistory', [entry, ...get().loadHistory]);
+    const newHistory = [entry, ...get().loadHistory];
+    set({ loadHistory: newHistory });
+    syncKey('loadHistory', newHistory);
     return true;
   },
 

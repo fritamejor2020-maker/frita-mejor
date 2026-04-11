@@ -16,6 +16,7 @@ import { PosView }        from './modules/pos/PosView';
 import { FritadoView }    from './modules/fritado/FritadoView';
 
 import { SellerSetupView }   from './views/SellerSetupView';
+import { DejadorSetupView }  from './views/DejadorSetupView';
 import { VendedorDashboard } from './views/VendedorDashboard';
 import { DejadorDashboard }  from './views/DejadorDashboard';
 import { MapTrackingView }   from './views/MapTrackingView';
@@ -59,6 +60,20 @@ function RoleRedirect() {
       }
     } catch (_) {}
     return <Navigate to="/vendedor-setup" replace />;
+  }
+
+  // If dejador, check if there's already an active session
+  if (user.role === 'DEJADOR' || user.role === 'dejador') {
+    try {
+      const raw = localStorage.getItem('frita-dejador-session');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed?.state?.isSetupComplete) {
+          return <Navigate to="/dejador" replace />;
+        }
+      }
+    } catch (_) {}
+    return <Navigate to="/dejador-setup" replace />;
   }
 
   const routes = { 
@@ -153,6 +168,7 @@ function App() {
         </Route>
 
         <Route element={<ProtectedRoute allowedRoles={['DEJADOR', 'dejador', 'ADMIN']} />}>
+          <Route path="/dejador-setup" element={<DejadorSetupView />} />
           <Route path="/dejador" element={<DejadorDashboard />} />
         </Route>
 

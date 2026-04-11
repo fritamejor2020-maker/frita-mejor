@@ -5,11 +5,12 @@ import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
-import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab } from '../../components/admin/AdminFinancesTab';
+import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab, ResumenOperativoTab } from '../../components/admin/AdminFinancesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
 import { AdminUsersTab } from '../../components/admin/AdminUsersTab';
 import { AdminVehiclesTab } from '../../components/admin/AdminVehiclesTab';
 import { AdminSuppliersTab } from '../../components/admin/AdminSuppliersTab';
+import { ResetGeneralPanel } from '../../components/admin/ResetGeneralPanel';
 import { AdminIncomeSourcesTab } from '../../components/admin/AdminIncomeSourcesTab';
 import { AdminCustomerDiscountsTab } from '../../components/admin/AdminCustomerDiscountsTab';
 import { formatMoney } from '../../utils/formatUtils';
@@ -2097,6 +2098,7 @@ export function AdminView() {
       { id: 'VEHICULOS',  label: '🛵 Triciclos & Vehículos' },
       { id: 'EQUIPO',     label: '🚴 Equipo Operativo' },
       { id: 'PRECIOS',    label: '🏷️ Precios Vendedores' },
+      { id: 'RESUMEN_OP', label: '📊 Resumen Operativo' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
     ],
     FINANZAS: [
@@ -2106,7 +2108,8 @@ export function AdminView() {
       { id: 'PROVEEDORES',label: '🤝 Proveedores (Gastos)' },
     ],
     SISTEMA: [
-      { id: 'USUARIOS',   label: '👥 Usuarios del Sistema' },
+      { id: 'USUARIOS',      label: '👥 Usuarios del Sistema' },
+      { id: 'RESET_GENERAL', label: '🗑️ Reset General' },
     ]
   };
 
@@ -2204,13 +2207,15 @@ export function AdminView() {
         {activeTab === 'FRITADO'    && <FritadoConfigPanel />}
         {activeTab === 'INVENTARIO' && <InventoryPanel />}
         {activeTab === 'RECETAS'    && <RecipesPanel />}
-        {activeTab === 'USUARIOS'   && <UsersPanel />}
+        {activeTab === 'USUARIOS'      && <UsersPanel />}
+        { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
         { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><PosCategoriesPanel /></div> }
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
         { activeTab === 'CLIENTES'  && <AdminCustomerDiscountsTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
+        { activeTab === 'RESUMEN_OP' && <ResumenOperativoTab /> }
         { activeTab === 'INGRESOS' && <AdminIncomesTab /> }
         { activeTab === 'EGRESOS' && <AdminExpensesTab /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }

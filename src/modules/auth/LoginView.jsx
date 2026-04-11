@@ -8,9 +8,32 @@ const ROLE_ROUTES = {
   OPERARIO:  '/produccion',
   FRITADOR:  '/fritado',
   CAJERO:    '/pos',
-  VENDEDOR:  '/vendedor-setup',
   DEJADOR:   '/dejador',
   FINANZAS:  '/finanzas'
+};
+
+// Para vendedores: si ya tienen un turno activo en localStorage, van directo al dashboard
+const getVendedorRoute = () => {
+  try {
+    const raw = localStorage.getItem('frita-seller-session');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.state?.isSetupComplete) return '/vendedor';
+    }
+  } catch (_) {}
+  return '/vendedor-setup';
+};
+
+// Para dejadores: ídem
+const getDejadorRoute = () => {
+  try {
+    const raw = localStorage.getItem('frita-dejador-session');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (parsed?.state?.isSetupComplete) return '/dejador';
+    }
+  } catch (_) {}
+  return '/dejador-setup';
 };
 
 export function LoginView() {
@@ -32,7 +55,10 @@ export function LoginView() {
     setLoading(false);
 
     if (result.ok) {
-      const route = ROLE_ROUTES[result.user.role] ?? '/produccion';
+      let route;
+      if (result.user.role === 'VENDEDOR') route = getVendedorRoute();
+      else if (result.user.role === 'DEJADOR' || result.user.role === 'dejador') route = getDejadorRoute();
+      else route = ROLE_ROUTES[result.user.role] ?? '/produccion';
       navigate(route, { replace: true });
     }
   };
