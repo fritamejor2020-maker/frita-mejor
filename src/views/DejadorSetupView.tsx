@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
+import { useVehicleStore } from '../store/useVehicleStore';
 
 export const DejadorSetupView = () => {
   const startShift = useDejadorSessionStore((state) => state.startShift);
   const navigate = useNavigate();
+  const dejadorViewEnabled = useVehicleStore((s: any) => s.dejadorViewEnabled ?? true);
 
   const [shift, setShift] = useState('AM');
   const [anotadorName, setAnotadorName] = useState('');
@@ -22,6 +24,21 @@ export const DejadorSetupView = () => {
     });
     navigate('/dejador');
   };
+
+  // Vista deshabilitada por el Admin
+  if (!dejadorViewEnabled) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#FFD56B]">
+        <div className="bg-white rounded-[40px] p-10 shadow-sm text-center max-w-sm w-full">
+          <span className="text-6xl block mb-4">🔒</span>
+          <h1 className="text-2xl font-black text-gray-800 mb-2">Vista Desactivada</h1>
+          <p className="text-gray-400 font-bold text-sm">
+            El administrador ha desactivado temporalmente el acceso a la vista de Dejador.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#FFD56B] font-sans w-full page-enter">

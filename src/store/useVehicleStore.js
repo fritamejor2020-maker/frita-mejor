@@ -30,11 +30,37 @@ export const useVehicleStore = create(
         { id: '12', type: 'Carrito',  name: 'Carrito 3',  abbreviation: 'C3', active: true },
       ],
 
+      // Controla si la vista del Vendedor y del Dejador están habilitadas
+      sellerViewEnabled: true,
+      dejadorViewEnabled: true,
+
+      // Controla qué tipos de punto aparecen como botones en el setup del Vendedor
+      enabledPointTypes: { Triciclo: true, Carrito: true, Local: false },
+
+      toggleSellerView: () => {
+        set((state) => ({ sellerViewEnabled: !state.sellerViewEnabled }));
+        syncVehicles(useVehicleStore.getState().vehicles);
+      },
+
+      toggleDejadorView: () => {
+        set((state) => ({ dejadorViewEnabled: !state.dejadorViewEnabled }));
+        syncVehicles(useVehicleStore.getState().vehicles);
+      },
+
+      togglePointType: (type) => {
+        set((state) => ({
+          enabledPointTypes: {
+            ...state.enabledPointTypes,
+            [type]: !state.enabledPointTypes?.[type],
+          },
+        }));
+      },
+
       addVehicle: (vehicleData) => {
         const newVehicle = {
           id: Date.now().toString(),
           active: true,
-          type: 'Triciclo', // Default type for now
+          type: 'Triciclo',
           ...vehicleData
         };
         set((state) => ({ vehicles: [...state.vehicles, newVehicle] }));

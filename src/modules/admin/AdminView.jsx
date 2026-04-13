@@ -2096,9 +2096,7 @@ export function AdminView() {
     ],
     FLOTA: [
       { id: 'VEHICULOS',  label: '🛵 Triciclos & Vehículos' },
-      { id: 'EQUIPO',     label: '🚴 Equipo Operativo' },
       { id: 'PRECIOS',    label: '🏷️ Precios Vendedores' },
-      { id: 'RESUMEN_OP', label: '📊 Resumen Operativo' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
     ],
     FINANZAS: [
@@ -2215,11 +2213,11 @@ export function AdminView() {
         { activeTab === 'CLIENTES'  && <AdminCustomerDiscountsTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
-        { activeTab === 'RESUMEN_OP' && <ResumenOperativoTab /> }
+
         { activeTab === 'INGRESOS' && <AdminIncomesTab /> }
         { activeTab === 'EGRESOS' && <AdminExpensesTab /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }
-        { activeTab === 'EQUIPO' && <AdminUsersTab /> }
+
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
