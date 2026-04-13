@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
@@ -55,10 +55,13 @@ export const ResumenOperativoTab = () => {
     if (filterDate && shiftDate !== filterDate) return null;
     if (filterShift && shiftTurno !== filterShift) return null;
 
-    // Carga inicial (suma por producto)
+    // Carga inicial (suma por producto) — solo del día de la jornada
     const cargaMap: Record<string, { name: string; qty: number }> = {};
+    const seenCargaIds = new Set<string>();
     loadHistory
-      .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId)
+      .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId
+        && (!shiftDate || dateOf(e.timestamp) === shiftDate)
+        && !seenCargaIds.has(e.id) && (seenCargaIds.add(e.id) || true))
       .forEach((e: any) => {
         e.items.forEach(({ productId, qty, name }: any) => {
           if (!cargaMap[productId]) cargaMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -66,10 +69,13 @@ export const ResumenOperativoTab = () => {
         });
       });
 
-    // Surtidos entregados
+    // Surtidos entregados — solo del día de la jornada
     const surtidoMap: Record<string, { name: string; qty: number }> = {};
+    const seenSurtidoIds = new Set<string>();
     completedRequests
-      .filter((r: any) => r.requester_point_id === vehicleId)
+      .filter((r: any) => r.requester_point_id === vehicleId
+        && (!shiftDate || dateOf(r.completed_at || r.created_at) === shiftDate)
+        && !seenSurtidoIds.has(r.id) && (seenSurtidoIds.add(r.id) || true))
       .forEach((r: any) => {
         (r.items_payload || []).forEach(({ productId, qty, name }: any) => {
           if (!surtidoMap[productId]) surtidoMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -77,10 +83,13 @@ export const ResumenOperativoTab = () => {
         });
       });
 
-    // Sobrantes (recepcion)
+    // Sobrantes (recepcion) — solo del día de la jornada
     const sobranteMap: Record<string, { name: string; qty: number }> = {};
+    const seenRecepcionIds = new Set<string>();
     loadHistory
-      .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId)
+      .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId
+        && (!shiftDate || dateOf(e.timestamp) === shiftDate)
+        && !seenRecepcionIds.has(e.id) && (seenRecepcionIds.add(e.id) || true))
       .forEach((e: any) => {
         e.items.forEach(({ productId, qty, name }: any) => {
           if (!sobranteMap[productId]) sobranteMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -342,7 +351,17 @@ export const AdminFinancesTab = () => {
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
 
   const updateEditDetail = (idx: number, field: string, value: string) => {
-    setEditDetails(prev => prev.map((d, i) => i === idx ? { ...d, [field]: value } : d));
+    setEditDetails(prev => prev.map((d, i) => {
+      if (i !== idx) return d;
+      const updated = { ...d, [field]: value };
+      // Vendido = Enviado - Quedó (siempre calculado automáticamente)
+      if (field === 'sent' || field === 'returned') {
+        const s = parseInt(field === 'sent' ? value : updated.sent) || 0;
+        const r = parseInt(field === 'returned' ? value : updated.returned) || 0;
+        updated.sold = String(Math.max(0, s - r));
+      }
+      return updated;
+    }));
   };
 
   const updateEditLogisticItem = (entryIdx: number, itemIdx: number, qty: string) => {
@@ -367,13 +386,26 @@ export const AdminFinancesTab = () => {
 
   // Carga el historial logístico de un vehículo en una fecha dada
   const buildLogisticsTimeline = (vehicleId: string, shiftDate: string) => {
-    // Deduplicar por ID para evitar entradas repetidas
     const seenIds = new Set<string>();
+
+    // Aceptar entradas del mismo día o hasta ±1 día para absorber desfases de huso horario
+    const isNearDate = (ts: string) => {
+      if (!shiftDate || !ts) return true; // si no hay fecha de referencia, incluir todo
+      const entryDate = dateOf(ts);
+      if (entryDate === shiftDate) return true;
+      // También aceptar el día anterior/siguiente por desfase UTC
+      const base = new Date(shiftDate);
+      const prev = new Date(base); prev.setDate(base.getDate() - 1);
+      const next = new Date(base); next.setDate(base.getDate() + 1);
+      const prevStr = `${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}-${String(prev.getDate()).padStart(2,'0')}`;
+      const nextStr = `${next.getFullYear()}-${String(next.getMonth()+1).padStart(2,'0')}-${String(next.getDate()).padStart(2,'0')}`;
+      return entryDate === prevStr || entryDate === nextStr;
+    };
 
     const logEntries = (loadHistory as any[])
       .filter(e => {
-        if (e.vehicleId !== vehicleId || dateOf(e.timestamp) !== shiftDate) return false;
-        if (seenIds.has(e.id)) return false; // descarta duplicados
+        if (e.vehicleId !== vehicleId || !isNearDate(e.timestamp)) return false;
+        if (seenIds.has(e.id)) return false;
         seenIds.add(e.id);
         return true;
       })
@@ -381,7 +413,7 @@ export const AdminFinancesTab = () => {
 
     const surtidoEntries = (completedRequests as any[])
       .filter(r => {
-        if (r.requester_point_id !== vehicleId || dateOf(r.completed_at || r.created_at) !== shiftDate) return false;
+        if (r.requester_point_id !== vehicleId || !isNearDate(r.completed_at || r.created_at)) return false;
         if (seenIds.has(r.id)) return false;
         seenIds.add(r.id);
         return true;
@@ -400,7 +432,8 @@ export const AdminFinancesTab = () => {
      let expenses = 0;
 
      // Calcular la fecha del cierre al inicio para usarla en los filtros logísticos
-     const shiftDate = new Date(s.closedAt).toISOString().split('T')[0];
+     // ⚠️ Usar dateOf() (fecha local) y NO toISOString() para evitar desfase UTC-5 Colombia
+     const shiftDate = dateOf(s.closedAt);
 
      if (s.type === 'VENDEDOR') {
          const priceMap: Record<string, { price: number, name: string }> = {};
@@ -453,34 +486,73 @@ export const AdminFinancesTab = () => {
              });
            });
 
+         // productOverrides: overrides de cantidades por producto guardados por admin
+         // Retrocompatibilidad: si no hay productOverrides pero hay soldItems con datos reales, usar soldItems
+         const _siRaw = (s.soldItems || {}) as Record<string, any>;
+         const _siOverrides: Record<string, {sent:number; returned:number; sold:number}> = {};
+         Object.values(_siRaw).forEach((i: any) => {
+           // Solo usar soldItems si tiene datos reales (sent explícito > 0 O returned > 0 O es el único registro)
+           const name = i.name || i.id;
+           if (name && (i.sent > 0 || i.returned > 0)) {
+             _siOverrides[name] = { sent: i.sent || 0, returned: i.returned || 0, sold: i.qty || 0 };
+           }
+         });
+         const productOverrides = (s.productOverrides && Object.keys(s.productOverrides).length > 0)
+           ? (s.productOverrides as Record<string, {sent:number; returned:number; sold:number}>)
+           : _siOverrides;
          const allPids = new Set([...Object.keys(cargaMap), ...Object.keys(surtidoMap), ...Object.keys(sobranteMap)]);
          theoretical = 0;
          details = [];
          allPids.forEach(pid => {
-           const carga = cargaMap[pid]?.qty || 0;
-           const surtido = surtidoMap[pid]?.qty || 0;
-           const sobrante = sobranteMap[pid]?.qty || 0;
-           const enviado = carga + surtido;          // Carga Inicial + Surtidos
-           const quedo = sobrante;                   // Sobrantes devueltos
-           const vendido = Math.max(0, enviado - quedo);
-           const unitPrice = priceMap[pid]?.price || 0;
-           const prodName = priceMap[pid]?.name || cargaMap[pid]?.name || surtidoMap[pid]?.name || sobranteMap[pid]?.name || pid;
-           theoretical += vendido * unitPrice;
-           details.push({ product: prodName, sent: enviado, returned: quedo, sold: vendido, unitPrice });
+           const carga    = cargaMap[pid]?.qty   || 0;
+           const surtido  = surtidoMap[pid]?.qty  || 0;
+           const sobrante = sobranteMap[pid]?.qty  || 0;
+           const logEnviado = carga + surtido;
+           const logQuedo   = sobrante;
+           const unitPrice  = priceMap[pid]?.price || 0;
+           const prodName   = priceMap[pid]?.name || cargaMap[pid]?.name || surtidoMap[pid]?.name || sobranteMap[pid]?.name || pid;
+           // Admin puede haber sobreescrito las cantidades de este producto
+           const ov = productOverrides[prodName];
+           const finalSent     = ov ? ov.sent     : logEnviado;
+           const finalReturned = ov ? ov.returned  : logQuedo;
+           const finalSold     = ov ? ov.sold      : Math.max(0, logEnviado - logQuedo);
+           theoretical += finalSold * unitPrice;
+           details.push({ product: prodName, sent: finalSent, returned: finalReturned, sold: finalSold, unitPrice });
          });
 
-         // Si no hay logística registrada, caer en soldItems almacenados
-         if (details.length === 0 && s.soldItems) {
-           Object.values(s.soldItems).forEach((i: any) => {
-             const price = priceMap[i.id]?.price || i.price || 0;
-             theoretical += (i.qty || 0) * price;
-             details.push({ product: i.name || i.id, sent: i.qty || 0, returned: 0, sold: i.qty || 0, unitPrice: price });
-           });
-           if (details.length === 0) theoretical = s.theorySales || 0;
-         }
+          // Logística tiene prioridad absoluta. theoreticalOverride solo actúa si NO hay logística.
+          if (details.length === 0) {
+            // Sin logística: usar soldItems + theoreticalOverride si existen
+            if (s.theoreticalOverride !== undefined && s.soldItems && Object.keys(s.soldItems).length > 0) {
+              theoretical = s.theoreticalOverride;
+              details = Object.values(s.soldItems).map((i: any) => ({
+                product: i.name || i.id,
+                sent: (i.sent > 0) ? i.sent : (i.qty || 0),
+                returned: i.returned || 0,
+                sold: i.qty || 0,
+                unitPrice: i.price || 0,
+              }));
+            } else if (s.soldItems) {
+              // Fallback básico: sin logística ni override
+              Object.values(s.soldItems).forEach((i: any) => {
+                const price = priceMap[i.id]?.price || i.price || 0;
+                theoretical += (i.qty || 0) * price;
+                details.push({ product: i.name || i.id, sent: i.qty || 0, returned: 0, sold: i.qty || 0, unitPrice: price });
+              });
+              if (details.length === 0) theoretical = s.theorySales || 0;
+            }
+          }
+          // Cuando hay logística: theoretical ya fue calculado de (enviado-sobrantes)×precio.
 
-         real = s.realAmount || 0;
          expenses = s.expensesAmount || s.expenses || 0;
+         // Calcular real SIEMPRE desde sus componentes para evitar datos corruptos
+         // realAmount puede estar mal si fue guardado antes del fix del formulario
+         const cashAmt     = s.cashAmount    || 0;
+         const transferAmt = s.transferAmount || 0;
+         real = cashAmt + transferAmt + expenses;  // efectivo + transferencia + salidas
+
+
+
      } else {
          // POS Shift
          const shiftSales = (posSales || []).filter((sale: any) => sale.shiftId === s.id && sale.status === 'PAID');
@@ -545,6 +617,8 @@ export const AdminFinancesTab = () => {
         dejadorName,
         theoretical,
         real,
+        cashAmount: s.cashAmount || 0,
+        transferAmount: s.transferAmount || 0,
         expenses,
         details
      };
@@ -682,7 +756,34 @@ export const AdminFinancesTab = () => {
                           setEditTransfer(String(closing._raw.transferAmount || 0));
                           setEditExpenses(String(closing.expenses || 0));
                           setEditExpensesDesc(closing._raw.expensesDesc || "");
-                          setEditDetails(closing.details.map((d: any) => ({ ...d })));
+                           // Si los detalles tienen enviado=0 (datos corruptos de edit antigua),
+                           // reconstruir desde logística para que el form muestre datos reales.
+                           const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
+                           let _initDetails = closing.details.map((d: any) => ({ ...d }));
+                           if (!_hasRealLogistics) {
+                             const _vid = closing._raw?.pointId;
+                             if (_vid) {
+                               const _tl = buildLogisticsTimeline(_vid, closing.date);
+                               const _cM: Record<string,number> = {};
+                               const _sM: Record<string,number> = {};
+                               const _rM: Record<string,number> = {};
+                               _tl.forEach((e: any) => {
+                                 (e.items || []).forEach((item: any) => {
+                                   const n = item.name || item.productId || '';
+                                   if (e.type === 'carga')    _cM[n] = (_cM[n] || 0) + (item.qty || 0);
+                                   else if (e.type === 'surtido')  _sM[n] = (_sM[n] || 0) + (item.qty || 0);
+                                   else if (e.type === 'recepcion') _rM[n] = (_rM[n] || 0) + (item.qty || 0);
+                                 });
+                               });
+                               _initDetails = closing.details.map((d: any) => {
+                                 const logSent = (_cM[d.product] || 0) + (_sM[d.product] || 0);
+                                 const logRet  = _rM[d.product] || 0;
+                                 if (logSent > 0) return { ...d, sent: logSent, returned: logRet, sold: String(Math.max(0, logSent - logRet)) };
+                                 return { ...d };
+                               });
+                             }
+                           }
+                           setEditDetails(_initDetails);
                           const vehicleId = closing._raw?.pointId;
                           setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
                         }}
@@ -721,17 +822,33 @@ export const AdminFinancesTab = () => {
                 </div>
 
                 {/* ─── Comparison Block ────────────────── */}
-                <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4">
+                <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4 overflow-hidden">
+                  {/* Fila principal: Teórico vs Real */}
                   <div className="grid grid-cols-2 divide-x divide-gray-200">
                     <div className="py-5 px-6 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Te&#xF3;rico (APP)</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
                       <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
                       <p className="text-[10px] font-bold text-gray-300 mt-1">Calc. por logística</p>
                     </div>
                     <div className="py-5 px-6 text-center">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
                       <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
-                      <p className="text-[10px] font-bold text-gray-300 mt-1">Efectivo + Transf. + Salidas</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">Total recibido</p>
+                    </div>
+                  </div>
+                  {/* Desglose de Real */}
+                  <div className="grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-200 bg-white">
+                    <div className="py-3 px-4 text-center">
+                      <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">💵 Efectivo</p>
+                      <p className="text-base font-black text-green-700">{fmt(closing.cashAmount)}</p>
+                    </div>
+                    <div className="py-3 px-4 text-center">
+                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
+                      <p className="text-base font-black text-blue-600">{fmt(closing.transferAmount)}</p>
+                    </div>
+                    <div className="py-3 px-4 text-center">
+                      <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
+                      <p className="text-base font-black text-red-500">{fmt(closing.expenses)}</p>
                     </div>
                   </div>
                 </div>
@@ -763,6 +880,17 @@ export const AdminFinancesTab = () => {
                 {isExpanded && (
                   <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
 
+                    {/* Banner: Valor Editado manualmente */}
+                    {(closing as any)._raw?.editedAt && (
+                      <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                        <span className="text-sm">✏️</span>
+                        <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
+                        <span className="text-[10px] font-bold text-blue-400 ml-auto">
+                          {new Date((closing as any)._raw.editedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Bloque Anotador / Dejador */}
                     {((closing as any).anotadorName || (closing as any).dejadorName) && (
                       <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex flex-wrap gap-3 items-center">
@@ -783,6 +911,45 @@ export const AdminFinancesTab = () => {
                      {/* ── Historial de Envíos (colapsable) ── */}
                      {closing._raw?.pointId && (() => {
                        const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
+                       // Inyectar entrada virtual si el cierre fue editado manualmente
+                       // Inyectar entradas del editHistory (una por cada edicion)
+                       const rawHistory = closing._raw?.editHistory;
+                       const buildDiffItems = (snap: any) => {
+                         const items: any[] = [];
+                         if (!snap) return items;
+                         const beforeDetails = snap.before?.details || (Array.isArray(snap.before) ? snap.before : []);
+                         const afterDetails  = snap.after?.details  || (Array.isArray(snap.after)  ? snap.after  : []);
+                         afterDetails.forEach((d: any) => {
+                           const prev = beforeDetails.find((b: any) => b.product === d.product);
+                           items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
+                         });
+                         if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
+                           items.push({ name: '💵 Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
+                         if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
+                           items.push({ name: '📲 Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
+                         if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
+                           items.push({ name: '📌 Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
+                         return items;
+                       };
+                       if (rawHistory && rawHistory.length > 0) {
+                         rawHistory.forEach((hist: any, hIdx: number) => {
+                           timeline.push({
+                             id: 'edit-' + closing.id + '-' + hIdx,
+                             type: 'edicion',
+                             timestamp: hist.editedAt,
+                             items: buildDiffItems(hist),
+                           });
+                         });
+                       } else if (closing._raw?.editedAt) {
+                         // Backward compat: snapshot antiguo de una sola edición
+                         timeline.push({
+                           id: 'edit-' + closing.id,
+                           type: 'edicion',
+                           timestamp: closing._raw.editedAt,
+                           items: buildDiffItems(closing._raw.editSnapshot),
+                         });
+                         timeline.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                       }
                        if (timeline.length === 0) return null;
                        const isHistorialOpen = expandedHistorialId === closing.id;
                        let surtidoCount = 0;
@@ -806,15 +973,22 @@ export const AdminFinancesTab = () => {
                                <div className="flex flex-col gap-2.5">
                                  {timeline.map((entry: any, idx: number) => {
                                    if (entry.type === 'surtido') surtidoCount++;
-                                   const icon = entry.type === 'carga' ? '📦' : entry.type === 'surtido' ? '🔄' : '📬';
+                                   const icon = entry.type === 'carga' ? '📦'
+                                     : entry.type === 'surtido' ? '🔄'
+                                     : entry.type === 'edicion' ? '✏️'
+                                     : '📬';
                                    const label = entry.type === 'carga' ? 'Carga Inicial'
                                      : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
+                                     : entry.type === 'edicion' ? 'Valor Editado por Admin'
                                      : 'Productos Recibidos';
                                    const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
                                      : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
+                                     : entry.type === 'edicion' ? 'bg-blue-50 border-blue-200'
                                      : 'bg-indigo-50 border-indigo-100';
                                    const textColor = entry.type === 'carga' ? 'text-red-600'
-                                     : entry.type === 'surtido' ? 'text-amber-700' : 'text-indigo-600';
+                                     : entry.type === 'surtido' ? 'text-amber-700'
+                                     : entry.type === 'edicion' ? 'text-blue-700'
+                                     : 'text-indigo-600';
                                    const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
                                    return (
                                      <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
@@ -824,7 +998,20 @@ export const AdminFinancesTab = () => {
                                          <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
                                        </div>
                                        <div className="flex flex-wrap gap-2">
-                                         {(entry.items || []).map((item: any, ii: number) => (
+                                         {entry.type === 'edicion' ? (() => {
+                                           const diffs = (entry.items || []).filter((item: any) => String(item.before) !== String(item.qty));
+                                           const fmtV = (v: any, fin: boolean) => fin ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(v)) : String(v);
+                                           return diffs.length === 0
+                                             ? <span className="text-xs text-gray-400 italic">Sin cambios en valores</span>
+                                             : diffs.map((item: any, ii: number) => (
+                                               <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-1">
+                                                 <span className="text-gray-500">{item.name}:</span>
+                                                 <span className="text-red-400 line-through">{fmtV(item.before, item.financial)}</span>
+                                                 <span className="text-gray-300 mx-0.5">&#x2192;</span>
+                                                 <span className="text-blue-700 font-black">{fmtV(item.qty, item.financial)}</span>
+                                               </span>
+                                             ));
+                                         })() : (entry.items || []).map((item: any, ii: number) => (
                                            <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
                                              <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
                                              <span className="text-gray-900">{item.qty}</span>
@@ -970,7 +1157,7 @@ export const AdminFinancesTab = () => {
                         {editDetails.map((d: any, i: number) => (
                           <tr key={i} className="hover:bg-gray-50/50">
                             <td className="py-2 px-4 font-bold text-gray-700 text-xs max-w-[90px] truncate">{d.product}</td>
-                            {(['sent','returned','sold'] as const).map(field => (
+                            {(['sent','returned'] as const).map(field => (
                               <td key={field} className="py-1.5 px-1 text-center">
                                 <input
                                   type="number" min="0"
@@ -980,6 +1167,12 @@ export const AdminFinancesTab = () => {
                                 />
                               </td>
                             ))}
+                            {/* Vendido: ENVIADO - QUEDÓ, solo lectura */}
+                            <td className="py-1.5 px-1 text-center">
+                              <span className="inline-block w-14 text-center bg-green-50 border border-green-200 rounded-lg py-1 text-sm font-black text-green-700">
+                                {Math.max(0, (parseInt(d.sent) || 0) - (parseInt(d.returned) || 0))}
+                              </span>
+                            </td>
                             <td className="py-1.5 px-2">
                               <div className="relative">
                                 <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">$</span>
@@ -998,7 +1191,7 @@ export const AdminFinancesTab = () => {
                     <div className="bg-gray-50 border-t border-gray-100 px-4 py-2.5 flex justify-between items-center">
                       <span className="text-xs font-bold text-gray-400">Total Calculado por Productos:</span>
                       <span className="text-sm font-black text-[#FF4040]">
-                        {fmt(editDetails.reduce((sum: number, d: any) => sum + (parseInt(d.sold) || 0) * (parseInt(d.unitPrice) || 0), 0))}
+                        {fmt(editDetails.reduce((sum: number, d: any) => sum + Math.max(0, (parseInt(d.sent)||0)-(parseInt(d.returned)||0)) * (parseInt(d.unitPrice) || 0), 0))}
                       </span>
                     </div>
                   </div>
@@ -1052,8 +1245,10 @@ export const AdminFinancesTab = () => {
               <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100 text-center">
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Diferencia Corregida</p>
                 {(() => {
-                  const newReal = (parseInt(editCash) || 0) + (parseInt(editTransfer) || 0);
-                  const newTheoretical = editingClosing.theoretical + (parseInt(editExpenses) || 0);
+                  const newReal = (parseInt(editCash) || 0) + (parseInt(editTransfer) || 0) + (parseInt(editExpenses) || 0);
+                  // Recalcular teórico en tiempo real desde los detalles editados
+                  const newTheoretical = editDetails.reduce((sum: number, d: any) =>
+                    sum + Math.max(0,(parseInt(d.sent)||0)-(parseInt(d.returned)||0)) * (parseInt(d.unitPrice)||0), 0);
                   const diff = newReal - newTheoretical;
                   return (
                     <p className={`text-2xl font-black ${diff === 0 ? 'text-green-600' : diff < 0 ? 'text-red-500' : 'text-green-600'}`}>
@@ -1079,20 +1274,44 @@ export const AdminFinancesTab = () => {
                     ...d,
                     sent: parseInt(d.sent) || 0,
                     returned: parseInt(d.returned) || 0,
-                    sold: parseInt(d.sold) || 0,
+                    sold: Math.max(0, (parseInt(d.sent)||0) - (parseInt(d.returned)||0)),
                     unitPrice: parseInt(d.unitPrice) || 0,
                   }));
                   const soldItems: Record<string, any> = {};
                   parsedDetails.forEach((d: any) => {
-                    soldItems[d.product] = { name: d.product, qty: d.sold, price: d.unitPrice };
+                    soldItems[d.product] = { name: d.product, qty: d.sold, sent: d.sent, returned: d.returned, price: d.unitPrice };
                   });
+                  const theoreticalOverride = parsedDetails.reduce(
+                    (sum: number, d: any) => sum + d.sold * d.unitPrice, 0
+                  );
                   updatePosShift(editingClosing.id, {
                     cashAmount: newCash,
                     transferAmount: newTransfer,
-                    realAmount: newCash + newTransfer,
+                    realAmount: newCash + newTransfer + newExpenses,
                     expenses: newExpenses,
                     expensesDesc: editExpensesDesc,
                     soldItems,
+                    theoreticalOverride,
+                    productOverrides: parsedDetails.reduce((acc: any, d: any) => { acc[d.product] = { sent: d.sent, returned: d.returned, sold: d.sold }; return acc; }, {}),
+                    editedAt: new Date().toISOString(),
+                    editHistory: [
+                      ...(editingClosing._raw?.editHistory || []),
+                      {
+                        editedAt: new Date().toISOString(),
+                        before: {
+                          details: editingClosing.details || [],
+                          cash: editingClosing.cashAmount || 0,
+                          transfer: editingClosing.transferAmount || 0,
+                          expenses: editingClosing.expenses || 0,
+                        },
+                        after: {
+                          details: parsedDetails,
+                          cash: newCash,
+                          transfer: newTransfer,
+                          expenses: newExpenses,
+                        },
+                      },
+                    ],
                   });
                   // Guardar cambios de logística al store
                   for (const entry of editLogistics) {
