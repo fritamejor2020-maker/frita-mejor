@@ -111,6 +111,7 @@ export const VendedorDashboard = () => {
       await sendRestockRequest(pointId as string, responsibleName as string);
       toast.success("Solicitud de surtido enviada exitosamente");
       clearRestockCart();
+      setStringSelections({});
     } catch (err: any) {
       toast.error("Error al pedir surtido: " + err.message);
     }
@@ -345,10 +346,10 @@ export const VendedorDashboard = () => {
                            const next = current === qty ? '' : qty;
                            setStringSelections(prev => ({ ...prev, [p.id]: next }));
                            const diff = (next ? 1 : 0) - currentQty;
-                           addToRestockCart(p.id, diff, p.name);
+                           addToRestockCart(p.id, diff, p.name, p.abbreviation, next || undefined);
                          } else {
                            const diff = qty - currentQty;
-                           addToRestockCart(p.id, diff, p.name);
+                           addToRestockCart(p.id, diff, p.name, p.abbreviation);
                          }
                        }}
                      />

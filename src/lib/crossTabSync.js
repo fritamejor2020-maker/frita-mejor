@@ -58,6 +58,10 @@ export function broadcastState(localStorageKey, state) {
 
 let initialized = false;
 
+// Flag para evitar re-emitir updates que llegaron de otra pestaña (rompe el eco infinito)
+let _isApplyingRemoteState = false;
+export function isApplyingRemoteState() { return _isApplyingRemoteState; }
+
 export function initCrossTabSync() {
   if (initialized) return;
   initialized = true;
@@ -72,17 +76,38 @@ export function initCrossTabSync() {
     const store = storeRegistry.get(key);
     if (!store) return;
 
-    // Solo aplicar si el mensaje es MÁS RECIENTE que nuestro último write propio
-    const myTs = localVersions.get(key) || 0;
-    if (ts <= myTs) {
-      // Nuestro estado es igual o más nuevo → ignorar (evita que otra tab
-      // restaure datos que acabamos de eliminar)
-      return;
-    }
+    // El chequeo ts<=myTs fue eliminado: bloqueaba pedidos legítimos cuando el
+    // dejador tenía un localVersions más alto (p.ej. tras un commit).
+    // El eco infinito ya está controlado por el flag _isApplyingRemoteState.
 
     try {
-      store.setState(state, true); // true = replace, no merge
+      _isApplyingRemoteState = true;
+
+      // Para logistics: usar union en completedRequests/rejectedRequests para que
+      // un snapshot antiguo del vendedor nunca borre los commits del dejador.
+      if (key === 'frita-mejor-logistics' && store.getState) {
+        const current = store.getState();
+        const merged = { ...state };
+
+        // Union: tomar el mayor conjunto entre local e incoming
+        if (current.completedRequests?.length > (state.completedRequests?.length || 0)) {
+          merged.completedRequests = current.completedRequests;
+        }
+        if (current.rejectedRequests?.length > (state.rejectedRequests?.length || 0)) {
+          merged.rejectedRequests = current.rejectedRequests;
+        }
+        if (current.loadHistory?.length > (state.loadHistory?.length || 0)) {
+          merged.loadHistory = current.loadHistory;
+        }
+
+        store.setState(merged);
+      } else {
+        store.setState(state);
+      }
+
+      _isApplyingRemoteState = false;
     } catch (err) {
+      _isApplyingRemoteState = false;
       console.warn(`[CrossTabSync] Error aplicando estado de "${key}":`, err.message);
     }
   };

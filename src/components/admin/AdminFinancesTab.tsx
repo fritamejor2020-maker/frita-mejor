@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
+import { refreshAllFromSupabase } from '../../lib/useRealtimeSync';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -329,6 +330,7 @@ interface ClosingDetail {
   returned: number;
   sold: number;
   unitPrice: number;
+  stringCounts?: Record<string, number>; // ej: { MON: 2, '20K': 1 }
 }
 
 
@@ -350,6 +352,12 @@ export const AdminFinancesTab = () => {
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
   const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string } | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try { await refreshAllFromSupabase(); } finally { setIsRefreshing(false); }
+  };
 
   const updateEditDetail = (idx: number, field: string, value: string) => {
     setEditDetails(prev => prev.map((d, i) => {
@@ -447,29 +455,33 @@ export const AdminFinancesTab = () => {
 
          // Carga inicial por producto — solo del día del cierre, deduplicar por ID
          const seenCargaIds = new Set<string>();
-         const cargaMap: Record<string, { name: string; qty: number }> = {};
+         const cargaMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          loadHistory
            .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId
              && dateOf(e.timestamp) === shiftDate   // ← solo la jornada del cierre
              && !seenCargaIds.has(e.id) && (seenCargaIds.add(e.id) || true))
            .forEach((e: any) => {
-             e.items.forEach(({ productId, qty, name }: any) => {
-               if (!cargaMap[productId]) cargaMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
+             e.items.forEach(({ productId, qty, name, stringValue }: any) => {
+               if (!cargaMap[productId]) cargaMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0, stringCounts: {} };
                cargaMap[productId].qty += qty;
+               if (stringValue)
+                 cargaMap[productId].stringCounts[stringValue] = (cargaMap[productId].stringCounts[stringValue] || 0) + (qty || 1);
              });
            });
 
          // Surtidos entregados — solo del día del cierre, deduplicar por ID
          const seenSurtidoIds = new Set<string>();
-         const surtidoMap: Record<string, { name: string; qty: number }> = {};
+         const surtidoMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          completedRequests
            .filter((r: any) => r.requester_point_id === vehicleId
              && dateOf(r.completed_at || r.created_at) === shiftDate  // ← solo la jornada
              && !seenSurtidoIds.has(r.id) && (seenSurtidoIds.add(r.id) || true))
            .forEach((r: any) => {
-             (r.items_payload || []).forEach(({ productId, qty, name }: any) => {
-               if (!surtidoMap[productId]) surtidoMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
+             (r.items_payload || []).forEach(({ productId, qty, name, stringValue }: any) => {
+               if (!surtidoMap[productId]) surtidoMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0, stringCounts: {} };
                surtidoMap[productId].qty += qty;
+               if (stringValue)
+                 surtidoMap[productId].stringCounts[stringValue] = (surtidoMap[productId].stringCounts[stringValue] || 0) + (qty || 1);
              });
            });
 
@@ -518,7 +530,10 @@ export const AdminFinancesTab = () => {
            const finalReturned = ov ? ov.returned  : logQuedo;
            const finalSold     = ov ? ov.sold      : Math.max(0, logEnviado - logQuedo);
            theoretical += finalSold * unitPrice;
-           details.push({ product: prodName, sent: finalSent, returned: finalReturned, sold: finalSold, unitPrice });
+           const _allCounts: Record<string, number> = {};
+           Object.entries(cargaMap[pid]?.stringCounts || {}).forEach(([sv, n]) => { _allCounts[sv] = (_allCounts[sv] || 0) + (n as number); });
+           Object.entries(surtidoMap[pid]?.stringCounts || {}).forEach(([sv, n]) => { _allCounts[sv] = (_allCounts[sv] || 0) + (n as number); });
+           details.push({ product: prodName, sent: finalSent, returned: finalReturned, sold: finalSold, unitPrice, stringCounts: Object.keys(_allCounts).length > 0 ? _allCounts : undefined });
          });
 
           // Logística tiene prioridad absoluta. theoreticalOverride solo actúa si NO hay logística.
@@ -602,8 +617,8 @@ export const AdminFinancesTab = () => {
        return new Date(ta).getTime() - new Date(tb).getTime();
      })[0];
 
-     const anotadorName = matchingDejadorShift?.anotadorName || anyEntry?.anotadorName || null;
-     const dejadorName  = matchingDejadorShift?.dejadorName  || anyEntry?.dejadorName  || null;
+     const anotadorName = anyEntry?.anotadorName || matchingDejadorShift?.anotadorName || null;
+     const dejadorName  = anyEntry?.dejadorName  || matchingDejadorShift?.dejadorName  || null;
 
      return {
         id: s.id,
@@ -668,26 +683,40 @@ export const AdminFinancesTab = () => {
 
   return (
     <div className="flex-1 flex flex-col gap-6">
-      {/* Filters */}
-      <div className="inline-flex items-center gap-3 bg-white rounded-full px-5 py-2.5 shadow-sm border border-gray-100 self-center flex-wrap justify-center mt-2">
-        <input
-          type="date"
-          value={filterDate}
-          onChange={(e) => setFilterDate(e.target.value)}
-          className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer"
-        />
-        <div className="w-px h-6 bg-gray-200" />
-        <select
-          value={filterShift}
-          onChange={(e) => setFilterShift(e.target.value)}
-          className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer appearance-none pr-6"
-          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
+      {/* Filters + Actualizar */}
+      <div className="flex items-center justify-center gap-3 flex-wrap mt-2">
+        <div className="inline-flex items-center gap-3 bg-white rounded-full px-5 py-2.5 shadow-sm border border-gray-100 flex-wrap justify-center">
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer"
+          />
+          <div className="w-px h-6 bg-gray-200" />
+          <select
+            value={filterShift}
+            onChange={(e) => setFilterShift(e.target.value)}
+            className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer appearance-none pr-6"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
+          >
+            <option value="">Todas las Jornadas</option>
+            <option value="AM">AM</option>
+            <option value="MD">MD</option>
+            <option value="PM">PM</option>
+          </select>
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          title="Actualizar datos desde la nube"
+          className={`inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm font-bold shadow-sm border transition-all ${isRefreshing ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed' : 'bg-white text-amber-600 border-amber-200 hover:bg-amber-50 hover:border-amber-300 active:scale-95'}`}
         >
-          <option value="">Todas las Jornadas</option>
-          <option value="AM">AM</option>
-          <option value="MD">MD</option>
-          <option value="PM">PM</option>
-        </select>
+          <svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={isRefreshing ? 'animate-spin' : ''}>
+            <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+          </svg>
+          {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+        </button>
       </div>
 
       {/* Main Card */}
@@ -847,23 +876,20 @@ export const AdminFinancesTab = () => {
                       <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
                       <p className="text-base font-black text-blue-600">{fmt(closing.transferAmount)}</p>
                     </div>
-                     <div className="py-3 px-4 text-center">
+                     <button
+                       className="py-3 px-4 text-center group hover:bg-red-50/60 rounded-xl transition-colors cursor-pointer w-full"
+                       onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
+                       title="Ver descripción del gasto"
+                     >
                        <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
-                       <div className="flex items-center justify-center gap-1.5">
-                         <p className="text-base font-black text-red-500">{fmt(closing.expenses)}</p>
-                         {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== '' && (
-                           <button
-                             onClick={() => setExpensesDescModal({ desc: closing._raw.expensesDesc, amount: closing.expenses, name: closing.pointName })}
-                             className="w-5 h-5 rounded-full bg-red-100 hover:bg-red-500 text-red-400 hover:text-white transition-all flex items-center justify-center text-[10px] font-black active:scale-90"
-                             title="Ver descripción del gasto"
-                           >
-                             ?
-                           </button>
-                         )}
-                       </div>
-                     </div>
-                  </div>
-                </div>
+                       <p className="text-base font-black text-red-500 group-hover:text-red-600 transition-colors">{fmt(closing.expenses)}</p>
+                       {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== ''
+                         ? <p className="text-[8px] font-bold text-red-300 mt-0.5 truncate max-w-[80px] mx-auto">{closing._raw.expensesDesc}</p>
+                         : <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
+                       }
+                     </button>
+                   </div>
+                 </div>
 
                 {/* ─── Footer: Badge + Toggle ─────────── */}
                 <div className="flex items-center justify-between">
@@ -1056,11 +1082,16 @@ export const AdminFinancesTab = () => {
                           return (
                             <tr key={i} className="hover:bg-gray-50/50 transition-colors">
                               <td className="py-3.5 px-5">
-                                <div className="flex items-center gap-2">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
                                     {(d.product || '??').substring(0, 3).toUpperCase()}
                                   </span>
                                   <span className="font-bold text-gray-800">{d.product}</span>
+                                  {(d as any).stringCounts && Object.entries((d as any).stringCounts).map(([sv, n]: [string, any]) => (
+                                    <span key={sv} className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
+                                      {Number(n) > 1 ? `${sv} x${n}` : sv}
+                                    </span>
+                                  ))}
                                 </div>
                               </td>
                               <td className="py-3.5 px-5 text-center">
@@ -1518,7 +1549,12 @@ export const AdminExpensesTab = () => {
 
             <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
               <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nota del vendedor</p>
-              <p className="text-sm font-bold text-gray-800 leading-relaxed">{expensesDescModal.desc}</p>
+              <p className="text-sm font-bold text-gray-800 leading-relaxed">
+                {expensesDescModal.desc && expensesDescModal.desc.trim() !== ''
+                  ? expensesDescModal.desc
+                  : <span className="text-gray-400 italic">Sin descripción registrada</span>
+                }
+              </p>
             </div>
 
             <button

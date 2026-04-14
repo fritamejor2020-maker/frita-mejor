@@ -30,17 +30,24 @@ export const useLogisticsStore = create(
   // ACCIONES VENDEDOR
   // ===============================
   
-  addToRestockCart: (productId, qty, name) => {
+  addToRestockCart: (productId, qty, name, abbreviation, stringValue) => {
     const currentCart = get().restockCart;
     const existing = currentCart.find(i => i.productId === productId);
     if (existing) {
       set({
         restockCart: currentCart.map(i =>
-          i.productId === productId ? { ...i, qty: i.qty + qty } : i
+          i.productId === productId
+            ? {
+                ...i,
+                qty: i.qty + qty,
+                ...(abbreviation !== undefined && { abbreviation }),
+                ...(stringValue !== undefined && { stringValue }),
+              }
+            : i
         )
       });
     } else {
-      set({ restockCart: [...currentCart, { productId, qty, name }] });
+      set({ restockCart: [...currentCart, { productId, qty, name, abbreviation, stringValue }] });
     }
   },
 

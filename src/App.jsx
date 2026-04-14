@@ -2,11 +2,11 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuthStore } from './store/useAuthStore';
 import { Toaster } from 'react-hot-toast';
-import { useRealtimeSync } from './lib/useRealtimeSync';
+import { useRealtimeSync, isApplyingRealtimeState } from './lib/useRealtimeSync';
 import { useInventoryStore } from './store/useInventoryStore';
 import { useLogisticsStore } from './store/useLogisticsStore';
 import { flushQueue } from './lib/syncManager';
-import { initCrossTabSync, registerStore, broadcastState } from './lib/crossTabSync';
+import { initCrossTabSync, registerStore, broadcastState, isApplyingRemoteState } from './lib/crossTabSync';
 import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
 
 import { LoginView }      from './modules/auth/LoginView';
@@ -145,12 +145,18 @@ function App() {
       () => useInventoryStore.getState()
     );
 
-    // Suscribir: cuando logistics cambia en ESTA pestaña → emitir a otras
+    // Suscribir: cuando logistics cambia en ESTA pestaña → emitir solo datos a otras
+    // No re-emitir si el cambio viene de crossTabSync (eco) ni de Supabase Realtime
+    // (cada pestaña recibe Supabase directamente — no necesita retransmisión)
     const unsubLogistics = useLogisticsStore.subscribe((state) => {
-      broadcastState('frita-mejor-logistics', state);
+      if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      const { restockCart, pendingRequests, completedRequests, rejectedRequests, loadHistory } = state;
+      broadcastState('frita-mejor-logistics', { restockCart, pendingRequests, completedRequests, rejectedRequests, loadHistory });
     });
     const unsubInventory = useInventoryStore.subscribe((state) => {
-      broadcastState('frita-mejor-inventory', state);
+      if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      const { products, posSettings, loadTemplates, posShifts, posSales } = state;
+      broadcastState('frita-mejor-inventory', { products, posSettings, loadTemplates, posShifts, posSales });
     });
 
     return () => {
