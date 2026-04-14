@@ -2096,7 +2096,7 @@ export function AdminView() {
     ],
     FLOTA: [
       { id: 'VEHICULOS',  label: '🛵 Triciclos & Vehículos' },
-      { id: 'PRECIOS',    label: '🏷️ Precios Vendedores' },
+      { id: 'PRECIOS',    label: '🛺 Productos Triciclos' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
     ],
     FINANZAS: [

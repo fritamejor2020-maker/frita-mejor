@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 
 interface NumberSelectorGroupProps {
-  presets: number[];
-  value: number;
-  onChange: (val: number) => void;
+  presets: (number | string)[];
+  value: number | string;
+  onChange: (val: number | string) => void;
   allowManual?: boolean;
   themeClass?: string;
 }
@@ -19,8 +19,8 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
     }
   }, [isManualOpen]);
 
-  // Si el valor actual no está en presets y es mayor a 0, tratamos de mantener el input manual abierto si tiene foco, o simplemente mostrar su valor.
-  const isCustomValue = value > 0 && !presets.includes(value);
+  const allStrings = presets.length > 0 && presets.every(p => typeof p === 'string');
+  const isCustomValue = !allStrings && typeof value === 'number' && value > 0 && !presets.includes(value);
 
   const getThemeClasses = (isActive: boolean) => {
     if (themeClass === 'carga' || themeClass === 'red') {
@@ -42,9 +42,9 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
         const isActive = value === qty;
         return (
           <button
-            key={qty}
+            key={String(qty)}
             onClick={() => {
-              onChange(isActive ? 0 : qty); // Toggle zero si vuelven a hacer clic
+              onChange(isActive ? (typeof qty === 'string' ? '' : 0) : qty);
               setIsManualOpen(false);
             }}
             className={`w-9 h-9 sm:w-11 sm:h-11 shrink-0 rounded-full border-[1.5px] font-black text-xs sm:text-base flex items-center justify-center transition-all duration-300 active:scale-90 shadow-sm hover:shadow-chunky-lg hover:-translate-y-0.5 ${getThemeClasses(isActive)}`}
@@ -54,7 +54,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
         );
       })}
 
-      {allowManual && (
+      {allowManual && !allStrings && (
         <div className="relative shrink-0 flex items-center justify-center">
           {isManualOpen || isCustomValue ? (
             <input

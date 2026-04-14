@@ -17,7 +17,8 @@ export const formatMoney = (val: number | string): string =>
  * Ej: "Hamburguesas de Patacón" → "HP" (ignora palabras de ≤2 letras como "de", "el", "la")
  * Ej: "Chorizo" → "CH" (nombre de 1 sola palabra → primeras 2 letras)
  */
-export const getProductAbbreviation = (name: string): string => {
+export const getProductAbbreviation = (name: string, abbreviation?: string): string => {
+  if (abbreviation && abbreviation.trim()) return abbreviation.trim().toUpperCase().slice(0, 3);
   if (!name) return '??';
   const stopWords = new Set(['de', 'del', 'el', 'la', 'los', 'las', 'y', 'e', 'a', 'en', 'con', 'sin']);
   const words = name.trim().split(/\s+/).filter(w => !stopWords.has(w.toLowerCase()));

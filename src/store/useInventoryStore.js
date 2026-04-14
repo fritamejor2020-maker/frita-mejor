@@ -218,6 +218,15 @@ export const useInventoryStore = create(
             }
           }
           if (Object.keys(updates).length > 0) {
+            // Smart merge for inventory: local ALWAYS wins over remote.
+            // - For items that exist locally: keep local version entirely (preserves price:null for deleted items)
+            // - For items that only exist in remote: append them (synced from other devices)
+            if (updates.inventory) {
+              const localInventory = get().inventory;
+              const localIds = new Set(localInventory.map(i => i.id));
+              const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id));
+              updates.inventory = [...localInventory, ...remoteOnlyItems];
+            }
             set(updates);
             console.log('[Store] Estado cargado desde Supabase:', Object.keys(updates));
           }
@@ -600,7 +609,12 @@ export const useInventoryStore = create(
       })),
 
       // Inventario
-      addInventoryItem: (item) => { set((s) => ({ inventory: [...s.inventory, { ...item, id: `INS-${Date.now()}`, qty: parseFloat(item.qty) }] })); syncKey('inventory', useInventoryStore.getState().inventory); },
+      addInventoryItem: (item) => {
+        const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
+        const newItem = { ...item, id: `${prefix}-${Date.now()}`, qty: parseFloat(item.qty) || 0 };
+        set((s) => ({ inventory: [...s.inventory, newItem] }));
+        syncKey('inventory', useInventoryStore.getState().inventory);
+      },
       updateInventoryItem: (id, data) => { set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) })); syncKey('inventory', useInventoryStore.getState().inventory); },
       deleteInventoryItem: (id) => { set((s) => ({ inventory: s.inventory.filter((i) => i.id !== id) })); syncKey('inventory', useInventoryStore.getState().inventory); },
 

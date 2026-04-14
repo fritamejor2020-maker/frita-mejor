@@ -121,9 +121,14 @@ function App() {
   useRealtimeSync();
 
   useEffect(() => {
-    // 1. Cargar estado remoto y vaciar cola Supabase
-    useInventoryStore.getState().loadFromRemote();
-    flushQueue();
+    // 1. Cargar estado remoto DESPUÉS de que Zustand persist hidrate
+    // El persist de Zustand carga síncronamente desde localStorage,
+    // pero lo hace en el mismo tick. Usamos un microtask (Promise.resolve)
+    // para asegurarnos de que ya está cargado antes de llamar loadFromRemote.
+    Promise.resolve().then(() => {
+      useInventoryStore.getState().loadFromRemote();
+      flushQueue();
+    });
 
     // 2. Inicializar sincronización entre pestañas (BroadcastChannel)
     initCrossTabSync();

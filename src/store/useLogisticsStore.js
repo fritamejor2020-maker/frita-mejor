@@ -24,6 +24,7 @@ export const useLogisticsStore = create(
   // Estado Auxiliar Logística: View pending requests
   pendingRequests: [],
   completedRequests: [],
+  rejectedRequests: [],
 
   // ===============================
   // ACCIONES VENDEDOR
@@ -99,6 +100,25 @@ export const useLogisticsStore = create(
     set({ pendingRequests: newPending, completedRequests: newCompleted });
     syncKey('pendingRequests', newPending);
     syncKey('completedRequests', newCompleted);
+  },
+
+  rejectRequest: (requestId) => {
+    const { pendingRequests, rejectedRequests = [] } = get();
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req) return;
+
+    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+    const newPending = pendingRequests.filter(r => r.id !== requestId);
+    const newRejected = [{
+      ...req,
+      status: 'rejected',
+      rejected_at: new Date().toISOString(),
+      anotadorName: anotadorName || null,
+      dejadorName: dejadorName || null,
+    }, ...rejectedRequests];
+    set({ pendingRequests: newPending, rejectedRequests: newRejected });
+    syncKey('pendingRequests', newPending);
+    syncKey('rejectedRequests', newRejected);
   },
 
   updatePendingRequest: (requestId, newPayload) => {
@@ -265,6 +285,7 @@ export const useLogisticsStore = create(
       partialize: (state) => ({ 
         pendingRequests: state.pendingRequests, 
         completedRequests: state.completedRequests,
+        rejectedRequests: state.rejectedRequests || [],
         loadHistory: state.loadHistory 
       }),
     }

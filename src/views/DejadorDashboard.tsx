@@ -34,7 +34,7 @@ const useRelativeTime = () => {
 export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
-  const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest } = useLogisticsStore();
+  const { pendingRequests, completedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getPosItems } = useInventoryStore();
   const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
@@ -51,6 +51,8 @@ export const DejadorDashboard = () => {
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
   const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
   const [loadQuantities, setLoadQuantities] = useState<Record<string, number>>({});
+  // For products with string presets (e.g. MON/20k/50k), track selected string value separately
+  const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   
@@ -69,8 +71,14 @@ export const DejadorDashboard = () => {
   const productPresets = (user as any)?.productPresets || {};
   const DEFAULT_PRESETS = [5, 10, 15, 20];
 
-  const getPresetsForProduct = (productId: string): number[] =>
-    productPresets[productId] || DEFAULT_PRESETS;
+  const getPresetsForProduct = (productId: string): (number | string)[] => {
+    // User overrides take priority
+    if (productPresets[productId]) return productPresets[productId];
+    // Custom product may have inventoryPresets set at creation time
+    const item = getPosItems().find((i: any) => i.id === productId);
+    if (item?.inventoryPresets && item.inventoryPresets.length > 0) return item.inventoryPresets;
+    return DEFAULT_PRESETS;
+  };
 
   // Modal edición de presets
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
@@ -122,9 +130,23 @@ export const DejadorDashboard = () => {
     }
   };
 
-  const handleQtyClick = (prodId: string, val: number) => {
-    // Si ya tiene ese valor lo quita, sino lo pone
-    setLoadQuantities(prev => ({ ...prev, [prodId]: val }));
+  const handleReject = (id: string, point: string) => {
+    if (!window.confirm(`¿Rechazar el pedido de ${point}? Esta acción no se puede deshacer.`)) return;
+    if (editingReqId === id) setEditingReqId(null);
+    rejectRequest(id);
+    showToast(`❌ Pedido de ${point} rechazado`);
+  };
+
+  const handleQtyClick = (prodId: string, val: number | string) => {
+    if (typeof val === 'string') {
+      // String preset: toggle selection (e.g. MON, 20k, 50k for Cambio)
+      const current = stringSelections[prodId];
+      const next = current === val ? '' : val;
+      setStringSelections(prev => ({ ...prev, [prodId]: next }));
+      setLoadQuantities(prev => ({ ...prev, [prodId]: next ? 1 : 0 }));
+    } else {
+      setLoadQuantities(prev => ({ ...prev, [prodId]: val }));
+    }
     setManualInputOpen(null);
   };
 
@@ -350,7 +372,7 @@ export const DejadorDashboard = () => {
                     className={`${getThemeClass('bg')} text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none`}
                     title={p.name || 'Producto'}
                   >
-                    {getProductAbbreviation(p.name || 'Producto')}
+                    {getProductAbbreviation(p.name || 'Producto', p.abbreviation)}
                   </div>
                   <button
                     onClick={() => openProductPresets(p.id)}
@@ -365,7 +387,11 @@ export const DejadorDashboard = () => {
                 <div className="flex gap-1.5 items-center pr-1">
                    <NumberSelectorGroup
                      presets={productPresetValues}
-                     value={loadQuantities[p.id] || 0}
+                     value={
+                       productPresetValues.length > 0 && productPresetValues.every((v: any) => typeof v === 'string')
+                         ? (stringSelections[p.id] || '')
+                         : (loadQuantities[p.id] || 0)
+                     }
                      themeClass={activeTab}
                      onChange={(val) => {
                        handleQtyClick(p.id, val);
@@ -393,6 +419,15 @@ export const DejadorDashboard = () => {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {pendingRequests.map((req: any) => (
                     <div key={req.id} className="bg-white rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed border-gray-300 relative overflow-hidden transition-all hover:shadow-md hover:border-gray-400">
+
+                      {/* ── Botón Rechazar — esquina superior derecha ── */}
+                      <button
+                        onClick={() => handleReject(req.id, req.requester_point_id)}
+                        className="absolute top-3 right-3 sm:top-4 sm:right-4 w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center rounded-full bg-red-50 text-red-400 border border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-90 text-base font-black z-10"
+                        title="Rechazar pedido"
+                      >
+                        ✕
+                      </button>
                       
                       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-6 mb-4 sm:mb-6">
                         <div className="flex items-center gap-3">
@@ -411,7 +446,7 @@ export const DejadorDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto">
+                        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto pr-8 sm:pr-0">
                            <button 
                              className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
                              onClick={() => {

@@ -22,9 +22,12 @@ export const VendedorDashboard = () => {
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
-  const products = getPosItems(); // unified POS product list (same IDs as Dejador & POS)
+  const products = getPosItems(); // all POS products (logistics + restock + closing)
+  const posProducts = products.filter((p) => p.showInPos !== false); // only visible in POS selling tab
 
   const [activeTab, setActiveTab] = useState('pos');
+  // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
+  const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
 
   // Cierre state
   const [cash, setCash] = useState('');
@@ -51,8 +54,12 @@ export const VendedorDashboard = () => {
   const productPresets = (user as any)?.productPresets || {};
   const DEFAULT_PRESETS = [5, 10, 15, 20];
 
-  const getPresetsForProduct = (productId: string): number[] =>
-    productPresets[productId] || DEFAULT_PRESETS;
+  const getPresetsForProduct = (productId: string): (number | string)[] => {
+    if (productPresets[productId]) return productPresets[productId];
+    const item = getPosItems().find((i: any) => i.id === productId);
+    if (item?.inventoryPresets && item.inventoryPresets.length > 0) return item.inventoryPresets;
+    return DEFAULT_PRESETS;
+  };
 
   const openProductPresets = (productId: string) => {
     setDraftPresets(getPresetsForProduct(productId).map(String));
@@ -244,7 +251,7 @@ export const VendedorDashboard = () => {
         {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (
           <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-            {products.map(p => (
+            {posProducts.map(p => (
               <button
                 key={p.id}
                 onClick={() => {
@@ -257,7 +264,7 @@ export const VendedorDashboard = () => {
                 className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-2 sm:p-5 min-h-[80px] sm:min-h-[120px] hover:-translate-y-0.5 hover:shadow-md group gap-0.5"
               >
                 <span className="font-black text-gray-900 text-lg sm:text-2xl tracking-wide group-hover:text-[#FF4040] transition-colors leading-none">
-                  {getProductAbbreviation(p.name)}
+                  {getProductAbbreviation(p.name, p.abbreviation)}
                 </span>
                 <span className="text-[#FF4040] font-black text-[11px] sm:text-sm leading-tight">
                   {formatMoney(p.price)}
@@ -312,7 +319,7 @@ export const VendedorDashboard = () => {
                       className="bg-[#FF4040] text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none"
                       title={p.name}
                     >
-                      {getProductAbbreviation(p.name)}
+                      {getProductAbbreviation(p.name, p.abbreviation)}
                     </div>
                     <button
                       onClick={() => openProductPresets(p.id)}
@@ -327,10 +334,22 @@ export const VendedorDashboard = () => {
                   <div className="flex gap-1.5 items-center pr-1">
                      <NumberSelectorGroup
                        presets={productPresetValues}
-                       value={currentQty}
+                       value={
+                         productPresetValues.length > 0 && productPresetValues.every((v) => typeof v === 'string')
+                           ? (stringSelections[p.id] || '')
+                           : currentQty
+                       }
                        onChange={(qty) => {
-                          const diff = qty - currentQty;
-                          addToRestockCart(p.id, diff, p.name);
+                         if (typeof qty === 'string') {
+                           const current = stringSelections[p.id];
+                           const next = current === qty ? '' : qty;
+                           setStringSelections(prev => ({ ...prev, [p.id]: next }));
+                           const diff = (next ? 1 : 0) - currentQty;
+                           addToRestockCart(p.id, diff, p.name);
+                         } else {
+                           const diff = qty - currentQty;
+                           addToRestockCart(p.id, diff, p.name);
+                         }
                        }}
                      />
                   </div>

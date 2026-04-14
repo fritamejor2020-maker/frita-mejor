@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
@@ -349,6 +349,7 @@ export const AdminFinancesTab = () => {
   const [editExpensesDesc, setEditExpensesDesc] = useState('');
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
+  const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string } | null>(null);
 
   const updateEditDetail = (idx: number, field: string, value: string) => {
     setEditDetails(prev => prev.map((d, i) => {
@@ -846,10 +847,21 @@ export const AdminFinancesTab = () => {
                       <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
                       <p className="text-base font-black text-blue-600">{fmt(closing.transferAmount)}</p>
                     </div>
-                    <div className="py-3 px-4 text-center">
-                      <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
-                      <p className="text-base font-black text-red-500">{fmt(closing.expenses)}</p>
-                    </div>
+                     <div className="py-3 px-4 text-center">
+                       <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
+                       <div className="flex items-center justify-center gap-1.5">
+                         <p className="text-base font-black text-red-500">{fmt(closing.expenses)}</p>
+                         {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== '' && (
+                           <button
+                             onClick={() => setExpensesDescModal({ desc: closing._raw.expensesDesc, amount: closing.expenses, name: closing.pointName })}
+                             className="w-5 h-5 rounded-full bg-red-100 hover:bg-red-500 text-red-400 hover:text-white transition-all flex items-center justify-center text-[10px] font-black active:scale-90"
+                             title="Ver descripción del gasto"
+                           >
+                             ?
+                           </button>
+                         )}
+                       </div>
+                     </div>
                   </div>
                 </div>
 
@@ -1474,6 +1486,50 @@ export const AdminExpensesTab = () => {
           </div>
         )}
       </div>
+
+      {/* ─── Modal: Descripción de Salidas ─── */}
+      {expensesDescModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => setExpensesDescModal(null)}
+        >
+          <div
+            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-sm"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-xl">📌</div>
+              <div>
+                <h3 className="font-black text-gray-900 text-base leading-tight">Descripción de Salidas</h3>
+                <p className="text-xs font-bold text-gray-400">{expensesDescModal.name}</p>
+              </div>
+              <button
+                onClick={() => setExpensesDescModal(null)}
+                className="ml-auto w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-black transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-red-50 rounded-2xl p-4 mb-4 border border-red-100">
+              <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Monto</p>
+              <p className="text-2xl font-black text-red-600">{fmt(expensesDescModal.amount)}</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nota del vendedor</p>
+              <p className="text-sm font-bold text-gray-800 leading-relaxed">{expensesDescModal.desc}</p>
+            </div>
+
+            <button
+              onClick={() => setExpensesDescModal(null)}
+              className="mt-5 w-full py-3 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
