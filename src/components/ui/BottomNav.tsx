@@ -26,7 +26,7 @@ export const BottomNav = ({ activeTab, onTabSelect, tabs }: BottomNavProps) => {
             key={tab.id}
             onClick={() => onTabSelect(tab.id)}
             style={{ transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1), background-color 0.2s ease, box-shadow 0.2s ease' }}
-            className={`flex flex-col items-center justify-center w-14 h-10 rounded-2xl ${
+            className={`flex flex-col items-center justify-center flex-1 h-12 rounded-2xl ${
               isActive
                 ? 'bg-[#FFB700] text-white shadow-[0_4px_14px_-3px_rgba(255,183,0,0.5)] -translate-y-1.5 scale-105'
                 : 'text-gray-300 bg-transparent hover:text-gray-400 hover:bg-gray-50'

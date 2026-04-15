@@ -17,13 +17,34 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
-  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift } = useInventoryStore();
+  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
   const products = getPosItems(); // all POS products (logistics + restock + closing)
   const posProducts = products.filter((p) => p.showInPos !== false); // only visible in POS selling tab
+
+  // Registrar turno en posShifts al abrir sesión (para que admin lo vea en tiempo real)
+  useEffect(() => {
+    if (!isSetupComplete || !openedAt || !pointId) return;
+    // Verificar si ya existe un turno activo para esta sesión
+    const already = (posShifts || []).find(
+      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
+    );
+    if (!already) {
+      addPosShift({
+        openedAt,
+        pointId,
+        shift,
+        responsibleName,
+        type: 'VENDEDOR',
+        closedAt: null,
+      });
+    }
+  // Solo ejecutar cuando la sesión empieza
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isSetupComplete, openedAt]);
 
   const [activeTab, setActiveTab] = useState('pos');
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
@@ -190,7 +211,15 @@ export const VendedorDashboard = () => {
           soldItems
       };
       
-      addPosShift(finalShift);
+      // Actualizar el registro activo (abierto al iniciar sesión) en lugar de crear uno nuevo
+      const activeShiftRecord = (posShifts || []).find(
+        (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
+      );
+      if (activeShiftRecord) {
+        updatePosShift(activeShiftRecord.id, finalShift);
+      } else {
+        addPosShift(finalShift);
+      }
 
       endShift();
       signOut();

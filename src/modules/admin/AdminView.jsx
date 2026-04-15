@@ -13,6 +13,7 @@ import { AdminSuppliersTab } from '../../components/admin/AdminSuppliersTab';
 import { ResetGeneralPanel } from '../../components/admin/ResetGeneralPanel';
 import { AdminIncomeSourcesTab } from '../../components/admin/AdminIncomeSourcesTab';
 import { AdminCustomerDiscountsTab } from '../../components/admin/AdminCustomerDiscountsTab';
+import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { formatMoney } from '../../utils/formatUtils';
 
 // ─── Componente de fila editable genérica ─────────────────────────────────────
@@ -2095,6 +2096,7 @@ export function AdminView() {
       { id: 'CLIENTES',     label: '🤝 Clientes & Descuentos' },
     ],
     FLOTA: [
+      { id: 'INVENTARIO_FLOTA', label: '📊 Inventario en Ruta' },
       { id: 'VEHICULOS',  label: '🛵 Triciclos & Vehículos' },
       { id: 'PRECIOS',    label: '🛺 Productos Triciclos' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
@@ -2218,6 +2220,7 @@ export function AdminView() {
         { activeTab === 'EGRESOS' && <AdminExpensesTab /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }
 
+        { activeTab === 'INVENTARIO_FLOTA' && <AdminVehicleInventoryTab /> }
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }

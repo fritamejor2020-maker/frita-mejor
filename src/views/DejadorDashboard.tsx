@@ -38,13 +38,15 @@ function useDeliveryAlert() {
   const masterGainRef = useRef<GainNode | null>(null);
   const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const loopActiveRef = useRef(false);
-  const stoppedRef    = useRef(false); // bloquea sonido después de stopAll
+  const stoppedRef    = useRef(false);
 
+  // Obtener (o crear) el AudioContext — nunca lo cerramos para evitar el estado "suspended"
   const getCtx = () => {
     if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
       const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
       audioCtxRef.current = ctx;
       const mg = ctx.createGain();
+      mg.gain.setValueAtTime(1, ctx.currentTime);
       mg.connect(ctx.destination);
       masterGainRef.current = mg;
     }
@@ -59,7 +61,7 @@ function useDeliveryAlert() {
     const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(mg); // ← master gain, no destination directo
+    gain.connect(mg);
     osc.type = 'square';
     osc.frequency.setValueAtTime(freq, startTime);
     osc.frequency.exponentialRampToValueAtTime(freq * 0.7, startTime + duration * 0.8);
@@ -72,9 +74,12 @@ function useDeliveryAlert() {
   };
 
   const playTripleBeep = () => {
-    if (stoppedRef.current) return; // no generar sonido si ya se detuvo
+    if (stoppedRef.current) return;
     try {
       const { ctx, mg } = getCtx();
+      // Restaurar gain maestro antes de reproducir (pudo haber sido silenciado)
+      mg.gain.cancelScheduledValues(ctx.currentTime);
+      mg.gain.setValueAtTime(1, ctx.currentTime);
       const t = ctx.currentTime;
       singleBeep(ctx, mg, t + 0.00, 1000, 0.12);
       singleBeep(ctx, mg, t + 0.18, 1000, 0.12);
@@ -83,7 +88,7 @@ function useDeliveryAlert() {
   };
 
   const playOnce = () => {
-    stoppedRef.current = false; // resetear para que el bip inicial siempre suene
+    stoppedRef.current = false;
     playTripleBeep();
   };
 
@@ -96,29 +101,28 @@ function useDeliveryAlert() {
   };
 
   const stopAll = () => {
-    // 1. Bloquear cualquier callback pendiente
     stoppedRef.current = true;
     loopActiveRef.current = false;
 
-    // 2. Cancelar el intervalo
+    // Cancelar loop si existe
     if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
 
-    // 3. Silenciar INMEDIATAMENTE via gain maestro
+    // Silenciar via gain maestro — SIN cerrar el contexto
+    // (cerrarlo causa que el siguiente bip quede bloqueado por autoplay policy)
     if (masterGainRef.current && audioCtxRef.current?.state !== 'closed') {
       try {
-        masterGainRef.current.gain.cancelScheduledValues(0);
-        masterGainRef.current.gain.setValueAtTime(0, audioCtxRef.current!.currentTime);
+        const t = audioCtxRef.current!.currentTime;
+        masterGainRef.current.gain.cancelScheduledValues(t);
+        masterGainRef.current.gain.setValueAtTime(0, t);
       } catch (_) {}
     }
-
-    // 4. Cerrar contexto tras breve delay (deja que el gain ramp complete)
-    const ctxToClose = audioCtxRef.current;
-    audioCtxRef.current  = null;
-    masterGainRef.current = null;
-    setTimeout(() => { try { ctxToClose?.close(); } catch (_) {} }, 150);
   };
 
-  useEffect(() => () => stopAll(), []);
+  // Solo cerramos el contexto al desmontar el componente
+  useEffect(() => () => {
+    if (loopRef.current) clearInterval(loopRef.current);
+    try { audioCtxRef.current?.close(); } catch (_) {}
+  }, []);
 
   return { playOnce, startLoop, stopAll, isLooping: loopActiveRef };
 }
@@ -127,7 +131,7 @@ function useDeliveryAlert() {
 export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
-  const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest } = useLogisticsStore();
+  const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getPosItems } = useInventoryStore();
   const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
@@ -139,6 +143,8 @@ export const DejadorDashboard = () => {
   const [newOrderCount, setNewOrderCount] = useState(0);
   const prevPendingCountRef = useRef(0);
   const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Bandera: el loop de inactividad solo se dispara UNA VEZ por sesión de pedido
+  const loopAlreadyFiredRef = useRef(false);
   const INACTIVITY_MS = 2 * 60 * 1000; // 2 minutos
 
   const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
@@ -166,26 +172,20 @@ export const DejadorDashboard = () => {
     }
   };
 
-  const scheduleInactivityLoop = () => {
+  const scheduleInactivityAlert = () => {
+    // Si la alerta de inactividad ya se disparó una vez, no volver a programarla
+    if (loopAlreadyFiredRef.current) return;
     clearInactivityTimer();
     inactivityTimerRef.current = setTimeout(() => {
-      // Leer el conteo actual (no stale) via ref
       if (genuinePendingCountRef.current > 0) {
-        startLoop();
-        setIsAlertPlaying(true);
+        loopAlreadyFiredRef.current = true; // Marcar: ya se usó, no repetir jamás
+        startLoop();                         // Loop continuo hasta que el usuario lo pare
+        setIsAlertPlaying(true);             // Activa tap-para-silenciar
       }
     }, INACTIVITY_MS);
   };
 
-  // Detectar toque del usuario mientras hay alerta → resetear el timer de inactividad
-  useEffect(() => {
-    if (!isAlertPlaying) return;
-    const onActivity = () => scheduleInactivityLoop();
-    const events = ['pointermove', 'keydown'] as const;
-    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
-    return () => events.forEach(e => window.removeEventListener(e, onActivity));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAlertPlaying]);
+  // NO hay listener de actividad del usuario — el timer de inactividad no se resetea
 
   // Guard: if no session, redirect to setup
   useEffect(() => {
@@ -195,22 +195,20 @@ export const DejadorDashboard = () => {
   // Detectar cambios en pedidos genuinos
   useEffect(() => {
     if (genuinePendingCount > prevPendingCountRef.current) {
-      // Llegó un pedido nuevo → bip + badge + timer
+      // Llegó un pedido NUEVO → resetear bandera + bip + programar timer una sola vez
+      loopAlreadyFiredRef.current = false; // Nuevo pedido = nueva oportunidad de loop
+      // Siempre tocar el bip al llegar un pedido nuevo
       const added = genuinePendingCount - prevPendingCountRef.current;
       setNewOrderCount(prev => prev + added);
-      if (!isLooping.current) {
-        playOnce();
-        setIsAlertPlaying(true);
-      }
-      scheduleInactivityLoop();
-    } else if (genuinePendingCount < prevPendingCountRef.current && genuinePendingCount > 0) {
-      // Se atendió/rechazó un pedido pero quedan otros → dejador activo, resetear timer
-      scheduleInactivityLoop();
+      playOnce();
+      setIsAlertPlaying(true);
+      scheduleInactivityAlert();
     }
     if (genuinePendingCount === 0) {
       // No quedan pedidos → apagar todo
       stopAll();
       clearInactivityTimer();
+      loopAlreadyFiredRef.current = false;
       setIsAlertPlaying(false);
       setNewOrderCount(0);
     }
@@ -218,16 +216,13 @@ export const DejadorDashboard = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [genuinePendingCount]);
 
-  // Parar alarma — simple y sin efectos secundarios que puedan re-activarla
+  // Parar alarma — silencia sin re-programar el timer (ya se disparó)
   const handleStopAlert = () => {
     stopAll();
     clearInactivityTimer();
     setIsAlertPlaying(false);
     setNewOrderCount(0);
-    // Reprogramar el timer de inactividad solo si aún hay pedidos (sin listeners, solo timer)
-    if (genuinePendingCountRef.current > 0) {
-      scheduleInactivityLoop();
-    }
+    // NO se reprograma — la alerta de inactividad solo ocurre una vez por pedido
   };
 
 
@@ -705,11 +700,11 @@ export const DejadorDashboard = () => {
                           </div>
                         </div>
 
-                        <div className="flex gap-2 sm:gap-3 w-full sm:w-auto pr-8 sm:pr-0">
+                        <div className="flex flex-wrap gap-2 sm:gap-3 w-full sm:w-auto">
                           {/* Botón Modificar — oculto en pedidos pospuestos */}
                           {!isPostponedCard && (
                             <button
-                              className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
+                              className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 whitespace-nowrap ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
                               onClick={() => {
                                 if (editingReqId === req.id) {
                                   updatePendingRequest(req.id, editPayload);
@@ -723,11 +718,12 @@ export const DejadorDashboard = () => {
                               {editingReqId === req.id ? 'Guardar' : 'Modificar'}
                             </button>
                           )}
+
                           {/* Botón Surtir — adaptativo */}
                           <button
                             onClick={() => handleCommit(req.id, req.requester_point_id, req)}
                             disabled={committingIds.has(req.id)}
-                            className={`flex-1 sm:flex-none font-black px-6 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base shadow-lg transition-all transform active:scale-95 ${
+                            className={`flex-1 sm:flex-none font-black px-5 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base shadow-lg transition-all transform active:scale-95 whitespace-nowrap ${
                               committingIds.has(req.id)
                                 ? 'bg-gray-300 text-gray-400 cursor-not-allowed shadow-none'
                                 : hasPostponed
@@ -753,18 +749,35 @@ export const DejadorDashboard = () => {
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Artículos solicitados:</h4>
                         <div className="flex flex-wrap gap-3">
                           {editingReqId === req.id ? (
-                            editPayload.map((item: any, idx: number) => (
-                              <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 bg-white">
-                                <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
-                                  {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
+                            editPayload.map((item: any, idx: number) => {
+                              const isPostp = postponedSet.has(idx);
+                              return (
+                                <div key={idx} className={`flex rounded-xl overflow-hidden shadow-sm transition-shadow border border-gray-200 bg-white ${isPostp ? 'opacity-50 ring-2 ring-orange-300' : 'hover:shadow-md'}`}>
+                                  <div className={`text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap ${isPostp ? 'bg-gray-400' : 'bg-red-500'}`} title={item.name}>
+                                    {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
+                                  </div>
+                                  <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
+                                  <div className={`font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center ${isPostp ? 'text-gray-400 line-through' : 'text-gray-900'}`}>
+                                    {item.qty}
+                                  </div>
+                                  <button onClick={() => handleUpdateEditQty(idx, 1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">+</button>
+                                  {/* Botón posponer por producto — solo visible en modo edición */}
+                                  {!isPostponedCard && (
+                                    <button
+                                      title={isPostp ? 'Marcar disponible' : 'No disponible en cocina'}
+                                      onClick={() => togglePostponed(req.id, idx)}
+                                      className={`px-3 py-2.5 border-l border-gray-200 font-bold text-sm transition-all active:scale-90 ${
+                                        isPostp
+                                          ? 'bg-orange-100 text-orange-500 hover:bg-orange-200'
+                                          : 'bg-white text-gray-300 hover:bg-orange-50 hover:text-orange-400'
+                                      }`}
+                                    >
+                                      {isPostp ? '↩' : '🚫'}
+                                    </button>
+                                  )}
                                 </div>
-                                <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
-                                <div className="text-gray-900 font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center">
-                                  {item.qty}
-                                </div>
-                                <button onClick={() => handleUpdateEditQty(idx, 1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">+</button>
-                              </div>
-                            ))
+                              );
+                            })
                           ) : (
                             payload.map((item: any, idx: number) => {
                               const isPostp = postponedSet.has(idx);
@@ -782,8 +795,8 @@ export const DejadorDashboard = () => {
                                   }`}>
                                     {item.qty}
                                   </div>
-                                  {/* Toggle no-disponible — solo en pedidos no pospuestos */}
-                                  {!isPostponedCard && (
+                                  {/* Toggle no-disponible — solo en modo edición */}
+                                  {!isPostponedCard && editingReqId === req.id && (
                                     <button
                                       title={isPostp ? 'Marcar disponible' : 'No disponible en cocina'}
                                       onClick={() => togglePostponed(req.id, idx)}

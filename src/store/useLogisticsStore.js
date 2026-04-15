@@ -174,6 +174,28 @@ export const useLogisticsStore = create(
     syncKey('rejectedRequests', newRejected);
   },
 
+  /**
+   * Acción Dejador: Posponer un pedido completo.
+   * Re-encola el pedido como nuevo pendiente con isPostponed: true
+   */
+  postponeRequest: (requestId) => {
+    const { pendingRequests } = get();
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req) return;
+
+    const newPending = pendingRequests.filter(r => r.id !== requestId);
+    const postponedRequest = {
+      ...req,
+      id: `REQ-POST-${Date.now()}`,
+      isPostponed: true,
+      created_at: new Date().toISOString(),
+      original_request_id: requestId,
+    };
+    const finalPending = [...newPending, postponedRequest];
+    set({ pendingRequests: finalPending });
+    syncKey('pendingRequests', finalPending);
+  },
+
   updatePendingRequest: (requestId, newPayload) => {
     const { pendingRequests } = get();
     const updated = pendingRequests.map(req => 
