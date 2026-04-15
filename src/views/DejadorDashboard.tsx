@@ -32,96 +32,205 @@ const useRelativeTime = () => {
 };
 
 
-// ─── Hook: Alerta sonora repetida para pedidos nuevos ────────────────────────
+// ─── Hook: Audio — bip único y loop continuo ─────────────────────────────────
 function useDeliveryAlert() {
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const oscillatorRef = useRef<OscillatorNode | null>(null);
-  const gainRef = useRef<GainNode | null>(null);
-  const playingRef = useRef(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioCtxRef   = useRef<AudioContext | null>(null);
+  const masterGainRef = useRef<GainNode | null>(null);
+  const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
+  const loopActiveRef = useRef(false);
+  const stoppedRef    = useRef(false); // bloquea sonido después de stopAll
 
-  const playBeep = () => {
-    if (!audioCtxRef.current) {
-      audioCtxRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+  const getCtx = () => {
+    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
+      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
+      audioCtxRef.current = ctx;
+      const mg = ctx.createGain();
+      mg.connect(ctx.destination);
+      masterGainRef.current = mg;
     }
-    const ctx = audioCtxRef.current;
-    // Forzar resume (política de autoplay)
-    if (ctx.state === 'suspended') ctx.resume();
+    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
+    return { ctx: audioCtxRef.current, mg: masterGainRef.current! };
+  };
 
-    const osc = ctx.createOscillator();
+  const singleBeep = (
+    ctx: AudioContext, mg: GainNode,
+    startTime: number, freq: number, duration: number
+  ) => {
+    const osc  = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.connect(gain);
-    gain.connect(ctx.destination);
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(880, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(440, ctx.currentTime + 0.25);
-    gain.gain.setValueAtTime(0.5, ctx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.35);
-    osc.start(ctx.currentTime);
-    osc.stop(ctx.currentTime + 0.4);
+    gain.connect(mg); // ← master gain, no destination directo
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(freq, startTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, startTime + duration * 0.8);
+    gain.gain.setValueAtTime(0, startTime);
+    gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
+    gain.gain.setValueAtTime(0.9, startTime + duration - 0.04);
+    gain.gain.linearRampToValueAtTime(0, startTime + duration);
+    osc.start(startTime);
+    osc.stop(startTime + duration);
   };
 
-  const startAlert = () => {
-    if (playingRef.current) return;
-    playingRef.current = true;
-    playBeep();
-    intervalRef.current = setInterval(playBeep, 1800);
+  const playTripleBeep = () => {
+    if (stoppedRef.current) return; // no generar sonido si ya se detuvo
+    try {
+      const { ctx, mg } = getCtx();
+      const t = ctx.currentTime;
+      singleBeep(ctx, mg, t + 0.00, 1000, 0.12);
+      singleBeep(ctx, mg, t + 0.18, 1000, 0.12);
+      singleBeep(ctx, mg, t + 0.36, 1200, 0.18);
+    } catch (_) {}
   };
 
-  const stopAlert = () => {
-    playingRef.current = false;
-    if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; }
-    if (audioCtxRef.current) { audioCtxRef.current.close(); audioCtxRef.current = null; }
+  const playOnce = () => {
+    stoppedRef.current = false; // resetear para que el bip inicial siempre suene
+    playTripleBeep();
   };
 
-  useEffect(() => () => stopAlert(), []);
+  const startLoop = () => {
+    if (loopActiveRef.current) return;
+    stoppedRef.current = false;
+    loopActiveRef.current = true;
+    playTripleBeep();
+    loopRef.current = setInterval(playTripleBeep, 1200);
+  };
 
-  return { startAlert, stopAlert, isPlaying: playingRef };
+  const stopAll = () => {
+    // 1. Bloquear cualquier callback pendiente
+    stoppedRef.current = true;
+    loopActiveRef.current = false;
+
+    // 2. Cancelar el intervalo
+    if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
+
+    // 3. Silenciar INMEDIATAMENTE via gain maestro
+    if (masterGainRef.current && audioCtxRef.current?.state !== 'closed') {
+      try {
+        masterGainRef.current.gain.cancelScheduledValues(0);
+        masterGainRef.current.gain.setValueAtTime(0, audioCtxRef.current!.currentTime);
+      } catch (_) {}
+    }
+
+    // 4. Cerrar contexto tras breve delay (deja que el gain ramp complete)
+    const ctxToClose = audioCtxRef.current;
+    audioCtxRef.current  = null;
+    masterGainRef.current = null;
+    setTimeout(() => { try { ctxToClose?.close(); } catch (_) {} }, 150);
+  };
+
+  useEffect(() => () => stopAll(), []);
+
+  return { playOnce, startLoop, stopAll, isLooping: loopActiveRef };
 }
+
 
 export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
-  const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest } = useLogisticsStore();
+  const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getPosItems } = useInventoryStore();
   const products = getPosItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
-  const { startAlert, stopAlert, isPlaying: alertPlayingRef } = useDeliveryAlert();
+  const { playOnce, startLoop, stopAll, isLooping } = useDeliveryAlert();
+
+  // ─── Alarm state ───
   const [isAlertPlaying, setIsAlertPlaying] = useState(false);
+  const [newOrderCount, setNewOrderCount] = useState(0);
   const prevPendingCountRef = useRef(0);
+  const inactivityTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const INACTIVITY_MS = 2 * 60 * 1000; // 2 minutos
+
   const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
   const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
-  // Filtro defensivo: excluir pedidos ya completados o rechazados aunque llegue
-  // un estado desincronizado que los incluya de nuevo.
+  // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
     ...(completedRequests || []).map((r: any) => r.id),
     ...(rejectedRequests  || []).map((r: any) => r.id),
   ]);
   const truePendingRequests = (pendingRequests || []).filter((r: any) => !processedIds.has(r.id));
 
+  // Conteo de pedidos genuinos del vendedor (sin los reencolados por el dejador)
+  const genuinePendingCount = truePendingRequests.filter((r: any) => !r.isPostponed).length;
+
+  // Ref siempre actualizada — usada dentro de callbacks/timers para evitar closures obsoletas
+  const genuinePendingCountRef = useRef(genuinePendingCount);
+  genuinePendingCountRef.current = genuinePendingCount;
+
+  const clearInactivityTimer = () => {
+    if (inactivityTimerRef.current) {
+      clearTimeout(inactivityTimerRef.current);
+      inactivityTimerRef.current = null;
+    }
+  };
+
+  const scheduleInactivityLoop = () => {
+    clearInactivityTimer();
+    inactivityTimerRef.current = setTimeout(() => {
+      // Leer el conteo actual (no stale) via ref
+      if (genuinePendingCountRef.current > 0) {
+        startLoop();
+        setIsAlertPlaying(true);
+      }
+    }, INACTIVITY_MS);
+  };
+
+  // Detectar toque del usuario mientras hay alerta → resetear el timer de inactividad
+  useEffect(() => {
+    if (!isAlertPlaying) return;
+    const onActivity = () => scheduleInactivityLoop();
+    const events = ['pointermove', 'keydown'] as const;
+    events.forEach(e => window.addEventListener(e, onActivity, { passive: true }));
+    return () => events.forEach(e => window.removeEventListener(e, onActivity));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAlertPlaying]);
+
   // Guard: if no session, redirect to setup
   useEffect(() => {
     if (!isSetupComplete) navigate('/dejador-setup', { replace: true });
   }, [isSetupComplete]);
 
-  // Detectar nuevos pedidos y disparar alerta sonora
+  // Detectar cambios en pedidos genuinos
   useEffect(() => {
-    const count = truePendingRequests.length;
-    if (count > prevPendingCountRef.current) {
-      startAlert();
-      setIsAlertPlaying(true);
+    if (genuinePendingCount > prevPendingCountRef.current) {
+      // Llegó un pedido nuevo → bip + badge + timer
+      const added = genuinePendingCount - prevPendingCountRef.current;
+      setNewOrderCount(prev => prev + added);
+      if (!isLooping.current) {
+        playOnce();
+        setIsAlertPlaying(true);
+      }
+      scheduleInactivityLoop();
+    } else if (genuinePendingCount < prevPendingCountRef.current && genuinePendingCount > 0) {
+      // Se atendió/rechazó un pedido pero quedan otros → dejador activo, resetear timer
+      scheduleInactivityLoop();
     }
-    prevPendingCountRef.current = count;
+    if (genuinePendingCount === 0) {
+      // No quedan pedidos → apagar todo
+      stopAll();
+      clearInactivityTimer();
+      setIsAlertPlaying(false);
+      setNewOrderCount(0);
+    }
+    prevPendingCountRef.current = genuinePendingCount;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [truePendingRequests.length]);
+  }, [genuinePendingCount]);
 
+  // Parar alarma — simple y sin efectos secundarios que puedan re-activarla
   const handleStopAlert = () => {
-    stopAlert();
+    stopAll();
+    clearInactivityTimer();
     setIsAlertPlaying(false);
+    setNewOrderCount(0);
+    // Reprogramar el timer de inactividad solo si aún hay pedidos (sin listeners, solo timer)
+    if (genuinePendingCountRef.current > 0) {
+      scheduleInactivityLoop();
+    }
   };
+
+
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
   const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
@@ -138,6 +247,19 @@ export const DejadorDashboard = () => {
   const [editPayload, setEditPayload] = useState<any[]>([]);
   // IDs de pedidos que están siendo procesados (evita doble tap en "Surtir Ya")
   const [committingIds, setCommittingIds] = useState<Set<string>>(new Set());
+  // Ítems pospuestos por pedido: { [requestId]: Set<itemIndex> }
+  const [postponedItems, setPostponedItems] = useState<Record<string, Set<number>>>({});
+
+  const togglePostponed = (reqId: string, itemIdx: number) => {
+    setPostponedItems(prev => {
+      const current = new Set(prev[reqId] || []);
+      if (current.has(itemIdx)) current.delete(itemIdx);
+      else current.add(itemIdx);
+      return { ...prev, [reqId]: current };
+    });
+  };
+
+  const getPostponedSet = (reqId: string): Set<number> => postponedItems[reqId] || new Set();
 
   const handleUpdateEditQty = (idx: number, delta: number) => {
     const newPayload = [...editPayload];
@@ -193,21 +315,51 @@ export const DejadorDashboard = () => {
     return () => clearInterval(interval);
   }, []);
 
-  const handleCommit = async (id: string, point: string) => {
+  const handleCommit = async (id: string, point: string, req: any) => {
     if (committingIds.has(id)) return; // Prevenir doble-tap
-    // Si hay una edición en curso para ESTE pedido, guardarla primero
-    if (editingReqId === id) {
-      updatePendingRequest(id, editPayload);
-      setEditingReqId(null);
-    }
-    setCommittingIds(prev => new Set([...prev, id]));
-    try {
-      await commitRestock(id);
-      showToast(`✅ Entrega a ${point} confirmada y descontada`);
-    } catch (err: any) {
-      showToast("❌ Error: " + err.message);
-    } finally {
-      setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+
+    // Obtener payload actual (editado o original)
+    const payload = editingReqId === id ? editPayload : (req.items_payload || []);
+    if (editingReqId === id) setEditingReqId(null);
+
+    const postponedSet = getPostponedSet(id);
+    const hasPostponed = postponedSet.size > 0;
+
+    // Si hay pospuestos, separar ítems
+    if (hasPostponed) {
+      const available = payload.filter((_: any, idx: number) => !postponedSet.has(idx));
+      const postponed = payload.filter((_: any, idx: number) => postponedSet.has(idx));
+
+      // Si TODOS están pospuestos, confirmar con advertencia
+      if (available.length === 0) {
+        if (!window.confirm('⚠️ Todos los productos están marcados como no disponibles. ¿Reencolar el pedido completo?')) return;
+      }
+
+      setCommittingIds(prev => new Set([...prev, id]));
+      try {
+        await commitPartialRestock(id, available, postponed);
+        // Limpiar estado de pospuestos para este pedido
+        setPostponedItems(prev => { const next = { ...prev }; delete next[id]; return next; });
+        const msg = available.length === 0
+          ? `⏳ Pedido de ${point} reencolado completo`
+          : `✅ Surtido parcial a ${point} — ${postponed.length} producto(s) reencolado(s)`;
+        showToast(msg);
+      } catch (err: any) {
+        showToast("❌ Error: " + err.message);
+      } finally {
+        setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
+    } else {
+      // Flujo normal: surtir todo
+      setCommittingIds(prev => new Set([...prev, id]));
+      try {
+        await commitRestock(id);
+        showToast(`✅ Entrega a ${point} confirmada y descontada`);
+      } catch (err: any) {
+        showToast("❌ Error: " + err.message);
+      } finally {
+        setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
     }
   };
 
@@ -319,7 +471,10 @@ export const DejadorDashboard = () => {
   };
 
   return (
-    <div className="min-h-screen pb-32 font-sans w-full bg-[#FFD56B] flex flex-col">
+    <div
+      className="min-h-screen pb-32 font-sans w-full bg-[#FFD56B] flex flex-col"
+      onPointerDown={isAlertPlaying ? handleStopAlert : undefined}
+    >
       
       {/* ─── HEADER ─── */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
@@ -498,8 +653,19 @@ export const DejadorDashboard = () => {
                 </div>
              ) : (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                  {truePendingRequests.map((req: any) => (
-                    <div key={req.id} className="bg-white rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed border-gray-300 relative overflow-hidden transition-all hover:shadow-md hover:border-gray-400">
+                  {truePendingRequests.map((req: any) => {
+                    const postponedSet = getPostponedSet(req.id);
+                    const payload = editingReqId === req.id ? editPayload : (req.items_payload || []);
+                    const hasPostponed = postponedSet.size > 0 && editingReqId !== req.id;
+                    const allPostponed = hasPostponed && postponedSet.size === payload.length;
+                    const isPostponedCard = !!req.isPostponed;
+
+                    return (
+                    <div key={req.id} className={`rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed relative overflow-hidden transition-all hover:shadow-md ${
+                      isPostponedCard
+                        ? 'bg-orange-50 border-orange-300 hover:border-orange-400'
+                        : 'bg-white border-gray-300 hover:border-gray-400'
+                    }`}>
 
                       {/* ── Botón Rechazar — esquina superior derecha ── */}
                       <button
@@ -509,86 +675,141 @@ export const DejadorDashboard = () => {
                       >
                         ✕
                       </button>
-                      
+
                       <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 sm:gap-6 mb-4 sm:mb-6">
                         <div className="flex items-center gap-3">
                           {/* Vehicle Circle Badge */}
-                          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-amber-400 rounded-full flex items-center justify-center text-white font-black text-xl sm:text-3xl shadow-sm border-4 border-amber-100">
+                          <div className={`w-14 h-14 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-white font-black text-xl sm:text-3xl shadow-sm border-4 ${
+                            isPostponedCard ? 'bg-orange-400 border-orange-100' : 'bg-amber-400 border-amber-100'
+                          }`}>
                             {req.requester_point_id}
                           </div>
                           <div className="flex flex-col">
-                            <span className="text-gray-800 font-black text-base sm:text-xl leading-tight">Pedido Urgente</span>
+                            <span className="text-gray-800 font-black text-base sm:text-xl leading-tight">
+                              {isPostponedCard ? '⏳ Productos Pendientes' : 'Pedido Urgente'}
+                            </span>
                             {req.requester_name && (
                               <span className="text-gray-600 font-bold text-sm leading-tight mt-0.5" title="Vendedor que solicitó">{req.requester_name}</span>
                             )}
-                            <span className="text-amber-600 font-bold text-xs sm:text-sm bg-amber-50 inline-block px-3 py-1 rounded-full mt-1 w-max">
+                            <span className={`font-bold text-xs sm:text-sm inline-block px-3 py-1 rounded-full mt-1 w-max ${
+                              isPostponedCard ? 'text-orange-600 bg-orange-100' : 'text-amber-600 bg-amber-50'
+                            }`}>
                               {req.created_at ? timeAgo(req.created_at) : 'Pendiente'}
                             </span>
+                            {/* Badge resumen de pospuestos */}
+                            {hasPostponed && (
+                              <span className="text-orange-600 bg-orange-100 font-bold text-xs px-3 py-1 rounded-full mt-1 w-max">
+                                {allPostponed ? '⚠️ Todo pospuesto' : `⏳ ${postponedSet.size} pospuesto(s)`}
+                              </span>
+                            )}
                           </div>
                         </div>
 
                         <div className="flex gap-2 sm:gap-3 w-full sm:w-auto pr-8 sm:pr-0">
-                           <button 
-                             className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
-                             onClick={() => {
-                               if (editingReqId === req.id) {
-                                 updatePendingRequest(req.id, editPayload);
-                                 setEditingReqId(null);
-                               } else {
-                                 setEditingReqId(req.id);
-                                 setEditPayload([...req.items_payload]);
-                               }
-                             }}
-                           >
-                             {editingReqId === req.id ? 'Guardar' : 'Modificar'}
-                           </button>
-                           <button 
-                              onClick={() => handleCommit(req.id, req.requester_point_id)}
-                              disabled={committingIds.has(req.id)}
-                              className={`flex-1 sm:flex-none font-black px-6 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base shadow-lg transition-all transform active:scale-95 ${
-                                committingIds.has(req.id)
-                                  ? 'bg-gray-300 text-gray-400 cursor-not-allowed shadow-none'
-                                  : 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl hover:-translate-y-0.5 active:shadow-sm'
-                              }`}
+                          {/* Botón Modificar — oculto en pedidos pospuestos */}
+                          {!isPostponedCard && (
+                            <button
+                              className={`flex-1 sm:flex-none font-bold px-4 sm:px-6 py-2 sm:py-3 rounded-full text-sm sm:text-base border-2 transition-colors active:scale-95 ${editingReqId === req.id ? 'bg-green-100 text-green-700 border-green-200 hover:border-green-300' : 'bg-gray-100 text-gray-600 border-transparent hover:border-gray-200'}`}
+                              onClick={() => {
+                                if (editingReqId === req.id) {
+                                  updatePendingRequest(req.id, editPayload);
+                                  setEditingReqId(null);
+                                } else {
+                                  setEditingReqId(req.id);
+                                  setEditPayload([...req.items_payload]);
+                                }
+                              }}
                             >
-                              {committingIds.has(req.id) ? '⏳ Procesando...' : 'Surtir Ya'}
+                              {editingReqId === req.id ? 'Guardar' : 'Modificar'}
                             </button>
+                          )}
+                          {/* Botón Surtir — adaptativo */}
+                          <button
+                            onClick={() => handleCommit(req.id, req.requester_point_id, req)}
+                            disabled={committingIds.has(req.id)}
+                            className={`flex-1 sm:flex-none font-black px-6 sm:px-8 py-2 sm:py-3 rounded-full text-sm sm:text-base shadow-lg transition-all transform active:scale-95 ${
+                              committingIds.has(req.id)
+                                ? 'bg-gray-300 text-gray-400 cursor-not-allowed shadow-none'
+                                : hasPostponed
+                                  ? 'bg-orange-500 text-white hover:bg-orange-600 hover:shadow-xl hover:-translate-y-0.5'
+                                  : isPostponedCard
+                                    ? 'bg-orange-400 text-white hover:bg-orange-500 hover:shadow-xl hover:-translate-y-0.5'
+                                    : 'bg-amber-500 text-white hover:bg-amber-600 hover:shadow-xl hover:-translate-y-0.5 active:shadow-sm'
+                            }`}
+                          >
+                            {committingIds.has(req.id)
+                              ? '⏳ Procesando...'
+                              : hasPostponed
+                                ? 'Surtir Lo Disponible →'
+                                : 'Surtir Ya'}
+                          </button>
                         </div>
                       </div>
 
                       {/* Fused Pills for Items */}
-                      <div className="bg-gray-50 rounded-2xl p-5 border border-gray-100">
+                      <div className={`rounded-2xl p-5 border ${
+                        isPostponedCard ? 'bg-orange-50/60 border-orange-100' : 'bg-gray-50 border-gray-100'
+                      }`}>
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Artículos solicitados:</h4>
                         <div className="flex flex-wrap gap-3">
-                           {editingReqId === req.id ? (
-                             editPayload.map((item: any, idx: number) => (
-                               <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 bg-white">
-                                 <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
-                                   {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
-                                 </div>
-                                 <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
-                                 <div className="text-gray-900 font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center">
-                                   {item.qty}
-                                 </div>
-                                 <button onClick={() => handleUpdateEditQty(idx, 1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">+</button>
-                               </div>
-                             ))
-                           ) : (
-                             req.items_payload?.map((item: any, idx: number) => (
-                               <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                                 <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
-                                   {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
-                                 </div>
-                                 <div className="bg-white text-gray-900 font-black text-base px-5 py-2.5 flex items-center min-w-[48px] justify-center border-y border-r border-gray-200">
-                                   {item.qty}
-                                 </div>
-                               </div>
-                             ))
-                           )}
+                          {editingReqId === req.id ? (
+                            editPayload.map((item: any, idx: number) => (
+                              <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-shadow border border-gray-200 bg-white">
+                                <div className="bg-red-500 text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap" title={item.name}>
+                                  {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
+                                </div>
+                                <button onClick={() => handleUpdateEditQty(idx, -1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">-</button>
+                                <div className="text-gray-900 font-black text-base px-3 py-2.5 flex items-center min-w-[40px] justify-center">
+                                  {item.qty}
+                                </div>
+                                <button onClick={() => handleUpdateEditQty(idx, 1)} className="px-3 bg-gray-100 hover:bg-gray-200 font-bold text-gray-600">+</button>
+                              </div>
+                            ))
+                          ) : (
+                            payload.map((item: any, idx: number) => {
+                              const isPostp = postponedSet.has(idx);
+                              return (
+                                <div key={idx} className={`flex rounded-xl overflow-hidden shadow-sm transition-all ${
+                                  isPostp ? 'opacity-50 ring-2 ring-orange-300' : 'hover:shadow-md'
+                                }`}>
+                                  <div className={`text-white font-black text-sm px-4 py-2.5 flex items-center justify-center min-w-[48px] whitespace-nowrap transition-colors ${
+                                    isPostp ? 'bg-gray-400' : 'bg-red-500'
+                                  }`} title={item.name}>
+                                    {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
+                                  </div>
+                                  <div className={`font-black text-base px-5 py-2.5 flex items-center min-w-[48px] justify-center border-y border-gray-200 ${
+                                    isPostp ? 'bg-gray-100 text-gray-400 line-through' : 'bg-white text-gray-900'
+                                  }`}>
+                                    {item.qty}
+                                  </div>
+                                  {/* Toggle no-disponible — solo en pedidos no pospuestos */}
+                                  {!isPostponedCard && (
+                                    <button
+                                      title={isPostp ? 'Marcar disponible' : 'No disponible en cocina'}
+                                      onClick={() => togglePostponed(req.id, idx)}
+                                      className={`px-3 py-2.5 border-y border-r border-gray-200 font-bold text-sm transition-all active:scale-90 ${
+                                        isPostp
+                                          ? 'bg-orange-100 text-orange-500 hover:bg-orange-200'
+                                          : 'bg-white text-gray-300 hover:bg-orange-50 hover:text-orange-400'
+                                      }`}
+                                    >
+                                      {isPostp ? '↩' : '🚫'}
+                                    </button>
+                                  )}
+                                </div>
+                              );
+                            })
+                          )}
                         </div>
+                        {hasPostponed && !allPostponed && (
+                          <p className="text-orange-500 font-bold text-xs mt-3">
+                            Los ítems con 🚫 se reencolarán como nuevo pedido pendiente.
+                          </p>
+                        )}
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
              )}
 
@@ -743,18 +964,23 @@ export const DejadorDashboard = () => {
           {toast}
         </div>
       )}
-      {/* ─── Botón flotante: parar alerta sonora ─── */}
+      {/* ─── Badge flotante: nuevos pedidos + botón para parar ─── */}
       {isAlertPlaying && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-bounce">
+        <div className={`fixed bottom-6 inset-x-0 flex justify-center z-50 ${isLooping.current ? 'animate-bounce' : ''}`}>
           <button
             onClick={handleStopAlert}
-            className="flex items-center gap-3 px-6 py-3.5 bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black text-sm rounded-full shadow-2xl shadow-red-500/40 transition-all border-2 border-white"
+            className="flex items-center gap-2 px-5 py-3.5 bg-red-500 hover:bg-red-600 active:scale-95 text-white font-black text-sm rounded-full shadow-2xl shadow-red-500/40 transition-all border-2 border-white"
           >
             <span className="flex h-3 w-3 relative">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75" />
               <span className="relative inline-flex rounded-full h-3 w-3 bg-white" />
             </span>
-            🔔 Nuevo Pedido — Toca para parar
+            {newOrderCount > 1
+              ? `🔔 ${newOrderCount} pedidos nuevos — Toca para entendido`
+              : '🔔 Nuevo pedido — Toca para entendido'}
+            {isLooping.current && (
+              <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">🔊 ACTIVO</span>
+            )}
           </button>
         </div>
       )}

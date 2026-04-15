@@ -109,6 +109,52 @@ export const useLogisticsStore = create(
     syncKey('completedRequests', newCompleted);
   },
 
+  /**
+   * Acción Dejador: Surtido parcial.
+   * - availableItems: ítems que SÍ se surten → van a completedRequests
+   * - postponedItems: ítems NO disponibles → se reenqueulan como nuevo pendingRequest con isPostponed:true
+   */
+  commitPartialRestock: async (requestId, availableItems, postponedItems) => {
+    const { pendingRequests, completedRequests } = get();
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req) return;
+
+    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+
+    // Quitar el request original de pendientes
+    const newPending = pendingRequests.filter(r => r.id !== requestId);
+
+    // Marcar como completado solo los ítems disponibles
+    const newCompleted = [{
+      ...req,
+      items_payload: availableItems,
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      anotadorName: anotadorName || null,
+      dejadorName: dejadorName || null,
+    }, ...completedRequests];
+
+    // Reencolar los ítems pospuestos como nuevo pedido pendiente
+    let finalPending = newPending;
+    if (postponedItems.length > 0) {
+      const postponedRequest = {
+        id: `REQ-POST-${Date.now()}`,
+        requester_point_id: req.requester_point_id,
+        requester_name: req.requester_name,
+        items_payload: postponedItems,
+        status: 'pending',
+        isPostponed: true,
+        created_at: new Date().toISOString(),
+        original_request_id: requestId,
+      };
+      finalPending = [...newPending, postponedRequest];
+    }
+
+    set({ pendingRequests: finalPending, completedRequests: newCompleted });
+    syncKey('pendingRequests', finalPending);
+    syncKey('completedRequests', newCompleted);
+  },
+
   rejectRequest: (requestId) => {
     const { pendingRequests, rejectedRequests = [] } = get();
     const req = pendingRequests.find(r => r.id === requestId);
