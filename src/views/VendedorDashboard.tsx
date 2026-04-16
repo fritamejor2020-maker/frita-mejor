@@ -49,6 +49,8 @@ export const VendedorDashboard = () => {
   const [activeTab, setActiveTab] = useState('pos');
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
   const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
+  // Campo de observación para el pedido de surtido
+  const [observacion, setObservacion] = useState('');
 
   // Cierre state
   const [cash, setCash] = useState('');
@@ -129,10 +131,11 @@ export const VendedorDashboard = () => {
 
   const handleSendRestock = async () => {
     try {
-      await sendRestockRequest(pointId as string, responsibleName as string);
+      await sendRestockRequest(pointId as string, responsibleName as string, observacion);
       toast.success("Solicitud de surtido enviada exitosamente");
       clearRestockCart();
       setStringSelections({});
+      setObservacion('');
     } catch (err: any) {
       toast.error("Error al pedir surtido: " + err.message);
     }
@@ -470,9 +473,22 @@ export const VendedorDashboard = () => {
 
       </div>
 
-      {/* BOTÓN FLOTANTE: ENVIAR SOLICITUD (siempre visible si hay items) */}
+      {/* CAMPO OBSERVACIÓN + BOTÓN FLOTANTE: ENVIAR SOLICITUD */}
       {activeTab === 'restock' && restockCart.some((i: any) => i.qty > 0) && (
-        <div className="fixed bottom-[72px] left-4 right-4 z-40 flex justify-center pointer-events-none">
+        <div className="fixed bottom-[72px] left-4 right-4 z-40 flex flex-col items-center gap-2 pointer-events-none">
+          {/* Textarea para la observación */}
+          <div className="w-full max-w-lg bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border border-amber-200 px-4 py-2 pointer-events-auto">
+            <label className="text-[10px] font-black text-amber-500 uppercase tracking-widest block mb-1">📝 Nota al Dejador (opcional)</label>
+            <textarea
+              value={observacion}
+              onChange={(e) => setObservacion(e.target.value)}
+              placeholder="Ej: Estoy en la esquina del parque, necesito cambio..."
+              rows={2}
+              maxLength={200}
+              className="w-full bg-transparent text-sm font-bold text-gray-700 outline-none resize-none placeholder-gray-300 leading-snug"
+            />
+          </div>
+          {/* Botón Enviar */}
           <button
             onClick={handleSendRestock}
             className="pointer-events-auto w-full max-w-lg bg-[#FF4040] text-white font-black text-lg py-4 rounded-full shadow-[0_15px_40px_-10px_rgba(255,64,64,0.6)] transition-all active:scale-95 hover:bg-red-500"

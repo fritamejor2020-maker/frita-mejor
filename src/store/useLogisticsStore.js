@@ -59,7 +59,7 @@ export const useLogisticsStore = create(
    * Acción Vendedor
    * Hace un INSERT en restock_requests con estado pending y limpia el restockCart.
    */
-  sendRestockRequest: async (pointId, requesterName) => {
+  sendRestockRequest: async (pointId, requesterName, observacion) => {
     const { restockCart, pendingRequests } = get();
     if (!pointId) throw new Error("Acceso denegado: pointId vacío.");
     if (restockCart.length === 0) throw new Error("Carrito de surtido vacío.");
@@ -70,6 +70,7 @@ export const useLogisticsStore = create(
       requester_point_id: pointId,
       requester_name: requesterName || 'Desconocido',
       items_payload: restockCart,
+      observacion: observacion?.trim() || null,
       status: 'pending',
       created_at: new Date().toISOString()
     };

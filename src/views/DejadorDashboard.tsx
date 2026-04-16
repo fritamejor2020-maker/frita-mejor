@@ -819,6 +819,16 @@ export const DejadorDashboard = () => {
                             Los ítems con 🚫 se reencolarán como nuevo pedido pendiente.
                           </p>
                         )}
+                        {/* Banner de observación del vendedor */}
+                        {req.observacion && (
+                          <div className="mt-4 flex items-start gap-2 bg-amber-50 border-l-4 border-amber-400 rounded-xl px-4 py-3">
+                            <span className="text-amber-500 text-base shrink-0">📝</span>
+                            <div>
+                              <p className="text-[10px] font-black text-amber-500 uppercase tracking-widest mb-0.5">Nota del vendedor</p>
+                              <p className="text-sm font-bold text-gray-700 leading-snug">{req.observacion}</p>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                     );
