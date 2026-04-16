@@ -44,6 +44,21 @@ export const useSellerSessionStore = create(
           responsibleName: null,
           openedAt: null,
         });
+      },
+
+      /**
+       * Fuerza el cierre de la sesión activa desde el Admin.
+       * Equivalente a endShift pero invocable externamente sin pasar por el flujo del Vendedor.
+       */
+      forceEndShift: () => {
+        set({
+          isSetupComplete: false,
+          pointId: null,
+          shift: null,
+          pointType: null,
+          responsibleName: null,
+          openedAt: null,
+        });
       }
     }),
     {

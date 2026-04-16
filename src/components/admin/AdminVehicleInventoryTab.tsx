@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useSellerSessionStore } from '../../store/useSellerSessionStore';
-import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw } from 'lucide-react';
+import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw, AlertTriangle } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const dateOf = (iso: string) => {
@@ -100,7 +100,7 @@ function buildShiftLogistics(
 }
 
 // ─── Card de un turno ─────────────────────────────────────────────────────────
-function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle }: any) {
+function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle, onForceClose }: any) {
   const vehicleId = shift.pointId || shift.vehicle || '?';
   const shiftDate = shift.fecha || dateOf(shift.closedAt || shift.openedAt || '');
   const openedAt  = shift.openedAt || shift.start_time || null;
@@ -144,15 +144,27 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
             </div>
           </div>
 
-          {hasData && (
-            <div className="text-right flex-shrink-0">
-              <p className="font-black text-gray-900 text-xl">{isClosed ? totalVendido : totalCarga + totalSurtido}</p>
-              <p className="text-xs font-bold text-gray-400">{isClosed ? 'uds. vendidas' : 'uds. en ruta'}</p>
-              {isClosed && totalVendidoPesos > 0 && (
-                <p className="text-sm font-black text-green-600 mt-0.5">{fmt(totalVendidoPesos)}</p>
-              )}
-            </div>
-          )}
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            {hasData && (
+              <div className="text-right">
+                <p className="font-black text-gray-900 text-xl">{isClosed ? totalVendido : totalCarga + totalSurtido}</p>
+                <p className="text-xs font-bold text-gray-400">{isClosed ? 'uds. vendidas' : 'uds. en ruta'}</p>
+                {isClosed && totalVendidoPesos > 0 && (
+                  <p className="text-sm font-black text-green-600 mt-0.5">{fmt(totalVendidoPesos)}</p>
+                )}
+              </div>
+            )}
+            {!isClosed && onForceClose && (
+              <button
+                onClick={onForceClose}
+                className="flex items-center gap-1.5 bg-red-50 hover:bg-red-100 text-red-600 font-black text-xs px-3 py-2 rounded-xl border border-red-200 transition-all hover:scale-105 active:scale-95"
+                title="Cerrar sesión forzosamente desde el Admin"
+              >
+                <AlertTriangle size={13} />
+                Forzar Cierre
+              </button>
+            )}
+          </div>
         </div>
 
         {hasData && (
@@ -261,7 +273,8 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
 // ─── Tab Principal ─────────────────────────────────────────────────────────────
 export function AdminVehicleInventoryTab() {
   const { loadHistory, completedRequests } = useLogisticsStore();
-  const { posShifts, getPosItems } = useInventoryStore();
+  const { posShifts, getPosItems, addPosShift, updatePosShift } = useInventoryStore();
+  const forceEndShift = useSellerSessionStore((s: any) => s.forceEndShift);
 
   // ── Leer sesión activa LOCAL del vendedor directamente ──────────────────────
   // Esto captura el turno en curso aunque no haya sincronizado con posShifts todavía
@@ -434,6 +447,34 @@ export function AdminVehicleInventoryTab() {
               priceMap={priceMap}
               isExpanded={expandedId === shift.id}
               onToggle={() => setExpandedId(expandedId === shift.id ? null : shift.id)}
+              onForceClose={!shift.closedAt ? () => {
+                const confirm = window.confirm(
+                  `¿Confirmas el CIERRE FORZADO del turno ${shift.pointId} (${shift.shift}) de "${shift.responsibleName || 'desconocido'}"?\n\nEsta acción cerrará la sesión activa del Vendedor desde el panel Admin.`
+                );
+                if (!confirm) return;
+
+                const closedAt = new Date().toISOString();
+
+                // Si el turno ya está en posShifts, actualizarlo; si es un turno LIVE sintético, registrarlo
+                const existingShift = (posShifts || []).find(
+                  (s: any) => s.type === 'VENDEDOR' && !s.closedAt && s.pointId === shift.pointId
+                );
+                if (existingShift) {
+                  updatePosShift(existingShift.id, { closedAt, forcedByAdmin: true });
+                } else {
+                  // Registrar el turno como cerrado directamente
+                  addPosShift({
+                    ...shift,
+                    id: shift.id.startsWith('LIVE-') ? `SHIFT-FORCED-${Date.now()}` : shift.id,
+                    closedAt,
+                    forcedByAdmin: true,
+                    type: 'VENDEDOR',
+                  });
+                }
+
+                // Limpiar la sesión local del vendedor
+                forceEndShift();
+              } : undefined}
             />
           ))}
         </div>
