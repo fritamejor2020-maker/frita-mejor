@@ -64,13 +64,33 @@ export const useLogisticsStore = create(
     if (!pointId) throw new Error("Acceso denegado: pointId vacío.");
     if (restockCart.length === 0) throw new Error("Carrito de surtido vacío.");
 
-    // Local Mock: Add to pendingRequests
+    // Intentar capturar ubicación GPS del vendedor al momento del pedido
+    let location = null;
+    try {
+      if (navigator.geolocation) {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            timeout: 5000,
+            maximumAge: 60000,
+          });
+        });
+        location = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+        };
+      }
+    } catch (_) {
+      // GPS no disponible o denegado — se envía sin ubicación
+    }
+
     const newRequest = {
       id: `REQ-${Date.now()}`,
       requester_point_id: pointId,
       requester_name: requesterName || 'Desconocido',
       items_payload: restockCart,
       observacion: observacion?.trim() || null,
+      location,
       status: 'pending',
       created_at: new Date().toISOString()
     };
@@ -143,6 +163,8 @@ export const useLogisticsStore = create(
         requester_point_id: req.requester_point_id,
         requester_name: req.requester_name,
         items_payload: postponedItems,
+        location: req.location || null,
+        observacion: req.observacion || null,
         status: 'pending',
         isPostponed: true,
         created_at: new Date().toISOString(),
