@@ -1,5 +1,5 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 
 // ── Mapa de módulos: cómo se ve cada uno en la pantalla ───────────────────────
@@ -21,11 +21,16 @@ export const ModuleSelectorView = () => {
   const navigate  = useNavigate();
   const { user, signOut } = useAuthStore();
 
-  if (!user) { navigate('/login', { replace: true }); return null; }
+  if (!user) return <Navigate to="/login" replace />;
 
   const userModules = (user.access || [])
     .map((key: string) => ({ key, ...MODULE_CARDS[key] }))
     .filter((m: any) => m.label); // filtrar claves sin tarjeta definida
+
+  // Si solo tiene un módulo, redirigir directo (no mostrar selector)
+  if (userModules.length === 1) {
+    return <Navigate to={userModules[0].route} replace />;
+  }
 
   const handleSelect = (route: string, key: string) => {
     // Para vendedor-setup: revisar si ya hay sesión activa
