@@ -161,7 +161,11 @@ export const useAuthStore = create(
           ...userData,
           id: `USR-${Date.now()}`,
           active: true,
-          access: ROLE_ACCESS[userData.role] || [],
+          // Respetar el access personalizado elegido en el formulario.
+          // Solo usar el del rol como fallback si no se pasó ninguno.
+          access: (userData.access && userData.access.length > 0)
+            ? userData.access
+            : (ROLE_ACCESS[userData.role] || []),
         };
         set((state) => ({ users: [...state.users, newUser] }));
         return { ok: true };
