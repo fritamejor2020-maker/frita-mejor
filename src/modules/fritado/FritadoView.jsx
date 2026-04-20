@@ -342,11 +342,17 @@ function FritadoPanel({ fryKitchen, onBack }) {
   const isTablet  = !isMobile && sw > 500 && sw <= 1200;
   const isTabletLandscape = isTablet && sw > sh;
 
+  // Móvil con pocos productos → tarjeta grande vertical
+  const isMobileFewProds = isMobile && count <= 3;
+  const isMobilePills    = isMobile && count > 3;
+
   const isTabletFewProds = isTablet && count <= 3;
   const isTabletPills    = isTablet && count > 3;
 
   let cols, allowScroll, pad, gap;
-  if (isMobile) {
+  if (isMobileFewProds) {
+    cols = 1; allowScroll = true; pad = 14; gap = 10;
+  } else if (isMobilePills) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
   } else if (isTabletFewProds) {
     cols = count || 1; allowScroll = false; pad = 16; gap = 12;
@@ -361,11 +367,13 @@ function FritadoPanel({ fryKitchen, onBack }) {
 
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
-  const cardH      = Math.min(availableH / rows, 400);
+  const cardH      = isMobileFewProds
+    ? Math.min(availableH / rows, 420)
+    : Math.min(availableH / rows, 400);
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
   const CARD_MAX = count <= 2 ? 440 : count <= 4 ? 360 : 270;
-  const gridMaxW = isTabletFewProds
+  const gridMaxW = (isMobileFewProds || isTabletFewProds)
     ? `${Math.min(CARD_MAX, sw - 2 * pad)}px`
     : allowScroll ? '100%'
     : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
@@ -438,7 +446,9 @@ function FritadoPanel({ fryKitchen, onBack }) {
           }}>
             {pairs.map((pair, i) => {
               const props = { key: i, pair, wasteMode, onFry: handleFry, onManual: (p) => setModalConfig({ pair: p }) };
-              if (isMobile)          return <FritadoCardMobile  {...props} size="sm" />;
+              // Móvil con pocos productos → tarjeta grande vertical
+              if (isMobileFewProds)  return <FritadoCardTablet  {...props} cardH={cardH} />;
+              if (isMobilePills)     return <FritadoCardMobile  {...props} size="sm" />;
               if (isTabletPills)     return <FritadoCardMobile  {...props} size="md" />;
               if (isTabletFewProds)  return <FritadoCardTablet  {...props} cardH={cardH} />;
               if (useCompact)        return <FritadoCardCompact {...props} />;

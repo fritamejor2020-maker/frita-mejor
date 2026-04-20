@@ -353,6 +353,10 @@ function ProductionPanel({ productionPoint, onBack }) {
   const isTablet  = !isMobile && sw > 500 && sw <= 1200;
   const isTabletLandscape = isTablet && sw > sh;
 
+  // Móvil con pocos productos → tarjeta grande (misma lógica que tablet)
+  const isMobileFewProds = isMobile && count <= 3;
+  const isMobilePills    = isMobile && count > 3;
+
   // En tablet: ≤3 productos → tarjeta grande centrada (no píldoras)
   //            >3 productos → píldoras con scroll
   const isTabletFewProds = isTablet && count <= 3;
@@ -360,7 +364,9 @@ function ProductionPanel({ productionPoint, onBack }) {
 
   // Columnas según dispositivo
   let cols, allowScroll, pad, gap;
-  if (isMobile) {
+  if (isMobileFewProds) {
+    cols = 1; allowScroll = true; pad = 14; gap = 10;
+  } else if (isMobilePills) {
     cols = 1; allowScroll = true; pad = 8; gap = 6;
   } else if (isTabletFewProds) {
     // Tarjeta grande centrada — sin scroll, 1 col por producto
@@ -383,15 +389,15 @@ function ProductionPanel({ productionPoint, onBack }) {
   // Compacto solo en PC cuando hay muy poco espacio
   const HEADER_H   = 52;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
-  // Limitamos cardH a máximo 400px para no crear tarjetas "monstruosas" si hay solo 1-2 productos
-  const cardH      = Math.min(availableH / rows, 400); 
+  // En móvil con tarjeta grande: limitar a 420px por tarjeta para no exagerar
+  const cardH      = isMobileFewProds
+    ? Math.min(availableH / rows, 420)
+    : Math.min(availableH / rows, 400);
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
-  // Ancho máximo por tarjeta — en PC con pocos productos, tarjetas más grandes
   const CARD_MAX  = count <= 2 ? 440 : count <= 4 ? 360 : 270;
-  // Para tablet con pocos productos: la tarjeta NO debe estirase full-width,
-  // sino quedar centrada con un ancho máximo cómodo para operar
-  const gridMaxW  = isTabletFewProds
+  // Para tablet/móvil con pocos productos: centrada con ancho máximo
+  const gridMaxW  = (isMobileFewProds || isTabletFewProds)
     ? `${Math.min(CARD_MAX, sw - 2 * pad)}px`
     : allowScroll ? '100%'
     : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
@@ -480,7 +486,9 @@ function ProductionPanel({ productionPoint, onBack }) {
           }}>
             {enriched.map((prod) => {
               const props = { key: prod.id, prod, productionPoint, wasteMode, onProduce: handleProduce, onManual: (p) => setManualProd(p) };
-              if (isMobile)          return <CardMobile  {...props} size="sm" />;
+              // Móvil con pocos productos → tarjeta grande vertical (igual que tablet)
+              if (isMobileFewProds)  return <CardTablet  {...props} cardH={cardH} />;
+              if (isMobilePills)     return <CardMobile  {...props} size="sm" />;
               if (isTabletPills)     return <CardMobile  {...props} size="md" />;
               if (isTabletFewProds)  return <CardTablet  {...props} cardH={cardH} />;
               if (useCompact)        return <CardCompact {...props} />;
