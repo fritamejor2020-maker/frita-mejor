@@ -218,7 +218,7 @@ function App() {
           <Route path="/dejador" element={<DejadorDashboard />} />
         </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
+        <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEJADOR']} />}>
           <Route path="/tracking" element={<MapTrackingView />} />
         </Route>
         {/* ---------------------------------------- */}

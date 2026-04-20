@@ -60,7 +60,7 @@ const DEFAULT_USERS = [
     password: '6',
     role: 'DEJADOR',
     active: true,
-    access: ['dejador'],
+    access: ['dejador', 'tracking'],
   },
   {
     id: 'USR-007',
@@ -99,7 +99,7 @@ export const ROLE_ACCESS = {
   BODEGUERO: ['bodega'],
   CAJERO:    ['pos'],
   VENDEDOR:  ['vendedor-setup', 'vendedor'],
-  DEJADOR:   ['dejador'],
+  DEJADOR:   ['dejador', 'tracking'],
   // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los dos
   FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos'],
 };
@@ -233,7 +233,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 9, // v9: finanzas separado en finanzas-ingresos y finanzas-gastos
+      version: 10, // v10: tracking agregado a DEJADOR, GPS en VendedorDashboard
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,

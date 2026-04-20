@@ -12,6 +12,7 @@ import { MoneyInput } from '../components/ui/MoneyInput';
 import { BottomNav } from '../components/ui/BottomNav';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
+import { useVendorTracking } from '../lib/useVendorTracking';
 
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
@@ -45,6 +46,15 @@ export const VendedorDashboard = () => {
   // Solo ejecutar cuando la sesión empieza
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSetupComplete, openedAt]);
+
+  // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
+  const trackingName = responsibleName || (user as any)?.name || 'Vendedor';
+  const trackingId   = (user as any)?.id || pointId || 'unknown';
+  const { status: gpsStatus, retry: gpsRetry } = useVendorTracking(
+    trackingId,
+    trackingName,
+    isSetupComplete // Solo activo cuando el turno está abierto
+  );
 
   const [activeTab, setActiveTab] = useState('pos');
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
@@ -274,6 +284,23 @@ export const VendedorDashboard = () => {
               {pointId && <span className="bg-amber-400 text-white font-black text-xs px-2.5 py-1 rounded-full tracking-widest">{pointId}</span>}
               {shift && <span className="bg-[#FF4040] text-white font-black text-xs px-2.5 py-1 rounded-full tracking-widest">{shift}</span>}
               {responsibleName && <span className="bg-gray-900 text-white font-bold text-xs px-2.5 py-1 rounded-full">👤 {responsibleName.split(' ')[0]}</span>}
+              {/* Indicador GPS */}
+              {gpsStatus === 'active' && (
+                <span className="flex items-center gap-1 bg-green-100 text-green-700 font-bold text-xs px-2.5 py-1 rounded-full">
+                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                  GPS activo
+                </span>
+              )}
+              {gpsStatus === 'requesting' && (
+                <span className="flex items-center gap-1 bg-yellow-100 text-yellow-700 font-bold text-xs px-2.5 py-1 rounded-full">
+                  📍 Solicitando GPS...
+                </span>
+              )}
+              {gpsStatus === 'denied' && (
+                <button onClick={gpsRetry} className="flex items-center gap-1 bg-red-100 text-red-600 font-bold text-xs px-2.5 py-1 rounded-full active:scale-95">
+                  ⚠️ GPS denegado — toca para reintentar
+                </button>
+              )}
             </div>
           )}
         </div>
