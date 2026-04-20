@@ -192,7 +192,14 @@ export const useInventoryStore = create(
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
       // Si Supabase tiene datos más recientes, los usa; si está vacío, queda el local.
+      // GUARD: si justo se ejecutó un Reset General, no cargar datos remotos
+      //        (los datos en Supabase deberían estar vacíos, pero por si acaso).
       loadFromRemote: async () => {
+        if (sessionStorage.getItem('__reset_done__') === '1') {
+          sessionStorage.removeItem('__reset_done__');
+          console.log('[Store] Reset recién ejecutado — omitiendo carga remota.');
+          return;
+        }
         try {
           const remote = await pullAll();
           const SYNC_KEYS = [

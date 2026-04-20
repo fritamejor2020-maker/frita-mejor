@@ -1,24 +1,7 @@
 import React, { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
-// ── Claves de localStorage que usa la app (una por cada store persistido) ──────
-const STORAGE_KEYS = [
-  'frita-mejor-inventory',     // posShifts, posProducts, posSales, posExpenses, users, etc.
-  'frita-mejor-logistics',     // loadHistory, completedRequests, pendingRequests
-  'frita-mejor-auth-v2',       // usuarios autenticados
-  'frita-mejor-income-config', // fuentes de ingreso
-  'frita-mejor-suppliers',     // proveedores
-  'frita-mejor-vehicles',      // vehículos / triciclos
-  'frita-seller-session',      // sesión activa del vendedor
-  'frita-dejador-session',     // sesión activa del dejador
-  'frita-sync-queue',          // cola de sincronización offline
-  'frita-pos-store',           // carrito POS
-];
-
 // ── Tablas de Supabase que se deben limpiar ────────────────────────────────────
-// app_state: todos los stores principales sincronizados via syncManager
-// incomes:   registros del useFinanceStore
-// expenses:  registros del useFinanceStore
 const SUPABASE_TABLES = ['app_state', 'incomes', 'expenses'];
 
 const MASTER_PASSWORD = 'Anamonica99';
@@ -41,25 +24,37 @@ function isSupabaseConfigured() {
   return url.length > 0 && !url.includes('placeholder');
 }
 
-/** Borra TODOS los registros de una tabla usando un filtro que siempre es verdadero.
- *  Requiere que la tabla tenga RLS deshabilitado o una política DELETE habilitada. */
+/** Borra TODOS los registros de una tabla. Devuelve { ok, error } */
 async function clearSupabaseTable(table) {
-  // Usamos gt('id', 0) para tablas con id numérico, o neq('key','') para app_state
-  // Para ser seguro aplicamos un delete sin filtro equivalente usando gt con epoch
-  const { error } = await supabase
-    .from(table)
-    .delete()
-    .gte('created_at', '2000-01-01');          // borra todo lo que tiene created_at (incomes, expenses)
-  if (error) throw error;
-}
-
-async function clearAppState() {
-  // app_state no tiene created_at — usa la columna 'key'
-  const { error } = await supabase
-    .from('app_state')
-    .delete()
-    .neq('key', '__keep__');                   // borra absolutamente todo
-  if (error) throw error;
+  try {
+    if (table === 'app_state') {
+      const { error } = await supabase
+        .from('app_state')
+        .delete()
+        .neq('key', '__keep__');
+      if (error) return { ok: false, error: error.message };
+      // Verificar que quedó vacío
+      const { data: remaining } = await supabase.from('app_state').select('key').limit(5);
+      if (remaining && remaining.length > 0) {
+        return { ok: false, error: `Quedan ${remaining.length} registro(s) en app_state tras el delete (posible restricción RLS)` };
+      }
+      return { ok: true, error: null };
+    } else {
+      const { error } = await supabase
+        .from(table)
+        .delete()
+        .gte('created_at', '2000-01-01');
+      if (error) return { ok: false, error: error.message };
+      // Verificar que quedó vacío
+      const { data: remaining } = await supabase.from(table).select('id').limit(5);
+      if (remaining && remaining.length > 0) {
+        return { ok: false, error: `Quedan ${remaining.length} registro(s) en ${table} tras el delete (posible restricción RLS)` };
+      }
+      return { ok: true, error: null };
+    }
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
 }
 
 // ── Componente ─────────────────────────────────────────────────────────────────
@@ -71,7 +66,8 @@ export const ResetGeneralPanel = () => {
   const [showPass, setShowPass]       = useState(false);
   const [confirmText, setConfirmText] = useState('');
   const [progress, setProgress]       = useState({ step: '', total: 0, done: 0 });
-  const [errorMsg, setErrorMsg]       = useState('');
+  const [supabaseResults, setSupabaseResults] = useState([]); // [{ table, ok, error }]
+  const [localDone, setLocalDone]     = useState(false);
 
   const CONFIRM_WORD = 'RESETEAR';
 
@@ -96,68 +92,99 @@ export const ResetGeneralPanel = () => {
 
     setStep('deleting');
     const supabaseOk = isSupabaseConfigured();
-    const totalSteps = supabaseOk ? STORAGE_KEYS.length + 3 : STORAGE_KEYS.length; // 3 tablas Supabase
+    const results = [];
 
-    let done = 0;
-
-    // ── 1. Limpiar localStorage ──────────────────────────────────────────────
-    for (const key of STORAGE_KEYS) {
-      setProgress({ step: `Limpiando: ${key}`, total: totalSteps, done });
-      localStorage.removeItem(key);
-      done++;
-      // pequeña pausa visual para que el usuario vea el progreso
-      await new Promise(r => setTimeout(r, 80));
-    }
-
-    // ── 2. Limpiar Supabase ──────────────────────────────────────────────────
+    // ── 1. Limpiar Supabase PRIMERO (antes del localStorage) ─────────────────
+    // Razón: si Supabase falla, el usuario puede ver exactamente qué falló.
+    // Si primero limpiamos localStorage y Supabase falla, al recargar los datos
+    // de Supabase vuelven a cargar en el store.
     if (supabaseOk) {
-      try {
-        // incomes
-        setProgress({ step: 'Borrando ingresos de Supabase...', total: totalSteps, done });
-        await clearSupabaseTable('incomes');
-        done++;
+      const totalSupa = SUPABASE_TABLES.length;
+      for (let i = 0; i < SUPABASE_TABLES.length; i++) {
+        const table = SUPABASE_TABLES[i];
+        setProgress({
+          step: `Borrando tabla: ${table}...`,
+          total: totalSupa + 2,
+          done: i,
+        });
+        const result = await clearSupabaseTable(table);
+        results.push({ table, ...result });
+        await new Promise(r => setTimeout(r, 150));
+      }
+      setSupabaseResults(results);
 
-        // expenses
-        setProgress({ step: 'Borrando egresos de Supabase...', total: totalSteps, done });
-        await clearSupabaseTable('expenses');
-        done++;
-
-        // app_state (contiene todos los stores: inventario, logística, auth, etc.)
-        setProgress({ step: 'Borrando estado sincronizado de Supabase...', total: totalSteps, done });
-        await clearAppState();
-        done++;
-      } catch (err) {
-        console.error('[ResetGeneral] Error al borrar Supabase:', err);
-        // No bloqueamos: el localStorage ya está vacío; mostramos advertencia
-        setErrorMsg(
-          `Los datos locales fueron eliminados, pero ocurrió un error al limpiar Supabase: ${err.message}. ` +
-          `Los datos remotos podrían reaparecer al recargar si hay conexión.`
-        );
+      const failedTables = results.filter(r => !r.ok);
+      if (failedTables.length > 0) {
+        // Hay tablas que no se pudieron borrar → detener y mostrar error detallado
         setStep('error');
         return;
       }
     }
 
+    // ── 2. Limpiar TODO el localStorage (no solo claves conocidas) ────────────
+    setProgress({ step: 'Limpiando almacenamiento local...', total: supabaseOk ? SUPABASE_TABLES.length + 2 : 2, done: supabaseOk ? SUPABASE_TABLES.length : 0 });
+    await new Promise(r => setTimeout(r, 200));
+
+    // Marcar que el reset ya fue ejecutado para que al recargar
+    // loadFromRemote no sobreescriba el estado vacío
+    sessionStorage.setItem('__reset_done__', '1');
+
+    // Borrar absolutamente todo el localStorage (más seguro que key por key)
+    localStorage.clear();
+    setLocalDone(true);
+
+    setProgress({ step: '¡Listo! Recargando en 3 segundos...', total: supabaseOk ? SUPABASE_TABLES.length + 2 : 2, done: supabaseOk ? SUPABASE_TABLES.length + 2 : 2 });
+
     setStep('done');
     setTimeout(() => {
-      window.location.reload();
-    }, 2500);
+      window.location.href = window.location.origin + window.location.pathname;
+    }, 3000);
   };
 
-  // ── Screen: Error parcial ────────────────────────────────────────────────────
+  // ── Screen: Error detallado ────────────────────────────────────────────────
   if (step === 'error') {
+    const failed  = supabaseResults.filter(r => !r.ok);
+    const success = supabaseResults.filter(r => r.ok);
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-6">
-        <div className="w-24 h-24 rounded-full bg-yellow-100 flex items-center justify-center text-5xl">⚠️</div>
-        <div className="text-center max-w-md">
-          <h2 className="text-2xl font-black text-gray-800">Reset Parcial</h2>
-          <p className="text-gray-600 font-bold mt-2 text-sm leading-relaxed">{errorMsg}</p>
+      <div className="flex flex-col items-center justify-center py-10 gap-6 max-w-lg mx-auto">
+        <div className="w-20 h-20 rounded-full bg-red-100 flex items-center justify-center text-4xl">🚨</div>
+        <div className="text-center">
+          <h2 className="text-2xl font-black text-gray-800">Error al Borrar Supabase</h2>
+          <p className="text-gray-500 font-bold mt-2 text-sm leading-relaxed">
+            El reset <span className="text-red-600 font-black">no se completó</span> porque Supabase rechazó el borrado.<br/>
+            Los datos locales <span className="text-green-600 font-black">NO fueron eliminados</span> (seguro).
+          </p>
         </div>
+
+        {/* Detalle por tabla */}
+        <div className="w-full bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex flex-col gap-3">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Resultado por tabla</p>
+          {supabaseResults.map(r => (
+            <div key={r.table} className={`flex items-start gap-3 p-3 rounded-xl ${r.ok ? 'bg-green-50 border border-green-100' : 'bg-red-50 border border-red-100'}`}>
+              <span className="text-xl flex-shrink-0">{r.ok ? '✅' : '❌'}</span>
+              <div className="flex-1 min-w-0">
+                <p className="font-black text-gray-800 text-sm font-mono">{r.table}</p>
+                {!r.ok && <p className="text-red-600 text-xs font-bold mt-0.5 break-words">{r.error}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="w-full bg-amber-50 border border-amber-200 rounded-2xl p-4">
+          <p className="text-[10px] font-bold text-amber-600 uppercase tracking-widest mb-2">¿Qué hacer?</p>
+          <ul className="space-y-1.5">
+            <li className="text-amber-800 text-sm font-bold">1. Ve a tu panel de Supabase → Table Editor</li>
+            <li className="text-amber-800 text-sm font-bold">2. Borra manualmente las filas de las tablas marcadas con ❌</li>
+            <li className="text-amber-800 text-sm font-bold">3. Verifica que las políticas RLS permiten DELETE</li>
+            <li className="text-amber-800 text-sm font-bold">4. Vuelve e intenta el reset nuevamente</li>
+          </ul>
+        </div>
+
         <button
-          onClick={() => window.location.reload()}
-          className="px-6 py-3 rounded-2xl bg-yellow-500 text-white font-black hover:bg-yellow-600 transition-colors"
+          onClick={() => { setStep('warning'); setSupabaseResults([]); }}
+          className="w-full py-3.5 rounded-2xl bg-gray-700 text-white font-black hover:bg-gray-800 transition-colors"
         >
-          Recargar de todas formas
+          ← Volver e Intentar de Nuevo
         </button>
       </div>
     );
@@ -165,7 +192,7 @@ export const ResetGeneralPanel = () => {
 
   // ── Screen: Deleting (progress) ──────────────────────────────────────────────
   if (step === 'deleting') {
-    const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 0;
+    const pct = progress.total > 0 ? Math.round((progress.done / progress.total) * 100) : 5;
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-6">
         <div className="w-24 h-24 rounded-full bg-red-100 flex items-center justify-center text-5xl animate-pulse">🗑️</div>
@@ -173,18 +200,29 @@ export const ResetGeneralPanel = () => {
           <h2 className="text-2xl font-black text-gray-800">Eliminando Datos...</h2>
           <p className="text-gray-500 font-bold mt-2 text-sm">{progress.step}</p>
         </div>
-        <div className="w-64 flex flex-col gap-2">
+        <div className="w-72 flex flex-col gap-2">
           <div className="flex justify-between text-xs font-bold text-gray-400">
             <span>{progress.done} / {progress.total} pasos</span>
             <span>{pct}%</span>
           </div>
-          <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
+          <div className="w-full h-3 bg-gray-100 rounded-full overflow-hidden">
             <div
-              className="h-full bg-red-500 rounded-full transition-all duration-200"
+              className="h-full bg-gradient-to-r from-red-500 to-orange-500 rounded-full transition-all duration-500"
               style={{ width: `${pct}%` }}
             />
           </div>
         </div>
+        {/* Resultados parciales de Supabase */}
+        {supabaseResults.length > 0 && (
+          <div className="flex flex-col gap-1.5 w-64">
+            {supabaseResults.map(r => (
+              <div key={r.table} className="flex items-center gap-2 text-sm">
+                <span>{r.ok ? '✅' : '❌'}</span>
+                <span className="font-mono font-bold text-gray-600">{r.table}</span>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -199,8 +237,23 @@ export const ResetGeneralPanel = () => {
           <p className="text-gray-500 font-bold mt-2">Todos los datos han sido eliminados.</p>
           <p className="text-gray-400 text-sm mt-1">La aplicación se recargará en un momento...</p>
         </div>
-        <div className="w-48 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-          <div className="h-full bg-green-500 rounded-full" style={{ animation: 'progress 2.5s linear forwards' }} />
+
+        {/* Resumen de lo borrado */}
+        <div className="flex flex-col gap-1.5 w-64">
+          <div className="flex items-center gap-2 text-sm">
+            <span>✅</span>
+            <span className="font-bold text-gray-600">localStorage completo</span>
+          </div>
+          {supabaseResults.map(r => (
+            <div key={r.table} className="flex items-center gap-2 text-sm">
+              <span>{r.ok ? '✅' : '⚠️'}</span>
+              <span className="font-mono font-bold text-gray-600">Supabase: {r.table}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="w-56 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+          <div className="h-full bg-green-500 rounded-full" style={{ animation: 'progress 3s linear forwards' }} />
         </div>
         <style>{`@keyframes progress { from { width: 0% } to { width: 100% } }`}</style>
       </div>
@@ -347,13 +400,15 @@ export const ResetGeneralPanel = () => {
         </div>
       </div>
 
-      {/* Lo que NO se borra */}
+      {/* Proceso del reset */}
       <div className="bg-blue-50 rounded-2xl p-5 border border-blue-100">
-        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">✓ Qué NO se pierde</p>
-        <ul className="space-y-1">
-          <li className="text-blue-700 text-sm font-bold">• El código de la aplicación (siempre disponible)</li>
-          <li className="text-blue-700 text-sm font-bold">• Las plantillas y configuración de producción</li>
-        </ul>
+        <p className="text-[10px] font-bold text-blue-400 uppercase tracking-widest mb-2">📋 Cómo funciona el reset</p>
+        <ol className="space-y-1">
+          <li className="text-blue-700 text-sm font-bold">1. Borra datos en Supabase (app_state, incomes, expenses)</li>
+          <li className="text-blue-700 text-sm font-bold">2. Verifica que quedaron vacíos</li>
+          <li className="text-blue-700 text-sm font-bold">3. Limpia TODO el almacenamiento local</li>
+          <li className="text-blue-700 text-sm font-bold">4. Recarga la aplicación desde cero</li>
+        </ol>
       </div>
 
       {/* Botón de inicio */}
