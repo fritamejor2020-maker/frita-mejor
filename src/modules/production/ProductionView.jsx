@@ -164,14 +164,15 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
   const big3  = cardH >= 260;  // suficiente para fuentes grandes
   const nameSz  = big3 ? 'text-xl'   : 'text-base';
   const stockSz = big3 ? 'text-xl'   : 'text-base';
-  const bigSz   = big3 ? 'text-4xl'  : 'text-2xl';
-  const unitSz  = big3 ? 'text-sm'   : 'text-xs';
-  const smSz    = big3 ? 'text-base' : 'text-sm';
-  const pad     = big3 ? 'p-4'       : 'p-3';
-  const smPy    = big3 ? 'py-3'      : 'py-2';
+  const bigSz   = big3 ? 'text-5xl'  : 'text-3xl';
+  const unitSz  = big3 ? 'text-base' : 'text-sm';
+  // Botones pequeños (2,5,10,20) — tamaño aumentado para facilitar el toque
+  const smSz    = big3 ? 'text-2xl'  : 'text-xl';
+  const smPy    = big3 ? 'py-5'      : 'py-4';
+  const pad     = big3 ? 'p-5'       : 'p-4';
 
   return (
-    <div className={`rounded-2xl ${pad} flex flex-col gap-2 h-full ${cardCls}`}>
+    <div className={`rounded-2xl ${pad} flex flex-col gap-3 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
         <div className={`font-black text-chunky-dark leading-tight truncate ${nameSz}`}>{prod.name}</div>
         <div className="flex items-baseline justify-center gap-1">
@@ -187,21 +188,22 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
         <span className={`font-bold opacity-70 ${unitSz}`}>{yieldUnit}</span>
       </button>
 
-      <div className="grid grid-cols-4 gap-1.5 shrink-0">
+      {/* Botones secundarios — más grandes para uso en producción */}
+      <div className="grid grid-cols-4 gap-2 shrink-0">
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none ${btnCls}`}>
+              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none active:scale-95 ${btnCls}`}>
               <span className={`leading-none ${smSz}`}>{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span className={`font-bold opacity-70 text-[9px]`}>{yieldUnit}</span>
+              <span className={`font-bold opacity-70 text-xs mt-0.5`}>{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
       <button onClick={() => onManual(prod)}
-        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold ${unitSz} hover:border-chunky-main hover:text-chunky-dark transition-colors ${smPy}`}>
+        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors py-3`}>
         ✏️ Manual
       </button>
     </div>
@@ -386,8 +388,11 @@ function ProductionPanel({ productionPoint, onBack }) {
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
   // Ancho máximo por tarjeta — en PC con pocos productos, tarjetas más grandes
-  const CARD_MAX  = count <= 2 ? 500 : count <= 4 ? 360 : 270;
-  const gridMaxW  = isTabletFewProds ? '100%'
+  const CARD_MAX  = count <= 2 ? 440 : count <= 4 ? 360 : 270;
+  // Para tablet con pocos productos: la tarjeta NO debe estirase full-width,
+  // sino quedar centrada con un ancho máximo cómodo para operar
+  const gridMaxW  = isTabletFewProds
+    ? `${Math.min(CARD_MAX, sw - 2 * pad)}px`
     : allowScroll ? '100%'
     : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 

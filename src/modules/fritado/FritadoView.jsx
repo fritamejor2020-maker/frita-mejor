@@ -161,11 +161,12 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
   const big3  = cardH >= 260;
   const nameSz  = big3 ? 'text-xl'  : 'text-base';
   const stockSz = big3 ? 'text-xl'  : 'text-base';
-  const bigSz   = big3 ? 'text-4xl' : 'text-2xl';
-  const unitSz  = big3 ? 'text-sm'  : 'text-xs';
-  const smSz    = big3 ? 'text-base': 'text-sm';
-  const pad     = big3 ? 'p-4'      : 'p-3';
-  const smPy    = big3 ? 'py-3'     : 'py-2';
+  const bigSz   = big3 ? 'text-5xl' : 'text-3xl';
+  const unitSz  = big3 ? 'text-base': 'text-sm';
+  // Botones secundarios más grandes para facilitar el toque en fritado
+  const smSz    = big3 ? 'text-2xl' : 'text-xl';
+  const pad     = big3 ? 'p-5'      : 'p-4';
+  const smPy    = big3 ? 'py-5'     : 'py-4';
   const boxPy   = big3 ? 'py-3 px-4': 'py-2 px-3';
 
   return (
@@ -196,12 +197,13 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
         <span className={`font-bold opacity-80 ${unitSz}`}>uds</span>
       </button>
 
-      <div className="grid grid-cols-4 gap-1.5 shrink-0">
+      {/* Botones secundarios — más grandes para facilitar el toque */}
+      <div className="grid grid-cols-4 gap-2 shrink-0">
         {smalls.slice(0, 4).map((amount, idx) => (
           <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
             className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-all active:scale-95 select-none ${btnCls}`}>
             <span className={`leading-none ${smSz}`}>{amount}</span>
-            <span className="text-[9px] font-bold opacity-70">uds</span>
+            <span className="text-xs font-bold opacity-70 mt-0.5">uds</span>
           </button>
         ))}
       </div>
@@ -362,8 +364,9 @@ function FritadoPanel({ fryKitchen, onBack }) {
   const cardH      = Math.min(availableH / rows, 400);
   const useCompact = !isMobile && !isTablet && !allowScroll && cardH < 140;
 
-  const CARD_MAX = count <= 2 ? 500 : count <= 4 ? 360 : 270;
-  const gridMaxW = isTabletFewProds ? '100%'
+  const CARD_MAX = count <= 2 ? 440 : count <= 4 ? 360 : 270;
+  const gridMaxW = isTabletFewProds
+    ? `${Math.min(CARD_MAX, sw - 2 * pad)}px`
     : allowScroll ? '100%'
     : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 
