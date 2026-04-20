@@ -1,14 +1,18 @@
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { useFinanceStore } from '../../../store/useFinanceStore';
+import { useAuthStore } from '../../../store/useAuthStore';
 import { useSupplierStore } from '../../../store/useSupplierStore';
+import { uploadFactura } from '../../../lib/storageUtils';
 import { Button } from '../../../components/ui/Button';
 import { MoneyInput } from '../../../components/ui/MoneyInput';
 
 export function ExpensesModal({ onClose }) {
   const { addExpense } = useFinanceStore();
+  const { user } = useAuthStore();
   const { suppliers, addSupplier, learnProductForSupplier, suggestSuppliersForProduct } = useSupplierStore();
   const fileInputRef = useRef(null);     // galería
   const cameraInputRef = useRef(null);  // cámara directa
+  const [facturaFile, setFacturaFile] = useState(null); // archivo real para subir
   
   const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
   const [descripcion, setDescripcion] = useState('');
@@ -39,11 +43,10 @@ export function ExpensesModal({ onClose }) {
   const handleFileChange = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // Crear una URL de previsualización local
       const previewUrl = URL.createObjectURL(file);
-      setFacturaUrl(file.name);
-      setFacturaPreview(previewUrl);
-      // Limpiar el input para que se pueda volver a seleccionar el mismo archivo
+      setFacturaFile(file);          // guardar el File real para subir
+      setFacturaUrl(file.name);      // nombre para referencia
+      setFacturaPreview(previewUrl); // preview local
       e.target.value = '';
     }
   };
@@ -51,41 +54,42 @@ export function ExpensesModal({ onClose }) {
   const handleSubmit = async () => {
     if (!isFormValid) return;
     setIsSubmitting(true);
-    
-    // Simulating upload delay if there is a file
-    if (facturaUrl) await new Promise(r => setTimeout(r, 600));
 
-    // Handle Supplier logic:
-    // If they typed a name but didn't pick an ID, create or find it.
+    // ── Subir foto a Supabase Storage si hay una seleccionada ──────────────
+    let finalFacturaUrl = null;
+    if (facturaFile) {
+      finalFacturaUrl = await uploadFactura(facturaFile);
+      // Si falló la subida, usamos null (no bloqueamos el guardado del gasto)
+    }
+
+    // ── Resolver proveedor ─────────────────────────────────────────────────
     let finalSupplierName = proveedor;
     let finalSupplierId = selectedSupplierId;
 
     if (!finalSupplierId) {
-      // Check if it already exists by exact name
       const existing = suppliers.find(s => s.name.toLowerCase() === finalSupplierName.toLowerCase());
       if (existing) {
         finalSupplierId = existing.id;
         finalSupplierName = existing.name;
       } else {
-        // Create new
         const newSup = addSupplier({ name: finalSupplierName, commonProducts: [descripcion] });
         finalSupplierId = newSup.id;
       }
     } else {
-      // If they picked an existing one, teach it that it also sells this new description
       learnProductForSupplier(finalSupplierId, descripcion);
     }
 
     await addExpense({
       fecha,
       descripcion,
-      proveedor: finalSupplierName, // Save text for backward compatibility
-      supplierId: finalSupplierId,  // Link to DB
+      proveedor: finalSupplierName,
+      supplierId: finalSupplierId,
       valor: numValor,
-      facturaUrl,
-      created_at: new Date().toISOString()
+      facturaUrl: finalFacturaUrl,   // URL pública de Supabase Storage (o null)
+      creado_por: user?.name || 'Desconocido',
+      created_at: new Date().toISOString(),
     });
-    
+
     setIsSubmitting(false);
     onClose();
   };

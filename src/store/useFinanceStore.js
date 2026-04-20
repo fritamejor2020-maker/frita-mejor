@@ -1,121 +1,118 @@
 import { create } from 'zustand';
+import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
-// Default Income Hierarchy matching the provided image
-const defaultIncomeHierarchy = {
-  Local: {
-    AM: ['6-10 am', '10-12 pm'],
-    PM: ['12-2 pm', '2-4 pm', '4-7 pm', '7-9 pm']
-  },
-  Triciclo: {
-    AM: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'],
-    MD: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'],
-    PM: ['T1', 'T2', 'T3', 'T4', 'T5', 'T6']
-  },
-  Contratas: {
-    AM: ['6-10 am', '10-12 pm'],
-    PM: ['12-2 pm', '2-4 pm', '4-7 pm', '7-9 pm']
-  },
-  Venta: {
-    Extra: ['Extra']
-  }
-};
+export const useFinanceStore = create(
+  persist(
+    (set, get) => ({
+      incomes:  [],
+      expenses: [],
+      isLoading: false,
+      error: null,
 
-export const useFinanceStore = create((set, get) => ({
-  incomes: [],
-  expenses: [],
-  incomeHierarchy: defaultIncomeHierarchy,
-  isLoading: false,
-  error: null,
+      // Intenta traer datos de Supabase (si las tablas existen).
+      // Si fallan, NO sobreescribe los datos locales para preservar el caché.
+      fetchFinances: async () => {
+        set({ isLoading: true });
+        try {
+          const [incomesRes, expensesRes] = await Promise.all([
+            supabase.from('incomes').select('*').order('created_at', { ascending: false }),
+            supabase.from('expenses').select('*').order('created_at', { ascending: false }),
+          ]);
 
-  fetchFinances: async () => {
-    set({ isLoading: true });
-    try {
-      const [incomesRes, expensesRes] = await Promise.all([
-        supabase.from('incomes').select('*').order('created_at', { ascending: false }),
-        supabase.from('expenses').select('*').order('created_at', { ascending: false })
-      ]);
+          // Solo actualizar si vinieron datos reales (no sobreescribir con array vacío por error de tabla)
+          if (!incomesRes.error && incomesRes.data?.length > 0) {
+            set({ incomes: incomesRes.data });
+          }
+          if (!expensesRes.error && expensesRes.data?.length > 0) {
+            set({ expenses: expensesRes.data });
+          }
+        } catch (error) {
+          console.warn('[FinanceStore] fetchFinances falló — usando datos locales:', error.message);
+        } finally {
+          set({ isLoading: false });
+        }
+      },
 
-      if (incomesRes.error) throw incomesRes.error;
-      if (expensesRes.error) throw expensesRes.error;
+      addIncome: async (incomeData) => {
+        const newIncome = {
+          id: Date.now().toString(),
+          created_at: new Date().toISOString(),
+          ...incomeData,
+        };
+        // Actualización optimista
+        set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-      set({ 
-        incomes: incomesRes.data || [], 
-        expenses: expensesRes.data || [],
-        isLoading: false 
-      });
-    } catch (error) {
-      console.error('Error fetching finances:', error);
-      // Fallback for local dev if tables don't exist yet
-      set({ error: error.message, isLoading: false });
+        // Intentar persistir en Supabase (silencioso si falla)
+        try {
+          const { data, error } = await supabase.from('incomes').insert([incomeData]).select();
+          if (!error && data?.[0]) {
+            set((state) => ({
+              incomes: state.incomes.map((i) => (i.id === newIncome.id ? data[0] : i)),
+            }));
+          }
+        } catch (e) {
+          console.warn('[FinanceStore] addIncome Supabase falló — guardado localmente.');
+        }
+      },
+
+      addMultipleIncomes: async (incomesArray) => {
+        const timestamp = new Date().toISOString();
+        const newIncomes = incomesArray.map((inc, idx) => ({
+          id: `${Date.now()}-${idx}`,
+          created_at: timestamp,
+          ...inc,
+        }));
+
+        set((state) => ({ incomes: [...newIncomes, ...state.incomes] }));
+
+        try {
+          const { data, error } = await supabase.from('incomes').insert(incomesArray).select();
+          if (!error && data?.length) {
+            set((state) => {
+              const updated = [...state.incomes];
+              newIncomes.forEach((opt) => {
+                const idx = updated.findIndex((i) => i.id === opt.id);
+                const dbEntry = data.find(
+                  (d) => d.ubicacion === opt.ubicacion && d.jornada === opt.jornada && d.tipo === opt.tipo
+                );
+                if (idx !== -1 && dbEntry) updated[idx] = dbEntry;
+              });
+              return { incomes: updated };
+            });
+          }
+        } catch (e) {
+          console.warn('[FinanceStore] addMultipleIncomes Supabase falló — guardado localmente.');
+        }
+      },
+
+      addExpense: async (expenseData) => {
+        const newExpense = {
+          id: Date.now().toString(),
+          created_at: new Date().toISOString(),
+          ...expenseData,
+        };
+        set((state) => ({ expenses: [newExpense, ...state.expenses] }));
+
+        try {
+          const { data, error } = await supabase.from('expenses').insert([expenseData]).select();
+          if (!error && data?.[0]) {
+            set((state) => ({
+              expenses: state.expenses.map((e) => (e.id === newExpense.id ? data[0] : e)),
+            }));
+          }
+        } catch (e) {
+          console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.');
+        }
+      },
+    }),
+    {
+      name: 'frita-mejor-finances',
+      // Solo persistir los arrays de datos (no isLoading, error)
+      partialize: (state) => ({
+        incomes:  state.incomes,
+        expenses: state.expenses,
+      }),
     }
-  },
-
-  addIncome: async (incomeData) => {
-    try {
-      // Optistic UI update for local dev
-      const newIncome = { id: Date.now().toString(), created_at: new Date().toISOString(), ...incomeData };
-      set((state) => ({ incomes: [newIncome, ...state.incomes] }));
-
-      // Try inserting to DB
-      const { data, error } = await supabase.from('incomes').insert([incomeData]).select();
-      if (!error && data) {
-         set((state) => ({ incomes: state.incomes.map(i => i.id === newIncome.id ? data[0] : i) }));
-      }
-    } catch (error) {
-      console.error("Error adding income", error);
-    }
-  },
-
-  addMultipleIncomes: async (incomesArray) => {
-    try {
-      const timestamp = new Date().toISOString();
-      const newIncomes = incomesArray.map((inc, index) => ({
-        id: `${Date.now()}-${index}`,
-        created_at: timestamp,
-        ...inc
-      }));
-
-      // Optistic UI update for local dev
-      set((state) => ({ incomes: [...newIncomes, ...state.incomes] }));
-
-      // Try batch inserting to DB
-      const { data, error } = await supabase.from('incomes').insert(incomesArray).select();
-      
-      if (!error && data) {
-         // Replace optimistic entries with real DB entries
-         // This is a naive replacement for demo purposes
-         set((state) => {
-           const currentIncomes = [...state.incomes];
-           newIncomes.forEach(optInc => {
-             const index = currentIncomes.findIndex(i => i.id === optInc.id);
-             if (index !== -1) {
-               // Assuming the order of returned data matches the inserted array
-               const dbEntry = data.find(d => d.ubicacion === optInc.ubicacion && d.jornada === optInc.jornada && d.tipo === optInc.tipo);
-               if (dbEntry) currentIncomes[index] = dbEntry;
-             }
-           });
-           return { incomes: currentIncomes };
-         });
-      }
-    } catch (error) {
-      console.error("Error adding multiple incomes", error);
-    }
-  },
-
-  addExpense: async (expenseData) => {
-    try {
-      // Optistic UI update for local dev
-      const newExpense = { id: Date.now().toString(), created_at: new Date().toISOString(), ...expenseData };
-      set((state) => ({ expenses: [newExpense, ...state.expenses] }));
-
-      // Try inserting to DB
-      const { data, error } = await supabase.from('expenses').insert([expenseData]).select();
-      if (!error && data) {
-         set((state) => ({ expenses: state.expenses.map(e => e.id === newExpense.id ? data[0] : e) }));
-      }
-    } catch (error) {
-      console.error("Error adding expense", error);
-    }
-  }
-}));
+  )
+);

@@ -107,11 +107,12 @@ function UserForm({
         </div>
         <div className="flex-1 min-w-[140px]">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">
-            Contraseña / PIN {isEdit && <span className="normal-case">(vacío = sin cambios)</span>}
+            {isEdit ? 'Nueva contraseña (opcional)' : 'Contraseña / PIN'}
           </label>
           <div className="relative">
             <input
               type={showPass ? 'text' : 'password'}
+              autoComplete="new-password"
               className="w-full border-2 border-gray-100 focus:border-frita-red rounded-xl px-3 py-2.5 font-bold outline-none text-gray-800 transition-colors pr-10"
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
