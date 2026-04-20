@@ -4,16 +4,17 @@ import { User, Edit2, Trash2, Check, X, UserMinus, UserCheck, Shield } from 'luc
 
 // ── Todos los módulos disponibles en la app ───────────────────────────────────
 const ALL_MODULES = [
-  { key: 'produccion',     label: 'Producción',     icon: '🏭', color: 'bg-blue-100 text-blue-700 border-blue-200' },
-  { key: 'bodega',         label: 'Bodega',          icon: '📦', color: 'bg-amber-100 text-amber-700 border-amber-200' },
-  { key: 'fritado',        label: 'Fritado',         icon: '🍳', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  { key: 'pos',            label: 'Caja POS',        icon: '🛒', color: 'bg-green-100 text-green-700 border-green-200' },
-  { key: 'finanzas',       label: 'Finanzas',        icon: '💰', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
-  { key: 'vendedor-setup', label: 'Conf. Vendedor',  icon: '⚙️', color: 'bg-red-100 text-red-700 border-red-200' },
-  { key: 'vendedor',       label: 'Vendedor',        icon: '🛵', color: 'bg-red-100 text-red-700 border-red-200' },
-  { key: 'dejador',        label: 'Dejador',         icon: '🚚', color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { key: 'admin',          label: 'Admin',           icon: '🔧', color: 'bg-purple-100 text-purple-700 border-purple-200' },
-  { key: 'tracking',       label: 'Rutas/Mapa',      icon: '🗺️', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+  { key: 'produccion',        label: 'Producción',     icon: '🏭', color: 'bg-blue-100 text-blue-700 border-blue-200' },
+  { key: 'bodega',            label: 'Bodega',          icon: '📦', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { key: 'fritado',           label: 'Fritado',         icon: '🍳', color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  { key: 'pos',               label: 'Caja POS',        icon: '🛒', color: 'bg-green-100 text-green-700 border-green-200' },
+  { key: 'finanzas-ingresos', label: 'Ingresos',        icon: '💵', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+  { key: 'finanzas-gastos',   label: 'Gastos',          icon: '💸', color: 'bg-red-100 text-red-700 border-red-200' },
+  { key: 'vendedor-setup',    label: 'Conf. Vendedor',  icon: '⚙️', color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { key: 'vendedor',          label: 'Vendedor',        icon: '🛵', color: 'bg-rose-100 text-rose-700 border-rose-200' },
+  { key: 'dejador',           label: 'Dejador',         icon: '🚚', color: 'bg-amber-100 text-amber-700 border-amber-200' },
+  { key: 'admin',             label: 'Admin',           icon: '🔧', color: 'bg-purple-100 text-purple-700 border-purple-200' },
+  { key: 'tracking',          label: 'Rutas/Mapa',      icon: '🗺️', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
 ];
 
 const ALL_ROLES = ['ADMIN', 'OPERARIO', 'FRITADOR', 'BODEGUERO', 'CAJERO', 'VENDEDOR', 'DEJADOR', 'FINANZAS'];

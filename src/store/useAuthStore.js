@@ -69,7 +69,7 @@ const DEFAULT_USERS = [
     password: '7',
     role: 'FINANZAS',
     active: true,
-    access: ['finanzas'],
+    access: ['finanzas-ingresos'],
   },
   {
     id: 'USR-008',
@@ -78,7 +78,7 @@ const DEFAULT_USERS = [
     password: '8',
     role: 'FINANZAS',
     active: true,
-    access: ['finanzas'],
+    access: ['finanzas-gastos'],
   },
   {
     id: 'USR-009',
@@ -93,14 +93,15 @@ const DEFAULT_USERS = [
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas', 'fritado'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'fritado'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
   CAJERO:    ['pos'],
   VENDEDOR:  ['vendedor-setup', 'vendedor'],
   DEJADOR:   ['dejador'],
-  FINANZAS:  ['finanzas'],
+  // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los dos
+  FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos'],
 };
 
 // =============================================================================
@@ -227,8 +228,8 @@ export const useAuthStore = create(
       },
     }),
     {
-      name: 'frita-mejor-auth-v2', // clave en localStorage (v2: claves simples por rol)
-      version: 8, // Incrementamos versión
+      name: 'frita-mejor-auth-v2',
+      version: 9, // v9: finanzas separado en finanzas-ingresos y finanzas-gastos
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,

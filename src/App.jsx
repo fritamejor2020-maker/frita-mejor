@@ -82,7 +82,9 @@ function RoleRedirect() {
 
     const singleRoutes = {
       produccion: '/produccion', bodega: '/bodega', fritado: '/fritado',
-      pos: '/pos', finanzas: '/finanzas', admin: '/admin', tracking: '/tracking',
+      pos: '/pos', finanzas: '/finanzas',
+      'finanzas-ingresos': '/finanzas', 'finanzas-gastos': '/finanzas',
+      admin: '/admin', tracking: '/tracking',
     };
     return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }

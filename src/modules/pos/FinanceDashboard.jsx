@@ -18,8 +18,12 @@ export function FinanceDashboard() {
   const [showIncomesChat,   setShowIncomesChat]   = useState(false);
   const [showExpensesChat,  setShowExpensesChat]  = useState(false);
 
-  const isIngresosUser = user?.name === 'Ingresos';
-  const isGastosUser   = user?.name === 'Gastos';
+  const isAdmin      = user?.role === 'ADMIN';
+  const userAccess   = user?.access || [];
+  // Puede ver ingresos si tiene finanzas-ingresos, finanzas (acceso legacy), o es admin
+  const canIngresos  = isAdmin || userAccess.includes('finanzas-ingresos') || userAccess.includes('finanzas');
+  // Puede ver gastos si tiene finanzas-gastos, finanzas (acceso legacy), o es admin
+  const canGastos    = isAdmin || userAccess.includes('finanzas-gastos')   || userAccess.includes('finanzas');
 
   const totalIngresos = incomes.reduce((s, i) => s + (i.total || 0), 0);
   const totalGastos   = expenses.reduce((s, e) => s + (e.valor || 0), 0);
@@ -62,7 +66,7 @@ export function FinanceDashboard() {
         <div className="flex flex-wrap justify-center gap-6 w-full max-w-2xl">
 
           {/* ── BLOQUE INGRESOS ── */}
-          {(isIngresosUser || user?.role === 'ADMIN') && (
+          {canIngresos && (
             <div className="flex flex-col gap-3 w-full sm:w-[300px]">
               {/* Botón principal */}
               <button
@@ -99,7 +103,7 @@ export function FinanceDashboard() {
           )}
 
           {/* ── BLOQUE GASTOS ── */}
-          {(isGastosUser || user?.role === 'ADMIN') && (
+          {canGastos && (
             <div className="flex flex-col gap-3 w-full sm:w-[300px]">
               {/* Botón principal */}
               <button

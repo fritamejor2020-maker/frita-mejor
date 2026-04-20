@@ -4,16 +4,17 @@ import { useAuthStore } from '../store/useAuthStore';
 
 // ── Mapa de módulos: cómo se ve cada uno en la pantalla ───────────────────────
 const MODULE_CARDS: Record<string, { label: string; icon: string; route: string; color: string; bg: string }> = {
-  'produccion':     { label: 'Producción',      icon: '🏭', route: '/produccion',    color: 'from-blue-500 to-blue-600',    bg: 'bg-blue-50' },
-  'bodega':         { label: 'Bodega',           icon: '📦', route: '/bodega',        color: 'from-amber-500 to-amber-600',  bg: 'bg-amber-50' },
-  'fritado':        { label: 'Fritado',          icon: '🍳', route: '/fritado',       color: 'from-yellow-500 to-orange-500',bg: 'bg-yellow-50' },
-  'pos':            { label: 'Caja POS',         icon: '🛒', route: '/pos',           color: 'from-green-500 to-green-600',  bg: 'bg-green-50' },
-  'finanzas':       { label: 'Finanzas',         icon: '💰', route: '/finanzas',      color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
-  'vendedor-setup': { label: 'Turno Vendedor',   icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
-  'vendedor':       { label: 'Venta Móvil',      icon: '🛵', route: '/vendedor',      color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
-  'dejador':        { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
-  'admin':          { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
-  'tracking':       { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
+  'produccion':       { label: 'Producción',      icon: '🏭', route: '/produccion',    color: 'from-blue-500 to-blue-600',    bg: 'bg-blue-50' },
+  'bodega':           { label: 'Bodega',           icon: '📦', route: '/bodega',        color: 'from-amber-500 to-amber-600',  bg: 'bg-amber-50' },
+  'fritado':          { label: 'Fritado',          icon: '🍳', route: '/fritado',       color: 'from-yellow-500 to-orange-500',bg: 'bg-yellow-50' },
+  'pos':              { label: 'Caja POS',         icon: '🛒', route: '/pos',           color: 'from-green-500 to-green-600',  bg: 'bg-green-50' },
+  'finanzas-ingresos':{ label: 'Ingresos',         icon: '💵', route: '/finanzas',      color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
+  'finanzas-gastos':  { label: 'Gastos',           icon: '💸', route: '/finanzas',      color: 'from-red-500 to-rose-600',     bg: 'bg-red-50' },
+  'vendedor-setup':   { label: 'Turno Vendedor',   icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
+  'vendedor':         { label: 'Venta Móvil',      icon: '🛵', route: '/vendedor',      color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
+  'dejador':          { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
+  'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
+  'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
 };
 
 export const ModuleSelectorView = () => {
