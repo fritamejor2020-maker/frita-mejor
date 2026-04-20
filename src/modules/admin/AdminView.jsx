@@ -2207,7 +2207,7 @@ export function AdminView() {
         {activeTab === 'FRITADO'    && <FritadoConfigPanel />}
         {activeTab === 'INVENTARIO' && <InventoryPanel />}
         {activeTab === 'RECETAS'    && <RecipesPanel />}
-        {activeTab === 'USUARIOS'      && <UsersPanel />}
+        {activeTab === 'USUARIOS'      && <AdminUsersTab />}
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
         { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><PosCategoriesPanel /></div> }

@@ -80,7 +80,7 @@ function RoleRedirect() {
       return <Navigate to="/dejador-setup" replace />;
     }
 
-    const singleRoutes: Record<string, string> = {
+    const singleRoutes = {
       produccion: '/produccion', bodega: '/bodega', fritado: '/fritado',
       pos: '/pos', finanzas: '/finanzas', admin: '/admin', tracking: '/tracking',
     };
