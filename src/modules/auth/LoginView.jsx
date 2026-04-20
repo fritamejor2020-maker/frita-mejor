@@ -55,11 +55,41 @@ export function LoginView() {
     setLoading(false);
 
     if (result.ok) {
-      let route;
-      if (result.user.role === 'VENDEDOR') route = getVendedorRoute();
-      else if (result.user.role === 'DEJADOR' || result.user.role === 'dejador') route = getDejadorRoute();
-      else route = ROLE_ROUTES[result.user.role] ?? '/produccion';
-      navigate(route, { replace: true });
+      const user   = result.user;
+      const access = user.access || [];
+
+      // Más de un módulo → mostrar selector para que el usuario elija
+      if (access.length > 1) {
+        navigate('/selector', { replace: true });
+        return;
+      }
+
+      // Un solo módulo → ir directo a él
+      if (access.length === 1) {
+        const key = access[0];
+        if (key === 'vendedor-setup' || key === 'vendedor') {
+          navigate(getVendedorRoute(), { replace: true });
+        } else if (key === 'dejador') {
+          navigate(getDejadorRoute(), { replace: true });
+        } else {
+          const MODULE_ROUTES = {
+            produccion:          '/produccion',
+            bodega:              '/bodega',
+            fritado:             '/fritado',
+            pos:                 '/pos',
+            'finanzas-ingresos': '/finanzas',
+            'finanzas-gastos':   '/finanzas',
+            finanzas:            '/finanzas',
+            admin:               '/admin',
+            tracking:            '/tracking',
+          };
+          navigate(MODULE_ROUTES[key] ?? '/selector', { replace: true });
+        }
+        return;
+      }
+
+      // Sin módulos asignados → selector (mostrará mensaje de sin acceso)
+      navigate('/selector', { replace: true });
     }
   };
 
