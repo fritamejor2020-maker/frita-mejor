@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
@@ -2072,10 +2073,33 @@ function FritadoConfigPanel() {
 }
 
 // ─── Vista Principal de Administrador ────────────────────────────────────────
+// ─── Hook: Monitoreo de almacenamiento Supabase ──────────────────────────────
+function useDbSize() {
+  const [dbInfo, setDbInfo] = useState(null);
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_db_size');
+        if (!error && data) {
+          const bytes = data.size_bytes || 0;
+          const limitBytes = 500 * 1024 * 1024; // 500 MB (plan gratuito)
+          const pct = Math.round((bytes / limitBytes) * 100);
+          setDbInfo({ bytes, pretty: data.size_pretty, pct, limit: '500 MB' });
+        }
+      } catch (_) {}
+    };
+    check();
+    const interval = setInterval(check, 5 * 60 * 1000); // Revisar cada 5 min
+    return () => clearInterval(interval);
+  }, []);
+  return dbInfo;
+}
+
 export function AdminView() {
   const signOut = useAuthStore((s) => s.signOut);
   const { inventory } = useInventoryStore();
   const [activeTab, setActiveTab] = useState('BODEGAS');
+  const dbInfo = useDbSize();
   const scrollContainerRef = React.useRef(null);
 
   const TABS_BY_CATEGORY = {
@@ -2135,6 +2159,27 @@ export function AdminView() {
             <span className="inline-block mt-2 bg-red-50 text-red-500 text-xs font-bold px-3 py-1 rounded-full">
               ⚠️ {lowStockCount} ítem{lowStockCount > 1 ? 's' : ''} bajo en stock
             </span>
+          )}
+          {/* Banner de almacenamiento Supabase */}
+          {dbInfo && (
+            <div className={`mt-2 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-bold ${
+              dbInfo.pct >= 85 ? 'bg-red-50 text-red-600 border border-red-200' :
+              dbInfo.pct >= 70 ? 'bg-amber-50 text-amber-600 border border-amber-200' :
+              'bg-emerald-50 text-emerald-600 border border-emerald-200'
+            }`}>
+              <div style={{ width: 60, height: 6, borderRadius: 3, background: '#e5e7eb', overflow: 'hidden' }}>
+                <div style={{
+                  width: `${Math.min(dbInfo.pct, 100)}%`,
+                  height: '100%',
+                  borderRadius: 3,
+                  background: dbInfo.pct >= 85 ? '#ef4444' : dbInfo.pct >= 70 ? '#f59e0b' : '#22c55e',
+                  transition: 'width 0.5s ease'
+                }} />
+              </div>
+              <span>💾 {dbInfo.pretty} / {dbInfo.limit} ({dbInfo.pct}%)</span>
+              {dbInfo.pct >= 85 && <span className="animate-pulse">⚠️ ¡Casi lleno!</span>}
+              {dbInfo.pct >= 70 && dbInfo.pct < 85 && <span>📢 Vigilar</span>}
+            </div>
           )}
         </div>
         <Button variant="outline" className="w-10 h-10 sm:w-12 sm:h-12 !min-w-0 !p-0 rounded-full flex items-center justify-center text-gray-400 border-gray-100 hover:bg-red-50" onClick={signOut} title="Cerrar sesión">

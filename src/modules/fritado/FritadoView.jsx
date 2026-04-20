@@ -374,7 +374,7 @@ function FritadoPanel({ fryKitchen, onBack }) {
 
   const CARD_MAX = count <= 2 ? 440 : count <= 4 ? 360 : 270;
   const gridMaxW = (isMobileFewProds || isTabletFewProds)
-    ? `${Math.min(CARD_MAX, sw - 2 * pad)}px`
+    ? `${Math.min(cols * CARD_MAX + (cols - 1) * gap, sw - 2 * pad)}px`
     : allowScroll ? '100%'
     : cols <= 4 ? cols * CARD_MAX + (cols - 1) * gap : '100%';
 

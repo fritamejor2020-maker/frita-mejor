@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2, Pencil, Save } from 'lucide-react';
+import { LogOut, Zap, ChevronDown, ChevronUp, CheckCircle2, Pencil, Save, MapPin } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -8,6 +8,7 @@ import { useVehicleStore } from '../store/useVehicleStore';
 import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
+import { MapTrackingView } from './MapTrackingView';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -390,7 +391,7 @@ export const DejadorDashboard = () => {
   };
 
   const handleSaveTemplate = () => {
-    const name = window.prompt("Nombre de esta Plantilla de Carga:");
+    const name = window.prompt("Nombre de esta Plantilla de Surtido:");
     if (!name) return;
     addLoadTemplate({
       name,
@@ -410,11 +411,12 @@ export const DejadorDashboard = () => {
   };
 
   // ─── THEME LOGIC ───
-  // Carga: Red | Surtir: Orange | Recibir: Indigo
+  // Surtir(carga): Red | Pedidos(surtir): Orange | Recibir: Indigo | GPS: Emerald
   const getThemeColor = () => {
     if (activeTab === 'carga')   return '#EF4444'; // bg-red-500
     if (activeTab === 'surtir')  return '#F59E0B'; // bg-amber-500
     if (activeTab === 'recibir') return '#4F46E5'; // bg-indigo-600
+    if (activeTab === 'gps')     return '#10b981'; // bg-emerald-500
     return '#EF4444';
   };
   
@@ -438,13 +440,20 @@ export const DejadorDashboard = () => {
       if (type === 'border') return 'border-indigo-600';
       if (type === 'activePill') return forceActive ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-indigo-600';
     }
+    if (activeTab === 'gps') {
+      if (type === 'bg') return 'bg-emerald-500';
+      if (type === 'text') return 'text-emerald-500';
+      if (type === 'border') return 'border-emerald-500';
+      if (type === 'activePill') return forceActive ? 'bg-emerald-500 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-emerald-500';
+    }
     return '';
   };
 
   const getHeaderTitle = () => {
-    if (activeTab === 'carga') return 'Carga Inicial';
-    if (activeTab === 'surtir') return 'Surtir Carros';
+    if (activeTab === 'carga') return 'Surtir';
+    if (activeTab === 'surtir') return 'Pedidos';
     if (activeTab === 'recibir') return 'Cierre Jornada';
+    if (activeTab === 'gps') return 'GPS Triciclos';
     return 'Logística';
   };
 
@@ -512,11 +521,12 @@ export const DejadorDashboard = () => {
           )}
 
           {/* ─── TABS ─── */}
-          <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-lg">
+          <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-2xl">
             {[
-              { id: 'carga', label: 'Carga Inicial' },
-              { id: 'surtir', label: 'Surtir' },
+              { id: 'carga', label: 'Surtir' },
+              { id: 'surtir', label: 'Pedidos' },
               { id: 'recibir', label: 'Recibir' },
+              { id: 'gps', label: '📍 GPS' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -589,7 +599,7 @@ export const DejadorDashboard = () => {
           </div>
         )}
 
-        {/* ─── TAB: CARGA INICIAL & RECIBIR (PRODUCT GRID) ─── */}
+        {/* ─── TAB: SURTIR & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in mb-8">
             {products.map((p: any) => {
@@ -635,7 +645,7 @@ export const DejadorDashboard = () => {
           </div>
         )}
 
-        {/* ─── TAB: SURTIR CARROS ─── */}
+        {/* ─── TAB: PEDIDOS ─── */}
         {activeTab === 'surtir' && (
           <div className="space-y-4 sm:space-y-6 mt-2">
             <h2 className="text-gray-700 font-black tracking-wide text-base sm:text-lg mb-3 sm:mb-4 px-2">Solicitudes Recientes</h2>
@@ -899,9 +909,18 @@ export const DejadorDashboard = () => {
           </div>
         )}
 
+        {/* ─── TAB: GPS TRICICLOS ─── */}
+        {activeTab === 'gps' && (
+          <div className="animate-fade-in" style={{ height: 'calc(100dvh - 220px)', minHeight: 400 }}>
+            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white h-full">
+              <MapTrackingView embedded />
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* ─── FLOATING CONFIRM BUTTON (For Carga & Recibir) ─── */}
+      {/* ─── FLOATING CONFIRM BUTTON (For Surtir & Recibir) ─── */}
       {(activeTab === 'carga' || activeTab === 'recibir') && (
         <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 pointer-events-none z-50">
            <div className="max-w-7xl mx-auto flex justify-center sm:justify-end">
@@ -922,7 +941,7 @@ export const DejadorDashboard = () => {
                   }
                   
                   if (success) {
-                    showToast(`✅ ${activeTab === 'carga' ? 'Carga registrada' : 'Sobrantes recibidos'} para ${selectedVehicle}`);
+                    showToast(`✅ ${activeTab === 'carga' ? 'Surtido registrado' : 'Sobrantes recibidos'} para ${selectedVehicle}`);
                     setLoadQuantities({});
                     setActivePreset(null);
                   } else {
@@ -933,7 +952,7 @@ export const DejadorDashboard = () => {
                    ${getThemeClass('bg')}`}
              >
                <CheckCircle2 strokeWidth={3} className="w-5 h-5 sm:w-7 sm:h-7" />
-               {activeTab === 'carga' ? 'Confirmar Carga' : 'Confirmar Recepción'}
+               {activeTab === 'carga' ? 'Confirmar Surtido' : 'Confirmar Recepción'}
              </button>
            </div>
         </div>

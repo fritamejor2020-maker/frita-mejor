@@ -2,7 +2,10 @@
  * useVendorTracking — hook para VENDEDORES
  * Pide permiso GPS y transmite la ubicación cada 30s
  * al canal de Supabase Realtime Presence 'vendor-tracking'.
- * Cuando el componente se desmonta, el vendedor desaparece del mapa.
+ * 
+ * ADEMÁS: guarda cada ubicación en la tabla `vendor_locations`
+ * para que la última posición quede persistida incluso si
+ * el vendedor pierde conexión o cierra la app.
  */
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
@@ -18,16 +21,45 @@ export function useVendorTracking(vendorId: string, vendorName: string, enabled:
   const channelRef  = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Guardar en Presence (tiempo real) + tabla vendor_locations (persistente) ──
   const sendLocation = async (lat: number, lng: number) => {
-    if (!channelRef.current) return;
-    await channelRef.current.track({
-      vendorId,
-      name: vendorName,
-      lat,
-      lng,
-      updatedAt: new Date().toISOString(),
-    });
+    const now = new Date().toISOString();
+
+    // 1) Enviar a Presence (en vivo para el mapa)
+    if (channelRef.current) {
+      await channelRef.current.track({
+        vendorId,
+        name: vendorName,
+        lat,
+        lng,
+        updatedAt: now,
+      });
+    }
+
+    // 2) Upsert en tabla vendor_locations (persiste la última ubicación)
+    try {
+      await supabase.from('vendor_locations').upsert({
+        vendor_id: vendorId,
+        vendor_name: vendorName,
+        lat,
+        lng,
+        updated_at: now,
+        is_active: true,
+      }, { onConflict: 'vendor_id' });
+    } catch (_) {
+      // Silencioso: si falla la BD, al menos Presence sigue funcionando
+    }
+
     setLastSent(new Date());
+  };
+
+  // ── Marcar como inactivo al dejar de rastrear ──
+  const markInactive = async () => {
+    try {
+      await supabase.from('vendor_locations')
+        .update({ is_active: false })
+        .eq('vendor_id', vendorId);
+    } catch (_) {}
   };
 
   const startTracking = () => {
@@ -74,6 +106,7 @@ export function useVendorTracking(vendorId: string, vendorName: string, enabled:
       await supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
+    await markInactive();
     setStatus('idle');
   };
 

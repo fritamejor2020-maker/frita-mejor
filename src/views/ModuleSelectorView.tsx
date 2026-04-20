@@ -10,11 +10,9 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'pos':              { label: 'Caja POS',         icon: '🛒', route: '/pos',           color: 'from-green-500 to-green-600',  bg: 'bg-green-50' },
   'finanzas-ingresos':{ label: 'Ingresos',         icon: '💵', route: '/finanzas',      color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
   'finanzas-gastos':  { label: 'Gastos',           icon: '💸', route: '/finanzas',      color: 'from-red-500 to-rose-600',     bg: 'bg-red-50' },
-  'vendedor-setup':   { label: 'Turno Vendedor',   icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
-  'vendedor':         { label: 'Venta Móvil',      icon: '🛵', route: '/vendedor',      color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
+  'vendedor-setup':   { label: 'Vendedor Móvil',  icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
   'dejador':          { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
   'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
-  'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
 };
 
 export const ModuleSelectorView = () => {
@@ -67,27 +65,27 @@ export const ModuleSelectorView = () => {
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg, #FFF9F0)' }}>
-      {/* Header */}
-      <div className="px-6 pt-8 pb-4 flex items-center justify-between">
-        <div>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Bienvenido</p>
-          <h1 className="text-2xl font-black text-gray-800 mt-0.5">{user.name}</h1>
+      {/* Header — franja blanca con esquinas redondeadas */}
+      <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
+        <div className="max-w-7xl mx-auto pt-6 sm:pt-8 pb-5 sm:pb-6 px-5 sm:px-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-bold text-amber-500 uppercase tracking-widest">Bienvenido</p>
+              <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mt-0.5 leading-tight">{user.name}</h1>
+            </div>
+            <button
+              onClick={() => { signOut(); navigate('/login', { replace: true }); }}
+              className="flex items-center gap-2 bg-red-50 text-red-500 font-black text-xs sm:text-sm px-4 py-2.5 rounded-full border border-red-200 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all active:scale-95 shrink-0"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+          <p className="text-sm font-bold text-gray-400 mt-3">Selecciona el módulo al que deseas acceder</p>
         </div>
-        <button
-          onClick={() => { signOut(); navigate('/login', { replace: true }); }}
-          className="text-xs font-bold text-gray-400 hover:text-red-500 transition-colors px-3 py-2 rounded-xl hover:bg-red-50"
-        >
-          Cerrar sesión
-        </button>
-      </div>
-
-      {/* Subtítulo */}
-      <div className="px-6 mb-6">
-        <p className="text-sm font-bold text-gray-500">Selecciona el módulo al que deseas acceder</p>
       </div>
 
       {/* Grid de módulos */}
-      <div className="flex-1 px-4 pb-8">
+      <div className="flex-1 px-4 pb-8 mt-6 sm:mt-8">
         <div className="grid grid-cols-2 gap-4 max-w-md mx-auto sm:max-w-xl sm:grid-cols-3">
           {userModules.map((m: any) => (
             <button

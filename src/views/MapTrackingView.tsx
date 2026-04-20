@@ -3,6 +3,10 @@
  * Para Admin y Dejadores: muestra la ubicación de los vendedores activos
  * usando Leaflet + OpenStreetMap (gratis, sin API key)
  * y Supabase Realtime Presence para actualizaciones en vivo.
+ *
+ * PERSISTENCIA: Al montar, carga las últimas ubicaciones guardadas
+ * de la tabla `vendor_locations`. Luego, Presence actualiza en vivo.
+ * Si un vendedor pierde conexión, su última ubicación de la BD sigue visible.
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet';
@@ -64,6 +68,7 @@ interface VendorLocation {
   lat: number;
   lng: number;
   updatedAt: string;
+  source?: 'presence' | 'db';  // de dónde vino el dato
 }
 
 // ── Componente auxiliar: centra el mapa si no hay ubicaciones aún ────────────
@@ -81,33 +86,85 @@ function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export const MapTrackingView = () => {
+export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) => {
   const { user, signOut } = useAuthStore();
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
   const [connected, setConnected] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  // Presence data — se fusiona con datos de la BD
+  const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
+  const dbRef = useRef<Map<string, VendorLocation>>(new Map());
 
   // Calcular si una ubicación está "vieja" (más de 2 minutos)
   const isStale = (updatedAt: string) =>
     Date.now() - new Date(updatedAt).getTime() > 2 * 60 * 1000;
 
+  // ── Fusionar Presence (en vivo) + BD (persistida) ──────────────────────────
+  const mergeVendors = () => {
+    const merged = new Map<string, VendorLocation>();
+
+    // Primero agregar los de la BD (última ubicación guardada)
+    dbRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'db' }));
+
+    // Luego sobrescribir con los de Presence (estos son más recientes)
+    presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
+
+    setVendors(Array.from(merged.values()));
+  };
+
+  // ── Cargar últimas ubicaciones guardadas de la BD al montar ────────────────
+  useEffect(() => {
+    const loadSavedLocations = async () => {
+      try {
+        const { data } = await supabase
+          .from('vendor_locations')
+          .select('*')
+          .order('updated_at', { ascending: false });
+
+        if (data && data.length > 0) {
+          data.forEach((row: any) => {
+            dbRef.current.set(row.vendor_id, {
+              vendorId: row.vendor_id,
+              name: row.vendor_name,
+              lat: row.lat,
+              lng: row.lng,
+              updatedAt: row.updated_at,
+              source: 'db',
+            });
+          });
+          mergeVendors();
+        }
+      } catch (_) {
+        // Silencioso — si la tabla no existe aún, no pasa nada
+      }
+    };
+
+    loadSavedLocations();
+
+    // Refrescar de la BD cada 60s como respaldo
+    const dbInterval = setInterval(loadSavedLocations, 60_000);
+    return () => clearInterval(dbInterval);
+  }, []);
+
+  // ── Suscripción a Presence (tiempo real) ──────────────────────────────────
   useEffect(() => {
     const ch = supabase.channel(CHANNEL, { config: { presence: { key: 'viewer-' + (user?.id ?? 'anon') } } });
     channelRef.current = ch;
 
     ch.on('presence', { event: 'sync' }, () => {
       const state = ch.presenceState() as Record<string, any[]>;
-      const list: VendorLocation[] = [];
+      presenceRef.current.clear();
+
       Object.values(state).forEach((entries) => {
         entries.forEach((e) => {
           // Solo incluir entradas con coordenadas reales (no los viewers)
           if (e.lat && e.lng && e.vendorId) {
-            list.push(e as VendorLocation);
+            presenceRef.current.set(e.vendorId, e as VendorLocation);
           }
         });
       });
-      setVendors(list);
+      mergeVendors();
     });
 
     ch.subscribe((status) => {
@@ -123,12 +180,15 @@ export const MapTrackingView = () => {
     const diff = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
     if (diff < 60) return 'Ahora mismo';
     if (diff < 120) return 'Hace 1 min';
-    return `Hace ${Math.floor(diff / 60)} min`;
+    if (diff < 3600) return `Hace ${Math.floor(diff / 60)} min`;
+    if (diff < 86400) return `Hace ${Math.floor(diff / 3600)}h`;
+    return `Hace ${Math.floor(diff / 86400)}d`;
   };
 
   return (
-    <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
-      {/* Header */}
+    <div style={{ height: embedded ? '100%' : '100dvh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+      {/* Header — hidden when embedded */}
+      {!embedded && (
       <header style={{
         background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.08)',
         padding: '10px 16px', display: 'flex', alignItems: 'center',
@@ -162,6 +222,7 @@ export const MapTrackingView = () => {
           </button>
         </div>
       </header>
+      )}
 
       {/* Contenido: mapa + panel lateral */}
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
@@ -173,32 +234,42 @@ export const MapTrackingView = () => {
           zoomControl={true}
         >
           <TileLayer
-            attribution='© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
           <AutoCenter vendors={vendors} />
-          {vendors.map((v) => (
+          {vendors.map((v) => {
+            const stale = isStale(v.updatedAt);
+            const fromDb = v.source === 'db';
+            return (
             <Marker
               key={v.vendorId}
               position={[v.lat, v.lng]}
-              icon={createVendorIcon(v.name, isStale(v.updatedAt))}
+              icon={createVendorIcon(v.name, stale)}
             >
               <Popup>
-                <div style={{ fontFamily: 'system-ui', minWidth: 140 }}>
+                <div style={{ fontFamily: 'system-ui', minWidth: 160 }}>
                   <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>🛵 {v.name}</div>
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
                     📍 {v.lat.toFixed(5)}, {v.lng.toFixed(5)}
                   </div>
-                  <div style={{ fontSize: 12, color: isStale(v.updatedAt) ? '#ef4444' : '#22c55e', fontWeight: 700, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: stale ? '#ef4444' : '#22c55e', fontWeight: 700, marginTop: 4 }}>
                     🕐 {formatTime(v.updatedAt)}
                   </div>
+                  {fromDb && stale && (
+                    <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 700, marginTop: 4, fontStyle: 'italic' }}>
+                      📡 Última ubicación guardada
+                    </div>
+                  )}
                 </div>
               </Popup>
             </Marker>
-          ))}
+            );
+          })}
         </MapContainer>
 
-        {/* Panel lateral de vendedores */}
+        {/* Panel lateral de vendedores — hidden when embedded */}
+        {!embedded && (
         <div style={{
           width: 220, background: 'white', boxShadow: '-2px 0 8px rgba(0,0,0,0.08)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 2,
@@ -241,12 +312,45 @@ export const MapTrackingView = () => {
                     <div style={{ fontSize: 10, fontWeight: 700, color: stale ? '#ef4444' : '#6b7280' }}>
                       🕐 {formatTime(v.updatedAt)}
                     </div>
+                    {v.source === 'db' && stale && (
+                      <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600, marginTop: 2 }}>
+                        📡 Última guardada
+                      </div>
+                    )}
                   </div>
                 );
               })
             )}
           </div>
         </div>
+        )}
+
+        {/* Embedded: floating vendor count badge */}
+        {embedded && vendors.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 10, right: 10, zIndex: 1000,
+            background: 'white', borderRadius: 20, padding: '6px 14px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)', display: 'flex',
+            alignItems: 'center', gap: 6,
+          }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e' }} />
+            <span style={{ fontWeight: 900, fontSize: 12, color: '#1f2937' }}>
+              {vendors.length} en ruta
+            </span>
+          </div>
+        )}
+        {embedded && (
+          <div style={{
+            position: 'absolute', top: 10, left: 10, zIndex: 1000,
+            background: connected ? '#dcfce7' : '#fef9c3', borderRadius: 20,
+            padding: '4px 10px', display: 'flex', alignItems: 'center', gap: 5,
+          }}>
+            <div style={{ width: 7, height: 7, borderRadius: '50%', background: connected ? '#22c55e' : '#eab308' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: connected ? '#15803d' : '#92400e' }}>
+              {connected ? 'En línea' : 'Conectando...'}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* CSS animaciones */}
