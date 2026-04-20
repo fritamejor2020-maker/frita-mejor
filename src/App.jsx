@@ -17,12 +17,13 @@ import { AdminView }      from './modules/admin/AdminView';
 import { PosView }        from './modules/pos/PosView';
 import { FritadoView }    from './modules/fritado/FritadoView';
 
-import { SellerSetupView }   from './views/SellerSetupView';
-import { DejadorSetupView }  from './views/DejadorSetupView';
-import { VendedorDashboard } from './views/VendedorDashboard';
-import { DejadorDashboard }  from './views/DejadorDashboard';
-import { MapTrackingView }   from './views/MapTrackingView';
-import { FinanceDashboard }  from './modules/pos/FinanceDashboard';
+import { SellerSetupView }     from './views/SellerSetupView';
+import { DejadorSetupView }    from './views/DejadorSetupView';
+import { VendedorDashboard }   from './views/VendedorDashboard';
+import { DejadorDashboard }    from './views/DejadorDashboard';
+import { MapTrackingView }     from './views/MapTrackingView';
+import { FinanceDashboard }    from './modules/pos/FinanceDashboard';
+import { ModuleSelectorView }  from './views/ModuleSelectorView';
 
 import { Link } from 'react-router-dom';
 
@@ -50,45 +51,44 @@ function RoleRedirect() {
   const { user } = useAuthStore();
   if (!user) return <Navigate to="/login" replace />;
 
-  // If vendor, check if there's already an active session before sending to setup
-  if (user.role === 'VENDEDOR' || user.role === 'vendedor') {
-    try {
-      const raw = localStorage.getItem('frita-seller-session');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.state?.isSetupComplete) {
+  const access = user.access || [];
+
+  // Si tiene MÁS de un módulo → pantalla de selección
+  if (access.length > 1) {
+    return <Navigate to="/selector" replace />;
+  }
+
+  // Un solo módulo → ir directo
+  if (access.length === 1) {
+    const key = access[0];
+
+    if (key === 'vendedor-setup' || key === 'vendedor') {
+      try {
+        const raw = localStorage.getItem('frita-seller-session');
+        if (raw && JSON.parse(raw)?.state?.isSetupComplete)
           return <Navigate to="/vendedor" replace />;
-        }
-      }
-    } catch (_) {}
-    return <Navigate to="/vendedor-setup" replace />;
-  }
+      } catch (_) {}
+      return <Navigate to="/vendedor-setup" replace />;
+    }
 
-  // If dejador, check if there's already an active session
-  if (user.role === 'DEJADOR' || user.role === 'dejador') {
-    try {
-      const raw = localStorage.getItem('frita-dejador-session');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed?.state?.isSetupComplete) {
+    if (key === 'dejador') {
+      try {
+        const raw = localStorage.getItem('frita-dejador-session');
+        if (raw && JSON.parse(raw)?.state?.isSetupComplete)
           return <Navigate to="/dejador" replace />;
-        }
-      }
-    } catch (_) {}
-    return <Navigate to="/dejador-setup" replace />;
+      } catch (_) {}
+      return <Navigate to="/dejador-setup" replace />;
+    }
+
+    const singleRoutes: Record<string, string> = {
+      produccion: '/produccion', bodega: '/bodega', fritado: '/fritado',
+      pos: '/pos', finanzas: '/finanzas', admin: '/admin', tracking: '/tracking',
+    };
+    return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }
 
-  const routes = { 
-    ADMIN: '/admin', 
-    BODEGUERO: '/bodega', 
-    OPERARIO: '/produccion', 
-    FRITADOR: '/fritado',
-    CAJERO: '/pos',
-    DEJADOR: '/dejador',
-    dejador: '/dejador',
-    FINANZAS: '/finanzas'
-  };
-  return <Navigate to={routes[user.role] ?? '/produccion'} replace />;
+  // Sin módulos → selector (mostrará mensaje de sin acceso)
+  return <Navigate to="/selector" replace />;
 }
 
 class ErrorBoundary extends React.Component {
@@ -176,6 +176,9 @@ function App() {
 
         {/* Redirección raíz basada en rol */}
         <Route path="/" element={<RoleRedirect />} />
+
+        {/* Selector de módulo (usuarios con múltiples accesos) */}
+        <Route path="/selector" element={<ModuleSelectorView />} />
 
         {/* Rutas protegidas */}
         <Route element={<ProtectedRoute allowedRoles={['OPERARIO', 'ADMIN']} />}>

@@ -181,8 +181,9 @@ export const useAuthStore = create(
           const updatedUsers = state.users.map((u) => {
             if (u.id !== id) return u;
             const updated = { ...u, ...updates };
-            // Si cambia el rol, actualizar el acceso automáticamente
-            if (updates.role && updates.role !== u.role) {
+            // Si se provee access explícito en updates, usarlo tal cual (personalizado por el Admin).
+            // Solo auto-asignar por rol si cambia el rol Y no se pasó access personalizado.
+            if (updates.role && updates.role !== u.role && !updates.access) {
               updated.access = ROLE_ACCESS[updates.role] ?? u.access;
             }
             return updated;
