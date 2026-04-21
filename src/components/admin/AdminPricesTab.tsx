@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
-import { Edit2, Check, Trash2, Plus, X, Search, ShoppingCart } from 'lucide-react';
+import { Edit2, Check, Trash2, Plus, X, Search, ShoppingCart, Shuffle } from 'lucide-react';
 import { formatMoney } from '../../utils/formatUtils';
 import { MoneyInput } from '../ui/MoneyInput';
 import { push } from '../../lib/syncManager';
 
 type Mode = 'list' | 'add-select' | 'add-custom';
+type PriceType = 'fijo' | 'variable';
 
 export const AdminPricesTab = () => {
   const { inventory, updateInventoryItem, addInventoryItem, deleteInventoryItem } = useInventoryStore();
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
+  const [editIsVariable, setEditIsVariable] = useState<boolean>(false);
+  const [editReferencePrice, setEditReferencePrice] = useState<number>(0);
   const [mode, setMode] = useState<Mode>('list');
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -25,6 +28,8 @@ export const AdminPricesTab = () => {
   // Custom product form
   const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState<number>(0);
+  const [customPriceType, setCustomPriceType] = useState<PriceType>('fijo');
+  const [customReferencePrice, setCustomReferencePrice] = useState<number>(0);
   const [customAbbrev, setCustomAbbrev] = useState('');
   const [customPresets, setCustomPresets] = useState<string[]>(['5', '10', '15', '20']);
   const [presetInput, setPresetInput] = useState('');
@@ -43,15 +48,27 @@ export const AdminPricesTab = () => {
     i.name.toLowerCase().includes(search.toLowerCase())
   );
 
+  const openEdit = (p: any) => {
+    setEditingId(p.id);
+    setEditPrice(p.price);
+    setEditIsVariable(p.variablePrice === true || p.price === 0);
+    setEditReferencePrice(p.referencePrice || 0);
+  };
+
   const handleSave = (id: string) => {
-    updateInventoryItem(id, { price: editPrice });
+    updateInventoryItem(id, {
+      price: editIsVariable ? 0 : editPrice,
+      variablePrice: editIsVariable,
+      referencePrice: editIsVariable ? editReferencePrice : undefined,
+    });
     setEditingId(null);
   };
 
   const handleAddFromInventory = (item: any) => {
-    // Set price=0 and ensure type is PRODUCTO so getPosItems() includes it in Dejador/Vendedor
+    // Set price=0, variablePrice=true and ensure type is PRODUCTO so getPosItems() includes it in Dejador/Vendedor
     updateInventoryItem(item.id, {
       price: 0,
+      variablePrice: true,
       type: item.type === 'FRITO' ? 'FRITO' : 'PRODUCTO',
     });
     setMode('list');
@@ -59,6 +76,7 @@ export const AdminPricesTab = () => {
     // Open the price editor immediately so admin can set the price
     setEditingId(item.id);
     setEditPrice(0);
+    setEditIsVariable(true);
   };
 
   const handleAddCustom = () => {
@@ -75,12 +93,16 @@ export const AdminPricesTab = () => {
       unit: 'ud',
       type: 'PRODUCTO',
       alert: 0,
-      price: customPrice,
+      price: customPriceType === 'variable' ? 0 : customPrice,
+      variablePrice: customPriceType === 'variable',
+      referencePrice: customPriceType === 'variable' ? customReferencePrice : undefined,
       abbreviation: customAbbrev.trim() || undefined,
       inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
     });
     setCustomName('');
     setCustomPrice(0);
+    setCustomPriceType('fijo');
+    setCustomReferencePrice(0);
     setCustomAbbrev('');
     setCustomPresets(['5', '10', '15', '20']);
     setMode('list');
@@ -98,6 +120,11 @@ export const AdminPricesTab = () => {
     }
     setConfirmDeleteId(null);
   };
+
+  // Separate lists: variable first, then fixed
+  // Use explicit variablePrice flag; fallback to price===0 for backward-compat
+  const variableProducts = products.filter((p: any) => p.variablePrice === true || (p.price === 0 && p.variablePrice !== false));
+  const fixedProducts = products.filter((p: any) => !variableProducts.some((vp: any) => vp.id === p.id));
 
   return (
     <div className="p-4 bg-[#FFD56B] flex-1 rounded-bl-[32px] rounded-br-[32px] md:rounded-[32px]">
@@ -118,87 +145,70 @@ export const AdminPricesTab = () => {
 
       {/* Product list */}
       <div className="space-y-3">
-        {products.map((p: any) => (
-          <div key={p.id} className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex justify-between items-center gap-3">
-            <div className="flex items-center gap-1.5 flex-1 min-w-0">
-              <span className="font-bold text-gray-800 text-lg leading-tight truncate">{p.name}</span>
-              {/* showInPos badge */}
-              <button
-                onClick={() => updateInventoryItem(p.id, { showInPos: !(p.showInPos !== false) })}
-                title={p.showInPos !== false ? 'Visible en POS vendedor — clic para ocultar' : 'Oculto en POS vendedor — clic para mostrar'}
-                className={`ml-1 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${
-                  p.showInPos !== false
-                    ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-500'
-                    : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
-                }`}
-              >
-                <ShoppingCart size={10} />
-                {p.showInPos !== false ? 'POS' : 'No POS'}
-              </button>
-            </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {editingId === p.id ? (
-                <>
-                  <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-frita-orange">
-                    <span className="px-3 py-2 text-gray-400 font-bold">$</span>
-                    <MoneyInput
-                      value={String(editPrice)}
-                      onChange={(v) => setEditPrice(parseInt(v) || 0)}
-                      className="bg-transparent outline-none font-black w-24 py-2 text-frita-red"
-                    />
-                  </div>
-                  <button
-                    onClick={() => handleSave(p.id)}
-                    className="bg-green-500 text-white p-2.5 rounded-xl shadow-sm hover:scale-105 transition-transform"
-                  >
-                    <Check size={18} strokeWidth={3} />
-                  </button>
-                  <button
-                    onClick={() => setEditingId(null)}
-                    className="bg-gray-100 text-gray-400 hover:text-gray-700 p-2.5 rounded-xl transition-colors"
-                  >
-                    <X size={18} strokeWidth={2.5} />
-                  </button>
-                </>
-              ) : (
-                <>
-                  <span className="font-black text-frita-red text-xl">{formatMoney(p.price)}</span>
-                  <button
-                    onClick={() => { setEditingId(p.id); setEditPrice(p.price); }}
-                    className="bg-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200 p-2.5 rounded-xl transition-colors"
-                  >
-                    <Edit2 size={18} strokeWidth={3} />
-                  </button>
-                  {confirmDeleteId === p.id ? (
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-bold text-red-500">¿Eliminar?</span>
-                      <button
-                        onClick={() => handleDelete(p.id)}
-                        className="bg-red-500 text-white text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-red-600 transition-colors"
-                      >
-                        Sí
-                      </button>
-                      <button
-                        onClick={() => setConfirmDeleteId(null)}
-                        className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-gray-200 transition-colors"
-                      >
-                        No
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => setConfirmDeleteId(p.id)}
-                      className="bg-gray-100 text-gray-300 hover:text-red-400 hover:bg-red-50 p-2.5 rounded-xl transition-colors"
-                    >
-                      <Trash2 size={18} strokeWidth={2.5} />
-                    </button>
-                  )}
-                </>
-              )}
+        {/* ── Precio Variable ─── */}
+        {variableProducts.length > 0 && (
+          <div className="mb-1">
+            <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-2 flex items-center gap-1.5">
+              <Shuffle size={12} /> Precio Variable
+            </p>
+            <div className="space-y-2">
+              {variableProducts.map((p: any) => (
+                <ProductRow
+                  key={p.id}
+                  p={p}
+                  editingId={editingId}
+                  editPrice={editPrice}
+                  editIsVariable={editIsVariable}
+                  editReferencePrice={editReferencePrice}
+                  setEditPrice={setEditPrice}
+                  setEditIsVariable={setEditIsVariable}
+                  setEditReferencePrice={setEditReferencePrice}
+                  handleSave={handleSave}
+                  openEdit={openEdit}
+                  setEditingId={setEditingId}
+                  confirmDeleteId={confirmDeleteId}
+                  setConfirmDeleteId={setConfirmDeleteId}
+                  handleDelete={handleDelete}
+                  updateInventoryItem={updateInventoryItem}
+                />
+              ))}
             </div>
           </div>
-        ))}
+        )}
+
+        {/* ── Precio Fijo ─── */}
+        {fixedProducts.length > 0 && (
+          <div>
+            {variableProducts.length > 0 && (
+              <p className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-2 mt-4 flex items-center gap-1.5">
+                📌 Precio Fijo
+              </p>
+            )}
+            <div className="space-y-2">
+              {fixedProducts.map((p: any) => (
+                <ProductRow
+                  key={p.id}
+                  p={p}
+                  editingId={editingId}
+                  editPrice={editPrice}
+                  editIsVariable={editIsVariable}
+                  editReferencePrice={editReferencePrice}
+                  setEditPrice={setEditPrice}
+                  setEditIsVariable={setEditIsVariable}
+                  setEditReferencePrice={setEditReferencePrice}
+                  handleSave={handleSave}
+                  openEdit={openEdit}
+                  setEditingId={setEditingId}
+                  confirmDeleteId={confirmDeleteId}
+                  setConfirmDeleteId={setConfirmDeleteId}
+                  handleDelete={handleDelete}
+                  updateInventoryItem={updateInventoryItem}
+                />
+              ))}
+            </div>
+          </div>
+        )}
 
         {products.length === 0 && (
           <div className="text-center py-12 text-gray-500">
@@ -331,18 +341,72 @@ export const AdminPricesTab = () => {
                 </div>
               </div>
 
-              {/* Precio */}
+              {/* ── Tipo de Precio ── */}
               <div>
-                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Precio de venta</label>
-                <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-gray-900">
-                  <span className="px-4 py-3 text-gray-400 font-bold">$</span>
-                  <MoneyInput
-                    value={String(customPrice)}
-                    onChange={(v) => setCustomPrice(parseInt(v) || 0)}
-                    className="bg-transparent outline-none font-black py-3 text-gray-900 flex-1"
-                  />
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Tipo de Precio</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setCustomPriceType('fijo')}
+                    className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border-2 transition-all font-black text-sm ${
+                      customPriceType === 'fijo'
+                        ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    📌 Fijo
+                    <span className="text-[10px] font-bold opacity-70">Precio definido</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCustomPriceType('variable')}
+                    className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border-2 transition-all font-black text-sm ${
+                      customPriceType === 'variable'
+                        ? 'border-amber-500 bg-amber-500 text-white shadow-md'
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-amber-300'
+                    }`}
+                  >
+                    💱 Variable
+                    <span className="text-[10px] font-bold opacity-70">Vendedor ingresa</span>
+                  </button>
                 </div>
+                {customPriceType === 'variable' && (
+                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
+                    <p className="text-[11px] font-bold text-amber-700">
+                      💱 El vendedor ingresa el precio real al vender.
+                      Aquí defines el <strong>precio promedio</strong> usado solo para calcular el teórico del cierre.
+                    </p>
+                    <div>
+                      <label className="block text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1">Precio Promedio / Referencial</label>
+                      <div className="flex bg-white border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
+                        <span className="px-3 py-2.5 text-amber-400 font-bold">$</span>
+                        <MoneyInput
+                          value={String(customReferencePrice)}
+                          onChange={(v) => setCustomReferencePrice(parseFloat(v) || 0)}
+                          className="bg-transparent outline-none font-black py-2.5 text-amber-700 flex-1"
+                          allowDecimal
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
+
+              {/* Precio (solo si fijo) */}
+              {customPriceType === 'fijo' && (
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Precio de venta</label>
+                  <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-gray-900">
+                    <span className="px-4 py-3 text-gray-400 font-bold">$</span>
+                    <MoneyInput
+                      value={String(customPrice)}
+                      onChange={(v) => setCustomPrice(parseFloat(v) || 0)}
+                      className="bg-transparent outline-none font-black py-3 text-gray-900 flex-1"
+                      allowDecimal
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Valores de los botones */}
               <div>
@@ -403,6 +467,174 @@ export const AdminPricesTab = () => {
           </div>
         </div>
       )}
+    </div>
+  );
+};
+
+// ── Sub-componente reutilizable para cada fila de producto ────────────────
+interface ProductRowProps {
+  p: any;
+  editingId: string | null;
+  editPrice: number;
+  editIsVariable: boolean;
+  editReferencePrice: number;
+  setEditPrice: (v: number) => void;
+  setEditIsVariable: (v: boolean) => void;
+  setEditReferencePrice: (v: number) => void;
+  handleSave: (id: string) => void;
+  openEdit: (p: any) => void;
+  setEditingId: (id: string | null) => void;
+  confirmDeleteId: string | null;
+  setConfirmDeleteId: (id: string | null) => void;
+  handleDelete: (id: string) => void;
+  updateInventoryItem: (id: string, data: any) => void;
+}
+
+const ProductRow = ({
+  p, editingId, editPrice, editIsVariable, editReferencePrice,
+  setEditPrice, setEditIsVariable, setEditReferencePrice,
+  handleSave, openEdit, setEditingId,
+  confirmDeleteId, setConfirmDeleteId, handleDelete,
+  updateInventoryItem,
+}: ProductRowProps) => {
+  const isEditing = editingId === p.id;
+  const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
+
+  return (
+    <div className={`bg-white p-4 rounded-2xl shadow-sm border flex justify-between items-center gap-3 ${
+      isVariable ? 'border-amber-200' : 'border-gray-100'
+    }`}>
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        <span className="font-bold text-gray-800 text-lg leading-tight truncate">{p.name}</span>
+        {/* showInPos badge */}
+        <button
+          onClick={() => updateInventoryItem(p.id, { showInPos: !(p.showInPos !== false) })}
+          title={p.showInPos !== false ? 'Visible en POS vendedor — clic para ocultar' : 'Oculto en POS vendedor — clic para mostrar'}
+          className={`ml-1 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${
+            p.showInPos !== false
+              ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-500'
+              : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
+          }`}
+        >
+          <ShoppingCart size={10} />
+          {p.showInPos !== false ? 'POS' : 'No POS'}
+        </button>
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        {isEditing ? (
+          <>
+            {/* Toggle fijo / variable mientras se edita */}
+            <div className="flex rounded-xl overflow-hidden border border-gray-200 text-[11px] font-black">
+              <button
+                onClick={() => { setEditIsVariable(false); }}
+                className={`px-2.5 py-1.5 transition-colors ${!editIsVariable ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+              >
+                📌 Fijo
+              </button>
+              <button
+                onClick={() => { setEditIsVariable(true); }}
+                className={`px-2.5 py-1.5 transition-colors ${editIsVariable ? 'bg-amber-500 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+              >
+                💱 Variable
+              </button>
+            </div>
+
+            {/* Input de precio (solo si fijo) */}
+            {!editIsVariable && (
+              <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-frita-orange">
+                <span className="px-3 py-2 text-gray-400 font-bold">$</span>
+                <MoneyInput
+                  value={String(editPrice)}
+                  onChange={(v) => setEditPrice(parseFloat(v) || 0)}
+                  className="bg-transparent outline-none font-black w-20 py-2 text-frita-red"
+                  allowDecimal
+                />
+              </div>
+            )}
+
+            {/* Precio promedio (solo si variable) */}
+            {editIsVariable && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest px-1">Precio Promedio</span>
+                <div className="flex bg-amber-50 border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
+                  <span className="px-3 py-2 text-amber-400 font-bold">$</span>
+                  <MoneyInput
+                    value={String(editReferencePrice)}
+                    onChange={(v) => setEditReferencePrice(parseFloat(v) || 0)}
+                    className="bg-transparent outline-none font-black w-20 py-2 text-amber-700"
+                    allowDecimal
+                  />
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={() => handleSave(p.id)}
+              className="bg-green-500 text-white p-2.5 rounded-xl shadow-sm hover:scale-105 transition-transform"
+            >
+              <Check size={18} strokeWidth={3} />
+            </button>
+            <button
+              onClick={() => setEditingId(null)}
+              className="bg-gray-100 text-gray-400 hover:text-gray-700 p-2.5 rounded-xl transition-colors"
+            >
+              <X size={18} strokeWidth={2.5} />
+            </button>
+          </>
+        ) : (
+          <>
+            {/* Precio o badge Variable */}
+            {isVariable ? (
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="flex items-center gap-1 bg-amber-100 text-amber-700 font-black text-xs px-3 py-1.5 rounded-full border border-amber-200">
+                  <Shuffle size={11} /> Variable
+                </span>
+                {p.referencePrice > 0 && (
+                  <span className="text-[10px] font-bold text-amber-500 px-1">≈ {formatMoney(p.referencePrice)}</span>
+                )}
+                {!p.referencePrice && (
+                  <span className="text-[9px] font-bold text-red-400 px-1">⚠ Sin precio promedio</span>
+                )}
+              </div>
+            ) : (
+              <span className="font-black text-frita-red text-xl">{formatMoney(p.price)}</span>
+            )}
+
+            <button
+              onClick={() => openEdit(p)}
+              className="bg-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200 p-2.5 rounded-xl transition-colors"
+            >
+              <Edit2 size={18} strokeWidth={3} />
+            </button>
+
+            {confirmDeleteId === p.id ? (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-red-500">¿Eliminar?</span>
+                <button
+                  onClick={() => handleDelete(p.id)}
+                  className="bg-red-500 text-white text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-red-600 transition-colors"
+                >
+                  Sí
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-gray-200 transition-colors"
+                >
+                  No
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmDeleteId(p.id)}
+                className="bg-gray-100 text-gray-300 hover:text-red-400 hover:bg-red-50 p-2.5 rounded-xl transition-colors"
+              >
+                <Trash2 size={18} strokeWidth={2.5} />
+              </button>
+            )}
+          </>
+        )}
+      </div>
     </div>
   );
 };

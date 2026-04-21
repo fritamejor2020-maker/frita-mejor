@@ -5,6 +5,7 @@ import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useSupplierStore } from '../store/useSupplierStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -54,6 +55,8 @@ function getApplicators() {
     completedRequests: (v) => useLogisticsStore.setState({ completedRequests: v }),
     rejectedRequests: (v) => useLogisticsStore.setState({ rejectedRequests: v }),
     loadHistory:     (v) => useLogisticsStore.setState({ loadHistory: v }),
+    // Usuarios: sincronizados para que todos los dispositivos vean los nuevos usuarios
+    users:           (v) => useAuthStore.setState({ users: v }),
   };
 }
 

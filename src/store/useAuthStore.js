@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { push } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
 
 // =============================================================================
 // BASE DE USUARIOS LOCAL (mientras no está conectado a Supabase)
@@ -161,13 +163,15 @@ export const useAuthStore = create(
           ...userData,
           id: `USR-${Date.now()}`,
           active: true,
-          // Respetar el access personalizado elegido en el formulario.
-          // Solo usar el del rol como fallback si no se pasó ninguno.
           access: (userData.access && userData.access.length > 0)
             ? userData.access
             : (ROLE_ACCESS[userData.role] || []),
         };
         set((state) => ({ users: [...state.users, newUser] }));
+        // Sincronizar con Supabase para que todos los dispositivos lo reciban
+        const updatedUsers = get().users;
+        markLocalWrite('users');
+        push('users', updatedUsers).catch(err => console.warn('[Sync] users', err.message));
         return { ok: true };
       },
 
@@ -186,27 +190,33 @@ export const useAuthStore = create(
           const updatedUsers = state.users.map((u) => {
             if (u.id !== id) return u;
             const updated = { ...u, ...updates };
-            // Si se provee access explícito en updates, usarlo tal cual (personalizado por el Admin).
-            // Solo auto-asignar por rol si cambia el rol Y no se pasó access personalizado.
             if (updates.role && updates.role !== u.role && !updates.access) {
               updated.access = ROLE_ACCESS[updates.role] ?? u.access;
             }
             return updated;
           });
 
-          // Si el admin está editando su propio perfil, actualizar la sesión activa también
           const updatedSelf = state.user?.id === id
             ? updatedUsers.find((u) => u.id === id)
             : state.user;
 
           return { users: updatedUsers, user: updatedSelf };
         });
+        // Sincronizar con Supabase
+        const updatedUsers = get().users;
+        markLocalWrite('users');
+        push('users', updatedUsers).catch(err => console.warn('[Sync] users', err.message));
+        return { ok: true };
       },
 
       deleteUser: (id) => {
         const current = get().user;
         if (current?.id === id) return { ok: false, error: 'No puedes eliminar tu propio usuario.' };
         set((state) => ({ users: state.users.filter((u) => u.id !== id) }));
+        // Sincronizar con Supabase
+        const updatedUsers = get().users;
+        markLocalWrite('users');
+        push('users', updatedUsers).catch(err => console.warn('[Sync] users', err.message));
         return { ok: true };
       },
 
@@ -229,6 +239,10 @@ export const useAuthStore = create(
         set((state) => ({
           users: state.users.map((u) => u.id === id ? { ...u, active: !u.active } : u),
         }));
+        // Sincronizar con Supabase
+        const updatedUsers = get().users;
+        markLocalWrite('users');
+        push('users', updatedUsers).catch(err => console.warn('[Sync] users', err.message));
       },
     }),
     {

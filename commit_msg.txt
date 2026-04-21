@@ -1,0 +1,5 @@
+fix: AdminUsersTab sincroniza usuarios a Supabase al abrir y boton manual
+
+- useEffect on mount: push usuarios actuales a Supabase automaticamente
+- Boton Sincronizar: fuerza push manual con confirmacion visual
+- Resuelve usuarios creados antes del fix de sync que solo estaban en localStorage

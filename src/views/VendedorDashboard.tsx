@@ -74,8 +74,12 @@ export const VendedorDashboard = () => {
     setSoldQty(prev => ({ ...prev, [inventoryId]: Math.max(0, val) }));
 
   // Build product price map for calcSoldByVehicle
+  // Para productos de precio variable, usa referencePrice (precio promedio) para el teórico
+  // Para productos de precio fijo, usa price directamente
   const productPriceMap = products.reduce((acc: any, p: any) => {
-    acc[p.id] = { price: p.price || 0, name: p.name };
+    const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
+    const priceForTheory = isVariable ? (p.referencePrice || 0) : (p.price || 0);
+    acc[p.id] = { price: priceForTheory, name: p.name };
     return acc;
   }, {});
 
@@ -331,7 +335,7 @@ export const VendedorDashboard = () => {
               <button
                 key={p.id}
                 onClick={() => {
-                  if (!p.price || p.price <= 0) {
+                  if (p.variablePrice === true || !p.price || p.price <= 0) {
                      setVariablePriceProduct(p);
                   } else {
                      addToCart(p, 1);
