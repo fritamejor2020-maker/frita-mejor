@@ -50,7 +50,7 @@ export const VendedorDashboard = () => {
   // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
   const trackingName = responsibleName || (user as any)?.name || 'Vendedor';
   const trackingId   = (user as any)?.id || pointId || 'unknown';
-  const { status: gpsStatus, retry: gpsRetry } = useVendorTracking(
+  const { status: gpsStatus, retry: gpsRetry, stop: gpsStop } = useVendorTracking(
     trackingId,
     trackingName,
     isSetupComplete // Solo activo cuando el turno está abierto
@@ -254,6 +254,8 @@ export const VendedorDashboard = () => {
         addPosShift(finalShift);
       }
 
+      // Marcar GPS inactivo inmediatamente — el vendedor desaparece del mapa
+      await gpsStop();
       endShift();
       signOut();
     } catch (err: any) {

@@ -120,9 +120,12 @@ export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) =>
         const { data } = await supabase
           .from('vendor_locations')
           .select('*')
+          .eq('is_active', true)              // ← Solo turno activo
           .order('updated_at', { ascending: false });
 
-        if (data && data.length > 0) {
+        if (data) {
+          // Limpiar y recargar — reflejar vendedores que cerraron turno
+          dbRef.current.clear();
           data.forEach((row: any) => {
             dbRef.current.set(row.vendor_id, {
               vendorId: row.vendor_id,
@@ -139,6 +142,7 @@ export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) =>
         // Silencioso — si la tabla no existe aún, no pasa nada
       }
     };
+
 
     loadSavedLocations();
 

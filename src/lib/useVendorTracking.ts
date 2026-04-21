@@ -119,5 +119,5 @@ export function useVendorTracking(vendorId: string, vendorName: string, enabled:
     };
   }, [enabled, vendorId]);
 
-  return { status, lastSent, retry: startTracking };
+  return { status, lastSent, retry: startTracking, stop: stopTracking };
 }
