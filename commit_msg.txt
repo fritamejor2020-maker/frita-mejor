@@ -1,1 +1,5 @@
-fix: PWA SW skipWaiting+clientsClaim para actualizacion inmediata en Vercel
+feat: referencePrice en productos variable para calculo teorico
+
+- AdminPricesTab: campo Precio Promedio al agregar/editar producto variable
+- Listado muestra precio referencial o advertencia si no esta definido
+- VendedorDashboard: productPriceMap usa referencePrice para teorico del cierre

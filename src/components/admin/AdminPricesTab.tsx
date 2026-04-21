@@ -13,6 +13,7 @@ export const AdminPricesTab = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editIsVariable, setEditIsVariable] = useState<boolean>(false);
+  const [editReferencePrice, setEditReferencePrice] = useState<number>(0);
   const [mode, setMode] = useState<Mode>('list');
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -28,6 +29,7 @@ export const AdminPricesTab = () => {
   const [customName, setCustomName] = useState('');
   const [customPrice, setCustomPrice] = useState<number>(0);
   const [customPriceType, setCustomPriceType] = useState<PriceType>('fijo');
+  const [customReferencePrice, setCustomReferencePrice] = useState<number>(0);
   const [customAbbrev, setCustomAbbrev] = useState('');
   const [customPresets, setCustomPresets] = useState<string[]>(['5', '10', '15', '20']);
   const [presetInput, setPresetInput] = useState('');
@@ -50,12 +52,14 @@ export const AdminPricesTab = () => {
     setEditingId(p.id);
     setEditPrice(p.price);
     setEditIsVariable(p.variablePrice === true || p.price === 0);
+    setEditReferencePrice(p.referencePrice || 0);
   };
 
   const handleSave = (id: string) => {
     updateInventoryItem(id, {
       price: editIsVariable ? 0 : editPrice,
       variablePrice: editIsVariable,
+      referencePrice: editIsVariable ? editReferencePrice : undefined,
     });
     setEditingId(null);
   };
@@ -91,12 +95,14 @@ export const AdminPricesTab = () => {
       alert: 0,
       price: customPriceType === 'variable' ? 0 : customPrice,
       variablePrice: customPriceType === 'variable',
+      referencePrice: customPriceType === 'variable' ? customReferencePrice : undefined,
       abbreviation: customAbbrev.trim() || undefined,
       inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
     });
     setCustomName('');
     setCustomPrice(0);
     setCustomPriceType('fijo');
+    setCustomReferencePrice(0);
     setCustomAbbrev('');
     setCustomPresets(['5', '10', '15', '20']);
     setMode('list');
@@ -154,8 +160,10 @@ export const AdminPricesTab = () => {
                   editingId={editingId}
                   editPrice={editPrice}
                   editIsVariable={editIsVariable}
+                  editReferencePrice={editReferencePrice}
                   setEditPrice={setEditPrice}
                   setEditIsVariable={setEditIsVariable}
+                  setEditReferencePrice={setEditReferencePrice}
                   handleSave={handleSave}
                   openEdit={openEdit}
                   setEditingId={setEditingId}
@@ -185,8 +193,10 @@ export const AdminPricesTab = () => {
                   editingId={editingId}
                   editPrice={editPrice}
                   editIsVariable={editIsVariable}
+                  editReferencePrice={editReferencePrice}
                   setEditPrice={setEditPrice}
                   setEditIsVariable={setEditIsVariable}
+                  setEditReferencePrice={setEditReferencePrice}
                   handleSave={handleSave}
                   openEdit={openEdit}
                   setEditingId={setEditingId}
@@ -361,9 +371,23 @@ export const AdminPricesTab = () => {
                   </button>
                 </div>
                 {customPriceType === 'variable' && (
-                  <p className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 mt-2">
-                    El vendedor ingresará el precio al momento de cada venta.
-                  </p>
+                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
+                    <p className="text-[11px] font-bold text-amber-700">
+                      💱 El vendedor ingresa el precio real al vender.
+                      Aquí defines el <strong>precio promedio</strong> usado solo para calcular el teórico del cierre.
+                    </p>
+                    <div>
+                      <label className="block text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1">Precio Promedio / Referencial</label>
+                      <div className="flex bg-white border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
+                        <span className="px-3 py-2.5 text-amber-400 font-bold">$</span>
+                        <MoneyInput
+                          value={String(customReferencePrice)}
+                          onChange={(v) => setCustomReferencePrice(parseInt(v) || 0)}
+                          className="bg-transparent outline-none font-black py-2.5 text-amber-700 flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
                 )}
               </div>
 
@@ -451,8 +475,10 @@ interface ProductRowProps {
   editingId: string | null;
   editPrice: number;
   editIsVariable: boolean;
+  editReferencePrice: number;
   setEditPrice: (v: number) => void;
   setEditIsVariable: (v: boolean) => void;
+  setEditReferencePrice: (v: number) => void;
   handleSave: (id: string) => void;
   openEdit: (p: any) => void;
   setEditingId: (id: string | null) => void;
@@ -463,8 +489,8 @@ interface ProductRowProps {
 }
 
 const ProductRow = ({
-  p, editingId, editPrice, editIsVariable,
-  setEditPrice, setEditIsVariable,
+  p, editingId, editPrice, editIsVariable, editReferencePrice,
+  setEditPrice, setEditIsVariable, setEditReferencePrice,
   handleSave, openEdit, setEditingId,
   confirmDeleteId, setConfirmDeleteId, handleDelete,
   updateInventoryItem,
@@ -524,6 +550,21 @@ const ProductRow = ({
               </div>
             )}
 
+            {/* Precio promedio (solo si variable) */}
+            {editIsVariable && (
+              <div className="flex flex-col gap-0.5">
+                <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest px-1">Precio Promedio</span>
+                <div className="flex bg-amber-50 border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
+                  <span className="px-3 py-2 text-amber-400 font-bold">$</span>
+                  <MoneyInput
+                    value={String(editReferencePrice)}
+                    onChange={(v) => setEditReferencePrice(parseInt(v) || 0)}
+                    className="bg-transparent outline-none font-black w-20 py-2 text-amber-700"
+                  />
+                </div>
+              </div>
+            )}
+
             <button
               onClick={() => handleSave(p.id)}
               className="bg-green-500 text-white p-2.5 rounded-xl shadow-sm hover:scale-105 transition-transform"
@@ -541,9 +582,17 @@ const ProductRow = ({
           <>
             {/* Precio o badge Variable */}
             {isVariable ? (
-              <span className="flex items-center gap-1 bg-amber-100 text-amber-700 font-black text-xs px-3 py-1.5 rounded-full border border-amber-200">
-                <Shuffle size={11} /> Variable
-              </span>
+              <div className="flex flex-col items-end gap-0.5">
+                <span className="flex items-center gap-1 bg-amber-100 text-amber-700 font-black text-xs px-3 py-1.5 rounded-full border border-amber-200">
+                  <Shuffle size={11} /> Variable
+                </span>
+                {p.referencePrice > 0 && (
+                  <span className="text-[10px] font-bold text-amber-500 px-1">≈ {formatMoney(p.referencePrice)}</span>
+                )}
+                {!p.referencePrice && (
+                  <span className="text-[9px] font-bold text-red-400 px-1">⚠ Sin precio promedio</span>
+                )}
+              </div>
             ) : (
               <span className="font-black text-frita-red text-xl">{formatMoney(p.price)}</span>
             )}
