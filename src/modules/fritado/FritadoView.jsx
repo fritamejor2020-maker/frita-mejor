@@ -366,7 +366,7 @@ function FritadoPanel({ fryKitchen, onBack }) {
   }
   const rows = Math.ceil(count / cols);
 
-  const HEADER_H   = 52;
+  const HEADER_H   = 72;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
   const cardH      = isMobileFewProds
     ? Math.min(availableH / rows, 420)
@@ -401,23 +401,23 @@ function FritadoPanel({ fryKitchen, onBack }) {
     <div style={{ height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden', background: 'var(--color-bg)' }}>
       {modalConfig && <ActionModal config={modalConfig} wasteMode={wasteMode} onClose={() => setModalConfig(null)} onConfirm={handleModalConfirm} />}
 
-      <header style={{ background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={onBack} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <header style={{ background: 'white', boxShadow: '0 1px 6px rgba(0,0,0,0.10)', padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onBack} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 15, color: '#1f2937', lineHeight: 1 }}>🍳 {fryKitchen.name}</div>
-            <div style={{ fontWeight: 700, fontSize: 10, color: '#9ca3af' }}>Panel de Fritado · Operario</div>
+            <div style={{ fontWeight: 900, fontSize: 20, color: '#1f2937', lineHeight: 1.1 }}>🍳 {fryKitchen.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af', marginTop: 2 }}>Panel de Fritado · Operario</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => setWasteMode(!wasteMode)}
-            style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 20, border: wasteMode ? '1px solid #fca5a5' : '1px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
+            style={{ fontSize: 14, fontWeight: 800, padding: '10px 18px', borderRadius: 24, border: wasteMode ? '1.5px solid #fca5a5' : '1.5px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
             {wasteMode ? '⚠️ SALIR' : '🗑️ MERMA'}
           </button>
-          <button onClick={signOut} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          <button onClick={signOut} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
           </button>
         </div>
       </header>
