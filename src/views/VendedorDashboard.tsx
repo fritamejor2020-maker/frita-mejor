@@ -18,7 +18,7 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
-  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
+  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts, fritadoRecipes } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
@@ -67,6 +67,11 @@ export const VendedorDashboard = () => {
   const [transfer, setTransfer] = useState('');
   const [expenses, setExpenses] = useState('');
   const [expensesDesc, setExpensesDesc] = useState('');
+
+  // Desglose de productos vendidos en el cierre (productId → qty vendida)
+  const [soldQty, setSoldQty] = useState<Record<string, number>>({});
+  const setSoldFor = (inventoryId: string, val: number) =>
+    setSoldQty(prev => ({ ...prev, [inventoryId]: Math.max(0, val) }));
 
   // Build product price map for calcSoldByVehicle
   const productPriceMap = products.reduce((acc: any, p: any) => {
@@ -194,13 +199,24 @@ export const VendedorDashboard = () => {
     const cashVal = parseInt(cash) || 0;
     const transferVal = parseInt(transfer) || 0;
     const expensesVal = parseInt(expenses) || 0;
-    // Real total = everything the vendor handled (cash + transfers + expenses)
     const realTotal = cashVal + transferVal + expensesVal;
 
     const { soldItems, theoretical: theorySalesVal } = getLogisticsCalc();
-    // diff > 0 → faltante (vendor owes more), diff < 0 → sobrante
     const difference = theorySalesVal - realTotal;
     const status = difference === 0 ? 'CUADRADO' : difference > 0 ? 'FALTANTE' : 'SOBRANTE';
+
+    // Construir details[] desde soldQty → un item por cada inventoryId con qty > 0
+    const details = products
+      .filter((p: any) => (soldQty[p.id] || 0) > 0)
+      .map((p: any) => ({
+        product: p.name,
+        inventoryId: p.id,
+        type: p.type,           // 'CRUDO' | 'FRITO' | 'PRODUCTO'
+        sold: soldQty[p.id] || 0,
+        unitPrice: p.price || 0,
+        sent: 0,                // no aplica para desglose manual del vendedor
+        returned: 0,
+      }));
 
     try {
       const shiftData = useSellerSessionStore.getState();
@@ -213,7 +229,7 @@ export const VendedorDashboard = () => {
           shift: shiftData.shift,
           pointType: shiftData.pointType,
           theorySales: theorySalesVal,
-          realAmount: realTotal,        // efectivo + transf + gastos
+          realAmount: realTotal,
           cashAmount: cashVal,
           transferAmount: transferVal,
           expenses: expensesVal,
@@ -221,10 +237,10 @@ export const VendedorDashboard = () => {
           status: status,
           difference: difference,
           type: 'VENDEDOR',
-          soldItems
+          soldItems,
+          details,
       };
-      
-      // Actualizar el registro activo (abierto al iniciar sesión) en lugar de crear uno nuevo
+
       const activeShiftRecord = (posShifts || []).find(
         (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
       );
@@ -478,6 +494,89 @@ export const VendedorDashboard = () => {
                </div>
 
             </div>
+
+            {/* DESGLOSE DE PRODUCTOS VENDIDOS */}
+            {(() => {
+              const recipes: any[] = fritadoRecipes || [];
+              const allItems = products;
+              const pairedIds = new Set<string>();
+              const pairs: Array<{ label: string; crudo?: any; frito: any }> = [];
+
+              recipes.forEach((r: any) => {
+                const crudoItem = allItems.find((p: any) => p.id === r.crudoId);
+                const fritoItem = allItems.find((p: any) => p.id === r.fritoId);
+                if (fritoItem) {
+                  const baseName = fritoItem.name.replace(/(fritas?|fritos?|crudas?|crudos?)/gi, '').trim();
+                  pairs.push({ label: baseName || fritoItem.name, crudo: crudoItem, frito: fritoItem });
+                  if (crudoItem) pairedIds.add(crudoItem.id);
+                  pairedIds.add(fritoItem.id);
+                }
+              });
+              const singles = allItems.filter((p: any) => !pairedIds.has(p.id));
+              if (pairs.length === 0 && singles.length === 0) return null;
+
+              const QtyInput = ({ item }: { item: any }) => {
+                const val = soldQty[item.id] || 0;
+                return (
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setSoldFor(item.id, val - 1)}
+                      className="w-8 h-8 rounded-full bg-gray-100 text-gray-600 font-black text-lg flex items-center justify-center active:scale-90 hover:bg-gray-200 transition-colors">−</button>
+                    <input type="number" min={0} value={val === 0 ? '' : val}
+                      onChange={e => setSoldFor(item.id, parseInt(e.target.value) || 0)}
+                      placeholder="0"
+                      className="w-14 text-center font-black text-gray-900 text-base bg-white border-2 border-gray-100 rounded-xl py-1.5 outline-none focus:border-[#FFB700] transition-colors" />
+                    <button onClick={() => setSoldFor(item.id, val + 1)}
+                      className="w-8 h-8 rounded-full bg-[#FF4040] text-white font-black text-lg flex items-center justify-center active:scale-90 hover:bg-red-500 transition-colors">+</button>
+                  </div>
+                );
+              };
+
+              return (
+                <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">📦 Productos Vendidos (Opcional)</h4>
+                  <div className="space-y-3">
+                    {pairs.map((pair, i) => (
+                      <div key={i} className="border border-gray-100 rounded-2xl overflow-hidden">
+                        <div className="bg-gray-50 px-4 py-2 border-b border-gray-100">
+                          <span className="font-black text-gray-700 text-sm">{pair.label}</span>
+                        </div>
+                        <div className="divide-y divide-gray-50">
+                          {pair.crudo && (
+                            <div className="flex items-center justify-between px-4 py-3">
+                              <div className="flex items-center gap-2">
+                                <span>🧊</span>
+                                <span className="font-bold text-gray-700 text-sm">Crudo</span>
+                                {pair.crudo.price > 0 && <span className="text-[10px] font-bold text-gray-400">{formatMoney(pair.crudo.price)}/ud</span>}
+                              </div>
+                              <QtyInput item={pair.crudo} />
+                            </div>
+                          )}
+                          <div className="flex items-center justify-between px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <span>🔥</span>
+                              <span className="font-bold text-gray-700 text-sm">Frito</span>
+                              {pair.frito.price > 0 && <span className="text-[10px] font-bold text-gray-400">{formatMoney(pair.frito.price)}/ud</span>}
+                            </div>
+                            <QtyInput item={pair.frito} />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    {singles.map((p: any) => (
+                      <div key={p.id} className="flex items-center justify-between border border-gray-100 rounded-2xl px-4 py-3">
+                        <div className="flex items-center gap-2">
+                          <span>{p.type === 'CRUDO' ? '🧊' : p.type === 'FRITO' ? '🔥' : '📦'}</span>
+                          <span className="font-bold text-gray-700 text-sm">{p.name}</span>
+                          {p.price > 0 && <span className="text-[10px] font-bold text-gray-400">{formatMoney(p.price)}/ud</span>}
+                        </div>
+                        <QtyInput item={p} />
+                      </div>
+                    ))}
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-300 mt-3 text-center">Solo para trazabilidad — no afecta el cuadre</p>
+                </div>
+              );
+            })()}
 
             {/* TOTAL DECLARADO */}
             <div className="bg-gray-50 rounded-3xl px-6 py-5 flex items-center justify-between border border-gray-100">

@@ -261,7 +261,7 @@ export const useInventoryStore = create(
        */
       getPosItems: () =>
         get().inventory.filter(
-          (i) => (i.type === 'FRITO' || i.type === 'PRODUCTO') && i.price != null
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null
         ),
 
       // Verifica si hay stock para producir [batches] lotes
