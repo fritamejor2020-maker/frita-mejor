@@ -1,5 +1,6 @@
-fix: AdminFinancesTab usa referencePrice para teorico de productos variable
+fix: sincronizar usuarios con Supabase para todos los dispositivos
 
-- ResumenOperativoTab priceMap: usa referencePrice si variablePrice=true
-- AdminFinancesTab mappedShifts priceMap: idem
-- soldItems fallback: idem
+- useAuthStore: addUser/updateUser/deleteUser/toggleUserActive ahora hacen
+  push('users') a Supabase despues de cada cambio
+- useRealtimeSync: registrar clave 'users' en aplicadores para que el
+  celular del vendedor reciba los nuevos usuarios en tiempo real
