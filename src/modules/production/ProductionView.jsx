@@ -95,13 +95,13 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-[#FFB700] text-gray-900 active:scale-90 shadow-sm';
 
-  // Tamaños aumentados para mejor usabilidad táctil
-  const nameW   = size === 'md' ? 130 : 100;
-  const circleD = size === 'md' ? 58  : 50;
-  const manualD = size === 'md' ? 44  : 38;
-  const nameSz  = size === 'md' ? 15  : 14;
-  const stockSz = size === 'md' ? 12  : 11;
-  const unitSzS = size === 'md' ? 9   : 7;
+  // Tamaños según dispositivo
+  const nameW   = size === 'md' ? 130 : 82;
+  const circleD = size === 'md' ? 46  : 38;
+  const manualD = size === 'md' ? 38  : 30;
+  const nameSz  = size === 'md' ? 15  : 13;
+  const stockSz = size === 'md' ? 13  : 11;
+  const unitSzS = size === 'md' ? 8   : 6;
 
   return (
     <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}
@@ -135,7 +135,7 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 18 : 15, cursor: 'pointer' }}
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
         title="Manual">
         ✏️
       </button>
@@ -228,14 +228,14 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   // Fuentes 100% proporcionales al espacio: más espacio = números más grandes
-  const bigSz  = Math.max(24, Math.min(72, Math.round(cardH * 0.34)));
-  const smSz   = Math.max(16, Math.min(26, Math.round(cardH * 0.10)));
-  const nameSz = Math.max(13, Math.min(20, Math.round(cardH * 0.09)));
-  const stockSz= Math.max(12, Math.min(18, Math.round(cardH * 0.08)));
-  const unitSz = Math.max(10, Math.min(16, Math.round(cardH * 0.07)));
-  const pad    = Math.max(8,  Math.min(16, Math.round(cardH * 0.06)));
-  const smPy   = Math.max(10, Math.min(20, Math.round(cardH * 0.06)));
-  const gap    = Math.max(6,  Math.min(12, Math.round(cardH * 0.04)));
+  const bigSz  = Math.max(18, Math.min(60, Math.round(cardH * 0.34)));
+  const smSz   = Math.max(9,  Math.min(15, Math.round(cardH * 0.08)));
+  const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
+  const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
+  const unitSz = Math.max(7,  Math.min(12, Math.round(cardH * 0.06)));
+  const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
+  const smPy   = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
+  const gap    = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
 
   return (
     <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
@@ -275,7 +275,7 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 10, padding: `${Math.max(8, smPy * 0.6)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(13, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
         ✏️ Manual
       </button>
     </div>
