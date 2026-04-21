@@ -170,8 +170,8 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
   const pad     = big3 ? 'p-4'       : 'p-3';
   // Altura mínima de botón secundario: 25% de cardH (mínimo 80px)
   const smMinH  = Math.max(80,  Math.round(cardH * 0.25));
-  // Altura mínima del botón principal: siempre 1.8× los secundarios (mínimo 140px)
-  const bigMinH = Math.max(140, Math.round(smMinH * 1.8));
+  // Altura mínima del botón principal: 1.3× los secundarios (mínimo 110px)
+  const bigMinH = Math.max(110, Math.round(smMinH * 1.3));
 
   // Regla: el texto nunca desborda según cantidad de dígitos
   const safeFontSz = (label, baseCls) => {
