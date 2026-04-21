@@ -1,5 +1,0 @@
-feat: persist variablePrice field on inventory items
-
-- AdminPricesTab: saves variablePrice:true/false explicitly on item
-- VendedorDashboard: checks p.variablePrice flag (+ price fallback)  
-- PosView: checks item.variablePrice flag (+ price fallback)
