@@ -95,13 +95,13 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-[#FFB700] text-gray-900 active:scale-90 shadow-sm';
 
-  // Tamaños según dispositivo
-  const nameW   = size === 'md' ? 130 : 82;
-  const circleD = size === 'md' ? 46  : 38;
-  const manualD = size === 'md' ? 38  : 30;
-  const nameSz  = size === 'md' ? 15  : 13;
-  const stockSz = size === 'md' ? 13  : 11;
-  const unitSzS = size === 'md' ? 8   : 6;
+  // Tamaños aumentados para mejor usabilidad táctil
+  const nameW   = size === 'md' ? 130 : 100;
+  const circleD = size === 'md' ? 58  : 50;
+  const manualD = size === 'md' ? 44  : 38;
+  const nameSz  = size === 'md' ? 15  : 14;
+  const stockSz = size === 'md' ? 12  : 11;
+  const unitSzS = size === 'md' ? 9   : 7;
 
   return (
     <div className={`rounded-2xl px-3 py-3 flex items-center gap-2 ${cardCls}`}
@@ -135,7 +135,7 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 18 : 15, cursor: 'pointer' }}
         title="Manual">
         ✏️
       </button>
@@ -228,14 +228,14 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   // Fuentes 100% proporcionales al espacio: más espacio = números más grandes
-  const bigSz  = Math.max(18, Math.min(60, Math.round(cardH * 0.34)));
-  const smSz   = Math.max(9,  Math.min(15, Math.round(cardH * 0.08)));
-  const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
-  const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
-  const unitSz = Math.max(7,  Math.min(12, Math.round(cardH * 0.06)));
-  const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
-  const smPy   = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
-  const gap    = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
+  const bigSz  = Math.max(24, Math.min(72, Math.round(cardH * 0.34)));
+  const smSz   = Math.max(16, Math.min(26, Math.round(cardH * 0.10)));
+  const nameSz = Math.max(13, Math.min(20, Math.round(cardH * 0.09)));
+  const stockSz= Math.max(12, Math.min(18, Math.round(cardH * 0.08)));
+  const unitSz = Math.max(10, Math.min(16, Math.round(cardH * 0.07)));
+  const pad    = Math.max(8,  Math.min(16, Math.round(cardH * 0.06)));
+  const smPy   = Math.max(10, Math.min(20, Math.round(cardH * 0.06)));
+  const gap    = Math.max(6,  Math.min(12, Math.round(cardH * 0.04)));
 
   return (
     <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
@@ -275,7 +275,7 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 10, padding: `${Math.max(8, smPy * 0.6)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(13, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
         ✏️ Manual
       </button>
     </div>
@@ -387,7 +387,7 @@ function ProductionPanel({ productionPoint, onBack }) {
   const rows = Math.ceil(count / cols);
 
   // Compacto solo en PC cuando hay muy poco espacio
-  const HEADER_H   = 52;
+  const HEADER_H   = 72;
   const availableH = sh - HEADER_H - 2 * pad - (rows - 1) * gap;
   // En móvil con tarjeta grande: limitar a 420px por tarjeta para no exagerar
   const cardH      = isMobileFewProds
@@ -438,24 +438,23 @@ function ProductionPanel({ productionPoint, onBack }) {
           onClose={() => setManualProd(null)} onConfirm={(amt, mode) => handleManualConfirm(manualProd, amt, mode)} />
       )}
 
-      {/* Header */}
-      <header style={{ background: 'white', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', padding: '8px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <button onClick={onBack} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+      <header style={{ background: 'white', boxShadow: '0 1px 6px rgba(0,0,0,0.10)', padding: '10px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={onBack} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid #e5e7eb', background: '#f9fafb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6b7280' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
           </button>
           <div>
-            <div style={{ fontWeight: 900, fontSize: 15, color: '#1f2937', lineHeight: 1 }}>{productionPoint.name}</div>
-            <div style={{ fontWeight: 700, fontSize: 10, color: '#9ca3af' }}>{productionPoint.location} · Operario</div>
+            <div style={{ fontWeight: 900, fontSize: 20, color: '#1f2937', lineHeight: 1.1 }}>{productionPoint.name}</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: '#9ca3af', marginTop: 2 }}>{productionPoint.location} · Operario</div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 6 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
           <button onClick={() => setWasteMode(!wasteMode)}
-            style={{ fontSize: 11, fontWeight: 700, padding: '6px 12px', borderRadius: 20, border: wasteMode ? '1px solid #fca5a5' : '1px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
+            style={{ fontSize: 14, fontWeight: 800, padding: '10px 18px', borderRadius: 24, border: wasteMode ? '1.5px solid #fca5a5' : '1.5px solid #e5e7eb', background: wasteMode ? '#fee2e2' : 'white', color: wasteMode ? '#dc2626' : '#6b7280', cursor: 'pointer' }}>
             {wasteMode ? '⚠️ SALIR' : '🗑️ DESCARTE'}
           </button>
-          <button onClick={signOut} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          <button onClick={signOut} style={{ width: 44, height: 44, borderRadius: '50%', border: '1px solid #e5e7eb', background: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#9ca3af' }}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
           </button>
         </div>
       </header>
