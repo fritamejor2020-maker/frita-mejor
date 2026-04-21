@@ -131,20 +131,7 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
             </button>
           );
         })}
-      </div>
-
-      {/* Manual */}
-      <button onClick={() => onManual(prod)}
-        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
-        title="Manual">
-        ✏️
-      </button>
-    </div>
-  );
-}
-
-
-// ─── Tarjeta TABLET: escala fuentes según espacio disponible ──────────────────
+     // ─── Tarjeta TABLET: escala fuentes según espacio disponible ────────────────
 function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 300 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
@@ -161,15 +148,23 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   // Escalar según espacio real por tarjeta
-  const big3  = cardH >= 260;  // suficiente para fuentes grandes
+  const big3    = cardH >= 260;
   const nameSz  = big3 ? 'text-xl'   : 'text-base';
   const stockSz = big3 ? 'text-xl'   : 'text-base';
-  const bigSz   = big3 ? 'text-5xl'  : 'text-3xl';
+  const bigSz   = big3 ? 'text-3xl'  : 'text-2xl';    // era text-5xl → ahora text-3xl
   const unitSz  = big3 ? 'text-base' : 'text-sm';
-  // Botones pequeños (2,5,10,20) — tamaño aumentado para facilitar el toque
   const smSz    = big3 ? 'text-2xl'  : 'text-xl';
-  const smPy    = big3 ? 'py-5'      : 'py-4';
+  const smPy    = big3 ? 'py-4'      : 'py-3';
+  const smUnit  = big3 ? 'text-sm'   : 'text-xs';     // era siempre text-xs → ahora sm cuando hay espacio
   const pad     = big3 ? 'p-5'       : 'p-4';
+
+  // Regla: el texto nunca desborda. Si el número tiene muchos dígitos, reduce el tamaño
+  const safeFontSz = (label, baseCls) => {
+    const len = String(label).length;
+    if (len <= 2) return baseCls;
+    if (len <= 3) return big3 ? 'text-xl' : 'text-lg';
+    return big3 ? 'text-lg' : 'text-base';  // 4+ dígitos (e.g. 160, 40.5)
+  };
 
   return (
     <div className={`rounded-2xl ${pad} flex flex-col gap-3 h-full ${cardCls}`}>
@@ -183,19 +178,34 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
       </div>
 
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none ${btnCls}`}>
+        className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none overflow-hidden ${btnCls}`}>
         <span className={`font-black leading-none ${bigSz}`}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
         <span className={`font-bold opacity-70 ${unitSz}`}>{yieldUnit}</span>
       </button>
 
-      {/* Botones secundarios — más grandes para uso en producción */}
+      {/* Botones secundarios */}
       <div className="grid grid-cols-4 gap-2 shrink-0">
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
+          const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none active:scale-95 ${btnCls}`}>
-              <span className={`leading-none ${smSz}`}>{a % 1 === 0 ? a : a.toFixed(1)}</span>
+              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none active:scale-95 overflow-hidden ${btnCls}`}>
+              <span className={`leading-none ${safeFontSz(label, smSz)}`}>{label}</span>
+              <span className={`font-bold opacity-75 mt-0.5 ${smUnit}`}>{yieldUnit}</span>
+            </button>
+          );
+        })}
+      </div>
+
+      <button onClick={() => onManual(prod)}
+        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors py-3`}>
+        ✏️ Manual
+      </button>
+    </div>
+  );
+}
+ a.toFixed(1)}</span>
               <span className={`font-bold opacity-70 text-xs mt-0.5`}>{yieldUnit}</span>
             </button>
           );
@@ -228,14 +238,22 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
   // Fuentes 100% proporcionales al espacio: más espacio = números más grandes
-  const bigSz  = Math.max(18, Math.min(60, Math.round(cardH * 0.34)));
-  const smSz   = Math.max(9,  Math.min(15, Math.round(cardH * 0.08)));
+  const bigSz  = Math.max(18, Math.min(42, Math.round(cardH * 0.28)));  // cap 60→42
+  const smSz   = Math.max(14, Math.min(22, Math.round(cardH * 0.09)));  // cap 15→22, min 9→14
   const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
   const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
-  const unitSz = Math.max(7,  Math.min(12, Math.round(cardH * 0.06)));
+  const unitSz = Math.max(9,  Math.min(13, Math.round(cardH * 0.06)));
   const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
-  const smPy   = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
-  const gap    = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
+  const smPy   = Math.max(8,  Math.min(16, Math.round(cardH * 0.05)));  // min 3→8, max 8→16
+  const gap    = Math.max(4,  Math.min(10, Math.round(cardH * 0.04)));
+
+  // Regla: font se reduce si el número tiene más dígitos
+  const safeSmSz = (label) => {
+    const len = String(label).length;
+    if (len <= 2) return smSz;
+    if (len <= 3) return Math.max(10, Math.round(smSz * 0.8));
+    return Math.max(9, Math.round(smSz * 0.65));  // 4+ dígitos
+  };
 
   return (
     <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
@@ -250,24 +268,25 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
         </div>
       </div>
 
-      {/* Botón principal — número grande proporcional */}
+      {/* Botón principal */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        style={{ borderRadius: 10, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+        style={{ borderRadius: 14, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
         className={`font-black transition-colors select-none ${btnCls}`}>
         <span style={{ fontSize: bigSz, fontWeight: 900, lineHeight: 1 }}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
         <span style={{ fontSize: unitSz, fontWeight: 700, opacity: 0.75, marginTop: 2 }}>{yieldUnit}</span>
       </button>
 
-      {/* Botones pequeños */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, flexShrink: 0 }}>
+      {/* Botones secundarios */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, flexShrink: 0 }}>
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
+          const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              style={{ borderRadius: 8, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
-              className={`font-black transition-colors select-none ${btnCls}`}>
-              <span style={{ fontSize: smSz, fontWeight: 900, lineHeight: 1 }}>{a % 1 === 0 ? a : a.toFixed(1)}</span>
-              <span style={{ fontSize: unitSz - 2, fontWeight: 700, opacity: 0.7 }}>{yieldUnit}</span>
+              style={{ borderRadius: 10, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
+              className={`font-black transition-colors select-none active:scale-95 ${btnCls}`}>
+              <span style={{ fontSize: safeSmSz(label), fontWeight: 900, lineHeight: 1 }}>{label}</span>
+              <span style={{ fontSize: Math.max(9, unitSz - 1), fontWeight: 700, opacity: 0.75 }}>{yieldUnit}</span>
             </button>
           );
         })}
@@ -275,7 +294,7 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 10, padding: `${Math.max(8, smPy * 0.55)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(12, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
         ✏️ Manual
       </button>
     </div>
