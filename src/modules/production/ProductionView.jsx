@@ -169,7 +169,9 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
   const smUnit  = big3 ? 'text-sm'   : 'text-xs';
   const pad     = big3 ? 'p-4'       : 'p-3';
   // Altura mínima de botón secundario: 25% de cardH (mínimo 80px)
-  const smMinH  = Math.max(80, Math.round(cardH * 0.25));
+  const smMinH  = Math.max(80,  Math.round(cardH * 0.25));
+  // Altura mínima del botón principal: siempre 1.8× los secundarios (mínimo 140px)
+  const bigMinH = Math.max(140, Math.round(smMinH * 1.8));
 
   // Regla: el texto nunca desborda según cantidad de dígitos
   const safeFontSz = (label, baseCls) => {
@@ -192,6 +194,7 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Botón principal */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
+        style={{ minHeight: bigMinH }}
         className={`rounded-3xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none overflow-hidden ${btnCls}`}>
         <span className={`font-black leading-none ${bigSz}`}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
         <span className={`font-bold opacity-70 ${unitSz}`}>{yieldUnit}</span>
