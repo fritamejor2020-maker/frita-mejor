@@ -3,6 +3,13 @@ import { Toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 
+// ─── Normalizar unidad: "unidades" / "unidad" → "ud" ──────────────────────────
+const fmtUnit = (u = '') => {
+  const l = u.toLowerCase();
+  if (l === 'unidades' || l === 'unidad') return 'ud';
+  return u;
+};
+
 // ─── Hook: tamaño de pantalla ─────────────────────────────────────────────────
 function useScreenSize() {
   const [size, setSize] = useState({ width: window.innerWidth, height: window.innerHeight });
@@ -83,7 +90,7 @@ function ManualModal({ product, recipe, wasteMode, onClose, onConfirm }) {
 function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, size = 'sm' }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
-  const yieldUnit = (prod.recipe?.yieldUnit ?? prod.unit);
+  const yieldUnit = fmtUnit(prod.recipe?.yieldUnit ?? prod.unit);
   const shortUnit = yieldUnit.length > 3 ? yieldUnit.slice(0, 3) : yieldUnit;
   const isDisabled = !prod.stockOk && !wasteMode;
 
@@ -147,7 +154,7 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
 function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 300 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
-  const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
+  const yieldUnit = fmtUnit(prod.recipe?.yieldUnit ?? prod.unit);
   const [big, ...smalls] = presets;
   const bigAmt     = big * yieldQty;
   const isDisabled = !prod.stockOk && !wasteMode;
@@ -230,7 +237,7 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
 function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 180 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
-  const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
+  const yieldUnit = fmtUnit(prod.recipe?.yieldUnit ?? prod.unit);
   const [big, ...smalls] = presets;
   const bigAmt     = big * yieldQty;
   const isDisabled = !prod.stockOk && !wasteMode;
@@ -313,7 +320,7 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 function CardCompact({ prod, productionPoint, wasteMode, onProduce, onManual }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
-  const yieldUnit = prod.recipe?.yieldUnit ?? prod.unit;
+  const yieldUnit = fmtUnit(prod.recipe?.yieldUnit ?? prod.unit);
   const shortUnit = yieldUnit.length > 3 ? yieldUnit.slice(0, 3) + '.' : yieldUnit;
   const isDisabled = !prod.stockOk && !wasteMode;
 
