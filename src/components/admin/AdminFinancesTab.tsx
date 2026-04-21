@@ -335,7 +335,7 @@ interface ClosingDetail {
 
 
 // ─── Component: Cierres ──────────────────────────────────────────────
-export const AdminFinancesTab = () => {
+export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean } = {}) => {
   const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
 
@@ -820,33 +820,35 @@ export const AdminFinancesTab = () => {
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                       </button>
-                      <button
-                        className="text-gray-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
-                        title="Eliminar conciliacion"
-                        onClick={() => {
-                          if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
-                          deletePosShift(closing._raw.id);
-                          const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
-                          const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
-                          const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
-                          useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
-                          // Persistir en localStorage para que otras tabs vean la eliminación
-                          try {
-                            const logKey = 'frita-mejor-logistics';
-                            const raw = localStorage.getItem(logKey);
-                            if (raw) {
-                              const parsed = JSON.parse(raw);
-                              if (parsed?.state) {
-                                parsed.state.loadHistory = newLH;
-                                parsed.state.completedRequests = newCR;
-                                localStorage.setItem(logKey, JSON.stringify(parsed));
+                      {closing._raw && allowDelete && (
+                        <button
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                          title="Eliminar conciliacion"
+                          onClick={() => {
+                            if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
+                            deletePosShift(closing._raw.id);
+                            const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
+                            const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
+                            const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
+                            useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
+                            // Persistir en localStorage para que otras tabs vean la eliminación
+                            try {
+                              const logKey = 'frita-mejor-logistics';
+                              const raw = localStorage.getItem(logKey);
+                              if (raw) {
+                                const parsed = JSON.parse(raw);
+                                if (parsed?.state) {
+                                  parsed.state.loadHistory = newLH;
+                                  parsed.state.completedRequests = newCR;
+                                  localStorage.setItem(logKey, JSON.stringify(parsed));
+                                }
                               }
-                            }
-                          } catch(_e) {}
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                      </button>
+                            } catch(_e) {}
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>

@@ -24,6 +24,7 @@ import { DejadorDashboard }    from './views/DejadorDashboard';
 import { MapTrackingView }     from './views/MapTrackingView';
 import { FinanceDashboard }    from './modules/pos/FinanceDashboard';
 import { ModuleSelectorView }  from './views/ModuleSelectorView';
+import { CierresView }         from './modules/cierres/CierresView';
 
 import { Link } from 'react-router-dom';
 
@@ -84,7 +85,7 @@ function RoleRedirect() {
       produccion: '/produccion', bodega: '/bodega', fritado: '/fritado',
       pos: '/pos', finanzas: '/finanzas',
       'finanzas-ingresos': '/finanzas', 'finanzas-gastos': '/finanzas',
-      admin: '/admin', tracking: '/tracking',
+      admin: '/admin', tracking: '/tracking', cierres: '/cierres',
     };
     return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }
@@ -220,6 +221,10 @@ function App() {
 
         <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEJADOR']} />}>
           <Route path="/tracking" element={<MapTrackingView />} />
+        </Route>
+
+        <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
+          <Route path="/cierres" element={<CierresView />} />
         </Route>
         {/* ---------------------------------------- */}
 
