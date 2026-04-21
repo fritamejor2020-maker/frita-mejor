@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
-import { User, Edit2, Trash2, Check, X, UserMinus, UserCheck, Shield } from 'lucide-react';
+import { User, Edit2, Trash2, Check, X, UserMinus, UserCheck, Shield, RefreshCw } from 'lucide-react';
+import { push } from '../../lib/syncManager';
 
 // ── Todos los módulos disponibles en la app ───────────────────────────────────
 const ALL_MODULES = [
@@ -186,6 +187,29 @@ export const AdminUsersTab = () => {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showAdd, setShowAdd]     = useState(false);
   const [form, setForm]           = useState<any>(EMPTY_FORM);
+  const [syncing, setSyncing]     = useState(false);
+  const [syncMsg, setSyncMsg]     = useState<string | null>(null);
+
+  // Al abrir la pestaña, empujar la lista actual de usuarios a Supabase
+  // Esto garantiza que usuarios creados antes del fix de sync lleguen a todos los dispositivos
+  useEffect(() => {
+    push('users', useAuthStore.getState().users).catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleForceSyncUsers = async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      await push('users', useAuthStore.getState().users);
+      setSyncMsg('✅ Usuarios sincronizados — el celular recibirá la lista al recargar.');
+    } catch {
+      setSyncMsg('❌ Error al sincronizar. Verifica la conexión.');
+    } finally {
+      setSyncing(false);
+      setTimeout(() => setSyncMsg(null), 5000);
+    }
+  };
 
   const handleSaveAdd = () => {
     if (!form.name || !form.password) { alert('Nombre y contraseña son obligatorios'); return; }
@@ -212,13 +236,33 @@ export const AdminUsersTab = () => {
           <h2 className="text-2xl font-black text-gray-800">Usuarios del Sistema</h2>
           <p className="text-sm text-gray-400 font-bold mt-0.5">Gestiona accesos y módulos por usuario</p>
         </div>
-        <button
-          className="bg-frita-red hover:bg-red-500 text-white font-black py-2 px-4 rounded-xl shadow-sm transition-all active:scale-95"
-          onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setEditingId(null); }}
-        >
-          + Agregar Usuario
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleForceSyncUsers}
+            disabled={syncing}
+            title="Forzar sincronización de usuarios a todos los dispositivos"
+            className={`flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl border transition-all ${
+              syncing
+                ? 'bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'bg-blue-50 text-blue-600 border-blue-200 hover:bg-blue-100 active:scale-95'
+            }`}
+          >
+            <RefreshCw size={13} className={syncing ? 'animate-spin' : ''} />
+            Sincronizar
+          </button>
+          <button
+            className="bg-frita-red hover:bg-red-500 text-white font-black py-2 px-4 rounded-xl shadow-sm transition-all active:scale-95"
+            onClick={() => { setShowAdd(true); setForm(EMPTY_FORM); setEditingId(null); }}
+          >
+            + Agregar Usuario
+          </button>
+        </div>
       </div>
+      {syncMsg && (
+        <div className="mb-4 text-sm font-bold text-center bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-blue-700">
+          {syncMsg}
+        </div>
+      )}
 
       {/* Formulario de agregar */}
       {showAdd && (

@@ -1,6 +1,5 @@
-fix: sincronizar usuarios con Supabase para todos los dispositivos
+fix: AdminUsersTab sincroniza usuarios a Supabase al abrir y boton manual
 
-- useAuthStore: addUser/updateUser/deleteUser/toggleUserActive ahora hacen
-  push('users') a Supabase despues de cada cambio
-- useRealtimeSync: registrar clave 'users' en aplicadores para que el
-  celular del vendedor reciba los nuevos usuarios en tiempo real
+- useEffect on mount: push usuarios actuales a Supabase automaticamente
+- Boton Sincronizar: fuerza push manual con confirmacion visual
+- Resuelve usuarios creados antes del fix de sync que solo estaban en localStorage
