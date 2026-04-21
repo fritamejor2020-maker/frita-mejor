@@ -8,6 +8,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
+      workbox: {
+        skipWaiting: true,       // Nuevo SW toma el control inmediatamente
+        clientsClaim: true,      // Reclamar todos los clientes abiertos
+        cleanupOutdatedCaches: true, // Borrar caches viejas automáticamente
+      },
       manifest: {
         name: 'Frita Mejor PWA',
         short_name: 'FritaMejor',
