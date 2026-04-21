@@ -188,8 +188,8 @@ export function PosView() {
       return;
     }
 
-    // Si el precio es 0 o indefinido y no hay override, abrimos modal
-    if (overridePrice === null && (!item.price || item.price <= 0)) {
+    // Si el producto es de precio variable (flag explícito) o precio 0, abrimos modal
+    if (overridePrice === null && (item.variablePrice === true || !item.price || item.price <= 0)) {
        setVariablePriceProduct(item);
        return;
     }

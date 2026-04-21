@@ -315,7 +315,7 @@ export const VendedorDashboard = () => {
               <button
                 key={p.id}
                 onClick={() => {
-                  if (!p.price || p.price <= 0) {
+                  if (p.variablePrice === true || !p.price || p.price <= 0) {
                      setVariablePriceProduct(p);
                   } else {
                      addToCart(p, 1);

@@ -49,18 +49,22 @@ export const AdminPricesTab = () => {
   const openEdit = (p: any) => {
     setEditingId(p.id);
     setEditPrice(p.price);
-    setEditIsVariable(p.price === 0);
+    setEditIsVariable(p.variablePrice === true || p.price === 0);
   };
 
   const handleSave = (id: string) => {
-    updateInventoryItem(id, { price: editIsVariable ? 0 : editPrice });
+    updateInventoryItem(id, {
+      price: editIsVariable ? 0 : editPrice,
+      variablePrice: editIsVariable,
+    });
     setEditingId(null);
   };
 
   const handleAddFromInventory = (item: any) => {
-    // Set price=0 and ensure type is PRODUCTO so getPosItems() includes it in Dejador/Vendedor
+    // Set price=0, variablePrice=true and ensure type is PRODUCTO so getPosItems() includes it in Dejador/Vendedor
     updateInventoryItem(item.id, {
       price: 0,
+      variablePrice: true,
       type: item.type === 'FRITO' ? 'FRITO' : 'PRODUCTO',
     });
     setMode('list');
@@ -68,7 +72,7 @@ export const AdminPricesTab = () => {
     // Open the price editor immediately so admin can set the price
     setEditingId(item.id);
     setEditPrice(0);
-    setEditIsVariable(true); // new items from inventory default to variable
+    setEditIsVariable(true);
   };
 
   const handleAddCustom = () => {
@@ -86,6 +90,7 @@ export const AdminPricesTab = () => {
       type: 'PRODUCTO',
       alert: 0,
       price: customPriceType === 'variable' ? 0 : customPrice,
+      variablePrice: customPriceType === 'variable',
       abbreviation: customAbbrev.trim() || undefined,
       inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
     });
@@ -111,8 +116,9 @@ export const AdminPricesTab = () => {
   };
 
   // Separate lists: variable first, then fixed
-  const variableProducts = products.filter((p: any) => p.price === 0);
-  const fixedProducts = products.filter((p: any) => p.price > 0);
+  // Use explicit variablePrice flag; fallback to price===0 for backward-compat
+  const variableProducts = products.filter((p: any) => p.variablePrice === true || (p.price === 0 && p.variablePrice !== false));
+  const fixedProducts = products.filter((p: any) => !variableProducts.some((vp: any) => vp.id === p.id));
 
   return (
     <div className="p-4 bg-[#FFD56B] flex-1 rounded-bl-[32px] rounded-br-[32px] md:rounded-[32px]">
@@ -464,7 +470,7 @@ const ProductRow = ({
   updateInventoryItem,
 }: ProductRowProps) => {
   const isEditing = editingId === p.id;
-  const isVariable = p.price === 0;
+  const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
 
   return (
     <div className={`bg-white p-4 rounded-2xl shadow-sm border flex justify-between items-center gap-3 ${
