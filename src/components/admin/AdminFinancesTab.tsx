@@ -20,9 +20,12 @@ export const ResumenOperativoTab = () => {
   const [filterShift, setFilterShift] = useState('');
   const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null);
 
-  // Precio por productId
+  // Precio por productId — usa referencePrice para productos con precio variable
   const priceMap: Record<string, { price: number; name: string }> = {};
-  products.forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
+  products.forEach((p: any) => {
+    const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
+    priceMap[p.id] = { price: isVariable ? (p.referencePrice || 0) : (p.price || 0), name: p.name };
+  });
 
   // Fecha para filtro — usa fecha LOCAL (UTC-5 Colombia)
   const dateOf = (iso: string) => {
@@ -447,7 +450,8 @@ export const AdminFinancesTab = () => {
      if (s.type === 'VENDEDOR') {
          const priceMap: Record<string, { price: number, name: string }> = {};
          (useInventoryStore.getState().getPosItems() || []).forEach((p: any) => {
-           priceMap[p.id] = { price: p.price || 0, name: p.name };
+           const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
+           priceMap[p.id] = { price: isVariable ? (p.referencePrice || 0) : (p.price || 0), name: p.name };
          });
 
          const { loadHistory, completedRequests } = useLogisticsStore.getState();
@@ -551,7 +555,9 @@ export const AdminFinancesTab = () => {
             } else if (s.soldItems) {
               // Fallback básico: sin logística ni override
               Object.values(s.soldItems).forEach((i: any) => {
-                const price = priceMap[i.id]?.price || i.price || 0;
+                const prod = (useInventoryStore.getState().getPosItems() || []).find((p: any) => p.id === i.id);
+                const isVarProd = prod && (prod.variablePrice === true || (prod.price === 0 && prod.variablePrice !== false));
+                const price = isVarProd ? (prod.referencePrice || 0) : (priceMap[i.id]?.price || i.price || 0);
                 theoretical += (i.qty || 0) * price;
                 details.push({ product: i.name || i.id, sent: i.qty || 0, returned: 0, sold: i.qty || 0, unitPrice: price });
               });
