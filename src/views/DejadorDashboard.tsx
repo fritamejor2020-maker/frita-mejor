@@ -133,7 +133,7 @@ export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
-  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems } = useInventoryStore();
+  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, posShifts, addPosShift } = useInventoryStore();
   const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
@@ -151,6 +151,18 @@ export const DejadorDashboard = () => {
   const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
   const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
+
+  // Mapa: tricicloId → nombre del vendedor con turno abierto
+  const vehicleVendorMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
+    (posShifts || []).forEach((s: any) => {
+      if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
+        const firstName = (s.responsibleName || s.userName || '').split(' ')[0];
+        if (firstName) map[s.pointId] = firstName;
+      }
+    });
+    return map;
+  }, [posShifts]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
@@ -519,8 +531,6 @@ export const DejadorDashboard = () => {
     return 'Logística';
   };
 
-  const { addPosShift } = useInventoryStore();
-
   const handleEndShift = () => {
     if (!window.confirm('¿Cerrar jornada del Dejador?')) return;
     // Guardar registro del cierre para el admin
@@ -616,18 +626,28 @@ export const DejadorDashboard = () => {
           <div className="mb-5 sm:mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
             
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
-              {vehicles.map((v: string) => (
+              {vehicles.map((v: string) => {
+                const vendorName = vehicleVendorMap[v];
+                return (
                 <button
                   key={v}
                   onClick={() => setSelectedVehicle(v)}
-                  className={`flex-none w-14 h-14 sm:w-[72px] sm:h-[72px] rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-base sm:text-xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg
+                  className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg px-2 py-1.5 min-w-[52px] sm:min-w-[72px] min-h-[52px] sm:min-h-[72px]
                     ${selectedVehicle === v 
                       ? 'bg-amber-500 text-white shadow-[0_0_0_4px_white]' 
                       : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
                 >
-                  {v}
+                  <span className="font-black text-base sm:text-xl leading-none">{v}</span>
+                  {vendorName && (
+                    <span className={`text-[9px] sm:text-[10px] font-bold leading-none truncate max-w-[58px] ${
+                      selectedVehicle === v ? 'text-amber-100' : 'text-gray-400'
+                    }`}>
+                      {vendorName}
+                    </span>
+                  )}
                 </button>
-              ))}
+                );
+              })}
             </div>
 
             {/* PRESET PILLS + Botón Organizar */}
