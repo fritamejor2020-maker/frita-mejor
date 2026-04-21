@@ -216,6 +216,7 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
       </button>
     </div>
   );
+}
 
 
 
