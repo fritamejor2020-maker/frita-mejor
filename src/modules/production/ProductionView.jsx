@@ -216,21 +216,7 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
       </button>
     </div>
   );
-}
- a.toFixed(1)}</span>
-              <span className={`font-bold opacity-70 text-xs mt-0.5`}>{yieldUnit}</span>
-            </button>
-          );
-        })}
-      </div>
 
-      <button onClick={() => onManual(prod)}
-        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors py-3`}>
-        ✏️ Manual
-      </button>
-    </div>
-  );
-}
 
 
 // ─── Tarjeta COCINA/PC: fuentes proporcionales a cardH ────────────────────────
