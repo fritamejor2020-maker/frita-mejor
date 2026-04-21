@@ -174,64 +174,71 @@ function App() {
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
         <Routes>
-        {/* Pública */}
-        <Route path="/login" element={<LoginView />} />
+          {/* ── Pública: única ruta sin login ───────────────── */}
+          <Route path="/login" element={<LoginView />} />
 
-        {/* Redirección raíz basada en rol */}
-        <Route path="/" element={<RoleRedirect />} />
+          {/* ── Todo lo demás requiere estar autenticado ─────── */}
+          <Route element={<ProtectedRoute />}>
 
-        {/* Selector de módulo (usuarios con múltiples accesos) */}
-        <Route path="/selector" element={<ModuleSelectorView />} />
+            {/* Redirección raíz basada en rol */}
+            <Route path="/" element={<RoleRedirect />} />
 
-        {/* Rutas protegidas */}
-        <Route element={<ProtectedRoute allowedRoles={['OPERARIO', 'ADMIN']} />}>
-          <Route path="/produccion" element={<ProductionView />} />
-        </Route>
+            {/* Selector de módulo — requiere login, sin restricción de módulo */}
+            <Route path="/selector" element={<ModuleSelectorView />} />
 
-        <Route element={<ProtectedRoute allowedRoles={['FRITADOR', 'ADMIN']} />}>
-          <Route path="/fritado" element={<FritadoView />} />
-        </Route>
+            {/* Módulos por access[] del usuario */}
+            <Route element={<ProtectedRoute allowedModules={['produccion']} />}>
+              <Route path="/produccion" element={<ProductionView />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['BODEGUERO', 'ADMIN']} />}>
-          <Route path="/bodega" element={<WarehouseView />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['fritado']} />}>
+              <Route path="/fritado" element={<FritadoView />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
-          <Route path="/admin" element={<AdminView />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['bodega']} />}>
+              <Route path="/bodega" element={<WarehouseView />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['CAJERO', 'ADMIN']} />}>
-          <Route path="/pos" element={<PosView />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['admin']} />}>
+              <Route path="/admin" element={<AdminView />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['FINANZAS', 'ADMIN']} />}>
-          <Route path="/finanzas" element={<FinanceDashboard />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['pos']} />}>
+              <Route path="/pos" element={<PosView />} />
+            </Route>
 
-        {/* --- NUEVAS RUTAS DE MÓDULO OPERATIVO --- */}
-        <Route element={<ProtectedRoute allowedRoles={['VENDEDOR', 'vendedor', 'ADMIN']} />}>
-          <Route path="/vendedor-setup" element={<SellerSetupView />} />
-          <Route path="/vendedor" element={<VendedorDashboard />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['finanzas-ingresos', 'finanzas-gastos']} />}>
+              <Route path="/finanzas" element={<FinanceDashboard />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['DEJADOR', 'dejador', 'ADMIN']} />}>
-          <Route path="/dejador-setup" element={<DejadorSetupView />} />
-          <Route path="/dejador" element={<DejadorDashboard />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['vendedor-setup', 'vendedor']} />}>
+              <Route path="/vendedor-setup" element={<SellerSetupView />} />
+              <Route path="/vendedor" element={<VendedorDashboard />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedRoles={['ADMIN', 'DEJADOR']} />}>
-          <Route path="/tracking" element={<MapTrackingView />} />
-        </Route>
+            <Route element={<ProtectedRoute allowedModules={['dejador']} />}>
+              <Route path="/dejador-setup" element={<DejadorSetupView />} />
+              <Route path="/dejador" element={<DejadorDashboard />} />
+            </Route>
 
-        <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
-          <Route path="/cierres" element={<CierresView />} />
-        </Route>
-        {/* ---------------------------------------- */}
+            <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
+              <Route path="/tracking" element={<MapTrackingView />} />
+            </Route>
 
-        <Route path="/unauthorized" element={<UnauthorizedView />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
-    </BrowserRouter>
+            <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
+              <Route path="/cierres" element={<CierresView />} />
+            </Route>
+
+            {/* Sin acceso al módulo */}
+            <Route path="/unauthorized" element={<UnauthorizedView />} />
+
+          </Route>
+          {/* ──────────────────────────────────────────────── */}
+
+          {/* Cualquier ruta desconocida → login */}
+          <Route path="*" element={<Navigate to="/login" replace />} />
+        </Routes>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }
