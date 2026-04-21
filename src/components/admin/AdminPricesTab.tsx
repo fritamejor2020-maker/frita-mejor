@@ -382,8 +382,9 @@ export const AdminPricesTab = () => {
                         <span className="px-3 py-2.5 text-amber-400 font-bold">$</span>
                         <MoneyInput
                           value={String(customReferencePrice)}
-                          onChange={(v) => setCustomReferencePrice(parseInt(v) || 0)}
+                          onChange={(v) => setCustomReferencePrice(parseFloat(v) || 0)}
                           className="bg-transparent outline-none font-black py-2.5 text-amber-700 flex-1"
+                          allowDecimal
                         />
                       </div>
                     </div>
@@ -399,8 +400,9 @@ export const AdminPricesTab = () => {
                     <span className="px-4 py-3 text-gray-400 font-bold">$</span>
                     <MoneyInput
                       value={String(customPrice)}
-                      onChange={(v) => setCustomPrice(parseInt(v) || 0)}
+                      onChange={(v) => setCustomPrice(parseFloat(v) || 0)}
                       className="bg-transparent outline-none font-black py-3 text-gray-900 flex-1"
+                      allowDecimal
                     />
                   </div>
                 </div>
@@ -544,8 +546,9 @@ const ProductRow = ({
                 <span className="px-3 py-2 text-gray-400 font-bold">$</span>
                 <MoneyInput
                   value={String(editPrice)}
-                  onChange={(v) => setEditPrice(parseInt(v) || 0)}
+                  onChange={(v) => setEditPrice(parseFloat(v) || 0)}
                   className="bg-transparent outline-none font-black w-20 py-2 text-frita-red"
+                  allowDecimal
                 />
               </div>
             )}
@@ -558,8 +561,9 @@ const ProductRow = ({
                   <span className="px-3 py-2 text-amber-400 font-bold">$</span>
                   <MoneyInput
                     value={String(editReferencePrice)}
-                    onChange={(v) => setEditReferencePrice(parseInt(v) || 0)}
+                    onChange={(v) => setEditReferencePrice(parseFloat(v) || 0)}
                     className="bg-transparent outline-none font-black w-20 py-2 text-amber-700"
+                    allowDecimal
                   />
                 </div>
               </div>

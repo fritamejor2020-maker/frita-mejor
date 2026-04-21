@@ -1,5 +1,6 @@
-feat: referencePrice en productos variable para calculo teorico
+feat: soporte de decimales en precios de productos
 
-- AdminPricesTab: campo Precio Promedio al agregar/editar producto variable
-- Listado muestra precio referencial o advertencia si no esta definido
-- VendedorDashboard: productPriceMap usa referencePrice para teorico del cierre
+- formatMoney muestra decimales solo cuando el valor los tiene
+- parseMoney soporta formato es-CO (coma decimal) y estandar (punto)
+- MoneyInput: prop allowDecimal para input de decimales tipo es-CO
+- AdminPricesTab: parseFloat en todos los campos de precio y referencia
