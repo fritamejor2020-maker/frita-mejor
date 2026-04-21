@@ -61,10 +61,17 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
               ref={inputRef}
               type="number"
               min="0"
+              step="any"
               value={value || ''}
               onChange={(e) => {
-                const num = parseInt(e.target.value, 10);
+                const num = parseFloat(e.target.value);
                 onChange(isNaN(num) ? 0 : num);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  inputRef.current?.blur();
+                }
               }}
               onBlur={() => {
                 if (!isCustomValue) setIsManualOpen(false);
@@ -72,6 +79,7 @@ export function NumberSelectorGroup({ presets, value, onChange, allowManual = tr
               className="w-12 h-9 sm:w-16 sm:h-11 rounded-full border-[1.5px] border-[#FFB700] bg-yellow-50 text-center font-black text-gray-800 outline-none focus:border-[#FFB700] shadow-inner text-xs sm:text-base animate-slide-in-right"
               placeholder="..."
             />
+
           ) : (
             <button
               onClick={() => setIsManualOpen(true)}
