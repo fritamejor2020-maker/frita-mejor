@@ -133,8 +133,8 @@ export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
-  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getPosItems } = useInventoryStore();
-  const products = getPosItems();
+  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems } = useInventoryStore();
+  const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const { playOnce, startLoop, stopAll, isLooping } = useDeliveryAlert();
@@ -266,29 +266,91 @@ export const DejadorDashboard = () => {
   const productPresets = (user as any)?.productPresets || {};
   const DEFAULT_PRESETS = [5, 10, 15, 20];
 
-  const getPresetsForProduct = (productId: string): (number | string)[] => {
-    // User overrides take priority
-    if (productPresets[productId]) return productPresets[productId];
-    // Custom product may have inventoryPresets set at creation time
-    const item = getPosItems().find((i: any) => i.id === productId);
+  // Orden y visibilidad por usuario
+  const userProductOrder: string[] = (user as any)?.productPresets?.productOrder || [];
+  const userHiddenProducts: string[] = (user as any)?.productPresets?.hiddenProducts || [];
+
+  // Ordenar y filtrar productos según preferencias del usuario
+  const products = React.useMemo(() => {
+    const ordered = userProductOrder.length > 0
+      ? [
+          ...userProductOrder.map((id: string) => allDeliveryProducts.find((p: any) => p.id === id)).filter(Boolean),
+          ...allDeliveryProducts.filter((p: any) => !userProductOrder.includes(p.id)),
+        ]
+      : allDeliveryProducts;
+    return ordered.filter((p: any) => !userHiddenProducts.includes(p.id));
+  }, [allDeliveryProducts, userProductOrder, userHiddenProducts]);
+
+  // Modo organizar productos
+  const [organizeMode, setOrganizeMode] = useState(false);
+  const [draftOrder, setDraftOrder] = useState<string[]>([]);
+  const [draftHidden, setDraftHidden] = useState<string[]>([]);
+
+  const openOrganize = () => {
+    // Inicializar draft con el orden actual de TODOS los productos (incluyendo ocultos)
+    const currentOrder = userProductOrder.length > 0
+      ? [
+          ...userProductOrder.map((id: string) => allDeliveryProducts.find((p: any) => p.id === id)).filter(Boolean),
+          ...allDeliveryProducts.filter((p: any) => !userProductOrder.includes(p.id)),
+        ]
+      : allDeliveryProducts;
+    setDraftOrder(currentOrder.map((p: any) => p.id));
+    setDraftHidden([...userHiddenProducts]);
+    setOrganizeMode(true);
+  };
+
+  const saveOrganize = () => {
+    const newPresets = { ...productPresets, productOrder: draftOrder, hiddenProducts: draftHidden };
+    updateUserPresets((user as any).id, newPresets);
+    setOrganizeMode(false);
+    showToast('✔ Orden guardado');
+  };
+
+  const moveProduct = (idx: number, dir: -1 | 1) => {
+    const next = [...draftOrder];
+    const swap = idx + dir;
+    if (swap < 0 || swap >= next.length) return;
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    setDraftOrder(next);
+  };
+
+  const toggleHidden = (id: string) => {
+    setDraftHidden(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
+  const getPresetsForProduct = (productId: string, action: 'surtir' | 'recibir' = 'surtir'): (number | string)[] => {
+    const actionKey = `${action}__${productId}`;
+    // 1. Override específico por acción (surtir__id / recibir__id)
+    if (productPresets[actionKey] && productPresets[actionKey].length > 0) return productPresets[actionKey];
+    // 2. Override genérico (retrocompatibilidad)
+    if (productPresets[productId] && productPresets[productId].length > 0) return productPresets[productId];
+    // 3. Presets del producto creado en Admin
+    const item = getDeliveryItems().find((i: any) => i.id === productId);
     if (item?.inventoryPresets && item.inventoryPresets.length > 0) return item.inventoryPresets;
     return DEFAULT_PRESETS;
   };
 
-  // Modal edición de presets
+  // Modal edición de presets — ahora con 2 secciones (Surtir / Recibir)
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
-  const [draftPresets, setDraftPresets] = useState<string[]>([]);
+  const [draftPresetsSurtir, setDraftPresetsSurtir] = useState<string[]>([]);
+  const [draftPresetsRecibir, setDraftPresetsRecibir] = useState<string[]>([]);
 
   const openProductPresets = (productId: string) => {
-    setDraftPresets(getPresetsForProduct(productId).map(String));
+    setDraftPresetsSurtir(getPresetsForProduct(productId, 'surtir').map(String));
+    setDraftPresetsRecibir(getPresetsForProduct(productId, 'recibir').map(String));
     setEditingProductId(productId);
   };
 
   const saveProductPresets = () => {
     if (!editingProductId) return;
-    const parsed = draftPresets.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
-    if (parsed.length < 1) { showToast('⚠️ Ingresa al menos un valor'); return; }
-    const newProductPresets = { ...productPresets, [editingProductId]: parsed };
+    const parsedSurtir = draftPresetsSurtir.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
+    const parsedRecibir = draftPresetsRecibir.map(v => parseInt(v, 10)).filter(n => !isNaN(n) && n > 0);
+    if (parsedSurtir.length < 1 && parsedRecibir.length < 1) { showToast('⚠️ Ingresa al menos un valor'); return; }
+    const newProductPresets = {
+      ...productPresets,
+      [`surtir__${editingProductId}`]: parsedSurtir.length > 0 ? parsedSurtir : undefined,
+      [`recibir__${editingProductId}`]: parsedRecibir.length > 0 ? parsedRecibir : undefined,
+    };
     updateUserPresets((user as any).id, newProductPresets);
     showToast('✔ Botones actualizados');
     setEditingProductId(null);
@@ -568,8 +630,8 @@ export const DejadorDashboard = () => {
               ))}
             </div>
 
-            {/* PRESET PILLS */}
-            <div className="flex gap-2 px-1 flex-shrink-0 flex-wrap justify-end">
+            {/* PRESET PILLS + Botón Organizar */}
+            <div className="flex gap-2 px-1 flex-shrink-0 flex-wrap justify-end items-center">
               {dejadorTemplates.map((tpl: any) => (
                 <div key={tpl.id} className="flex items-center">
                   <button
@@ -595,6 +657,14 @@ export const DejadorDashboard = () => {
               >
                 + Guardar Actual
               </button>
+              {/* Botón Organizar productos */}
+              <button
+                onClick={openOrganize}
+                className="flex items-center gap-1.5 py-2 px-4 rounded-full bg-white border-2 border-gray-300 text-gray-600 font-bold text-sm hover:border-gray-500 hover:text-gray-800 transition-all active:scale-95"
+                title="Reordenar y ocultar productos"
+              >
+                ⚙️ Organizar
+              </button>
             </div>
           </div>
         )}
@@ -603,7 +673,8 @@ export const DejadorDashboard = () => {
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in mb-8">
             {products.map((p: any) => {
-              const productPresetValues = getPresetsForProduct(p.id);
+              const action = activeTab === 'carga' ? 'surtir' : 'recibir';
+              const productPresetValues = getPresetsForProduct(p.id, action);
               return (
               <div key={p.id} className={`${activeTab === 'recibir' ? 'bg-indigo-50 border-indigo-200' : 'bg-red-50 border-red-200'} rounded-[28px] flex flex-row items-center justify-between p-2 shadow-sm border`}>
 
@@ -958,60 +1029,141 @@ export const DejadorDashboard = () => {
         </div>
       )}
 
-      {/* MODAL EDITAR PRESETS POR PRODUCTO (Dejador) */}
-      {editingProductId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm">
-            <div className="flex items-center gap-3 mb-1">
-              <div className={`${getThemeClass('bg')} text-white font-black text-sm px-3 py-1.5 rounded-full`}>
-                {getProductAbbreviation(products.find((p: any) => p.id === editingProductId)?.name || '')}
-              </div>
-              <h3 className="font-black text-xl text-gray-900">Botones de cantidad</h3>
-            </div>
-            <p className="text-gray-400 font-bold text-sm mb-5">Valores rápidos para este producto. Se guardan solo para ti.</p>
-
-            <div className="flex gap-2 mb-6 flex-wrap">
-              {draftPresets.map((val, idx) => (
-                <input
-                  key={idx}
-                  type="number"
-                  min="1"
-                  value={val}
-                  onChange={(e) => {
-                    const next = [...draftPresets];
-                    next[idx] = e.target.value;
-                    setDraftPresets(next);
-                  }}
-                  className="w-16 h-14 rounded-2xl border-2 border-[#FF4040] text-center font-black text-gray-900 text-lg outline-none focus:border-[#FFB700] transition-colors shadow-sm"
+      {/* MODAL EDITAR PRESETS POR PRODUCTO — 2 secciones: Surtir / Recibir */}
+      {editingProductId && (() => {
+        const productName = allDeliveryProducts.find((p: any) => p.id === editingProductId)?.name || '';
+        const PresetEditor = ({ label, color, drafts, setDrafts }: { label: string; color: string; drafts: string[]; setDrafts: React.Dispatch<React.SetStateAction<string[]>> }) => (
+          <div>
+            <p className={`text-[11px] font-black uppercase tracking-widest mb-2 ${color}`}>{label}</p>
+            <div className="flex gap-2 flex-wrap">
+              {drafts.map((val, idx) => (
+                <input key={idx} type="number" min="1" value={val}
+                  onChange={(e) => { const next = [...drafts]; next[idx] = e.target.value; setDrafts(next); }}
+                  className="w-14 h-12 rounded-2xl border-2 border-gray-200 text-center font-black text-gray-900 text-base outline-none focus:border-amber-400 transition-colors shadow-sm"
                 />
               ))}
-              {draftPresets.length < 6 && (
-                <button onClick={() => setDraftPresets(p => [...p, ''])}
-                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 font-bold text-2xl flex items-center justify-center hover:border-gray-400 transition-colors">
-                  +
-                </button>
+              {drafts.length < 6 && (
+                <button onClick={() => setDrafts(p => [...p, ''])}
+                  className="w-14 h-12 rounded-2xl border-2 border-dashed border-gray-300 text-gray-400 font-bold text-xl flex items-center justify-center hover:border-gray-400 transition-colors">+</button>
               )}
-              {draftPresets.length > 1 && (
-                <button onClick={() => setDraftPresets(p => p.slice(0, -1))}
-                  className="w-16 h-14 rounded-2xl border-2 border-dashed border-red-200 text-red-300 font-bold text-2xl flex items-center justify-center hover:border-red-400 hover:text-red-500 transition-colors">
-                  −
-                </button>
+              {drafts.length > 1 && (
+                <button onClick={() => setDrafts(p => p.slice(0, -1))}
+                  className="w-14 h-12 rounded-2xl border-2 border-dashed border-red-200 text-red-300 font-bold text-xl flex items-center justify-center hover:border-red-400 hover:text-red-500 transition-colors">−</button>
               )}
+            </div>
+          </div>
+        );
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-[32px] p-6 shadow-2xl w-full max-w-sm">
+              <div className="flex items-center gap-3 mb-1">
+                <div className="bg-gray-900 text-white font-black text-sm px-3 py-1.5 rounded-full">
+                  {getProductAbbreviation(productName)}
+                </div>
+                <h3 className="font-black text-xl text-gray-900">Botones de cantidad</h3>
+              </div>
+              <p className="text-gray-400 font-bold text-sm mb-5">Valores independientes para Surtir y para Recibir.</p>
+
+              <div className="flex flex-col gap-5 mb-6">
+                <PresetEditor
+                  label="🔴 Surtir (Carga inicial)"
+                  color="text-red-500"
+                  drafts={draftPresetsSurtir}
+                  setDrafts={setDraftPresetsSurtir}
+                />
+                <div className="border-t border-gray-100" />
+                <PresetEditor
+                  label="🔵 Recibir (Cierre de jornada)"
+                  color="text-indigo-500"
+                  drafts={draftPresetsRecibir}
+                  setDrafts={setDraftPresetsRecibir}
+                />
+              </div>
+
+              <div className="flex gap-3">
+                <button onClick={() => setEditingProductId(null)}
+                  className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-base hover:bg-gray-200 transition-colors active:scale-95">
+                  Cancelar
+                </button>
+                <button onClick={saveProductPresets}
+                  className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-base shadow-lg shadow-red-200 hover:bg-red-500 transition-colors active:scale-95 flex items-center justify-center gap-2">
+                  <Save size={16} /> Guardar
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* MODAL ORGANIZAR PRODUCTOS */}
+      {organizeMode && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-[32px] p-6 shadow-2xl w-full max-w-sm max-h-[85vh] flex flex-col">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-black text-xl text-gray-900">⚙️ Organizar Productos</h3>
+              <button onClick={() => setOrganizeMode(false)}
+                className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-400 hover:bg-gray-200 transition-colors">✕</button>
+            </div>
+            <p className="text-gray-400 font-bold text-xs mb-4">Arrastra con ▲▼ para reordenar. Toca el ojo 👁️ para ocultar/mostrar.</p>
+
+            <div className="flex-1 overflow-y-auto space-y-2 mb-5">
+              {draftOrder.map((id: string, idx: number) => {
+                const prod = allDeliveryProducts.find((p: any) => p.id === id);
+                if (!prod) return null;
+                const isHidden = draftHidden.includes(id);
+                return (
+                  <div key={id} className={`flex items-center gap-3 p-3 rounded-2xl border-2 transition-all ${
+                    isHidden ? 'bg-gray-50 border-gray-100 opacity-50' : 'bg-white border-gray-200 hover:border-amber-200'
+                  }`}>
+                    {/* Orden */}
+                    <div className="flex flex-col gap-0.5">
+                      <button
+                        onClick={() => moveProduct(idx, -1)}
+                        disabled={idx === 0}
+                        className="w-6 h-6 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-black disabled:opacity-20 hover:bg-amber-100 hover:text-amber-600 transition-colors"
+                      >▲</button>
+                      <button
+                        onClick={() => moveProduct(idx, 1)}
+                        disabled={idx === draftOrder.length - 1}
+                        className="w-6 h-6 rounded-lg bg-gray-100 text-gray-500 flex items-center justify-center text-xs font-black disabled:opacity-20 hover:bg-amber-100 hover:text-amber-600 transition-colors"
+                      >▼</button>
+                    </div>
+                    {/* Nombre */}
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-black text-sm truncate ${isHidden ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{prod.name}</p>
+                      <p className="text-[10px] font-bold text-gray-400">{getProductAbbreviation(prod.name, prod.abbreviation)}</p>
+                    </div>
+                    {/* Toggle visible */}
+                    <button
+                      onClick={() => toggleHidden(id)}
+                      title={isHidden ? 'Mostrar producto' : 'Ocultar producto'}
+                      className={`w-9 h-9 rounded-full flex items-center justify-center text-base transition-all active:scale-90 ${
+                        isHidden
+                          ? 'bg-gray-100 text-gray-300 hover:bg-amber-100 hover:text-amber-500'
+                          : 'bg-amber-50 text-amber-500 hover:bg-red-50 hover:text-red-400'
+                      }`}
+                    >
+                      {isHidden ? '🙈' : '👁️'}
+                    </button>
+                  </div>
+                );
+              })}
             </div>
 
             <div className="flex gap-3">
-              <button onClick={() => setEditingProductId(null)}
+              <button onClick={() => setOrganizeMode(false)}
                 className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-base hover:bg-gray-200 transition-colors active:scale-95">
                 Cancelar
               </button>
-              <button onClick={saveProductPresets}
-                className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-base shadow-lg shadow-red-200 hover:bg-red-500 transition-colors active:scale-95 flex items-center justify-center gap-2">
-                <Save size={16} /> Guardar
+              <button onClick={saveOrganize}
+                className="flex-1 py-3 rounded-2xl bg-amber-500 text-white font-black text-base shadow-lg shadow-amber-200 hover:bg-amber-600 transition-colors active:scale-95 flex items-center justify-center gap-2">
+                <Save size={16} /> Guardar orden
               </button>
             </div>
           </div>
         </div>
       )}
+
 
       {/* TOAST */}
       {toast && (

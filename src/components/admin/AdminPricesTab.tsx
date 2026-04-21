@@ -519,7 +519,20 @@ const ProductRow = ({
           <ShoppingCart size={10} />
           {p.showInPos !== false ? 'POS' : 'No POS'}
         </button>
+        {/* showInTricicloPos badge — visible en POS del Vendedor pero NO en flujo del Dejador */}
+        <button
+          onClick={() => updateInventoryItem(p.id, { showInTricicloPos: !p.showInTricicloPos })}
+          title={p.showInTricicloPos ? 'Solo POS Triciclo (Dejador no lo ve) — clic para desmarcar' : 'Aparece en flujo normal del Dejador — clic para marcar como Solo POS'}
+          className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${
+            p.showInTricicloPos
+              ? 'bg-blue-100 text-blue-700 hover:bg-gray-100 hover:text-gray-400'
+              : 'bg-gray-100 text-gray-300 hover:bg-blue-100 hover:text-blue-600'
+          }`}
+        >
+          🛵 {p.showInTricicloPos ? 'Solo POS' : 'Con surtido'}
+        </button>
       </div>
+
 
       <div className="flex items-center gap-2 flex-shrink-0">
         {isEditing ? (

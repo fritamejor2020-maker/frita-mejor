@@ -264,6 +264,27 @@ export const useInventoryStore = create(
           (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null
         ),
 
+      /**
+       * Productos del flujo logístico del Dejador (Surtir + Recibir).
+       * Excluye productos marcados como showInTricicloPos:true
+       * (esos son solo para el POS del vendedor, no necesitan ser cargados en triciclo).
+       */
+      getDeliveryItems: () =>
+        get().inventory.filter(
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null && !i.showInTricicloPos
+        ),
+
+      /**
+       * Productos del POS del Vendedor de triciclo.
+       * Incluye TODOS los productos con precio, incluyendo los showInTricicloPos.
+       * Excluye los marcados showInPos:false.
+       */
+      getVendedorPosItems: () =>
+        get().inventory.filter(
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null && i.showInPos !== false
+        ),
+
+
       // Verifica si hay stock para producir [batches] lotes
       checkStock: (recipeId, batches = 1) => {
         const recipe = get().recipes.find((r) => r.id === recipeId);

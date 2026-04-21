@@ -18,12 +18,12 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
-  const { getPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts, fritadoRecipes } = useInventoryStore();
+  const { getPosItems, getVendedorPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts, fritadoRecipes } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
-  const products = getPosItems(); // all POS products (logistics + restock + closing)
+  const products = getVendedorPosItems(); // productos del POS de vendedor (incluye showInTricicloPos)
   const posProducts = products.filter((p) => p.showInPos !== false); // only visible in POS selling tab
 
   // Registrar turno en posShifts al abrir sesión (para que admin lo vea en tiempo real)
@@ -98,7 +98,7 @@ export const VendedorDashboard = () => {
 
   const getPresetsForProduct = (productId: string): (number | string)[] => {
     if (productPresets[productId]) return productPresets[productId];
-    const item = getPosItems().find((i: any) => i.id === productId);
+    const item = getVendedorPosItems().find((i: any) => i.id === productId);
     if (item?.inventoryPresets && item.inventoryPresets.length > 0) return item.inventoryPresets;
     return DEFAULT_PRESETS;
   };
