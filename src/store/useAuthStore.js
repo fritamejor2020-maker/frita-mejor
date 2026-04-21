@@ -17,7 +17,7 @@ const DEFAULT_USERS = [
     password: '1',
     role: 'ADMIN',
     active: true,
-    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking'],
+    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres'],
   },
   {
     id: 'USR-002',
@@ -95,7 +95,7 @@ const DEFAULT_USERS = [
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'fritado'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'fritado', 'cierres'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
@@ -247,12 +247,29 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 10, // v10: tracking agregado a DEJADOR, GPS en VendedorDashboard
+      version: 11, // v11: cierres agregado a ADMIN en access[] y ROLE_ACCESS
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
         users: state.users,
       }),
+      // Migración: asegurar que usuarios ADMIN tengan 'cierres' en access[]
+      migrate: (persisted, fromVersion) => {
+        const state = persisted;
+        if (fromVersion < 11 && state.users) {
+          state.users = state.users.map((u) => {
+            if (u.role === 'ADMIN' && !u.access?.includes('cierres')) {
+              return { ...u, access: [...(u.access || []), 'cierres'] };
+            }
+            return u;
+          });
+          // Actualizar también el usuario en sesión si es ADMIN
+          if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('cierres')) {
+            state.user = { ...state.user, access: [...(state.user.access || []), 'cierres'] };
+          }
+        }
+        return state;
+      },
     }
   )
 );
