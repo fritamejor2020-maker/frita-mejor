@@ -1169,11 +1169,12 @@ function ReportsPanel() {
                   {inventory.map((item) => {
                     const wh = warehouses.find(w => w.id === item.warehouseId);
                     const isLow = item.qty <= item.alert;
-                    const typeColorMap = { INSUMO: 'bg-blue-50 text-blue-500', PRODUCTO: 'bg-green-50 text-green-500', CRUDO: 'bg-orange-50 text-orange-500', FRITO: 'bg-yellow-50 text-yellow-600' };
+                    const typeColorMap = { INSUMO: 'bg-blue-50 text-blue-500', PRODUCTO: 'bg-green-50 text-green-500', CRUDO: 'bg-sky-50 text-sky-600', FRITO: 'bg-orange-50 text-orange-500' };
+                    const typeIcon = { INSUMO: '📋', PRODUCTO: '📦', CRUDO: '🧊', FRITO: '🔥' };
                     return (
                       <tr key={item.id} className={`hover:bg-gray-50/50 ${isLow ? 'bg-red-50/30' : ''}`}>
                         <td className="py-3 px-4 font-black text-chunky-dark">{item.name}</td>
-                        <td className="py-3 px-4"><span className={`text-xs font-bold px-2 py-1 rounded-full ${typeColorMap[item.type] || 'bg-gray-100 text-gray-500'}`}>{item.type}</span></td>
+                        <td className="py-3 px-4"><span className={`text-xs font-bold px-2 py-1 rounded-full ${typeColorMap[item.type] || 'bg-gray-100 text-gray-500'}`}>{typeIcon[item.type] || ''} {item.type}</span></td>
                         <td className="py-3 px-4 font-bold text-gray-500 text-xs">{wh?.name || 'General'}</td>
                         <td className="py-3 px-4 font-black text-chunky-dark">{item.qty} <span className="text-gray-400 text-xs font-bold">{item.unit}</span></td>
                         <td className="py-3 px-4 font-bold text-gray-600">{item.price ? fmtMoney(item.price) : '—'}</td>
@@ -1945,6 +1946,11 @@ function FritadoConfigPanel() {
   const [newRecipe, setNewRecipe] = useState({ crudoId: '', fritoId: '', presets: [10, 20, 50, 100, 200], productionPointIds: [] });
 
   const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO'].includes(i.type));
+  // Helper: etiqueta un item con su tipo para que sea distinguible en dropdowns
+  const itemLabel = (p) => {
+    const badge = p.type === 'CRUDO' ? '🧊 CRUDO' : p.type === 'FRITO' ? '🔥 FRITO' : p.type === 'PRODUCTO' ? '📦 PRODUCTO' : p.type;
+    return `${p.name}  [${badge}]  (${p.qty ?? 0} ${p.unit || 'ud'})`;
+  };
 
   const handleStartEdit = (recipe) => {
     setEditingId(recipe.id);
@@ -1977,17 +1983,17 @@ function FritadoConfigPanel() {
       {showAdd && (
         <div className="bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-200 mb-6 flex flex-wrap gap-4 items-end animate-fade-in">
           <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-bold text-gray-400 block mb-1">Producto Origen (Crudo)</label>
+            <label className="text-xs font-bold text-gray-400 block mb-1">🧊 Producto Origen (el que entra crudo)</label>
             <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newRecipe.crudoId} onChange={(e) => setNewRecipe({...newRecipe, crudoId: e.target.value})}>
               <option value="">Seleccionar origen...</option>
-              {allProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {allProducts.map(p => <option key={p.id} value={p.id}>{itemLabel(p)}</option>)}
             </select>
           </div>
           <div className="flex-1 min-w-[200px]">
-            <label className="text-xs font-bold text-gray-400 block mb-1">Producto Destino (Frito)</label>
+            <label className="text-xs font-bold text-gray-400 block mb-1">🔥 Producto Destino (el que sale frito)</label>
             <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newRecipe.fritoId} onChange={(e) => setNewRecipe({...newRecipe, fritoId: e.target.value})}>
               <option value="">Seleccionar destino...</option>
-              {allProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+              {allProducts.map(p => <option key={p.id} value={p.id}>{itemLabel(p)}</option>)}
             </select>
           </div>
           <button className="bg-green-500 text-white font-black py-2 px-6 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors w-full md:w-auto mt-2 md:mt-0" 
