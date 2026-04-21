@@ -159,27 +159,28 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
-  // Escalar según espacio real por tarjeta
+  // Tamaños dinámicos según espacio disponible
   const big3    = cardH >= 260;
   const nameSz  = big3 ? 'text-xl'   : 'text-base';
   const stockSz = big3 ? 'text-xl'   : 'text-base';
-  const bigSz   = big3 ? 'text-3xl'  : 'text-2xl';    // era text-5xl → ahora text-3xl
+  const bigSz   = big3 ? 'text-2xl'  : 'text-xl';   // reducido: 5xl→3xl→2xl
   const unitSz  = big3 ? 'text-base' : 'text-sm';
   const smSz    = big3 ? 'text-2xl'  : 'text-xl';
-  const smPy    = big3 ? 'py-4'      : 'py-3';
-  const smUnit  = big3 ? 'text-sm'   : 'text-xs';     // era siempre text-xs → ahora sm cuando hay espacio
-  const pad     = big3 ? 'p-5'       : 'p-4';
+  const smUnit  = big3 ? 'text-sm'   : 'text-xs';
+  const pad     = big3 ? 'p-4'       : 'p-3';
+  // Altura mínima de botón secundario: 25% de cardH (mínimo 80px)
+  const smMinH  = Math.max(80, Math.round(cardH * 0.25));
 
-  // Regla: el texto nunca desborda. Si el número tiene muchos dígitos, reduce el tamaño
+  // Regla: el texto nunca desborda según cantidad de dígitos
   const safeFontSz = (label, baseCls) => {
     const len = String(label).length;
     if (len <= 2) return baseCls;
     if (len <= 3) return big3 ? 'text-xl' : 'text-lg';
-    return big3 ? 'text-lg' : 'text-base';  // 4+ dígitos (e.g. 160, 40.5)
+    return big3 ? 'text-lg' : 'text-base';
   };
 
   return (
-    <div className={`rounded-2xl ${pad} flex flex-col gap-3 h-full ${cardCls}`}>
+    <div className={`rounded-3xl ${pad} flex flex-col gap-3 h-full ${cardCls}`}>
       <div className="text-center shrink-0">
         <div className={`font-black text-chunky-dark leading-tight truncate ${nameSz}`}>{prod.name}</div>
         <div className="flex items-baseline justify-center gap-1">
@@ -189,29 +190,31 @@ function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, car
         </div>
       </div>
 
+      {/* Botón principal */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        className={`rounded-2xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none overflow-hidden ${btnCls}`}>
+        className={`rounded-3xl flex-1 min-h-0 flex flex-col items-center justify-center font-black transition-colors select-none overflow-hidden ${btnCls}`}>
         <span className={`font-black leading-none ${bigSz}`}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
         <span className={`font-bold opacity-70 ${unitSz}`}>{yieldUnit}</span>
       </button>
 
-      {/* Botones secundarios */}
+      {/* Botones secundarios con altura mínima garantizada */}
       <div className="grid grid-cols-4 gap-2 shrink-0">
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              className={`rounded-xl ${smPy} flex flex-col items-center font-black transition-colors select-none active:scale-95 overflow-hidden ${btnCls}`}>
+              style={{ minHeight: smMinH }}
+              className={`rounded-2xl flex flex-col items-center justify-center font-black transition-colors select-none active:scale-95 overflow-hidden ${btnCls}`}>
               <span className={`leading-none ${safeFontSz(label, smSz)}`}>{label}</span>
-              <span className={`font-bold opacity-75 mt-0.5 ${smUnit}`}>{yieldUnit}</span>
+              <span className={`font-bold opacity-75 mt-1 ${smUnit}`}>{yieldUnit}</span>
             </button>
           );
         })}
       </div>
 
       <button onClick={() => onManual(prod)}
-        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-xl flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors py-3`}>
+        className={`w-full shrink-0 border border-dashed border-gray-300 rounded-2xl flex items-center justify-center text-gray-400 font-bold text-sm hover:border-chunky-main hover:text-chunky-dark transition-colors py-3`}>
         ✏️ Manual
       </button>
     </div>
@@ -236,26 +239,28 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
     : wasteMode ? 'bg-red-100 hover:bg-red-200 text-red-700 border-2 border-red-200'
     : 'bg-[#FFB700] hover:bg-yellow-400 text-gray-900 border-2 border-transparent shadow-sm';
 
-  // Fuentes 100% proporcionales al espacio: más espacio = números más grandes
-  const bigSz  = Math.max(18, Math.min(42, Math.round(cardH * 0.28)));  // cap 60→42
-  const smSz   = Math.max(14, Math.min(22, Math.round(cardH * 0.09)));  // cap 15→22, min 9→14
+  // Fuentes 100% proporcionales al espacio
+  const bigSz  = Math.max(18, Math.min(36, Math.round(cardH * 0.22)));  // cap 42→36, factor 0.28→0.22
+  const smSz   = Math.max(14, Math.min(22, Math.round(cardH * 0.09)));
   const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
   const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
   const unitSz = Math.max(9,  Math.min(13, Math.round(cardH * 0.06)));
-  const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
-  const smPy   = Math.max(8,  Math.min(16, Math.round(cardH * 0.05)));  // min 3→8, max 8→16
+  const pad    = Math.max(4,  Math.min(14, Math.round(cardH * 0.05)));
+  const smPy   = Math.max(8,  Math.min(18, Math.round(cardH * 0.06)));  // aumentado
   const gap    = Math.max(4,  Math.min(10, Math.round(cardH * 0.04)));
+  // Altura mínima de botón secundario: 22% de cardH (mínimo 70px)
+  const smMinH = Math.max(70, Math.round(cardH * 0.22));
 
-  // Regla: font se reduce si el número tiene más dígitos
+  // Regla anti-overflow: reduce font según dígitos
   const safeSmSz = (label) => {
     const len = String(label).length;
     if (len <= 2) return smSz;
     if (len <= 3) return Math.max(10, Math.round(smSz * 0.8));
-    return Math.max(9, Math.round(smSz * 0.65));  // 4+ dígitos
+    return Math.max(9, Math.round(smSz * 0.65));
   };
 
   return (
-    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
+    <div style={{ borderRadius: 18, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
          className={cardCls}>
       {/* Nombre + stock */}
       <div style={{ textAlign: 'center', flexShrink: 0 }}>
@@ -269,20 +274,20 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Botón principal */}
       <button disabled={isDisabled} onClick={() => onProduce(prod, big)}
-        style={{ borderRadius: 14, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
+        style={{ borderRadius: 24, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
         className={`font-black transition-colors select-none ${btnCls}`}>
         <span style={{ fontSize: bigSz, fontWeight: 900, lineHeight: 1 }}>{bigAmt % 1 === 0 ? bigAmt : bigAmt.toFixed(1)}</span>
         <span style={{ fontSize: unitSz, fontWeight: 700, opacity: 0.75, marginTop: 2 }}>{yieldUnit}</span>
       </button>
 
-      {/* Botones secundarios */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, flexShrink: 0 }}>
+      {/* Botones secundarios con altura mínima garantizada */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 6, flexShrink: 0 }}>
         {smalls.slice(0, 4).map((b, i) => {
           const a = b * yieldQty;
           const label = a % 1 === 0 ? String(a) : a.toFixed(1);
           return (
             <button key={i} disabled={isDisabled} onClick={() => onProduce(prod, b)}
-              style={{ borderRadius: 10, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
+              style={{ borderRadius: 18, minHeight: smMinH, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer', overflow: 'hidden' }}
               className={`font-black transition-colors select-none active:scale-95 ${btnCls}`}>
               <span style={{ fontSize: safeSmSz(label), fontWeight: 900, lineHeight: 1 }}>{label}</span>
               <span style={{ fontSize: Math.max(9, unitSz - 1), fontWeight: 700, opacity: 0.75 }}>{yieldUnit}</span>
@@ -293,7 +298,7 @@ function CardNormal({ prod, productionPoint, wasteMode, onProduce, onManual, car
 
       {/* Manual */}
       <button onClick={() => onManual(prod)}
-        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 10, padding: `${Math.max(8, smPy * 0.55)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(12, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 18, padding: `${Math.max(8, smPy * 0.55)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(12, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
         ✏️ Manual
       </button>
     </div>
