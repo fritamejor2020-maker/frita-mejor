@@ -103,12 +103,13 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
     : 'bg-chunky-main text-chunky-dark active:scale-90 shadow-sm';
 
-  const nameW   = size === 'md' ? 120 : 90;
-  const circleD = size === 'md' ? 46  : 38;
-  const manualD = size === 'md' ? 36  : 30;
-  const nameSz  = size === 'md' ? 14  : 13;
-  const stockSz = size === 'md' ? 11  : 10;
-  const btnSz   = size === 'md' ? 14  : 12;
+  // Tamaños aumentados para mejor usabilidad táctil
+  const nameW   = size === 'md' ? 130 : 100;
+  const circleD = size === 'md' ? 58  : 50;   // era 46/38 → ahora 58/50
+  const manualD = size === 'md' ? 44  : 38;   // era 36/30 → ahora 44/38
+  const nameSz  = size === 'md' ? 15  : 14;
+  const stockSz = size === 'md' ? 12  : 11;
+  const btnSz   = size === 'md' ? 18  : 16;   // era 14/12 → ahora 18/16
   const maxCircles = size === 'md' ? 4 : 5;
 
   return (
@@ -126,8 +127,8 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
         </div>
       </div>
 
-      {/* Botones circulares — máx 4 en tablet para que no desborden */}
-      <div style={{ display: 'flex', gap: 5, flex: 1, justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
+      {/* Botones circulares */}
+      <div style={{ display: 'flex', gap: 6, flex: 1, justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
         {presets.slice(0, maxCircles).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
             style={{ width: circleD, height: circleD, minWidth: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
@@ -138,7 +139,7 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
       </div>
 
       <button onClick={() => onManual(pair)}
-        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 15 : 12, cursor: 'pointer' }}>
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 18 : 15, cursor: 'pointer' }}>
         ✏️
       </button>
     </div>
@@ -229,17 +230,17 @@ function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
 
-  const bigSz  = Math.max(18, Math.min(60, Math.round(cardH * 0.34)));
-  const smSz   = Math.max(9,  Math.min(15, Math.round(cardH * 0.08)));
-  const nameSz = Math.max(10, Math.min(16, Math.round(cardH * 0.08)));
-  const stockSz= Math.max(9,  Math.min(14, Math.round(cardH * 0.07)));
-  const unitSz = Math.max(7,  Math.min(12, Math.round(cardH * 0.06)));
-  const pad    = Math.max(4,  Math.min(12, Math.round(cardH * 0.05)));
-  const smPy   = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
-  const gap    = Math.max(3,  Math.min(8,  Math.round(cardH * 0.03)));
+  const bigSz  = Math.max(24, Math.min(72, Math.round(cardH * 0.34)));
+  const smSz   = Math.max(16, Math.min(26, Math.round(cardH * 0.10)));  // era max 15 → ahora max 26
+  const nameSz = Math.max(13, Math.min(20, Math.round(cardH * 0.09)));
+  const stockSz= Math.max(12, Math.min(18, Math.round(cardH * 0.08)));
+  const unitSz = Math.max(10, Math.min(16, Math.round(cardH * 0.07)));
+  const pad    = Math.max(8,  Math.min(16, Math.round(cardH * 0.06)));
+  const smPy   = Math.max(10, Math.min(20, Math.round(cardH * 0.06)));  // era max 8 → ahora min 10
+  const gap    = Math.max(6,  Math.min(12, Math.round(cardH * 0.04)));
 
   return (
-    <div style={{ borderRadius: 12, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
+    <div style={{ borderRadius: 16, padding: pad, display: 'flex', flexDirection: 'column', gap, height: '100%', paddingBottom: pad }}
          className={cardCls}>
       <div style={{ textAlign: 'center', flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
@@ -252,25 +253,25 @@ function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
       </div>
 
       <button disabled={isDisabled} onClick={() => onFry(pair, big)}
-        style={{ borderRadius: 10, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+        style={{ borderRadius: 14, flexGrow: 1, minHeight: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
         className={`font-black transition-all select-none ${btnCls}`}>
         <span style={{ fontSize: bigSz, fontWeight: 900, lineHeight: 1 }}>{big}</span>
         <span style={{ fontSize: unitSz, fontWeight: 700, opacity: 0.75, marginTop: 2 }}>uds</span>
       </button>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, flexShrink: 0 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 5, flexShrink: 0 }}>
         {smalls.slice(0, 4).map((amount, idx) => (
           <button key={idx} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            style={{ borderRadius: 8, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
+            style={{ borderRadius: 10, paddingTop: smPy, paddingBottom: smPy, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, border: 'none', cursor: isDisabled ? 'not-allowed' : 'pointer' }}
             className={`font-black transition-all active:scale-95 select-none ${btnCls}`}>
             <span style={{ fontSize: smSz, fontWeight: 900, lineHeight: 1 }}>{amount}</span>
-            <span style={{ fontSize: unitSz - 2, fontWeight: 700, opacity: 0.7 }}>uds</span>
+            <span style={{ fontSize: Math.max(9, unitSz - 2), fontWeight: 700, opacity: 0.75 }}>uds</span>
           </button>
         ))}
       </div>
 
       <button onClick={() => onManual(pair)}
-        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 8, padding: '3px 0', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: unitSz, fontWeight: 700, color: '#9ca3af', cursor: 'pointer', minHeight: 18 }}>
+        style={{ flexShrink: 0, border: '1.5px dashed #d1d5db', borderRadius: 10, padding: `${Math.max(8, smPy * 0.6)}px 0`, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: Math.max(13, unitSz), fontWeight: 700, color: '#9ca3af', cursor: 'pointer' }}>
         ✏️ Manual
       </button>
     </div>
