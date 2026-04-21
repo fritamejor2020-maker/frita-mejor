@@ -345,14 +345,15 @@ function InventoryPanel() {
   const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useInventoryStore();
   const [editingId, setEditingId] = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
-  const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', type: 'INSUMO', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
+  const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
   const [filterWh,  setFilterWh]  = useState('ALL');
 
   const fields = [
     { key: 'name',        label: 'Nombre',          wide: true },
     { key: 'barcode',     label: 'Cód. de Barras',   wide: false },
     { key: 'warehouseId', label: 'Bodega',   options: [{ value: '', label: 'General' }, ...warehouses.map((w) => ({ value: w.id, label: w.name }))] },
-    { key: 'type',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO', 'CRUDO', 'FRITO'] },
+    { key: 'tipo',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO'] },
+    { key: 'estado',      label: 'Estado',   options: ['N/A', 'CRUDO', 'FRITO'] },
     { key: 'qty',         label: 'Cantidad', type: 'number' },
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
     { key: 'alert',       label: 'Alerta en',type: 'number' },
@@ -360,6 +361,22 @@ function InventoryPanel() {
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
     { key: 'imageUrl',    label: 'URL de Imagen (POS)', wide: true },
   ];
+
+  // Convierte los dos campos vizuales en el campo 'type' real del item
+  const buildType = (tipo, estado) => {
+    if (tipo === 'INSUMO') return 'INSUMO';
+    if (estado === 'CRUDO') return 'CRUDO';
+    if (estado === 'FRITO') return 'FRITO';
+    return 'PRODUCTO'; // PRODUCTO + N/A
+  };
+
+  // Descompone un 'type' existente en los dos campos visuales
+  const decomposeType = (type) => {
+    if (type === 'INSUMO')   return { tipo: 'INSUMO',   estado: 'N/A' };
+    if (type === 'CRUDO')    return { tipo: 'PRODUCTO', estado: 'CRUDO' };
+    if (type === 'FRITO')    return { tipo: 'PRODUCTO', estado: 'FRITO' };
+    return                          { tipo: 'PRODUCTO', estado: 'N/A' };  // 'PRODUCTO'
+  };
 
   const change = (k, v) => {
     if (editingId) setForm((f) => ({ ...f, [k]: v }));
@@ -377,7 +394,7 @@ function InventoryPanel() {
             <option value="ALL">Todas las bodegas</option>
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
-          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', type: 'INSUMO', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
+          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
             + Agregar ítem
           </Button>
         </div>
@@ -386,7 +403,7 @@ function InventoryPanel() {
       {showAdd && (
         <div className="mb-4">
           <EditableRow fields={fields} values={form} onChange={change}
-            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price) }); setShowAdd(false); } }}
+            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price), type: buildType(form.tipo, form.estado) }); setShowAdd(false); } }}
             onCancel={() => setShowAdd(false)} />
         </div>
       )}
@@ -397,7 +414,7 @@ function InventoryPanel() {
           return editingId === item.id ? (
             <div key={item.id}>
               <EditableRow fields={fields} values={form} onChange={change}
-                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price) }); setEditingId(null); }}
+                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price), type: buildType(form.tipo, form.estado) }); setEditingId(null); }}
                 onCancel={() => setEditingId(null)} />
             </div>
           ) : (
@@ -423,7 +440,7 @@ function InventoryPanel() {
                 {item.qty}<span className="text-gray-400 font-bold text-xs ml-1">{item.unit}</span>
               </span>
               <div className="flex gap-2 ml-auto">
-                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, type: item.type, alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '' }); setShowAdd(false); }}>
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '' }); setShowAdd(false); }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
                 <button className="text-gray-300 hover:text-red-400" onClick={() => deleteInventoryItem(item.id)}>
