@@ -131,7 +131,19 @@ function CardMobile({ prod, productionPoint, wasteMode, onProduce, onManual, siz
             </button>
           );
         })}
-     // ─── Tarjeta TABLET: escala fuentes según espacio disponible ────────────────
+      </div>
+
+      <button onClick={() => onManual(prod)}
+        style={{ width: manualD, height: manualD, minWidth: manualD, borderRadius: '50%', flexShrink: 0, border: '1.5px dashed #d1d5db', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'transparent', fontSize: size === 'md' ? 16 : 12, cursor: 'pointer' }}
+        title="Manual">
+        ✏️
+      </button>
+    </div>
+  );
+}
+
+
+// ─── Tarjeta TABLET: escala fuentes según espacio disponible ──────────────────
 function CardTablet({ prod, productionPoint, wasteMode, onProduce, onManual, cardH = 300 }) {
   const presets   = prod.linePresets?.[productionPoint.id] ?? [1, 2, 5, 10, 20];
   const yieldQty  = prod.recipe?.yieldQty ?? 1;
