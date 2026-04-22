@@ -57,7 +57,7 @@ export function IncomesModal({ onClose }) {
   const numTransferencias = parseFloat(transferencias) || 0;
   const numSalidas = parseFloat(salidas) || 0;
   const totalSingle = numEfectivo + numTransferencias;
-  const isSingleFormValid = numEfectivo > 0 || numTransferencias > 0;
+  const isSingleFormValid = (numEfectivo > 0 || numTransferencias > 0) && !!photoBase64;
 
   // Calculations Grid
   const getGridRowTotal = (row) => (parseFloat(row.efectivo) || 0) + (parseFloat(row.transferencias) || 0);
@@ -68,7 +68,7 @@ export function IncomesModal({ onClose }) {
     acc.total += getGridRowTotal(row);
     return acc;
   }, { efectivo: 0, transferencias: 0, salidas: 0, total: 0 });
-  const isGridFormValid = gridTotals.efectivo > 0 || gridTotals.transferencias > 0;
+  const isGridFormValid = (gridTotals.efectivo > 0 || gridTotals.transferencias > 0) && !!photoBase64;
 
   const handleNextStep = (type, value) => {
     if (type === 'ubicacion') {
