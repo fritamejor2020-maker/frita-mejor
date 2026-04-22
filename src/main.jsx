@@ -11,13 +11,9 @@ createRoot(document.getElementById('root')).render(
 )
 
 // ── Service Worker PWA ──────────────────────────────────────────────────────
-// Cuando Vercel despliega una nueva versión:
-// 1. onNeedRefresh → muestra un banner para que el usuario actualice
-// 2. controllerchange → recarga automática como fallback
 const updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
-    // Crear banner de actualización
     const existing = document.getElementById('sw-update-banner');
     if (existing) return;
     const banner = document.createElement('div');
@@ -38,12 +34,18 @@ const updateSW = registerSW({
     `;
     document.body.appendChild(banner);
   },
-  onOfflineReady() {
-    // Silencioso — app lista offline
+  onRegisteredSW(_swUrl, registration) {
+    // Chequear actualizaciones cada 30 segundos mientras la app está abierta
+    if (registration) {
+      setInterval(() => {
+        registration.update();
+      }, 30_000);
+    }
   },
+  onOfflineReady() {},
 });
 
-// Fallback: si el SW cambia de controlador, recargar automáticamente
+// Fallback: recargar automáticamente cuando el nuevo SW toma el control
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
