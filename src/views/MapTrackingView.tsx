@@ -298,77 +298,85 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
           })}
         </MapContainer>
 
-        {/* Panel lateral de vendedores — hidden when embedded */}
+        {/* Panel flotante de vendedores — abajo al centro, solo en modo standalone */}
         {!embedded && (
-        <div style={{
-          width: 250, background: 'white', boxShadow: '-2px 0 8px rgba(0,0,0,0.08)',
-          display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 2,
-          flexShrink: 0,
-        }}>
-          <div style={{ padding: '14px 14px 8px', borderBottom: '1px solid #f3f4f6' }}>
-            <div style={{ fontWeight: 900, fontSize: 13, color: '#1f2937' }}>Vendedores activos</div>
-            <div style={{ fontWeight: 700, fontSize: 11, color: '#9ca3af', marginTop: 2 }}>
-              {vendors.length === 0 ? 'Ninguno en línea' : `${vendors.length} en ruta`}
-            </div>
-          </div>
+          <div style={{
+            position: 'absolute', bottom: 20, left: '50%',
+            transform: 'translateX(-50%)',
+            zIndex: 1000, pointerEvents: 'auto',
+            maxWidth: '92vw', width: 'max-content',
+          }}>
 
-          <div style={{ overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {vendors.length === 0 ? (
-              <div style={{ textAlign: 'center', paddingTop: 40 }}>
-                <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
-                <div style={{ fontSize: 12, fontWeight: 700, color: '#9ca3af' }}>
-                  Los vendedores aparecerán aquí cuando estén en turno con GPS activo
-                </div>
-              </div>
-            ) : (
-              vendors.map((v) => {
-                const stale = isStale(v.updatedAt);
-                const isSelected = selectedVehicleId === v.vendorId;
-                return (
-                  <div
-                    key={v.vendorId}
-                    onClick={() => setSelectedVehicleId(isSelected ? null : v.vendorId)}
-                    style={{
-                      background: isSelected ? '#fffbeb' : stale ? '#f9fafb' : '#fffbeb',
-                      border: `2px solid ${isSelected ? '#f59e0b' : stale ? '#e5e7eb' : '#fde68a'}`,
-                      borderRadius: 12, padding: '10px 12px', cursor: 'pointer',
-                      transition: 'all 0.15s',
-                    }}
-                  >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
-                      <div style={{
-                        width: 8, height: 8, borderRadius: '50%',
-                        background: stale ? '#9ca3af' : '#22c55e', flexShrink: 0,
-                      }} />
-                      <span style={{ fontWeight: 900, fontSize: 13, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-                        {v.name}
-                      </span>
-                      {isSelected && <span style={{ fontSize: 10 }}>📦</span>}
-                    </div>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: stale ? '#ef4444' : '#6b7280' }}>
-                      🕐 {formatTime(v.updatedAt)}
-                    </div>
-                    {v.source === 'db' && stale && (
-                      <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 600, marginTop: 2 }}>
-                        📡 Última guardada
-                      </div>
-                    )}
-                  </div>
-                );
-              })
-            )}
-
-            {/* Inventario del vehículo seleccionado */}
+            {/* Inventario del vehículo seleccionado — aparece encima del panel */}
             {selectedVehicleId && (
-              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 10, marginTop: 4 }}>
+              <div style={{
+                background: 'white', borderRadius: 20, padding: '12px 14px',
+                boxShadow: '0 4px 24px rgba(0,0,0,0.18)', marginBottom: 8,
+                maxWidth: 320, width: '90vw',
+              }}>
                 <div style={{ fontWeight: 900, fontSize: 11, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  📦 Inventario en Ruta
+                  📦 Inventario en Ruta · {selectedVehicleId}
                 </div>
                 <VehicleShiftCard vehicleId={selectedVehicleId} activeOnly />
               </div>
             )}
+
+            {/* Cuadro flotante de vendedores */}
+            <div style={{
+              background: 'rgba(255,255,255,0.97)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: 20,
+              boxShadow: '0 4px 24px rgba(0,0,0,0.18)',
+              padding: vendors.length === 0 ? '12px 20px' : '10px 12px',
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6,
+            }}>
+              {/* Header */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <div style={{
+                  width: 8, height: 8, borderRadius: '50%',
+                  background: vendors.length > 0 ? '#22c55e' : '#d1d5db',
+                  flexShrink: 0,
+                }} />
+                <span style={{ fontWeight: 800, fontSize: 12, color: '#374151' }}>
+                  {vendors.length === 0 ? 'Ningún vendedor en línea' : `${vendors.length} vendedor${vendors.length > 1 ? 'es' : ''} en ruta`}
+                </span>
+              </div>
+
+              {/* Tarjetas de vendedores en fila */}
+              {vendors.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, maxWidth: '88vw' }}>
+                  {vendors.map((v) => {
+                    const stale = isStale(v.updatedAt);
+                    const isSelected = selectedVehicleId === v.vendorId;
+                    return (
+                      <div
+                        key={v.vendorId}
+                        onClick={() => setSelectedVehicleId(isSelected ? null : v.vendorId)}
+                        style={{
+                          background: isSelected ? '#fef3c7' : stale ? '#f9fafb' : 'white',
+                          border: `2px solid ${isSelected ? '#f59e0b' : stale ? '#e5e7eb' : '#d1fae5'}`,
+                          borderRadius: 14, padding: '8px 12px', cursor: 'pointer',
+                          transition: 'all 0.15s', minWidth: 90,
+                          boxShadow: isSelected ? '0 0 0 3px rgba(245,158,11,0.2)' : '0 1px 4px rgba(0,0,0,0.06)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: stale ? '#9ca3af' : '#22c55e', flexShrink: 0 }} />
+                          <span style={{ fontWeight: 900, fontSize: 12, color: '#1f2937', whiteSpace: 'nowrap' }}>
+                            {v.name.split(' ')[0]}
+                          </span>
+                          {isSelected && <span style={{ fontSize: 9 }}>📦</span>}
+                        </div>
+                        <div style={{ fontSize: 10, color: stale ? '#ef4444' : '#6b7280', fontWeight: 600 }}>
+                          🕐 {formatTime(v.updatedAt)}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
         )}
 
         {/* Embedded: floating vendor count badge */}
