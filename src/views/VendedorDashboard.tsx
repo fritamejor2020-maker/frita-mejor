@@ -18,13 +18,16 @@ export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
-  const { getPosItems, getVendedorPosItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
+  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
   const products = getVendedorPosItems();
   const posProducts = products.filter((p) => p.showInPos !== false);
+  // Para pedir surtido: incluye productos con showInPos:false (ej. "Cambio")
+  // pero excluye los marcados showInTricicloPos:true (solo POS, no requieren carga)
+  const restockProducts = getDeliveryItems();
 
   // Modales propios (window.confirm/prompt bloqueados en Android PWA)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
@@ -383,7 +386,7 @@ export const VendedorDashboard = () => {
 
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-               {products.map(p => {
+               {restockProducts.map(p => {
                 const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
                 const productPresetValues = getPresetsForProduct(p.id);
               return (
