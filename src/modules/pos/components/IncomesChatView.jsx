@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useFinanceStore } from '../../../store/useFinanceStore';
 import { formatMoney } from '../../../utils/formatUtils';
 
@@ -27,6 +27,25 @@ function avatarColor(name = '') {
   let hash = 0;
   for (const c of name) hash = (hash * 31 + c.charCodeAt(0)) & 0xffffffff;
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+
+// ── Thumbnail de foto expandible ────────────────────────────────────────────
+function PhotoThumbnail({ src }) {
+  const [expanded, setExpanded] = useState(false);
+  return (
+    <>
+      <div className="mt-2 cursor-pointer" onClick={() => setExpanded(true)}>
+        <img src={src} alt="Foto sobre" className="w-full max-h-32 object-cover rounded-xl border border-green-800/50 hover:opacity-90 transition-opacity" />
+        <p className="text-[9px] font-bold text-gray-600 mt-0.5 ml-0.5">Toca para ver completa</p>
+      </div>
+      {expanded && (
+        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setExpanded(false)}>
+          <img src={src} alt="Foto sobre" className="max-w-full max-h-full object-contain rounded-xl" />
+          <button onClick={() => setExpanded(false)} className="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center text-xl font-black">✕</button>
+        </div>
+      )}
+    </>
+  );
 }
 
 // ── Burbuja de ingreso ────────────────────────────────────────────────────────
@@ -103,6 +122,11 @@ function IncomesBubble({ income }) {
               <span className="font-black text-green-400 text-lg">{formatMoney(income.total || 0)}</span>
             </div>
           </div>
+
+          {/* Foto del sobre */}
+          {income.photoBase64 && (
+            <PhotoThumbnail src={income.photoBase64} />
+          )}
         </div>
 
         {/* Botón compartir */}
