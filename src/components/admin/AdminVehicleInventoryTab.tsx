@@ -486,7 +486,16 @@ export function AdminVehicleInventoryTab() {
 // ─── Componente exportado para usar en el tab GPS del Dejador ──────────────────
 // Muestra la tarjeta de inventario en ruta de UN triciclo específico.
 // currentShift: jornada activa del Dejador ('AM'|'MD'|'PM') para filtrar correctamente.
-export function VehicleShiftCard({ vehicleId, currentShift }: { vehicleId: string; currentShift?: string }) {
+// activeOnly: si true, solo muestra turnos activos (sin closedAt), sin fallback al más reciente.
+export function VehicleShiftCard({
+  vehicleId,
+  currentShift,
+  activeOnly = false,
+}: {
+  vehicleId: string;
+  currentShift?: string;
+  activeOnly?: boolean;
+}) {
   const { loadHistory, completedRequests } = useLogisticsStore();
   const { posShifts, getPosItems } = useInventoryStore();
   const sellerSession = useSellerSessionStore() as any;
@@ -502,7 +511,6 @@ export function VehicleShiftCard({ vehicleId, currentShift }: { vehicleId: strin
   // Sesión live del vendedor (puede no estar aún en posShifts)
   const liveShift = useMemo(() => {
     if (!sellerSession?.isSetupComplete || sellerSession?.pointId !== vehicleId) return null;
-    // Solo si coincide con la jornada actual del Dejador
     if (currentShift && sellerSession?.shift !== currentShift) return null;
     const alreadyStored = (posShifts || []).some(
       (s: any) => !s.closedAt && s.pointId === vehicleId && s.openedAt === sellerSession.openedAt
@@ -520,11 +528,12 @@ export function VehicleShiftCard({ vehicleId, currentShift }: { vehicleId: strin
     };
   }, [sellerSession, posShifts, vehicleId, currentShift]);
 
-  // Buscar el turno correcto:
-  // 1. Turno activo (sin closedAt) que coincida con jornada actual
-  // 2. Turno de hoy que coincida con jornada actual
-  // 3. Turno activo de cualquier jornada
-  // 4. Turno más reciente (fallback)
+  // Buscar el turno correcto con prioridad:
+  // 1. Sesión live del vendedor
+  // 2. Turno activo que coincida con jornada actual
+  // 3. Turno de hoy que coincida con jornada actual (solo si !activeOnly)
+  // 4. Cualquier turno activo
+  // 5. El más reciente (fallback — solo si !activeOnly)
   const shift = useMemo(() => {
     if (liveShift) return liveShift;
 
@@ -532,43 +541,51 @@ export function VehicleShiftCard({ vehicleId, currentShift }: { vehicleId: strin
       (s: any) => s.type === 'VENDEDOR' && s.pointId === vehicleId
     );
 
-    // Prioridad: activo + jornada actual
     if (currentShift) {
       const activeMatchingShift = forVehicle.find(
         (s: any) => !s.closedAt && s.shift === currentShift
       );
       if (activeMatchingShift) return activeMatchingShift;
 
-      // Hoy + jornada actual (aunque esté cerrado)
-      const todayMatchingShift = forVehicle
-        .filter((s: any) => {
-          const sDate = s.fecha || dateOf(s.closedAt || s.openedAt || '');
-          return sDate === today && s.shift === currentShift;
-        })
-        .sort((a: any, b: any) =>
-          new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
-        )[0];
-      if (todayMatchingShift) return todayMatchingShift;
+      if (!activeOnly) {
+        // Hoy + jornada actual (aunque esté cerrado)
+        const todayMatchingShift = forVehicle
+          .filter((s: any) => {
+            const sDate = s.fecha || dateOf(s.closedAt || s.openedAt || '');
+            return sDate === today && s.shift === currentShift;
+          })
+          .sort((a: any, b: any) =>
+            new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
+          )[0];
+        if (todayMatchingShift) return todayMatchingShift;
+      }
     }
 
     // Cualquier turno activo
     const anyActive = forVehicle.find((s: any) => !s.closedAt);
     if (anyActive) return anyActive;
 
-    // Fallback: el más reciente
-    return forVehicle.sort((a: any, b: any) =>
-      new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
-    )[0] || null;
-  }, [posShifts, vehicleId, liveShift, currentShift, today]);
+    // Fallback: el más reciente (solo si NO activeOnly)
+    if (!activeOnly) {
+      return forVehicle.sort((a: any, b: any) =>
+        new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
+      )[0] || null;
+    }
+
+    return null;
+  }, [posShifts, vehicleId, liveShift, currentShift, activeOnly, today]);
 
   if (!vehicleId) return null;
 
   if (!shift) {
     return (
       <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl px-6 py-8 text-center mt-4">
-        <span className="text-3xl block mb-2">📋</span>
+        <span className="text-3xl block mb-2">🛵</span>
         <p className="font-bold text-gray-500 text-sm">
-          Sin turno {currentShift ? `(${currentShift}) ` : ''}registrado para <strong>{vehicleId}</strong> hoy
+          {activeOnly
+            ? <>Sin turno activo para <strong>{vehicleId}</strong> ahora</>
+            : <>Sin turno {currentShift ? `(${currentShift}) ` : ''}registrado para <strong>{vehicleId}</strong> hoy</>
+          }
         </p>
         <p className="text-gray-400 text-xs mt-1">El turno aparece cuando el Vendedor inicia sesión</p>
       </div>

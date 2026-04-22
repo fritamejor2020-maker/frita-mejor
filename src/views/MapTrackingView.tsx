@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
+import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 
 // ── Centro por defecto: Pitalito, Huila ──────────────────────────────────────
 const DEFAULT_CENTER: [number, number] = [1.8485, -76.0522];
@@ -91,6 +92,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
   const [connected, setConnected] = useState(false);
+  const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   // Presence data — se fusiona con datos de la BD
   const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
@@ -252,6 +254,8 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
               icon={createVendorIcon(v.name, stale)}
               eventHandlers={embedded && onVehicleSelect ? {
                 click: () => onVehicleSelect(v.vendorId),
+              } : !embedded ? {
+                click: () => setSelectedVehicleId(id => id === v.vendorId ? null : v.vendorId),
               } : undefined}
             >
               {/* Popup solo en modo standalone (no embedded) */}
@@ -297,7 +301,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
         {/* Panel lateral de vendedores — hidden when embedded */}
         {!embedded && (
         <div style={{
-          width: 220, background: 'white', boxShadow: '-2px 0 8px rgba(0,0,0,0.08)',
+          width: 250, background: 'white', boxShadow: '-2px 0 8px rgba(0,0,0,0.08)',
           display: 'flex', flexDirection: 'column', overflow: 'hidden', zIndex: 2,
           flexShrink: 0,
         }}>
@@ -308,7 +312,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
             </div>
           </div>
 
-          <div style={{ flex: 1, overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div style={{ overflowY: 'auto', padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
             {vendors.length === 0 ? (
               <div style={{ textAlign: 'center', paddingTop: 40 }}>
                 <div style={{ fontSize: 36, marginBottom: 8 }}>🛵</div>
@@ -319,21 +323,27 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
             ) : (
               vendors.map((v) => {
                 const stale = isStale(v.updatedAt);
+                const isSelected = selectedVehicleId === v.vendorId;
                 return (
-                  <div key={v.vendorId} style={{
-                    background: stale ? '#f9fafb' : '#fffbeb',
-                    border: `1.5px solid ${stale ? '#e5e7eb' : '#fde68a'}`,
-                    borderRadius: 12, padding: '10px 12px',
-                  }}>
+                  <div
+                    key={v.vendorId}
+                    onClick={() => setSelectedVehicleId(isSelected ? null : v.vendorId)}
+                    style={{
+                      background: isSelected ? '#fffbeb' : stale ? '#f9fafb' : '#fffbeb',
+                      border: `2px solid ${isSelected ? '#f59e0b' : stale ? '#e5e7eb' : '#fde68a'}`,
+                      borderRadius: 12, padding: '10px 12px', cursor: 'pointer',
+                      transition: 'all 0.15s',
+                    }}
+                  >
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 }}>
                       <div style={{
                         width: 8, height: 8, borderRadius: '50%',
-                        background: stale ? '#9ca3af' : '#22c55e',
-                        flexShrink: 0,
+                        background: stale ? '#9ca3af' : '#22c55e', flexShrink: 0,
                       }} />
-                      <span style={{ fontWeight: 900, fontSize: 13, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ fontWeight: 900, fontSize: 13, color: '#1f2937', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                         {v.name}
                       </span>
+                      {isSelected && <span style={{ fontSize: 10 }}>📦</span>}
                     </div>
                     <div style={{ fontSize: 10, fontWeight: 700, color: stale ? '#ef4444' : '#6b7280' }}>
                       🕐 {formatTime(v.updatedAt)}
@@ -346,6 +356,16 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
                   </div>
                 );
               })
+            )}
+
+            {/* Inventario del vehículo seleccionado */}
+            {selectedVehicleId && (
+              <div style={{ borderTop: '1px solid #f3f4f6', paddingTop: 10, marginTop: 4 }}>
+                <div style={{ fontWeight: 900, fontSize: 11, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                  📦 Inventario en Ruta
+                </div>
+                <VehicleShiftCard vehicleId={selectedVehicleId} activeOnly />
+              </div>
             )}
           </div>
         </div>
