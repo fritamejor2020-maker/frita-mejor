@@ -646,7 +646,35 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
      };
   });
 
-  const filteredClosings = [...mappedShifts].filter((c: any) => {
+  // Deduplicar: si hay 2 registros cerrados para el mismo vehículo+turno+fecha,
+  // quedarse con el más completo (con datos reales) o el más reciente.
+  const deduplicatedClosings = (() => {
+    const seen = new Map<string, any>();
+    for (const c of mappedShifts) {
+      const key = `${c.date}__${c.shift}__${c._raw?.pointId || c.pointName}`;
+      const existing = seen.get(key);
+      if (!existing) {
+        seen.set(key, c);
+      } else {
+        // Preferir el que tiene datos financieros reales
+        const cHasReal  = (c._raw?.cashAmount || 0) + (c._raw?.transferAmount || 0) > 0;
+        const exHasReal = (existing._raw?.cashAmount || 0) + (existing._raw?.transferAmount || 0) > 0;
+        if (cHasReal && !exHasReal) {
+          seen.set(key, c); // el nuevo tiene datos, el viejo no → reemplazar
+        } else if (!cHasReal && exHasReal) {
+          // mantener el existente
+        } else {
+          // Ambos tienen (o no tienen) datos — quedarse con el más reciente
+          const cTime  = new Date(c._raw?.closedAt || 0).getTime();
+          const exTime = new Date(existing._raw?.closedAt || 0).getTime();
+          if (cTime > exTime) seen.set(key, c);
+        }
+      }
+    }
+    return Array.from(seen.values());
+  })();
+
+  const filteredClosings = deduplicatedClosings.filter((c: any) => {
     if (filterDate && c.date !== filterDate) return false;
     if (filterShift && c.shift !== filterShift) return false;
     return true;
