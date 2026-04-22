@@ -102,7 +102,10 @@ export const VendedorDashboard = () => {
 
   const getPresetsForProduct = (productId: string): (number | string)[] => {
     if (productPresets[productId]) return productPresets[productId];
-    const item = getVendedorPosItems().find((i: any) => i.id === productId);
+    // Buscar en surtido primero (incluye showInPos:false como TIN, C.L, CAM)
+    // y luego en POS, para cubrir todos los productos
+    const item = restockProducts.find((i: any) => i.id === productId)
+              ?? products.find((i: any) => i.id === productId);
     if (item?.inventoryPresets && item.inventoryPresets.length > 0) return item.inventoryPresets;
     return DEFAULT_PRESETS;
   };
