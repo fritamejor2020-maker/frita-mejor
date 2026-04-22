@@ -482,3 +482,53 @@ export function AdminVehicleInventoryTab() {
     </div>
   );
 }
+
+// ─── Componente exportado para usar en el tab GPS del Dejador ──────────────────
+// Muestra la tarjeta de inventario en ruta de UN triciclo específico.
+export function VehicleShiftCard({ vehicleId }: { vehicleId: string }) {
+  const { loadHistory, completedRequests } = useLogisticsStore();
+  const { posShifts, getPosItems } = useInventoryStore();
+  const [isExpanded, setIsExpanded] = useState(false);
+
+  const products = getPosItems();
+  const priceMap: Record<string, { price: number; name: string }> = {};
+  (products || []).forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
+
+  // Buscar el turno más reciente para ese vehículo (activo primero, luego el último cerrado)
+  const shift = useMemo(() => {
+    const forVehicle = (posShifts || [])
+      .filter((s: any) => s.type === 'VENDEDOR' && s.pointId === vehicleId)
+      .sort((a: any, b: any) => {
+        if (!a.closedAt && b.closedAt) return -1;
+        if (a.closedAt && !b.closedAt) return 1;
+        return new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime();
+      });
+    return forVehicle[0] || null;
+  }, [posShifts, vehicleId]);
+
+  if (!vehicleId) return null;
+
+  if (!shift) {
+    return (
+      <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl px-6 py-8 text-center mt-4">
+        <span className="text-3xl block mb-2">📋</span>
+        <p className="font-bold text-gray-500 text-sm">Sin turno registrado para <strong>{vehicleId}</strong> hoy</p>
+        <p className="text-gray-400 text-xs mt-1">El turno aparece cuando el Vendedor inicia sesión</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-4">
+      <ShiftCard
+        shift={shift}
+        loadHistory={loadHistory || []}
+        completedRequests={completedRequests || []}
+        priceMap={priceMap}
+        isExpanded={isExpanded}
+        onToggle={() => setIsExpanded(e => !e)}
+        onForceClose={undefined}
+      />
+    </div>
+  );
+}

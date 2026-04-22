@@ -9,7 +9,7 @@ import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 import { MapTrackingView } from './MapTrackingView';
-import { AdminVehicleInventoryTab } from '../components/admin/AdminVehicleInventoryTab';
+import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -298,6 +298,12 @@ export const DejadorDashboard = () => {
   const [organizeMode, setOrganizeMode] = useState(false);
   const [draftOrder, setDraftOrder] = useState<string[]>([]);
   const [draftHidden, setDraftHidden] = useState<string[]>([]);
+
+  // GPS tab: triciclo seleccionado
+  const [gpsSelectedVehicle, setGpsSelectedVehicle] = useState<string>('');
+  useEffect(() => {
+    if (!gpsSelectedVehicle && vehicles.length > 0) setGpsSelectedVehicle(vehicles[0]);
+  }, [vehicles.length]);
 
 
   const openOrganize = () => {
@@ -1013,8 +1019,45 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: GPS TRICICLOS ─── */}
         {activeTab === 'gps' && (
-          <div className="animate-fade-in">
-            <AdminVehicleInventoryTab />
+          <div className="animate-fade-in flex flex-col gap-4">
+
+            {/* Selector de triciclo */}
+            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+              {vehicles.map((v: string) => {
+                const vendorName = vehicleVendorMap[v];
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setGpsSelectedVehicle(v)}
+                    className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 min-w-[52px] font-black text-sm transition-all duration-200 border-2 active:scale-95 ${
+                      gpsSelectedVehicle === v
+                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
+                        : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300'
+                    }`}
+                  >
+                    <span className="leading-none">{v}</span>
+                    {vendorName && (
+                      <span className={`text-[9px] font-bold leading-none ${
+                        gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-gray-400'
+                      }`}>
+                        {vendorName}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Mapa */}
+            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 320 }}>
+              <MapTrackingView embedded />
+            </div>
+
+            {/* Inventario en ruta del triciclo seleccionado */}
+            {gpsSelectedVehicle && (
+              <VehicleShiftCard vehicleId={gpsSelectedVehicle} />
+            )}
+
           </div>
         )}
 
