@@ -694,7 +694,15 @@ export const DejadorDashboard = () => {
         {/* ─── TAB: SURTIR & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in mb-8">
-            {products.map((p: any) => {
+          {/* Reordenar para que la grid rellene de arriba a abajo (columna por columna):
+               [0,1,2,3,4,5] con 2 cols → [0,3,1,4,2,5] así queda:
+               col1: 0,1,2   col2: 3,4,5  */}
+            {(() => {
+              const half = Math.ceil(products.length / 2);
+              const col1 = products.slice(0, half);
+              const col2 = products.slice(half);
+              const reordered = col1.map((item: any, i: number) => [item, col2[i]]).flat().filter(Boolean);
+              return reordered.map((p: any) => {
               const action = activeTab === 'carga' ? 'surtir' : 'recibir';
               const productPresetValues = getPresetsForProduct(p.id, action);
               return (
@@ -734,7 +742,8 @@ export const DejadorDashboard = () => {
                    />
                 </div>
               </div>
-            )})}
+              );})
+            })()}
           </div>
         )}
 
