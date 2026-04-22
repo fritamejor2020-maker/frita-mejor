@@ -407,9 +407,11 @@ export const DejadorDashboard = () => {
   const handleCommit = async (id: string, point: string, req: any) => {
     if (committingIds.has(id)) return; // Prevenir doble-tap
 
+    // Determinar si el dejador editó el pedido antes de confirmar
+    const wasEditing = editingReqId === id;
     // Obtener payload actual (editado o original)
-    const payload = editingReqId === id ? editPayload : (req.items_payload || []);
-    if (editingReqId === id) setEditingReqId(null);
+    const payload = wasEditing ? editPayload : (req.items_payload || []);
+    if (wasEditing) setEditingReqId(null);
 
     const postponedSet = getPostponedSet(id);
     const hasPostponed = postponedSet.size > 0;
@@ -438,8 +440,19 @@ export const DejadorDashboard = () => {
       } finally {
         setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
       }
+    } else if (wasEditing) {
+      // El dejador editó cantidades pero no pospuso. Guardar el payload editado.
+      setCommittingIds(prev => new Set([...prev, id]));
+      try {
+        await commitPartialRestock(id, payload, []);
+        showToast(`✅ Entrega editada a ${point} confirmada`);
+      } catch (err: any) {
+        showToast("❌ Error: " + err.message);
+      } finally {
+        setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
+      }
     } else {
-      // Flujo normal: surtir todo
+      // Flujo normal sin edición: surtir todo tal como se pidió
       setCommittingIds(prev => new Set([...prev, id]));
       try {
         await commitRestock(id);
@@ -449,6 +462,7 @@ export const DejadorDashboard = () => {
       } finally {
         setCommittingIds(prev => { const next = new Set(prev); next.delete(id); return next; });
       }
+
     }
   };
 
