@@ -133,7 +133,7 @@ function useDeliveryAlert() {
 export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
-  const { pendingRequests, completedRequests, rejectedRequests, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
+  const { pendingRequests, completedRequests, rejectedRequests, loadHistory, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, posShifts, addPosShift } = useInventoryStore();
   const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
