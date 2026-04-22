@@ -138,24 +138,6 @@ export const useAuthStore = create(
           return { ok: false };
         }
 
-        // Auto-parche: asegurar que el usuario tenga todos los módulos de su rol
-        // Útil cuando se agregan nuevos módulos y el usuario tiene datos viejos en Supabase
-        const roleModules = ROLE_ACCESS[found.role] || [];
-        const currentAccess = found.access || [];
-        const missingModules = roleModules.filter((m) => !currentAccess.includes(m));
-
-        if (missingModules.length > 0) {
-          // Solo agregar los faltantes, no reemplazar (respeta restricciones personalizadas de otros roles)
-          const patchedAccess = [...currentAccess, ...missingModules];
-          const patchedUser = { ...found, access: patchedAccess };
-          const updatedUsers = users.map((u) => u.id === found.id ? patchedUser : u);
-          set({ users: updatedUsers, user: patchedUser, loading: false, error: null });
-          // Sincronizar el parche a Supabase en segundo plano
-          markLocalWrite('users');
-          push('users', updatedUsers).catch(() => {});
-          return { ok: true, user: patchedUser };
-        }
-
         set({ user: found, loading: false, error: null });
         return { ok: true, user: found };
       },

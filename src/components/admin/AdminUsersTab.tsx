@@ -190,6 +190,7 @@ export const AdminUsersTab = () => {
   const [form, setForm]           = useState<any>(EMPTY_FORM);
   const [syncing, setSyncing]     = useState(false);
   const [syncMsg, setSyncMsg]     = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<{ id: string; name: string } | null>(null);
 
   // Al abrir la pestaña, empujar la lista actual de usuarios a Supabase
   // Esto garantiza que usuarios creados antes del fix de sync lleguen a todos los dispositivos
@@ -323,7 +324,8 @@ export const AdminUsersTab = () => {
                       title="Editar"
                       onClick={() => {
                         setEditingId(u.id);
-                        setForm({ name: u.name, role: u.role, password: '', access: u.access || ROLE_ACCESS[u.role] || [] });
+                        // Usar u.access exactamente como está (null/undefined = sin acceso asignado aún, no rellenar)
+                        setForm({ name: u.name, role: u.role, password: '', access: u.access ?? [] });
                         setShowAdd(false);
                       }}
                     >
@@ -339,7 +341,7 @@ export const AdminUsersTab = () => {
                     <button
                       className="p-2 rounded-xl bg-red-50 text-red-400 hover:text-red-600 hover:bg-red-100 transition-colors"
                       title="Eliminar"
-                      onClick={() => { if (confirm(`¿Eliminar usuario "${u.name}"?`)) deleteUser(u.id); }}
+                      onClick={() => setDeletingUser({ id: u.id, name: u.name })}
                     >
                       <Trash2 size={16} strokeWidth={2.5} />
                     </button>
@@ -350,6 +352,21 @@ export const AdminUsersTab = () => {
           </div>
         ))}
       </div>
+
+      {/* Modal confirmar eliminar usuario */}
+      {deletingUser && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">¿Eliminar usuario?</h2>
+            <p className="text-sm text-gray-500 mb-6">«{deletingUser.name}» se eliminará del sistema.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletingUser(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95">Cancelar</button>
+              <button onClick={() => { deleteUser(deletingUser.id); setDeletingUser(null); }} className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95">Sí, eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
