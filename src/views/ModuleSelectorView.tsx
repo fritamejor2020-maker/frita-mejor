@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
-import { useAuthStore } from '../store/useAuthStore';
+import { useAuthStore, ROLE_ACCESS } from '../store/useAuthStore';
 
 // ── Mapa de módulos: cómo se ve cada uno en la pantalla ───────────────────────
 const MODULE_CARDS: Record<string, { label: string; icon: string; route: string; color: string; bg: string }> = {
@@ -25,8 +25,14 @@ export const ModuleSelectorView = () => {
 
   const isDejador = (user.access || []).includes('dejador');
 
-  const userModules = (user.access || [])
-    .filter((key: string) => !(isDejador && key === 'tracking')) // Dejadores no ven Rutas y Mapa (el GPS está integrado en su dashboard)
+  // Acceso efectivo: combinar lo guardado en localStorage CON los módulos del rol actual.
+  // Así aunque el caché esté desactualizado, siempre aparecen los módulos correctos.
+  const roleModules: string[] = (ROLE_ACCESS as any)[user.role] || [];
+  const storedAccess: string[] = user.access || [];
+  const effectiveAccess = Array.from(new Set([...storedAccess, ...roleModules]));
+
+  const userModules = effectiveAccess
+    .filter((key: string) => !(isDejador && key === 'tracking')) // Dejadores no ven Rutas y Mapa (GPS integrado en su dashboard)
     .map((key: string) => ({ key, ...MODULE_CARDS[key] }))
     .filter((m: any) => m.label); // filtrar claves sin tarjeta definida
 
