@@ -23,7 +23,10 @@ export const ModuleSelectorView = () => {
 
   if (!user) return <Navigate to="/login" replace />;
 
-  const isDejador = (user.access || []).includes('dejador');
+  // Es "solo Dejador" si tiene el módulo dejador pero NO tiene admin ni es rol ADMIN/SUPER.
+  // Esto evita que Arlinson (ADMIN con acceso a dejador) pierda el módulo de mapa.
+  const hasAdmin = (user.access || []).includes('admin') || user.role === 'ADMIN';
+  const isDejadorOnly = (user.access || []).includes('dejador') && !hasAdmin;
 
   // Acceso efectivo: combinar lo guardado en localStorage CON los módulos del rol actual.
   // Así aunque el caché esté desactualizado, siempre aparecen los módulos correctos.
@@ -32,7 +35,7 @@ export const ModuleSelectorView = () => {
   const effectiveAccess = Array.from(new Set([...storedAccess, ...roleModules]));
 
   const userModules = effectiveAccess
-    .filter((key: string) => !(isDejador && key === 'tracking')) // Dejadores no ven Rutas y Mapa (GPS integrado en su dashboard)
+    .filter((key: string) => !(isDejadorOnly && key === 'tracking')) // Solo Dejadores puros no ven Rutas y Mapa
     .map((key: string) => ({ key, ...MODULE_CARDS[key] }))
     .filter((m: any) => m.label); // filtrar claves sin tarjeta definida
 
