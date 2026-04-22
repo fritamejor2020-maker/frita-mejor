@@ -417,9 +417,9 @@ export const DejadorDashboard = () => {
       const available = payload.filter((_: any, idx: number) => !postponedSet.has(idx));
       const postponed = payload.filter((_: any, idx: number) => postponedSet.has(idx));
 
-      // Si TODOS están pospuestos, confirmar con advertencia
+      // Si TODOS están pospuestos, proceder directo (UI ya muestra que todo está marcado)
       if (available.length === 0) {
-        if (!window.confirm('⚠️ Todos los productos están marcados como no disponibles. ¿Reencolar el pedido completo?')) return;
+        // Sin confirm — el dejador ya tomó la decisión marcando todos como no disponibles
       }
 
       setCommittingIds(prev => new Set([...prev, id]));
@@ -451,7 +451,6 @@ export const DejadorDashboard = () => {
   };
 
   const handleReject = (id: string, point: string) => {
-    if (!window.confirm(`¿Rechazar el pedido de ${point}? Esta acción no se puede deshacer.`)) return;
     if (editingReqId === id) setEditingReqId(null);
     rejectRequest(id);
     showToast(`❌ Pedido de ${point} rechazado`);

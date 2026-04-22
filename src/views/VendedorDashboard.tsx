@@ -23,8 +23,13 @@ export const VendedorDashboard = () => {
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
-  const products = getVendedorPosItems(); // productos del POS de vendedor (incluye showInTricicloPos)
-  const posProducts = products.filter((p) => p.showInPos !== false); // only visible in POS selling tab
+  const products = getVendedorPosItems();
+  const posProducts = products.filter((p) => p.showInPos !== false);
+
+  // Modales propios (window.confirm/prompt bloqueados en Android PWA)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
   // Registrar turno en posShifts al abrir sesión (para que admin lo vea en tiempo real)
   useEffect(() => {
@@ -157,26 +162,28 @@ export const VendedorDashboard = () => {
   };
 
   const handleSaveTemplate = () => {
-    // Only save items that have a quantity > 0 in the restock cart
     const itemsToSave: Record<string, number> = {};
     restockCart.forEach((item: any) => {
       if (item.qty > 0) itemsToSave[item.productId] = item.qty;
     });
-
     if (Object.keys(itemsToSave).length === 0) {
-      toast.error("Agrega productos al pedido antes de guardar una plantilla");
+      toast.error('Agrega productos al pedido antes de guardar una plantilla');
       return;
     }
+    setNewTemplateName('');
+    setShowSaveTemplate(true);
+  };
 
-    const name = window.prompt("Nombre de esta Carga Guardada:");
-    if (!name) return;
-    
-    addLoadTemplate({
-      name,
-      role: 'VENDEDOR',
-      items: itemsToSave
+  const confirmSaveTemplate = () => {
+    if (!newTemplateName.trim()) return;
+    const itemsToSave: Record<string, number> = {};
+    restockCart.forEach((item: any) => {
+      if (item.qty > 0) itemsToSave[item.productId] = item.qty;
     });
+    addLoadTemplate({ name: newTemplateName.trim(), role: 'VENDEDOR', items: itemsToSave });
     toast.success('Plantilla guardada exitosamente');
+    setShowSaveTemplate(false);
+    setNewTemplateName('');
   };
 
   const loadTemplateItems = (templateId: string) => {
@@ -357,7 +364,7 @@ export const VendedorDashboard = () => {
                     <Zap size={14} /> {tpl.name}
                   </button>
                   <button
-                    onClick={() => { if(window.confirm(`¿Eliminar "${tpl.name}"?`)) deleteLoadTemplate(tpl.id); }}
+                    onClick={() => setDeletingTemplate({ id: tpl.id, name: tpl.name })}
                     className="flex items-center justify-center py-1.5 px-2 rounded-r-full bg-white border-2 border-amber-400 text-amber-400 text-sm whitespace-nowrap active:scale-95 shadow-sm hover:bg-red-50 hover:text-red-500 hover:border-red-400 transition-colors"
                     title="Eliminar plantilla"
                   >
@@ -697,6 +704,44 @@ export const VendedorDashboard = () => {
       )}
 
       <BottomNav activeTab={activeTab} onTabSelect={setActiveTab} tabs={tabs} />
+
+      {/* Modal guardar plantilla */}
+      {showSaveTemplate && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">⚡</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">Guardar Plantilla</h2>
+            <p className="text-sm text-gray-500 mb-4">Dale un nombre a esta configuración.</p>
+            <input
+              type="text" autoFocus value={newTemplateName}
+              onChange={e => setNewTemplateName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmSaveTemplate()}
+              placeholder="Ej: Carga Lunes"
+              className="w-full border-2 border-amber-300 rounded-2xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-amber-500 mb-5"
+            />
+            <div className="flex gap-3">
+              <button onClick={() => setShowSaveTemplate(false)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95">Cancelar</button>
+              <button onClick={confirmSaveTemplate} disabled={!newTemplateName.trim()} className="flex-1 py-3 rounded-2xl bg-amber-500 text-white font-black text-sm active:scale-95 disabled:opacity-40">Guardar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal borrar plantilla */}
+      {deletingTemplate && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">¿Eliminar plantilla?</h2>
+            <p className="text-sm text-gray-500 mb-6">"{deletingTemplate.name}" se borrará permanentemente.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletingTemplate(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95">Cancelar</button>
+              <button onClick={() => { deleteLoadTemplate(deletingTemplate.id); setDeletingTemplate(null); }} className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95">Sí, borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
