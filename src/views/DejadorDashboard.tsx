@@ -9,6 +9,7 @@ import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 import { MapTrackingView } from './MapTrackingView';
+import { AdminVehicleInventoryTab } from '../components/admin/AdminVehicleInventoryTab';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -298,12 +299,6 @@ export const DejadorDashboard = () => {
   const [draftOrder, setDraftOrder] = useState<string[]>([]);
   const [draftHidden, setDraftHidden] = useState<string[]>([]);
 
-  // GPS tab: triciclo seleccionado para ver inventario en ruta
-  const [gpsSelectedVehicle, setGpsSelectedVehicle] = useState<string>('');
-  // Inicializar con el primer vehículo cuando los vehículos estén disponibles
-  React.useEffect(() => {
-    if (!gpsSelectedVehicle && vehicles.length > 0) setGpsSelectedVehicle(vehicles[0]);
-  }, [vehicles.length]);
 
   const openOrganize = () => {
     // Inicializar draft con el orden actual de TODOS los productos (incluyendo ocultos)
@@ -1008,140 +1003,11 @@ export const DejadorDashboard = () => {
         )}
 
         {/* ─── TAB: GPS TRICICLOS ─── */}
-        {activeTab === 'gps' && (() => {
-          const { loadHistory, completedRequests } = useLogisticsStore.getState();
-
-          // Calcular inventario en ruta para el triciclo GPS seleccionado
-          const calcRouteInventory = (vehicleId: string) => {
-            const totals: Record<string, { name: string; loaded: number; surtido: number; returned: number; current: number }> = {};
-            loadHistory
-              .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId)
-              .forEach((e: any) => {
-                e.items.forEach(({ productId, name, qty }: any) => {
-                  if (!totals[productId]) totals[productId] = { name, loaded: 0, surtido: 0, returned: 0, current: 0 };
-                  totals[productId].loaded += qty;
-                });
-              });
-            completedRequests
-              .filter((r: any) => r.requester_point_id === vehicleId)
-              .forEach((r: any) => {
-                (r.items_payload || []).forEach(({ productId, name, qty }: any) => {
-                  if (!totals[productId]) totals[productId] = { name, loaded: 0, surtido: 0, returned: 0, current: 0 };
-                  totals[productId].surtido += qty;
-                });
-              });
-            loadHistory
-              .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId)
-              .forEach((e: any) => {
-                e.items.forEach(({ productId, name, qty }: any) => {
-                  if (!totals[productId]) totals[productId] = { name, loaded: 0, surtido: 0, returned: 0, current: 0 };
-                  totals[productId].returned += qty;
-                });
-              });
-            Object.values(totals).forEach((t) => { t.current = t.loaded + t.surtido - t.returned; });
-            return Object.values(totals).filter(t => t.loaded > 0 || t.surtido > 0);
-          };
-
-          const routeItems = gpsSelectedVehicle ? calcRouteInventory(gpsSelectedVehicle) : [];
-          const hasInventory = routeItems.length > 0;
-
-          return (
-            <div className="animate-fade-in flex flex-col gap-4">
-              {/* Selector de triciclo */}
-              <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-                {vehicles.map((v: string) => {
-                  const vendorName = vehicleVendorMap[v];
-                  return (
-                    <button
-                      key={v}
-                      onClick={() => setGpsSelectedVehicle(v)}
-                      className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 min-w-[52px] font-black text-sm transition-all duration-200 border-2 active:scale-95 ${
-                        gpsSelectedVehicle === v
-                          ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
-                          : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300'
-                      }`}
-                    >
-                      <span className="leading-none">{v}</span>
-                      {vendorName && (
-                        <span className={`text-[9px] font-bold leading-none ${gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-gray-400'}`}>
-                          {vendorName}
-                        </span>
-                      )}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Mapa */}
-              <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 320 }}>
-                <MapTrackingView embedded />
-              </div>
-
-              {/* Inventario en ruta */}
-              <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50">
-                  <div>
-                    <h3 className="font-black text-gray-900 text-base">
-                      📦 Inventario en Ruta — <span className="text-emerald-500">{gpsSelectedVehicle || '—'}</span>
-                    </h3>
-                    <p className="text-xs font-bold text-gray-400 mt-0.5">
-                      {hasInventory ? `${routeItems.length} productos · Carga + Surtidos − Devueltos` : 'Sin registro de carga para este triciclo hoy'}
-                    </p>
-                  </div>
-                  {hasInventory && (
-                    <span className="bg-emerald-100 text-emerald-700 font-black text-xs px-3 py-1 rounded-full">
-                      {routeItems.reduce((acc, i) => acc + i.current, 0).toFixed(1)} uds en ruta
-                    </span>
-                  )}
-                </div>
-
-                {!hasInventory ? (
-                  <div className="text-center py-10">
-                    <span className="text-4xl block mb-3">🛵</span>
-                    <p className="font-bold text-gray-400 text-sm">
-                      {gpsSelectedVehicle ? `No hay cargas registradas para ${gpsSelectedVehicle}` : 'Selecciona un triciclo'}
-                    </p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-gray-50">
-                    {/* Header de columnas */}
-                    <div className="grid grid-cols-4 px-5 py-2 bg-gray-50">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest col-span-1">Producto</span>
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Cargado</span>
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Surtido</span>
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">En ruta</span>
-                    </div>
-                    {routeItems.map((item, idx) => {
-                      const pct = item.loaded + item.surtido > 0
-                        ? Math.max(0, item.current / (item.loaded + item.surtido))
-                        : 0;
-                      const barColor = pct > 0.5 ? 'bg-emerald-400' : pct > 0.2 ? 'bg-amber-400' : 'bg-red-400';
-                      return (
-                        <div key={idx} className="px-5 py-3">
-                          <div className="grid grid-cols-4 items-center mb-1.5">
-                            <span className="font-black text-gray-800 text-sm col-span-1 truncate pr-2">{item.name}</span>
-                            <span className="text-center font-bold text-gray-500 text-sm">{item.loaded}</span>
-                            <span className="text-center font-bold text-blue-500 text-sm">+{item.surtido}</span>
-                            <span className={`text-center font-black text-sm ${item.current > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                              {item.current > 0 ? item.current.toFixed(1) : '0'}
-                            </span>
-                          </div>
-                          {/* Barra de progreso */}
-                          <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div
-                              className={`h-full rounded-full transition-all ${barColor}`}
-                              style={{ width: `${(pct * 100).toFixed(1)}%` }}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })()}
+        {activeTab === 'gps' && (
+          <div className="animate-fade-in">
+            <AdminVehicleInventoryTab />
+          </div>
+        )}
 
       </div>
 
