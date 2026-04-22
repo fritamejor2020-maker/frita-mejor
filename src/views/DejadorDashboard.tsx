@@ -311,6 +311,10 @@ export const DejadorDashboard = () => {
   // Confirmar borrar template
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
+  // Modal guardar nuevo template
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false);
+  const [newTemplateName, setNewTemplateName] = useState('');
+
   const openOrganize = () => {
     // Inicializar draft con el orden actual de TODOS los productos (incluyendo ocultos)
     const currentOrder = userProductOrder.length > 0
@@ -478,14 +482,20 @@ export const DejadorDashboard = () => {
   };
 
   const handleSaveTemplate = () => {
-    const name = window.prompt("Nombre de esta Plantilla de Surtido:");
-    if (!name) return;
+    setNewTemplateName('');
+    setShowSaveTemplate(true);
+  };
+
+  const confirmSaveTemplate = () => {
+    if (!newTemplateName.trim()) return;
     addLoadTemplate({
-      name,
+      name: newTemplateName.trim(),
       role: 'DEJADOR',
       items: { ...loadQuantities }
     });
     showToast('✅ Plantilla guardada exitosamente');
+    setShowSaveTemplate(false);
+    setNewTemplateName('');
   };
 
   const loadTemplateItems = (templateId: string) => {
@@ -1273,6 +1283,41 @@ export const DejadorDashboard = () => {
               <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">🔊 ACTIVO</span>
             )}
           </button>
+        </div>
+      )}
+
+      {/* ─── Modal guardar nueva plantilla ─── */}
+      {showSaveTemplate && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">⚡</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">Guardar Plantilla</h2>
+            <p className="text-sm text-gray-500 mb-4">Dale un nombre a esta configuración de surtido.</p>
+            <input
+              type="text"
+              autoFocus
+              value={newTemplateName}
+              onChange={e => setNewTemplateName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && confirmSaveTemplate()}
+              placeholder="Ej: Carga Fin de Semana"
+              className="w-full border-2 border-amber-300 rounded-2xl px-4 py-3 text-sm font-bold text-gray-800 outline-none focus:border-amber-500 mb-5"
+            />
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowSaveTemplate(false)}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmSaveTemplate}
+                disabled={!newTemplateName.trim()}
+                className="flex-1 py-3 rounded-2xl bg-amber-500 text-white font-black text-sm active:scale-95 transition-all disabled:opacity-40"
+              >
+                Guardar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
