@@ -561,12 +561,16 @@ export function VehicleShiftCard({
       }
     }
 
-    // Cualquier turno activo
-    const anyActive = forVehicle.find((s: any) => !s.closedAt);
-    if (anyActive) return anyActive;
+    // Cualquier turno activo (sin filtro de jornada)
+    // Solo si NO hay currentShift (sin contexto de jornada)
+    if (!currentShift) {
+      const anyActive = forVehicle.find((s: any) => !s.closedAt);
+      if (anyActive) return anyActive;
+    }
 
-    // Fallback: el más reciente (solo si NO activeOnly)
-    if (!activeOnly) {
+    // Fallback: el más reciente — SOLO si no hay contexto de jornada y !activeOnly
+    // Con currentShift definido, NO hacer fallback a otra jornada
+    if (!activeOnly && !currentShift) {
       return forVehicle.sort((a: any, b: any) =>
         new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
       )[0] || null;
