@@ -232,6 +232,10 @@ export const useAuthStore = create(
             : state.user;
           return { users: updatedUsers, user: updatedSelf };
         });
+        // Persistir en Supabase para que sobreviva resyncs y funcione en otros dispositivos
+        const updatedUsers = get().users;
+        markLocalWrite('users');
+        push('users', updatedUsers).catch(err => console.warn('[Sync] users presets', err.message));
       },
 
       toggleUserActive: (id) => {

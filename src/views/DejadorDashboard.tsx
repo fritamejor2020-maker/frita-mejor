@@ -788,6 +788,42 @@ export const DejadorDashboard = () => {
           </div>
         )}
 
+        {/* ─── HISTORIAL DE CARGAS INICIALES ─── */}
+        {activeTab === 'carga' && (() => {
+          const recentCargas = [...(loadHistory as any[])]
+            .filter((e: any) => e.type === 'carga')
+            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .slice(0, 30);
+          if (recentCargas.length === 0) return null;
+          return (
+            <div className="mt-8 mb-6">
+              <h2 className="font-black text-gray-700 tracking-wide text-base mb-3 px-1">📦 Historial de Cargas</h2>
+              <div className="space-y-2">
+                {recentCargas.map((entry: any) => {
+                  const totalItems = (entry.items || []).reduce((sum: number, i: any) => sum + (i.qty || 0), 0);
+                  const d = new Date(entry.timestamp);
+                  const timeStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                  return (
+                    <div key={entry.id} className="bg-white/80 rounded-2xl px-4 py-3 flex items-center gap-3 shadow-sm border border-white">
+                      <div className="w-10 h-10 rounded-xl bg-red-500 text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-sm">
+                        {(entry.vehicleId || '?').slice(0, 2).toUpperCase()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-black text-gray-800 text-sm">{entry.vehicleId || 'Sin triciclo'}</p>
+                        <p className="text-gray-400 font-bold text-xs">{timeStr}{entry.dejadorName ? ` · ${entry.dejadorName}` : ''}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="font-black text-red-500 text-sm">{totalItems} uds.</p>
+                        <p className="text-gray-300 font-bold text-[10px]">{(entry.items || []).length} productos</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
         {/* ─── TAB: PEDIDOS ─── */}
         {activeTab === 'surtir' && (
           <div className="space-y-4 sm:space-y-6 mt-2">
