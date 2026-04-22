@@ -11,4 +11,14 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Registra el Service Worker de la PWA
-registerSW({ immediate: true })
+// onNeedRefresh: cuando Vercel despliega una nueva versión, recarga automáticamente
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    // Nueva versión disponible → recargar para aplicarla
+    window.location.reload();
+  },
+  onOfflineReady() {
+    // App lista para usarse offline (silencioso)
+  },
+});
