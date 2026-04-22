@@ -266,15 +266,17 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 11, // v11: cierres agregado a ADMIN en access[] y ROLE_ACCESS
+      version: 12, // v12: tracking agregado a ADMIN y DEJADOR en access[] y ROLE_ACCESS
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
         users: state.users,
       }),
-      // Migración: asegurar que usuarios ADMIN tengan 'cierres' en access[]
+      // Migración: asegurar módulos nuevos en access[]
       migrate: (persisted, fromVersion) => {
         const state = persisted;
+
+        // v11: 'cierres' para ADMIN
         if (fromVersion < 11 && state.users) {
           state.users = state.users.map((u) => {
             if (u.role === 'ADMIN' && !u.access?.includes('cierres')) {
@@ -282,11 +284,26 @@ export const useAuthStore = create(
             }
             return u;
           });
-          // Actualizar también el usuario en sesión si es ADMIN
           if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('cierres')) {
             state.user = { ...state.user, access: [...(state.user.access || []), 'cierres'] };
           }
         }
+
+        // v12: 'tracking' para ADMIN y DEJADOR
+        if (fromVersion < 12 && state.users) {
+          state.users = state.users.map((u) => {
+            const needsTracking =
+              (u.role === 'ADMIN' || u.role === 'DEJADOR') && !u.access?.includes('tracking');
+            return needsTracking
+              ? { ...u, access: [...(u.access || []), 'tracking'] }
+              : u;
+          });
+          if (state.user && (state.user.role === 'ADMIN' || state.user.role === 'DEJADOR')
+            && !state.user.access?.includes('tracking')) {
+            state.user = { ...state.user, access: [...(state.user.access || []), 'tracking'] };
+          }
+        }
+
         return state;
       },
     }
