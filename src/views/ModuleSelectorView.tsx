@@ -23,7 +23,10 @@ export const ModuleSelectorView = () => {
 
   if (!user) return <Navigate to="/login" replace />;
 
+  const isDejador = (user.access || []).includes('dejador');
+
   const userModules = (user.access || [])
+    .filter((key: string) => !(isDejador && key === 'tracking')) // Dejadores no ven Rutas y Mapa (el GPS está integrado en su dashboard)
     .map((key: string) => ({ key, ...MODULE_CARDS[key] }))
     .filter((m: any) => m.label); // filtrar claves sin tarjeta definida
 
