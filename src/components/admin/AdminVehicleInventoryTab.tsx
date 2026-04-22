@@ -283,7 +283,6 @@ export function AdminVehicleInventoryTab() {
   const [filterDate,  setFilterDate]  = useState('');
   const [filterShift, setFilterShift] = useState('');
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
-  const [showDebug,   setShowDebug]   = useState(false);
 
   // Mapa de precios
   const products = getPosItems();
@@ -375,26 +374,9 @@ export function AdminVehicleInventoryTab() {
             </button>
           )}
         </div>
-        {/* Debug toggle */}
-        <button onClick={() => setShowDebug(d => !d)}
-          className="text-xs font-bold text-gray-300 hover:text-gray-500 transition-colors px-3 py-1 rounded-full border border-gray-100">
-          {showDebug ? '🔍 Ocultar debug' : '🔍 Debug'}
-        </button>
       </div>
 
-      {/* ── Panel de debug ── */}
-      {showDebug && (
-        <div className="bg-gray-900 text-green-400 font-mono text-xs rounded-2xl p-4 space-y-1">
-          <p>📦 posShifts total: <strong>{(posShifts || []).length}</strong></p>
-          <p>🔍 Tipos en posShifts: <strong>{[...new Set((posShifts || []).map((s: any) => s.type || 'sin-tipo'))].join(', ') || 'vacío'}</strong></p>
-          <p>🔴 Sesión vendedor activa: <strong>{sellerSession?.isSetupComplete ? `${sellerSession.pointId} / ${sellerSession.shift} (${sellerSession.responsibleName})` : 'Ninguna'}</strong></p>
-          <p>📋 Turnos combinados (allShifts): <strong>{allShifts.length}</strong></p>
-          <p>✅ Filtrados (filteredShifts): <strong>{filteredShifts.length}</strong></p>
-          {(posShifts || []).slice(0, 3).map((s: any, i: number) => (
-            <p key={i}>→ [{i}] type=<strong>{s.type}</strong> pointId=<strong>{s.pointId}</strong> closedAt=<strong>{s.closedAt ? '✅' : 'null'}</strong></p>
-          ))}
-        </div>
-      )}
+
 
       {/* ── KPIs ── */}
       <div className="grid grid-cols-3 gap-3">
@@ -431,10 +413,6 @@ export function AdminVehicleInventoryTab() {
               ? 'Cambia los filtros de fecha / jornada'
               : 'El turno aparece aquí en cuanto el Vendedor inicia sesión'}
           </p>
-          <button onClick={() => setShowDebug(true)}
-            className="mt-4 text-xs font-bold text-gray-400 hover:text-gray-600 underline transition-colors">
-            Ver diagnóstico →
-          </button>
         </div>
       ) : (
         <div className="space-y-4">
