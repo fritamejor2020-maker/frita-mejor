@@ -22,7 +22,9 @@ export const VendedorDashboard = () => {
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
-  const vendedorTemplates = loadTemplates?.filter((t: any) => t.role === 'VENDEDOR') || [];
+  const vendedorTemplates = loadTemplates?.filter((t: any) =>
+    t.role === 'VENDEDOR' && (!t.userId || t.userId === (user as any)?.id)
+  ) || [];
   const products = getVendedorPosItems();
   const posProducts = products.filter((p) => p.showInPos !== false);
   // Para pedir surtido: incluye productos con showInPos:false (ej. "Cambio")
@@ -186,7 +188,7 @@ export const VendedorDashboard = () => {
     restockCart.forEach((item: any) => {
       if (item.qty > 0) itemsToSave[item.productId] = item.qty;
     });
-    addLoadTemplate({ name: newTemplateName.trim(), role: 'VENDEDOR', items: itemsToSave });
+    addLoadTemplate({ name: newTemplateName.trim(), role: 'VENDEDOR', userId: (user as any)?.id, items: itemsToSave });
     toast.success('Plantilla guardada exitosamente');
     setShowSaveTemplate(false);
     setNewTemplateName('');

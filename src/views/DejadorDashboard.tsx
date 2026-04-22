@@ -385,7 +385,9 @@ export const DejadorDashboard = () => {
     setEditingProductId(null);
   };
 
-  const dejadorTemplates = loadTemplates?.filter((t: any) => t.role === 'DEJADOR') || [];
+  const dejadorTemplates = loadTemplates?.filter((t: any) =>
+    t.role === 'DEJADOR' && (!t.userId || t.userId === (user as any)?.id)
+  ) || [];
 
   // Toast for success feedback
   const [toast, setToast] = useState<string | null>(null);
@@ -490,6 +492,7 @@ export const DejadorDashboard = () => {
     addLoadTemplate({
       name: newTemplateName.trim(),
       role: 'DEJADOR',
+      userId: (user as any)?.id,
       items: { ...loadQuantities }
     });
     showToast('✅ Plantilla guardada exitosamente');
