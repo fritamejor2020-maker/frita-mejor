@@ -86,7 +86,7 @@ function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) => {
+export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedded?: boolean; onVehicleSelect?: (vehicleId: string) => void }) => {
   const { user, signOut } = useAuthStore();
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
@@ -250,7 +250,12 @@ export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) =>
               key={v.vendorId}
               position={[v.lat, v.lng]}
               icon={createVendorIcon(v.name, stale)}
+              eventHandlers={embedded && onVehicleSelect ? {
+                click: () => onVehicleSelect(v.vendorId),
+              } : undefined}
             >
+              {/* Popup solo en modo standalone (no embedded) */}
+              {!embedded && (
               <Popup>
                 <div style={{ fontFamily: 'system-ui', minWidth: 160 }}>
                   <div style={{ fontWeight: 900, fontSize: 15, marginBottom: 4 }}>🛵 {v.name}</div>
@@ -267,6 +272,23 @@ export const MapTrackingView = ({ embedded = false }: { embedded?: boolean }) =>
                   )}
                 </div>
               </Popup>
+              )}
+              {embedded && (
+              <Popup>
+                <div style={{ fontFamily: 'system-ui', minWidth: 120 }}>
+                  <div style={{ fontWeight: 900, fontSize: 13, marginBottom: 2 }}>🛵 {v.name}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>🕐 {formatTime(v.updatedAt)}</div>
+                  {onVehicleSelect && (
+                    <button
+                      onClick={() => onVehicleSelect(v.vendorId)}
+                      style={{ marginTop: 6, width: '100%', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, padding: '4px 8px', fontWeight: 900, fontSize: 11, cursor: 'pointer' }}
+                    >
+                      Ver inventario →
+                    </button>
+                  )}
+                </div>
+              </Popup>
+              )}
             </Marker>
             );
           })}

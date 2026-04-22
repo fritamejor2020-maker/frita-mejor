@@ -1050,7 +1050,10 @@ export const DejadorDashboard = () => {
 
             {/* Mapa */}
             <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 320 }}>
-              <MapTrackingView embedded />
+              <MapTrackingView
+                embedded
+                onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
+              />
             </div>
 
             {/* Inventario en ruta del triciclo seleccionado */}
