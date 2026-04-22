@@ -11,14 +11,12 @@ createRoot(document.getElementById('root')).render(
 )
 
 // Registra el Service Worker de la PWA
-// onNeedRefresh: cuando Vercel despliega una nueva versión, recarga automáticamente
-registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    // Nueva versión disponible → recargar para aplicarla
+// Con skipWaiting+clientsClaim en vite.config, el nuevo SW toma el control
+// apenas Vercel despliega. Escuchamos 'controllerchange' para recargar la página.
+registerSW({ immediate: true });
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
     window.location.reload();
-  },
-  onOfflineReady() {
-    // App lista para usarse offline (silencioso)
-  },
-});
+  });
+}
