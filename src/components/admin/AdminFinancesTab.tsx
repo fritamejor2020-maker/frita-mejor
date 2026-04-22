@@ -436,6 +436,21 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   };
 
+  // Pre-computar ventanas de tiempo por vehículo+fecha para separar turnos del mismo día
+  // Ej: AM cierra a las 14h, MD cierra a las 20h → cada uno solo ve su logística
+  const shiftsByVehicleDate: Record<string, any[]> = {};
+  (posShifts || [])
+    .filter((s: any) => s.closedAt && s.type === 'VENDEDOR')
+    .forEach((s: any) => {
+      const key = `${s.pointId || ''}__${dateOf(s.closedAt)}`;
+      if (!shiftsByVehicleDate[key]) shiftsByVehicleDate[key] = [];
+      shiftsByVehicleDate[key].push(s);
+    });
+  // Ordenar cada grupo por closedAt ascendente (AM primero, MD después, etc.)
+  Object.values(shiftsByVehicleDate).forEach((arr: any[]) =>
+    arr.sort((a: any, b: any) => new Date(a.closedAt).getTime() - new Date(b.closedAt).getTime())
+  );
+
   // Solo VENDEDOR y POS tienen cierre de finanzas. Los DEJADORES no.
   const mappedShifts = (posShifts || []).filter((s: any) => s.closedAt && s.type !== 'DEJADOR').map((s: any) => {
      let details: ClosingDetail[] = [];
@@ -457,12 +472,37 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
          const { loadHistory, completedRequests } = useLogisticsStore.getState();
          const vehicleId = s.pointId;
 
+         // Calcular ventana de tiempo de este turno para separar logística cuando
+         // hay varios turnos del mismo vehículo en el mismo día (AM + MD, etc.)
+         const windowEnd = new Date(s.closedAt).getTime();
+         let windowStart = 0; // primer turno del día: desde el inicio del día
+         if (s.type === 'VENDEDOR') {
+           const key = `${s.pointId || ''}__${shiftDate}`;
+           const group = shiftsByVehicleDate[key] || [];
+           const idx = group.findIndex((sh: any) => sh.id === s.id);
+           if (idx > 0) {
+             // Turno posterior: empieza donde cerró el turno anterior
+             windowStart = new Date(group[idx - 1].closedAt).getTime();
+           }
+         }
+         // Helper: ¿pertenece este timestamp a la ventana de este turno?
+         const inWindow = (ts: string) => {
+           if (!ts) return false;
+           const t = new Date(ts).getTime();
+           if (windowStart > 0) {
+             // Multi-turno: ventana estricta (después del cierre del turno anterior)
+             return t > windowStart && t <= windowEnd;
+           }
+           // Primer turno del día: acepta toda la logística del día
+           return dateOf(ts) === shiftDate;
+         };
+
          // Carga inicial por producto — solo del día del cierre, deduplicar por ID
          const seenCargaIds = new Set<string>();
          const cargaMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          loadHistory
            .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId
-             && dateOf(e.timestamp) === shiftDate   // ← solo la jornada del cierre
+             && inWindow(e.timestamp)   // ← solo la ventana de este turno
              && !seenCargaIds.has(e.id) && (seenCargaIds.add(e.id) || true))
            .forEach((e: any) => {
              e.items.forEach(({ productId, qty, name, stringValue }: any) => {
@@ -478,7 +518,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
          const surtidoMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          completedRequests
            .filter((r: any) => r.requester_point_id === vehicleId
-             && dateOf(r.completed_at || r.created_at) === shiftDate  // ← solo la jornada
+             && inWindow(r.completed_at || r.created_at)  // ← solo la ventana de este turno
              && !seenSurtidoIds.has(r.id) && (seenSurtidoIds.add(r.id) || true))
            .forEach((r: any) => {
              (r.items_payload || []).forEach(({ productId, qty, name, stringValue }: any) => {
@@ -494,7 +534,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
          const sobranteMap: Record<string, { name: string; qty: number }> = {};
          loadHistory
            .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId
-             && dateOf(e.timestamp) === shiftDate  // ← solo la jornada
+             && inWindow(e.timestamp)  // ← solo la ventana de este turno
              && !seenRecepcionIds.has(e.id) && (seenRecepcionIds.add(e.id) || true))
            .forEach((e: any) => {
              e.items.forEach(({ productId, qty, name }: any) => {
