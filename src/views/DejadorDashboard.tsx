@@ -1019,37 +1019,10 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: GPS TRICICLOS ─── */}
         {activeTab === 'gps' && (
-          <div className="animate-fade-in flex flex-col gap-4">
+          <div className="animate-fade-in flex flex-col gap-4 relative">
 
-            {/* Selector de triciclo */}
-            <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
-              {vehicles.map((v: string) => {
-                const vendorName = vehicleVendorMap[v];
-                return (
-                  <button
-                    key={v}
-                    onClick={() => setGpsSelectedVehicle(v)}
-                    className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 min-w-[52px] font-black text-sm transition-all duration-200 border-2 active:scale-95 ${
-                      gpsSelectedVehicle === v
-                        ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
-                        : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300'
-                    }`}
-                  >
-                    <span className="leading-none">{v}</span>
-                    {vendorName && (
-                      <span className={`text-[9px] font-bold leading-none ${
-                        gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-gray-400'
-                      }`}>
-                        {vendorName}
-                      </span>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Mapa */}
-            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 320 }}>
+            {/* Mapa — ocupa todo el alto disponible */}
+            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 340 }}>
               <MapTrackingView
                 embedded
                 onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
@@ -1060,6 +1033,36 @@ export const DejadorDashboard = () => {
             {gpsSelectedVehicle && (
               <VehicleShiftCard vehicleId={gpsSelectedVehicle} currentShift={shift || undefined} />
             )}
+
+            {/* Selector flotante de triciclo — abajo al centro, adaptive */}
+            <div className="fixed bottom-6 left-1/2 z-50" style={{ transform: 'translateX(-50%)', pointerEvents: 'auto' }}>
+              <div className="bg-white/95 backdrop-blur-sm shadow-2xl rounded-3xl border border-white px-3 py-2 flex flex-wrap justify-center gap-1.5"
+                   style={{ maxWidth: '90vw' }}>
+                {vehicles.map((v: string) => {
+                  const vendorName = vehicleVendorMap[v];
+                  return (
+                    <button
+                      key={v}
+                      onClick={() => setGpsSelectedVehicle(gpsSelectedVehicle === v ? '' : v)}
+                      className={`flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-1.5 font-black text-sm transition-all duration-200 active:scale-95 ${
+                        gpsSelectedVehicle === v
+                          ? 'bg-emerald-500 text-white shadow-md'
+                          : 'bg-gray-100 text-gray-700 hover:bg-emerald-50'
+                      }`}
+                    >
+                      <span className="leading-none text-xs font-black">{v}</span>
+                      {vendorName && (
+                        <span className={`text-[8px] font-bold leading-none ${
+                          gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-gray-400'
+                        }`}>
+                          {vendorName.split(' ')[0]}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
           </div>
         )}
