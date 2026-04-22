@@ -1058,7 +1058,7 @@ export const DejadorDashboard = () => {
 
             {/* Inventario en ruta del triciclo seleccionado */}
             {gpsSelectedVehicle && (
-              <VehicleShiftCard vehicleId={gpsSelectedVehicle} />
+              <VehicleShiftCard vehicleId={gpsSelectedVehicle} currentShift={shift || undefined} />
             )}
 
           </div>
