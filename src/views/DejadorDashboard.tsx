@@ -308,6 +308,9 @@ export const DejadorDashboard = () => {
   // Confirmar cierre de jornada
   const [showEndShiftConfirm, setShowEndShiftConfirm] = useState(false);
 
+  // Confirmar borrar template
+  const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
+
   const openOrganize = () => {
     // Inicializar draft con el orden actual de TODOS los productos (incluyendo ocultos)
     const currentOrder = userProductOrder.length > 0
@@ -676,7 +679,7 @@ export const DejadorDashboard = () => {
                     <Zap size={16} fill={activePreset === tpl.id ? "white" : "currentColor"} /> {tpl.name}
                   </button>
                   <button
-                    onClick={() => { if(window.confirm(`¿Eliminar plantilla "${tpl.name}"?`)) deleteLoadTemplate(tpl.id); }}
+                    onClick={() => setDeletingTemplate({ id: tpl.id, name: tpl.name })}
                     className={`flex items-center justify-center py-2 px-2 rounded-r-full border-2 border-l font-bold text-sm transition-all active:scale-95
                       ${activePreset === tpl.id ? 'bg-amber-500 text-white border-amber-500 border-l-amber-300' : 'bg-white border-amber-500 text-amber-400 hover:bg-red-50 hover:text-red-500 hover:border-red-400'}`}
                     title="Eliminar plantilla"
@@ -1270,6 +1273,31 @@ export const DejadorDashboard = () => {
               <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">🔊 ACTIVO</span>
             )}
           </button>
+        </div>
+      )}
+
+      {/* ─── Modal confirmar borrar template ─── */}
+      {deletingTemplate && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">¿Eliminar plantilla?</h2>
+            <p className="text-sm text-gray-500 mb-6">"{deletingTemplate.name}" se borrará permanentemente.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingTemplate(null)}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deleteLoadTemplate(deletingTemplate.id); setDeletingTemplate(null); }}
+                className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95 transition-all"
+              >
+                Sí, borrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
