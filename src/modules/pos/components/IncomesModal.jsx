@@ -255,7 +255,7 @@ export function IncomesModal({ onClose }) {
                 ) : (
                   <button onClick={() => photoInputRef.current?.click()} className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-4 flex items-center justify-center gap-3 hover:border-green-500 hover:bg-green-950/20 transition-all group">
                     <span className="text-2xl group-hover:scale-110 transition-transform">📷</span>
-                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre <span className="text-gray-600">(opcional)</span></span>
+                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
                   </button>
                 )}
               </div>
@@ -299,7 +299,7 @@ export function IncomesModal({ onClose }) {
                 ) : (
                   <button onClick={() => photoInputRef.current?.click()} className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-green-500 hover:bg-green-950/20 transition-all group">
                     <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
-                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre <span className="text-gray-600">(opcional)</span></span>
+                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
                   </button>
                 )}
               </div>
