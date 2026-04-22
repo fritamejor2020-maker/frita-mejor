@@ -13,6 +13,7 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'vendedor-setup':   { label: 'Vendedor Móvil',  icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
   'dejador':          { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
   'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
+  'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
   'cierres':          { label: 'Auditor Cierres',  icon: '🧐', route: '/cierres',       color: 'from-teal-500 to-teal-700',    bg: 'bg-teal-50' },
 };
 
