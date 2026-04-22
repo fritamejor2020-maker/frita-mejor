@@ -159,10 +159,8 @@ const INITIAL_POS_SETTINGS = {
   restockPresets: [5, 10, 15, 20],
 };
 
-const INITIAL_LOAD_TEMPLATES = [
-  { id: 'TPL-001', name: 'Carga Finde', role: 'DEJADOR', items: { 'P-001': 20, 'P-002': 15, 'P-003': 15 } },
-  { id: 'TPL-002', name: 'Carga Lunes', role: 'DEJADOR', items: { 'P-001': 10, 'P-002': 5,  'P-003': 5 } },
-];
+// Templates vacíos — el usuario crea sus propias plantillas desde el Dejador
+const INITIAL_LOAD_TEMPLATES = [];
 
 // =============================================================================
 // ZUSTAND STORE CON PERSISTENCIA (localStorage)

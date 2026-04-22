@@ -305,6 +305,8 @@ export const DejadorDashboard = () => {
     if (!gpsSelectedVehicle && vehicles.length > 0) setGpsSelectedVehicle(vehicles[0]);
   }, [vehicles.length]);
 
+  // Confirmar cierre de jornada
+  const [showEndShiftConfirm, setShowEndShiftConfirm] = useState(false);
 
   const openOrganize = () => {
     // Inicializar draft con el orden actual de TODOS los productos (incluyendo ocultos)
@@ -540,7 +542,11 @@ export const DejadorDashboard = () => {
   };
 
   const handleEndShift = () => {
-    if (!window.confirm('¿Cerrar jornada del Dejador?')) return;
+    setShowEndShiftConfirm(true); // Abrir modal de confirmación
+  };
+
+  const confirmEndShift = () => {
+    setShowEndShiftConfirm(false);
     // Guardar registro del cierre para el admin
     addPosShift({
       type: 'DEJADOR',
@@ -1264,6 +1270,31 @@ export const DejadorDashboard = () => {
               <span className="ml-1 bg-white/20 text-white text-xs font-bold px-2 py-0.5 rounded-full">🔊 ACTIVO</span>
             )}
           </button>
+        </div>
+      )}
+
+      {/* ─── Modal confirmar cierre de jornada ─── */}
+      {showEndShiftConfirm && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">🚪</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">¿Cerrar Jornada?</h2>
+            <p className="text-sm text-gray-500 mb-6">Se cerrará la sesión del Dejador y volverás al login.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowEndShiftConfirm(false)}
+                className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95 transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmEndShift}
+                className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95 transition-all"
+              >
+                Sí, cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
