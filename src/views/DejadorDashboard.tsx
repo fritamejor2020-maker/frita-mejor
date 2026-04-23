@@ -44,9 +44,10 @@ function useDeliveryAlert() {
 
   // ── Precargar el archivo WAV al montar ──────────────────────────────────────
   useEffect(() => {
+    // chimes.wav — sonido real grabado, mucho más agradable que síntesis
     const audio = new Audio('/sounds/alarm.wav');
     audio.preload = 'auto';
-    audio.volume  = 1.0;   // Máximo volumen posible desde JS
+    audio.volume  = 1.0;
     audioRef.current = audio;
     return () => {
       audio.pause();
@@ -132,7 +133,7 @@ function useDeliveryAlert() {
     stoppedRef.current    = false;
     loopActiveRef.current = true;
     playAlarm();
-    loopRef.current = setInterval(playAlarm, 2000); // 2s — da tiempo al chime de 0.85s
+    loopRef.current = setInterval(playAlarm, 3500); // chimes.wav dura ~2.1s, 3.5s da pausa entre repeticiones
   };
 
   const stopAll = () => {
