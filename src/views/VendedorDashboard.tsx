@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
@@ -19,7 +19,7 @@ export const VendedorDashboard = () => {
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
-  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
+  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
@@ -37,26 +37,8 @@ export const VendedorDashboard = () => {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
-  // Registrar turno en posShifts al abrir sesión (para que admin lo vea en tiempo real)
-  useEffect(() => {
-    if (!isSetupComplete || !openedAt || !pointId) return;
-    // Verificar si ya existe un turno activo para esta sesión
-    const already = (posShifts || []).find(
-      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
-    );
-    if (!already) {
-      addPosShift({
-        openedAt,
-        pointId,
-        shift,
-        responsibleName,
-        type: 'VENDEDOR',
-        closedAt: null,
-      });
-    }
-  // Solo ejecutar cuando la sesión empieza
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isSetupComplete, openedAt]);
+  // NOTA: El posShift se crea en SellerSetupView.handleStartShift (no aquí)
+  // para evitar duplicados por race condition con la rehidratación de Zustand persist.
 
   // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
   const trackingName = responsibleName || (user as any)?.name || 'Vendedor';

@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 
 export const SellerSetupView = () => {
@@ -35,7 +36,19 @@ export const SellerSetupView = () => {
       alert("Faltan datos");
       return;
     }
-    startShift({ pointId, shift, pointType, responsibleName });
+    const openedAt = new Date().toISOString();
+    startShift({ pointId, shift, pointType, responsibleName, openedAt });
+
+    // Crear el posShift aquí — el store ya está 100% hidratado en este punto.
+    // Nunca en un useEffect del Dashboard (race condition con rehidratación de Zustand).
+    const { posShifts, addPosShift } = useInventoryStore.getState();
+    const alreadyExists = (posShifts || []).some(
+      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
+    );
+    if (!alreadyExists) {
+      addPosShift({ openedAt, pointId, shift, responsibleName, type: 'VENDEDOR', closedAt: null });
+    }
+
     navigate('/vendedor');
   };
 
