@@ -67,11 +67,12 @@ L.Icon.Default.mergeOptions({
 // ── Tipo de vendedor activo ───────────────────────────────────────────────────
 interface VendorLocation {
   vendorId: string;
+  pointId?: string;   // T1, T2… — necesario para VehicleShiftCard
   name: string;
   lat: number;
   lng: number;
   updatedAt: string;
-  source?: 'presence' | 'db' | 'offline'; // offline = última pos conocida, turno activo, app cerrada
+  source?: 'presence' | 'db' | 'offline';
 }
 
 // ── Componente auxiliar: centra el mapa si no hay ubicaciones aún ────────────
@@ -150,6 +151,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
       dbRef.current.set(vendorId, {
         vendorId,
+        pointId: loc.pointId || undefined,
         name: loc.name || loc.pointId || 'Vendedor',
         lat: loc.lat,
         lng: loc.lng,
@@ -175,7 +177,10 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         entries.forEach((e) => {
           // Solo incluir entradas con coordenadas reales (no los viewers)
           if (e.lat && e.lng && e.vendorId) {
-            presenceRef.current.set(e.vendorId, e as VendorLocation);
+            presenceRef.current.set(e.vendorId, {
+              ...(e as VendorLocation),
+              pointId: e.pointId || undefined,
+            });
           }
         });
       });
@@ -262,9 +267,9 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
               position={[v.lat, v.lng]}
               icon={createVendorIcon(v.name, stale, offline)}
               eventHandlers={embedded && onVehicleSelect ? {
-                click: () => onVehicleSelect(v.vendorId),
+                click: () => onVehicleSelect(v.pointId || v.vendorId),
               } : !embedded ? {
-                click: () => setSelectedVehicleId(id => id === v.vendorId ? null : v.vendorId),
+                click: () => setSelectedVehicleId(id => id === (v.pointId || v.vendorId) ? null : (v.pointId || v.vendorId)),
               } : undefined}
             >
               {!embedded && (
@@ -292,7 +297,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
                   <div style={{ fontSize: 11, color: '#6b7280' }}>🕐 {formatTime(v.updatedAt)}</div>
                   {onVehicleSelect && (
                     <button
-                      onClick={() => onVehicleSelect(v.vendorId)}
+                      onClick={() => onVehicleSelect(v.pointId || v.vendorId)}
                       style={{ marginTop: 6, width: '100%', background: '#10b981', color: 'white', border: 'none', borderRadius: 8, padding: '4px 8px', fontWeight: 900, fontSize: 11, cursor: 'pointer' }}
                     >
                       Ver inventario →
