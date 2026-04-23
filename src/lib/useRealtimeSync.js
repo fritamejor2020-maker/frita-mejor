@@ -1,4 +1,6 @@
 import { useEffect, useRef } from 'react';
+import { flushSync } from 'react-dom';
+import { unstable_batchedUpdates } from 'react-dom';
 import { supabase } from './supabase';
 import { pullAll } from './syncManager';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -14,7 +16,6 @@ import { useAuthStore } from '../store/useAuthStore';
 // ==============================================================================
 
 // Flag para evitar que los updates de Supabase Realtime disparen re-broadcasts al crossTabSync.
-// Cada pestaña recibe los eventos de Supabase directamente — no hay que retransmitirlos.
 let _isApplyingRealtimeState = false;
 export function isApplyingRealtimeState() { return _isApplyingRealtimeState; }
 
@@ -29,48 +30,49 @@ export function markLocalWrite(key) {
 
 // Mapa de key → función que aplica el valor remoto al store correspondiente
 function getApplicators() {
-  const inv = useInventoryStore.getState();
-  const veh = useVehicleStore.getState();
-  const sup = useSupplierStore.getState();
-  const log = useLogisticsStore.getState();
-
   return {
-    warehouses:      (v) => useInventoryStore.setState({ warehouses: v }),
-    inventory:       (v) => useInventoryStore.setState({ inventory: v }),
-    movements:       (v) => useInventoryStore.setState({ movements: v }),
-    products:        (v) => useInventoryStore.setState({ products: v }),
-    recipes:         (v) => useInventoryStore.setState({ recipes: v }),
-    fritadoRecipes:  (v) => useInventoryStore.setState({ fritadoRecipes: v }),
-    posCategories:   (v) => useInventoryStore.setState({ posCategories: v }),
-    posSettings:     (v) => useInventoryStore.setState({ posSettings: v }),
-    posShifts:       (v) => useInventoryStore.setState({ posShifts: v }),
-    posSales:        (v) => useInventoryStore.setState({ posSales: v }),
-    posExpenses:     (v) => useInventoryStore.setState({ posExpenses: v }),
-    customers:       (v) => useInventoryStore.setState({ customers: v }),
-    customerTypes:   (v) => useInventoryStore.setState({ customerTypes: v }),
-    loadTemplates:   (v) => useInventoryStore.setState({ loadTemplates: v }),
-    vehicles:        (v) => useVehicleStore.setState({ vehicles: v }),
-    suppliers:       (v) => useSupplierStore.setState({ suppliers: v }),
-    pendingRequests: (v) => useLogisticsStore.setState({ pendingRequests: v }),
+    warehouses:        (v) => useInventoryStore.setState({ warehouses: v }),
+    inventory:         (v) => useInventoryStore.setState({ inventory: v }),
+    movements:         (v) => useInventoryStore.setState({ movements: v }),
+    products:          (v) => useInventoryStore.setState({ products: v }),
+    recipes:           (v) => useInventoryStore.setState({ recipes: v }),
+    fritadoRecipes:    (v) => useInventoryStore.setState({ fritadoRecipes: v }),
+    posCategories:     (v) => useInventoryStore.setState({ posCategories: v }),
+    posSettings:       (v) => useInventoryStore.setState({ posSettings: v }),
+    posShifts:         (v) => useInventoryStore.setState({ posShifts: v }),
+    posSales:          (v) => useInventoryStore.setState({ posSales: v }),
+    posExpenses:       (v) => useInventoryStore.setState({ posExpenses: v }),
+    customers:         (v) => useInventoryStore.setState({ customers: v }),
+    customerTypes:     (v) => useInventoryStore.setState({ customerTypes: v }),
+    loadTemplates:     (v) => useInventoryStore.setState({ loadTemplates: v }),
+    vehicles:          (v) => useVehicleStore.setState({ vehicles: v }),
+    suppliers:         (v) => useSupplierStore.setState({ suppliers: v }),
+    pendingRequests:   (v) => useLogisticsStore.setState({ pendingRequests: v }),
     completedRequests: (v) => useLogisticsStore.setState({ completedRequests: v }),
-    rejectedRequests: (v) => useLogisticsStore.setState({ rejectedRequests: v }),
-    loadHistory:     (v) => useLogisticsStore.setState({ loadHistory: v }),
-    // Usuarios: sincronizados para que todos los dispositivos vean los nuevos usuarios
-    users:           (v) => useAuthStore.setState({ users: v }),
+    rejectedRequests:  (v) => useLogisticsStore.setState({ rejectedRequests: v }),
+    loadHistory:       (v) => useLogisticsStore.setState({ loadHistory: v }),
+    users:             (v) => useAuthStore.setState({ users: v }),
   };
 }
 
-// Aplica un mapa { key: value } usando los applicators registrados
-async function applyRemoteSnapshot(snapshot) {
+/**
+ * Aplica un mapa { key: value } agrupando TODOS los setState en un único
+ * render de React usando unstable_batchedUpdates.
+ * Esto evita el crash "insertBefore" que ocurría cuando múltiples setState
+ * en secuencia disparaban renders de React solapados.
+ */
+function applyRemoteSnapshot(snapshot) {
   const applicators = getApplicators();
   _isApplyingRealtimeState = true;
   try {
-    Object.entries(snapshot).forEach(([key, value]) => {
-      const apply = applicators[key];
-      if (apply) {
-        console.log(`[Realtime] Aplicando estado remoto (pull): "${key}"`);
-        apply(value);
-      }
+    unstable_batchedUpdates(() => {
+      Object.entries(snapshot).forEach(([key, value]) => {
+        const apply = applicators[key];
+        if (apply) {
+          console.log(`[Realtime] Aplicando estado remoto (pull): "${key}"`);
+          apply(value);
+        }
+      });
     });
   } finally {
     _isApplyingRealtimeState = false;
@@ -79,13 +81,12 @@ async function applyRemoteSnapshot(snapshot) {
 
 /**
  * Fuerza una re-lectura de todo el estado desde Supabase y lo aplica localmente.
- * Útil para el admin, o cuando se detecta que el canal reconectó.
  */
 export async function refreshAllFromSupabase() {
   try {
     const snapshot = await pullAll();
     if (snapshot && Object.keys(snapshot).length > 0) {
-      await applyRemoteSnapshot(snapshot);
+      applyRemoteSnapshot(snapshot);
       console.log('[Realtime] Estado fresco obtenido desde Supabase ✅');
     }
   } catch (err) {
@@ -93,9 +94,26 @@ export async function refreshAllFromSupabase() {
   }
 }
 
+// ── Batching de eventos individuales de Realtime ──────────────────────────────
+// Supabase puede disparar varios eventos en ráfaga (uno por key).
+// Los acumulamos en un objeto y los aplicamos todos juntos con un setTimeout(0),
+// garantizando un único render de React por ráfaga de cambios remotos.
+let _pendingBatch = {};
+let _batchTimer = null;
+
+function scheduleBatch(key, value) {
+  _pendingBatch[key] = value;
+  if (_batchTimer) return; // ya hay un flush programado
+  _batchTimer = setTimeout(() => {
+    const batch = _pendingBatch;
+    _pendingBatch = {};
+    _batchTimer = null;
+    applyRemoteSnapshot(batch);
+  }, 0); // flush en el siguiente macrotask (fuera del render actual)
+}
+
 export function useRealtimeSync() {
   const channelRef = useRef(null);
-  // Debounce para no hacer pull múltiple si reconecta varias veces seguidas
   const pullDebounceRef = useRef(null);
 
   useEffect(() => {
@@ -114,27 +132,20 @@ export function useRealtimeSync() {
           if (_ignoreRemoteKeys.has(key)) return;
 
           const applicators = getApplicators();
-          const apply = applicators[key];
-          if (apply) {
+          if (applicators[key]) {
             console.log(`[Realtime] Actualización remota recibida: "${key}"`);
-            // Diferir el setState al siguiente microtask para evitar el crash
-            // "insertBefore" que ocurre cuando Supabase dispara setState
-            // sincrónicamente dentro del reconciliador de React.
-            queueMicrotask(() => {
-              _isApplyingRealtimeState = true;
-              try { apply(value); } finally { _isApplyingRealtimeState = false; }
-            });
+            // Acumular y aplicar en batch para evitar renders concurrentes
+            scheduleBatch(key, value);
           }
         }
       )
       .subscribe((status) => {
         console.log('[Realtime] Canal status:', status);
-        // Al conectar o reconectar: hacer pull completo para sincronizar estado perdido
         if (status === 'SUBSCRIBED') {
           clearTimeout(pullDebounceRef.current);
           pullDebounceRef.current = setTimeout(() => {
             refreshAllFromSupabase();
-          }, 800); // espera 800ms para que los stores estén listos
+          }, 800);
         }
       });
 
@@ -142,6 +153,7 @@ export function useRealtimeSync() {
 
     return () => {
       clearTimeout(pullDebounceRef.current);
+      if (_batchTimer) { clearTimeout(_batchTimer); _batchTimer = null; }
       supabase.removeChannel(channel);
     };
   }, []);
