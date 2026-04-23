@@ -211,7 +211,9 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
             onClick={onToggle}
             className="text-sm font-bold text-amber-500 hover:text-amber-600 flex items-center gap-1 transition-colors"
           >
-            {isExpanded ? <><ChevronUp size={16} /> Ocultar detalle</> : <><ChevronDown size={16} /> Ver detalle por producto</>}
+            {isExpanded
+              ? <><ChevronUp size={16} /><span>Ocultar detalle</span></>
+              : <><ChevronDown size={16} /><span>Ver detalle por producto</span></>}
           </button>
         )}
       </div>
