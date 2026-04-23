@@ -354,7 +354,8 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
               {vendors.length > 0 && (
                 <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 6, maxWidth: '88vw' }}>
                   {vendors.map((v) => {
-                    const stale = isStale(v.updatedAt);
+                    const stale    = isStale(v.updatedAt);
+                    const offline  = v.source === 'offline';
                     const isSelected = selectedVehicleId === v.vendorId;
                     return (
                   <div
