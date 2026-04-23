@@ -96,16 +96,16 @@ function useDeliveryAlert() {
       compressor.connect(ctx.destination);
 
       const playTone = (startTime: number, freq: number, dur: number) => {
-        // Layerear 2 osciladores: fundamental + subarmónico para más presencia
-        [freq, freq * 2].forEach((f, i) => {
+        // Sine wave con armónico suave — mismo sonido que el WAV
+        [[freq, 1.0], [freq * 2, 0.15], [freq * 3, 0.05]].forEach(([f, amp]) => {
           const osc  = ctx.createOscillator();
           const gain = ctx.createGain();
-          osc.type = 'square';
+          osc.type = 'sine';
           osc.frequency.setValueAtTime(f, startTime);
+          // Envolvente campana: ataque 5ms, decay exponencial
           gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(i === 0 ? 1.0 : 0.4, startTime + 0.01);
-          gain.gain.setValueAtTime(i === 0 ? 1.0 : 0.4, startTime + dur - 0.02);
-          gain.gain.linearRampToValueAtTime(0, startTime + dur);
+          gain.gain.linearRampToValueAtTime(amp as number, startTime + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
           osc.connect(gain);
           gain.connect(compressor);
           osc.start(startTime);
@@ -114,9 +114,9 @@ function useDeliveryAlert() {
       };
 
       const t = ctx.currentTime;
-      playTone(t + 0.00, 1100, 0.15);
-      playTone(t + 0.22, 1100, 0.15);
-      playTone(t + 0.44, 1400, 0.22);
+      playTone(t + 0.00, 1318.5, 0.30);  // E6
+      playTone(t + 0.18, 1046.5, 0.30);  // C6
+      playTone(t + 0.36, 1567.9, 0.45);  // G6
 
       setTimeout(() => { try { ctx.close(); } catch (_) {} }, 1500);
     } catch (_) {}
@@ -132,7 +132,7 @@ function useDeliveryAlert() {
     stoppedRef.current    = false;
     loopActiveRef.current = true;
     playAlarm();
-    loopRef.current = setInterval(playAlarm, 1500);
+    loopRef.current = setInterval(playAlarm, 2000); // 2s — da tiempo al chime de 0.85s
   };
 
   const stopAll = () => {
