@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save } from 'lucide-react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -17,7 +17,8 @@ import { useVendorTracking } from '../lib/useVendorTracking';
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
-  const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle } = useLogisticsStore();
+  const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
+          pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
   const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   
@@ -71,6 +72,8 @@ export const VendedorDashboard = () => {
   const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
   // Campo de observación para el pedido de surtido
   const [observacion, setObservacion] = useState('');
+  // Panel Mis Pedidos
+  const [showMisPedidos, setShowMisPedidos] = useState(false);
 
   // Cierre state
   const [cash, setCash] = useState('');
@@ -442,6 +445,135 @@ export const VendedorDashboard = () => {
             </div>
             {/* Espaciador para que el último producto no quede detrás del botón flotante */}
             <div style={{ height: '80px' }} aria-hidden="true" />
+
+            {/* ── MIS PEDIDOS ── */}
+            {(() => {
+              const myPending   = (pendingRequests   || []).filter((r: any) => r.requester_point_id === pointId);
+              const myCompleted = (completedRequests || []).filter((r: any) => r.requester_point_id === pointId);
+              const myRejected  = (rejectedRequests  || []).filter((r: any) => r.requester_point_id === pointId);
+              const allMine = [
+                ...myPending.map((r: any) => ({ ...r, _status: 'pending' })),
+                ...myCompleted.map((r: any) => ({ ...r, _status: 'completed' })),
+                ...myRejected.map((r: any) => ({ ...r, _status: 'rejected' })),
+              ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              ).slice(0, 15); // Mostrar máx. 15 pedidos recientes
+
+              if (allMine.length === 0) return null;
+
+              const hasPending = myPending.length > 0;
+
+              const fmtTime = (iso: string) =>
+                iso ? new Date(iso).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '—';
+
+              return (
+                <div className="mt-2 mb-4">
+                  {/* Cabecera desplegable */}
+                  <button
+                    onClick={() => setShowMisPedidos(v => !v)}
+                    className="w-full flex items-center justify-between bg-white rounded-2xl px-4 py-3 shadow-sm border border-gray-100 active:scale-[0.98] transition-all"
+                  >
+                    <div className="flex items-center gap-2">
+                      <Package size={16} className="text-amber-500" />
+                      <span className="font-black text-gray-800 text-sm"><span>Mis Pedidos</span></span>
+                      {hasPending && (
+                        <span className="bg-[#FF4040] text-white text-[10px] font-black px-2 py-0.5 rounded-full animate-pulse">
+                          {myPending.length} pendiente{myPending.length > 1 ? 's' : ''}
+                        </span>
+                      )}
+                      {!hasPending && (
+                        <span className="bg-gray-100 text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                          {allMine.length}
+                        </span>
+                      )}
+                    </div>
+                    {showMisPedidos ? <ChevronUp size={16} className="text-gray-400" /> : <ChevronDown size={16} className="text-gray-400" />}
+                  </button>
+
+                  {/* Lista de pedidos */}
+                  {showMisPedidos && (
+                    <div className="mt-2 space-y-2">
+                      {allMine.map((req: any) => {
+                        const isPending   = req._status === 'pending';
+                        const isCompleted = req._status === 'completed';
+                        const isRejected  = req._status === 'rejected';
+
+                        return (
+                          <div
+                            key={req.id}
+                            className={`rounded-2xl border-2 px-4 py-3 ${
+                              isPending   ? 'bg-amber-50 border-amber-200' :
+                              isCompleted ? 'bg-green-50 border-green-100' :
+                                            'bg-red-50 border-red-100'
+                            }`}
+                          >
+                            {/* Fila superior: estado + hora */}
+                            <div className="flex items-center justify-between mb-2">
+                              <div className="flex items-center gap-1.5">
+                                {isPending && (
+                                  <>
+                                    <Clock size={13} className="text-amber-500" />
+                                    <span className="text-amber-700 font-black text-xs"><span>En espera</span></span>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                  </>
+                                )}
+                                {isCompleted && (
+                                  <>
+                                    <CheckCircle size={13} className="text-green-500" />
+                                    <span className="text-green-700 font-black text-xs"><span>Surtido</span></span>
+                                    {req.dejadorName && (
+                                      <span className="text-green-600 font-bold text-xs"><span>· {req.dejadorName}</span></span>
+                                    )}
+                                  </>
+                                )}
+                                {isRejected && (
+                                  <>
+                                    <XCircle size={13} className="text-red-500" />
+                                    <span className="text-red-700 font-black text-xs"><span>Rechazado</span></span>
+                                  </>
+                                )}
+                              </div>
+                              <span className="text-gray-400 font-bold text-[10px]">
+                                <span>{fmtTime(isCompleted ? (req.completed_at || req.created_at) : isRejected ? (req.rejected_at || req.created_at) : req.created_at)}</span>
+                              </span>
+                            </div>
+
+                            {/* Productos del pedido */}
+                            <div className="flex flex-wrap gap-1.5">
+                              {(req.items_payload || []).map((item: any, i: number) => (
+                                <span
+                                  key={i}
+                                  className={`text-xs font-black px-2.5 py-1 rounded-full ${
+                                    isPending   ? 'bg-amber-100 text-amber-800' :
+                                    isCompleted ? 'bg-green-100 text-green-800' :
+                                                  'bg-red-100 text-red-700'
+                                  }`}
+                                >
+                                  <span>{item.abbreviation || item.name} ×{item.qty}</span>
+                                </span>
+                              ))}
+                            </div>
+
+                            {/* Observación (si hay) */}
+                            {req.observacion && (
+                              <p className="text-xs font-bold text-gray-500 mt-1.5 italic">📝 <span>{req.observacion}</span></p>
+                            )}
+
+                            {/* Mensaje de estado para pendientes */}
+                            {isPending && (
+                              <div className="flex items-center gap-1 mt-2">
+                                <AlertCircle size={11} className="text-amber-400" />
+                                <span className="text-amber-600 font-bold text-[10px]"><span>El Dejador aún no ha atendido este pedido</span></span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
+
           </div>
         )}
 
