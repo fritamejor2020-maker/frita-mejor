@@ -133,7 +133,7 @@ function useDeliveryAlert() {
     stoppedRef.current    = false;
     loopActiveRef.current = true;
     playAlarm();
-    loopRef.current = setInterval(playAlarm, 3500); // chimes.wav dura ~2.1s, 3.5s da pausa entre repeticiones
+    loopRef.current = setInterval(playAlarm, 2500); // mixkit_ding dura ~1s, pausa de 1.5s entre repeticiones
   };
 
   const stopAll = () => {
