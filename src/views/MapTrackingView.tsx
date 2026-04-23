@@ -23,25 +23,26 @@ const DEFAULT_ZOOM = 14;
 const CHANNEL = 'vendor-tracking';
 
 // ── Ícono personalizado para el vendedor ─────────────────────────────────────
-const createVendorIcon = (name: string, stale: boolean) => {
-  const color = stale ? '#9ca3af' : '#FFB700';
-  const border = stale ? '#6b7280' : '#e67e00';
-  const emoji = '🛵';
+const createVendorIcon = (name: string, stale: boolean, offline = false) => {
+  const color  = offline ? '#e5e7eb' : stale ? '#9ca3af' : '#FFB700';
+  const border = offline ? '#9ca3af' : stale ? '#6b7280' : '#e67e00';
+  const emoji  = offline ? '📍' : '🛵';
+  const extra  = offline ? 'opacity:0.75; filter:grayscale(0.5);' : '';
   return L.divIcon({
     className: '',
     html: `
       <div style="
         display:flex; flex-direction:column; align-items:center; gap:2px;
-        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3));
+        filter: drop-shadow(0 2px 4px rgba(0,0,0,0.3)); ${extra}
       ">
         <div style="
-          background:${color}; border:3px solid ${border};
+          background:${color}; border:3px ${offline ? 'dashed' : 'solid'} ${border};
           border-radius:50%; width:44px; height:44px;
           display:flex; align-items:center; justify-content:center;
-          font-size:22px; animation:${stale ? 'none' : 'pulse 2s infinite'};
+          font-size:22px; animation:${(!stale && !offline) ? 'pulse 2s infinite' : 'none'};
         ">${emoji}</div>
         <div style="
-          background:white; border:1.5px solid ${border};
+          background:white; border:1.5px ${offline ? 'dashed' : 'solid'} ${border};
           border-radius:12px; padding:2px 8px;
           font-size:11px; font-weight:900; color:#1f2937;
           white-space:nowrap; max-width:100px; overflow:hidden;
@@ -69,7 +70,7 @@ interface VendorLocation {
   lat: number;
   lng: number;
   updatedAt: string;
-  source?: 'presence' | 'db';  // de dónde vino el dato
+  source?: 'presence' | 'db' | 'offline'; // offline = última pos conocida, turno activo, app cerrada
 }
 
 // ── Componente auxiliar: centra el mapa si no hay ubicaciones aún ────────────
@@ -87,7 +88,11 @@ function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedded?: boolean; onVehicleSelect?: (vehicleId: string) => void }) => {
+export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShifts = [] }: {
+  embedded?: boolean;
+  onVehicleSelect?: (vehicleId: string) => void;
+  activeShifts?: any[];   // posShifts con turno activo para cruzar con la última ubicación
+}) => {
   const { user, signOut } = useAuthStore();
   const navigate = useNavigate();
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
@@ -119,39 +124,52 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
   useEffect(() => {
     const loadSavedLocations = async () => {
       try {
+        // Traer TODAS las ubicaciones actualizadas hoy (sin filtrar por is_active)
+        // así los vendedores que cerraron la app siguen apareciendo en el mapa
+        // mientras su turno esté abierto.
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+
         const { data } = await supabase
           .from('vendor_locations')
           .select('*')
-          .eq('is_active', true)              // ← Solo turno activo
+          .gte('updated_at', todayStart.toISOString())
           .order('updated_at', { ascending: false });
 
         if (data) {
-          // Limpiar y recargar — reflejar vendedores que cerraron turno
           dbRef.current.clear();
           data.forEach((row: any) => {
-            dbRef.current.set(row.vendor_id, {
-              vendorId: row.vendor_id,
-              name: row.vendor_name,
-              lat: row.lat,
-              lng: row.lng,
-              updatedAt: row.updated_at,
-              source: 'db',
-            });
+            // Determinar si el vendedor está online (Presence) o sólo tenemos su última pos
+            const isOnline = presenceRef.current.has(row.vendor_id);
+            // Cruzar con shifts activos para saber si el turno sigue abierto
+            const hasActiveShift = activeShifts.some(
+              (s: any) => s.type === 'VENDEDOR' && s.pointId === row.vendor_id && !s.closedAt
+            );
+            // Solo mostrar si hay turno activo (evitar mostrar ubicaciones de turnos anteriores)
+            if (!hasActiveShift && !row.is_active) return;
+
+            if (!isOnline) {
+              // No está en Presence → mostrar última ubicación como 'offline'
+              dbRef.current.set(row.vendor_id, {
+                vendorId: row.vendor_id,
+                name: row.vendor_name,
+                lat: row.lat,
+                lng: row.lng,
+                updatedAt: row.updated_at,
+                source: 'offline',
+              });
+            }
           });
           mergeVendors();
         }
-      } catch (_) {
-        // Silencioso — si la tabla no existe aún, no pasa nada
-      }
+      } catch (_) {}
     };
 
 
     loadSavedLocations();
-
-    // Refrescar de la BD cada 60s como respaldo
-    const dbInterval = setInterval(loadSavedLocations, 60_000);
+    const dbInterval = setInterval(loadSavedLocations, 30_000); // refrescar cada 30s
     return () => clearInterval(dbInterval);
-  }, []);
+  }, [activeShifts]);
 
   // ── Suscripción a Presence (tiempo real) ──────────────────────────────────
   useEffect(() => {
@@ -245,20 +263,19 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
           />
           <AutoCenter vendors={vendors} />
           {vendors.map((v) => {
-            const stale = isStale(v.updatedAt);
-            const fromDb = v.source === 'db';
+            const stale   = isStale(v.updatedAt);
+            const offline = v.source === 'offline';
             return (
             <Marker
               key={v.vendorId}
               position={[v.lat, v.lng]}
-              icon={createVendorIcon(v.name, stale)}
+              icon={createVendorIcon(v.name, stale, offline)}
               eventHandlers={embedded && onVehicleSelect ? {
                 click: () => onVehicleSelect(v.vendorId),
               } : !embedded ? {
                 click: () => setSelectedVehicleId(id => id === v.vendorId ? null : v.vendorId),
               } : undefined}
             >
-              {/* Popup solo en modo standalone (no embedded) */}
               {!embedded && (
               <Popup>
                 <div style={{ fontFamily: 'system-ui', minWidth: 160 }}>
@@ -266,12 +283,12 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
                   <div style={{ fontSize: 12, color: '#6b7280' }}>
                     📍 {v.lat.toFixed(5)}, {v.lng.toFixed(5)}
                   </div>
-                  <div style={{ fontSize: 12, color: stale ? '#ef4444' : '#22c55e', fontWeight: 700, marginTop: 4 }}>
+                  <div style={{ fontSize: 12, color: offline ? '#f59e0b' : stale ? '#ef4444' : '#22c55e', fontWeight: 700, marginTop: 4 }}>
                     🕐 {formatTime(v.updatedAt)}
                   </div>
-                  {fromDb && stale && (
-                    <div style={{ fontSize: 10, color: '#9ca3af', fontWeight: 700, marginTop: 4, fontStyle: 'italic' }}>
-                      📡 Última ubicación guardada
+                  {offline && (
+                    <div style={{ fontSize: 10, color: '#f59e0b', fontWeight: 700, marginTop: 4, background: '#fef3c7', borderRadius: 6, padding: '3px 6px' }}>
+                      📡 Última ubicación conocida · App cerrada
                     </div>
                   )}
                 </div>
@@ -349,27 +366,32 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect }: { embedde
                     const stale = isStale(v.updatedAt);
                     const isSelected = selectedVehicleId === v.vendorId;
                     return (
-                      <div
+                  <div
                         key={v.vendorId}
                         onClick={() => setSelectedVehicleId(isSelected ? null : v.vendorId)}
                         style={{
-                          background: isSelected ? '#fef3c7' : stale ? '#f9fafb' : 'white',
-                          border: `2px solid ${isSelected ? '#f59e0b' : stale ? '#e5e7eb' : '#d1fae5'}`,
+                          background: isSelected ? '#fef3c7' : offline ? '#f9fafb' : stale ? '#f9fafb' : 'white',
+                          border: `2px solid ${isSelected ? '#f59e0b' : offline ? '#d1d5db' : stale ? '#e5e7eb' : '#d1fae5'}`,
                           borderRadius: 14, padding: '8px 12px', cursor: 'pointer',
                           transition: 'all 0.15s', minWidth: 90,
                           boxShadow: isSelected ? '0 0 0 3px rgba(245,158,11,0.2)' : '0 1px 4px rgba(0,0,0,0.06)',
                         }}
                       >
                         <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 2 }}>
-                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: stale ? '#9ca3af' : '#22c55e', flexShrink: 0 }} />
+                          <div style={{ width: 7, height: 7, borderRadius: '50%', background: offline ? '#d1d5db' : stale ? '#9ca3af' : '#22c55e', flexShrink: 0 }} />
                           <span style={{ fontWeight: 900, fontSize: 12, color: '#1f2937', whiteSpace: 'nowrap' }}>
                             {v.name.split(' ')[0]}
                           </span>
                           {isSelected && <span style={{ fontSize: 9 }}>📦</span>}
                         </div>
-                        <div style={{ fontSize: 10, color: stale ? '#ef4444' : '#6b7280', fontWeight: 600 }}>
-                          🕐 {formatTime(v.updatedAt)}
+                        <div style={{ fontSize: 10, color: offline ? '#f59e0b' : stale ? '#ef4444' : '#6b7280', fontWeight: 600 }}>
+                          {offline ? '📡 ' : '🕐 '}{formatTime(v.updatedAt)}
                         </div>
+                        {offline && (
+                          <div style={{ fontSize: 9, color: '#9ca3af', fontWeight: 700, marginTop: 2 }}>
+                            App cerrada
+                          </div>
+                        )}
                       </div>
                     );
                   })}

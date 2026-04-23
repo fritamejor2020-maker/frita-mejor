@@ -261,7 +261,7 @@ function App() {
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
-                <Route path="/tracking" element={<MapTrackingView />} />
+                <Route path="/tracking" element={<MapTrackingView activeShifts={useInventoryStore.getState().posShifts || []} />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>

@@ -1136,6 +1136,7 @@ export const DejadorDashboard = () => {
               <MapTrackingView
                 embedded
                 onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
+                activeShifts={posShifts || []}
               />
             </div>
 
