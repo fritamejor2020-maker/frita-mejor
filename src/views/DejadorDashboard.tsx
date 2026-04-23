@@ -35,96 +35,120 @@ const useRelativeTime = () => {
 };
 
 
-// ─── Hook: Audio — bip único y loop continuo ─────────────────────────────────
+// ─── Hook: Audio — alarma máximo volumen con WAV real + vibración ─────────────
 function useDeliveryAlert() {
-  const audioCtxRef   = useRef<AudioContext | null>(null);
-  const masterGainRef = useRef<GainNode | null>(null);
+  const audioRef      = useRef<HTMLAudioElement | null>(null);
   const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
   const loopActiveRef = useRef(false);
   const stoppedRef    = useRef(false);
 
-  // Obtener (o crear) el AudioContext — nunca lo cerramos para evitar el estado "suspended"
-  const getCtx = () => {
-    if (!audioCtxRef.current || audioCtxRef.current.state === 'closed') {
-      const ctx = new (window.AudioContext || (window as any).webkitAudioContext)();
-      audioCtxRef.current = ctx;
-      const mg = ctx.createGain();
-      mg.gain.setValueAtTime(1, ctx.currentTime);
-      mg.connect(ctx.destination);
-      masterGainRef.current = mg;
-    }
-    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume();
-    return { ctx: audioCtxRef.current, mg: masterGainRef.current! };
+  // ── Precargar el archivo WAV al montar ──────────────────────────────────────
+  useEffect(() => {
+    const audio = new Audio('/sounds/alarm.wav');
+    audio.preload = 'auto';
+    audio.volume  = 1.0;   // Máximo volumen posible desde JS
+    audioRef.current = audio;
+    return () => {
+      audio.pause();
+      audioRef.current = null;
+    };
+  }, []);
+
+  // ── Vibración del dispositivo (iOS Safari 16.4+ y Android Chrome) ───────────
+  const vibrate = () => {
+    try {
+      if ('vibrate' in navigator) {
+        // Patrón: vibra 200ms, pausa 80ms, vibra 200ms, pausa 80ms, vibra 400ms
+        navigator.vibrate([200, 80, 200, 80, 400]);
+      }
+    } catch (_) {}
   };
 
-  const singleBeep = (
-    ctx: AudioContext, mg: GainNode,
-    startTime: number, freq: number, duration: number
-  ) => {
-    const osc  = ctx.createOscillator();
-    const gain = ctx.createGain();
-    osc.connect(gain);
-    gain.connect(mg);
-    osc.type = 'square';
-    osc.frequency.setValueAtTime(freq, startTime);
-    osc.frequency.exponentialRampToValueAtTime(freq * 0.7, startTime + duration * 0.8);
-    gain.gain.setValueAtTime(0, startTime);
-    gain.gain.linearRampToValueAtTime(0.9, startTime + 0.01);
-    gain.gain.setValueAtTime(0.9, startTime + duration - 0.04);
-    gain.gain.linearRampToValueAtTime(0, startTime + duration);
-    osc.start(startTime);
-    osc.stop(startTime + duration);
-  };
-
-  const playTripleBeep = () => {
+  // ── Reproducir el archivo WAV (siempre desde el inicio) ─────────────────────
+  const playAlarm = () => {
     if (stoppedRef.current) return;
     try {
-      const { ctx, mg } = getCtx();
-      // Restaurar gain maestro antes de reproducir (pudo haber sido silenciado)
-      mg.gain.cancelScheduledValues(ctx.currentTime);
-      mg.gain.setValueAtTime(1, ctx.currentTime);
+      const audio = audioRef.current;
+      if (audio) {
+        audio.currentTime = 0;
+        audio.volume = 1.0;
+        const p = audio.play();
+        // Fallback Web Audio API si el archivo no se puede reproducir
+        if (p) p.catch(() => playFallbackBeep());
+      } else {
+        playFallbackBeep();
+      }
+    } catch (_) { playFallbackBeep(); }
+    vibrate();
+  };
+
+  // ── Fallback: Web Audio API con compressor para más volumen ─────────────────
+  const playFallbackBeep = () => {
+    try {
+      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
+      const compressor = ctx.createDynamicsCompressor();
+      compressor.threshold.value = -3;
+      compressor.knee.value      = 0;
+      compressor.ratio.value     = 20;
+      compressor.attack.value    = 0.001;
+      compressor.release.value   = 0.1;
+      compressor.connect(ctx.destination);
+
+      const playTone = (startTime: number, freq: number, dur: number) => {
+        // Layerear 2 osciladores: fundamental + subarmónico para más presencia
+        [freq, freq * 2].forEach((f, i) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'square';
+          osc.frequency.setValueAtTime(f, startTime);
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(i === 0 ? 1.0 : 0.4, startTime + 0.01);
+          gain.gain.setValueAtTime(i === 0 ? 1.0 : 0.4, startTime + dur - 0.02);
+          gain.gain.linearRampToValueAtTime(0, startTime + dur);
+          osc.connect(gain);
+          gain.connect(compressor);
+          osc.start(startTime);
+          osc.stop(startTime + dur);
+        });
+      };
+
       const t = ctx.currentTime;
-      singleBeep(ctx, mg, t + 0.00, 1000, 0.12);
-      singleBeep(ctx, mg, t + 0.18, 1000, 0.12);
-      singleBeep(ctx, mg, t + 0.36, 1200, 0.18);
+      playTone(t + 0.00, 1100, 0.15);
+      playTone(t + 0.22, 1100, 0.15);
+      playTone(t + 0.44, 1400, 0.22);
+
+      setTimeout(() => { try { ctx.close(); } catch (_) {} }, 1500);
     } catch (_) {}
   };
 
   const playOnce = () => {
     stoppedRef.current = false;
-    playTripleBeep();
+    playAlarm();
   };
 
   const startLoop = () => {
     if (loopActiveRef.current) return;
-    stoppedRef.current = false;
+    stoppedRef.current    = false;
     loopActiveRef.current = true;
-    playTripleBeep();
-    loopRef.current = setInterval(playTripleBeep, 1200);
+    playAlarm();
+    loopRef.current = setInterval(playAlarm, 1500);
   };
 
   const stopAll = () => {
-    stoppedRef.current = true;
+    stoppedRef.current    = true;
     loopActiveRef.current = false;
-
-    // Cancelar loop si existe
     if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
-
-    // Silenciar via gain maestro — SIN cerrar el contexto
-    // (cerrarlo causa que el siguiente bip quede bloqueado por autoplay policy)
-    if (masterGainRef.current && audioCtxRef.current?.state !== 'closed') {
-      try {
-        const t = audioCtxRef.current!.currentTime;
-        masterGainRef.current.gain.cancelScheduledValues(t);
-        masterGainRef.current.gain.setValueAtTime(0, t);
-      } catch (_) {}
-    }
+    try {
+      audioRef.current?.pause();
+      if (audioRef.current) audioRef.current.currentTime = 0;
+    } catch (_) {}
+    // Detener vibración
+    try { if ('vibrate' in navigator) navigator.vibrate(0); } catch (_) {}
   };
 
-  // Solo cerramos el contexto al desmontar el componente
   useEffect(() => () => {
-    if (loopRef.current) clearInterval(loopRef.current);
-    try { audioCtxRef.current?.close(); } catch (_) {}
+    stopAll();
   }, []);
 
   return { playOnce, startLoop, stopAll, isLooping: loopActiveRef };
