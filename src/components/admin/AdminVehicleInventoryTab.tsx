@@ -27,14 +27,20 @@ function buildShiftLogistics(
   completedRequests: any[],
   priceMap: Record<string, { price: number; name: string }>
 ) {
-  const from = openedAt ? new Date(openedAt).getTime() : 0;
-  const to   = closedAt ? new Date(closedAt).getTime() : Date.now();
+  // Use START OF DAY as lower bound so loads made before the vendor opens their session
+  // (which is the normal Dejador workflow) are still counted. Mirrors calcSoldByVehicle.
+  const fromDay: number = (() => {
+    const ref = openedAt || (shiftDate ? `${shiftDate}T00:00:00` : null);
+    if (!ref) return 0;
+    const d = new Date(ref);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); // midnight local
+  })();
+  const to = closedAt ? new Date(closedAt).getTime() : Date.now();
 
   const inWindow = (ts: string) => {
     if (!ts) return false;
     const t = new Date(ts).getTime();
-    if (openedAt) return t >= from && t <= to;
-    return dateOf(ts) === shiftDate;
+    return t >= fromDay && t <= to;
   };
 
   // Cargas
