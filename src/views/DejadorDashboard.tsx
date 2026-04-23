@@ -976,7 +976,7 @@ export const DejadorDashboard = () => {
                         <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-3">Artículos solicitados:</h4>
                         <div className="flex flex-wrap gap-3">
                           {editingReqId === req.id ? (
-                            editPayload.map((item: any, idx: number) => {
+                            editPayload.filter((item: any) => item.qty > 0).map((item: any, idx: number) => {
                               const isPostp = postponedSet.has(idx);
                               return (
                                 <div key={idx} className={`flex rounded-xl overflow-hidden shadow-sm transition-shadow border border-gray-200 bg-white ${isPostp ? 'opacity-50 ring-2 ring-orange-300' : 'hover:shadow-md'}`}>
@@ -1006,7 +1006,7 @@ export const DejadorDashboard = () => {
                               );
                             })
                           ) : (
-                            payload.map((item: any, idx: number) => {
+                            payload.filter((item: any) => item.qty > 0).map((item: any, idx: number) => {
                               const isPostp = postponedSet.has(idx);
                               return (
                                 <div key={idx} className={`flex rounded-xl overflow-hidden shadow-sm transition-all ${
@@ -1107,7 +1107,7 @@ export const DejadorDashboard = () => {
 
                         {/* Fused Pills inside History */}
                         <div className="flex flex-wrap gap-2">
-                           {req.items_payload?.map((item: any, idx: number) => (
+                           {req.items_payload?.filter((item: any) => item.qty > 0).map((item: any, idx: number) => (
                              <div key={idx} className="flex rounded-lg overflow-hidden border border-amber-200/50">
                                <div className="bg-gray-200/50 text-gray-500 font-black text-xs px-3 py-1.5 flex items-center min-w-[40px] justify-center whitespace-nowrap" title={item.name}>
                                  {item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation)}
