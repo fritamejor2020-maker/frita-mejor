@@ -242,6 +242,20 @@ export const DejadorDashboard = () => {
 
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
+
+  // Auto-marcar como leídos al entrar al tab de Pedidos
+  useEffect(() => {
+    if (activeTab === 'surtir') {
+      const unread = truePendingRequests.filter((r: any) => !r.readAt && !r.isPostponed);
+      if (unread.length > 0) {
+        unread.forEach((r: any) => markRequestRead(r.id));
+        stopAll();
+        clearInactivityTimer();
+        setIsAlertPlaying(false);
+      }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]);
   const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
   const [loadQuantities, setLoadQuantities] = useState<Record<string, number>>({});
   // For products with string presets (e.g. MON/20k/50k), track selected string value separately
@@ -854,8 +868,8 @@ export const DejadorDashboard = () => {
                             : 'bg-white border-gray-300 hover:border-gray-400'
                       }`}
                       onPointerDown={() => {
-                        // Al tocar la tarjeta: marcar como leído y parar el loop
-                        if (!req.readAt) {
+                        // Redundancia: si llegó a ver esta tarjeta sin haber marcado el tab, marcar aquí
+                        if (!req.readAt && !req.isPostponed) {
                           markRequestRead(req.id);
                           stopAll();
                           clearInactivityTimer();
