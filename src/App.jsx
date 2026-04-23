@@ -108,10 +108,48 @@ class ErrorBoundary extends React.Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '20px', color: 'red', fontFamily: 'monospace' }}>
-          <h2>Unhandled App Error!</h2>
-          <pre>{this.state.error?.toString()}</pre>
-          <pre style={{ whiteSpace: 'pre-wrap' }}>{this.state.error?.stack}</pre>
+        <div style={{
+          padding: '40px 20px',
+          fontFamily: 'sans-serif',
+          textAlign: 'center',
+          background: '#fff8f8',
+          minHeight: '100vh',
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: '12px'
+        }}>
+          <span style={{ fontSize: '3rem' }}>⚠️</span>
+          <h2 style={{ color: '#c0392b', fontWeight: 900, margin: 0 }}>¡Error de aplicación no controlado!</h2>
+          <pre style={{
+            color: '#c0392b',
+            fontSize: '0.75rem',
+            background: '#fff0f0',
+            border: '1px solid #fcc',
+            borderRadius: '8px',
+            padding: '12px 16px',
+            maxWidth: '600px',
+            textAlign: 'left',
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-all'
+          }}>{this.state.error?.toString()}</pre>
+          <button
+            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            style={{
+              background: '#e74c3c',
+              color: 'white',
+              border: 'none',
+              borderRadius: '999px',
+              padding: '12px 28px',
+              fontWeight: 900,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              marginTop: '8px'
+            }}
+          >
+            🔄 Recargar aplicación
+          </button>
         </div>
       );
     }
@@ -169,77 +207,79 @@ function App() {
   }, []);
 
   return (
-    <ErrorBoundary>
+    <>
       <SyncStatusIndicator />
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
-        <Routes>
-          {/* ── Pública: única ruta sin login ───────────────── */}
-          <Route path="/login" element={<LoginView />} />
+        <ErrorBoundary>
+          <Routes>
+            {/* ── Pública: única ruta sin login ───────────────── */}
+            <Route path="/login" element={<LoginView />} />
 
-          {/* ── Todo lo demás requiere estar autenticado ─────── */}
-          <Route element={<ProtectedRoute />}>
+            {/* ── Todo lo demás requiere estar autenticado ─────── */}
+            <Route element={<ProtectedRoute />}>
 
-            {/* Redirección raíz basada en rol */}
-            <Route path="/" element={<RoleRedirect />} />
+              {/* Redirección raíz basada en rol */}
+              <Route path="/" element={<RoleRedirect />} />
 
-            {/* Selector de módulo — requiere login, sin restricción de módulo */}
-            <Route path="/selector" element={<ModuleSelectorView />} />
+              {/* Selector de módulo — requiere login, sin restricción de módulo */}
+              <Route path="/selector" element={<ModuleSelectorView />} />
 
-            {/* Módulos por access[] del usuario */}
-            <Route element={<ProtectedRoute allowedModules={['produccion']} />}>
-              <Route path="/produccion" element={<ProductionView />} />
+              {/* Módulos por access[] del usuario */}
+              <Route element={<ProtectedRoute allowedModules={['produccion']} />}>
+                <Route path="/produccion" element={<ProductionView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['fritado']} />}>
+                <Route path="/fritado" element={<FritadoView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['bodega']} />}>
+                <Route path="/bodega" element={<WarehouseView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['admin']} />}>
+                <Route path="/admin" element={<AdminView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['pos']} />}>
+                <Route path="/pos" element={<PosView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['finanzas-ingresos', 'finanzas-gastos']} />}>
+                <Route path="/finanzas" element={<FinanceDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['vendedor-setup', 'vendedor']} />}>
+                <Route path="/vendedor-setup" element={<SellerSetupView />} />
+                <Route path="/vendedor" element={<VendedorDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['dejador']} />}>
+                <Route path="/dejador-setup" element={<DejadorSetupView />} />
+                <Route path="/dejador" element={<DejadorDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
+                <Route path="/tracking" element={<MapTrackingView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
+                <Route path="/cierres" element={<CierresView />} />
+              </Route>
+
+              {/* Sin acceso al módulo */}
+              <Route path="/unauthorized" element={<UnauthorizedView />} />
+
             </Route>
+            {/* ──────────────────────────────────────────────── */}
 
-            <Route element={<ProtectedRoute allowedModules={['fritado']} />}>
-              <Route path="/fritado" element={<FritadoView />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['bodega']} />}>
-              <Route path="/bodega" element={<WarehouseView />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['admin']} />}>
-              <Route path="/admin" element={<AdminView />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['pos']} />}>
-              <Route path="/pos" element={<PosView />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['finanzas-ingresos', 'finanzas-gastos']} />}>
-              <Route path="/finanzas" element={<FinanceDashboard />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['vendedor-setup', 'vendedor']} />}>
-              <Route path="/vendedor-setup" element={<SellerSetupView />} />
-              <Route path="/vendedor" element={<VendedorDashboard />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['dejador']} />}>
-              <Route path="/dejador-setup" element={<DejadorSetupView />} />
-              <Route path="/dejador" element={<DejadorDashboard />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
-              <Route path="/tracking" element={<MapTrackingView />} />
-            </Route>
-
-            <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
-              <Route path="/cierres" element={<CierresView />} />
-            </Route>
-
-            {/* Sin acceso al módulo */}
-            <Route path="/unauthorized" element={<UnauthorizedView />} />
-
-          </Route>
-          {/* ──────────────────────────────────────────────── */}
-
-          {/* Cualquier ruta desconocida → login */}
-          <Route path="*" element={<Navigate to="/login" replace />} />
-        </Routes>
+            {/* Cualquier ruta desconocida → login */}
+            <Route path="*" element={<Navigate to="/login" replace />} />
+          </Routes>
+        </ErrorBoundary>
       </BrowserRouter>
-    </ErrorBoundary>
+    </>
   );
 }
 

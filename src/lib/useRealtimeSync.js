@@ -117,9 +117,13 @@ export function useRealtimeSync() {
           const apply = applicators[key];
           if (apply) {
             console.log(`[Realtime] Actualización remota recibida: "${key}"`);
-            _isApplyingRealtimeState = true;
-            apply(value);
-            _isApplyingRealtimeState = false;
+            // Diferir el setState al siguiente microtask para evitar el crash
+            // "insertBefore" que ocurre cuando Supabase dispara setState
+            // sincrónicamente dentro del reconciliador de React.
+            queueMicrotask(() => {
+              _isApplyingRealtimeState = true;
+              try { apply(value); } finally { _isApplyingRealtimeState = false; }
+            });
           }
         }
       )
