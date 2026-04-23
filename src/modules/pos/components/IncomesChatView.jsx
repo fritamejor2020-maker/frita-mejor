@@ -30,8 +30,11 @@ function avatarColor(name = '') {
 }
 
 // ── Thumbnail de foto expandible ────────────────────────────────────────────
+// Prioriza photoUrl (Supabase Storage, visible en todos los dispositivos)
+// Fallback a photoBase64 (solo local, del dispositivo que tomó la foto)
 function PhotoThumbnail({ src, rotation = 0 }) {
   const [expanded, setExpanded] = useState(false);
+  if (!src) return null;
   return (
     <>
       <div className="mt-2 cursor-pointer" onClick={() => setExpanded(true)}>
@@ -174,9 +177,12 @@ function IncomesBubble({ income }) {
             </p>
           )}
 
-          {/* Foto del sobre */}
-          {income.photoBase64 && (
-            <PhotoThumbnail src={income.photoBase64} rotation={income.photoRotation || 0} />
+          {/* Foto del sobre — usa URL de Storage (visible en todos) o base64 local */}
+          {(income.photoUrl || income.photoBase64) && (
+            <PhotoThumbnail
+              src={income.photoUrl || income.photoBase64}
+              rotation={income.photoRotation || 0}
+            />
           )}
         </div>
 

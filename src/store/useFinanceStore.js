@@ -2,6 +2,33 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
+// ── Sube una foto base64 a Supabase Storage y devuelve la URL pública ──────────
+async function uploadPhoto(base64) {
+  if (!base64) return null;
+  try {
+    // Convertir base64 a Blob
+    const res  = await fetch(base64);
+    const blob = await res.blob();
+    const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+    const path = `incomes/${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('income-photos')
+      .upload(path, blob, { contentType: blob.type, upsert: false });
+
+    if (error) {
+      console.warn('[FinanceStore] uploadPhoto error:', error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('income-photos').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (e) {
+    console.warn('[FinanceStore] uploadPhoto falló:', e.message);
+    return null;
+  }
+}
+
 export const useFinanceStore = create(
   persist(
     (set, get) => ({
@@ -88,18 +115,22 @@ export const useFinanceStore = create(
         // Actualización optimista local
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-        // Persistir en Supabase — excluir photoBase64 (muy grande para la API REST)
-        // La foto se guarda solo en localStorage de quien registró el ingreso
+        // Subir foto a Storage y obtener URL pública (visible en todos los dispositivos)
         try {
-          const { photoBase64: _photo, ...incomeForDB } = incomeData;
-          const { data, error } = await supabase.from('incomes').insert([incomeForDB]).select();
+          const photoUrl = await uploadPhoto(incomeData.photoBase64);
+          const { photoBase64: _pb, ...incomeForDB } = incomeData;
+          const incomeWithPhoto = { ...incomeForDB, ...(photoUrl ? { photoUrl } : {}) };
+
+          const { data, error } = await supabase.from('incomes').insert([incomeWithPhoto]).select();
           if (error) {
             console.warn('[FinanceStore] addIncome error Supabase:', error.message);
           } else if (data?.[0]) {
-            // Mantener la foto local aunque el registro venga de Supabase
+            // Mantener base64 local Y agregar la URL remota
             set((state) => ({
               incomes: state.incomes.map((i) =>
-                i.id === newIncome.id ? { ...data[0], photoBase64: incomeData.photoBase64 } : i
+                i.id === newIncome.id
+                  ? { ...data[0], photoBase64: incomeData.photoBase64, photoUrl }
+                  : i
               ),
             }));
           }
@@ -119,21 +150,28 @@ export const useFinanceStore = create(
         set((state) => ({ incomes: [...newIncomes, ...state.incomes] }));
 
         try {
-          // Excluir photoBase64 de todos los registros para Supabase
-          const incomesForDB = incomesArray.map(({ photoBase64: _p, ...rest }) => rest);
+          // Subir todas las fotos a Storage en paralelo
+          const photosUrls = await Promise.all(
+            incomesArray.map((inc) => uploadPhoto(inc.photoBase64))
+          );
+          const incomesForDB = incomesArray.map(({ photoBase64: _p, ...rest }, i) => ({
+            ...rest,
+            ...(photosUrls[i] ? { photoUrl: photosUrls[i] } : {}),
+          }));
           const { data, error } = await supabase.from('incomes').insert(incomesForDB).select();
           if (error) {
             console.warn('[FinanceStore] addMultipleIncomes error Supabase:', error.message);
           } else if (data?.length) {
             set((state) => {
               const updated = [...state.incomes];
-              newIncomes.forEach((opt) => {
-                const idx = updated.findIndex((i) => i.id === opt.id);
+              newIncomes.forEach((opt, idx) => {
+                const i = updated.findIndex((x) => x.id === opt.id);
                 const dbEntry = data.find(
                   (d) => d.ubicacion === opt.ubicacion && d.jornada === opt.jornada && d.tipo === opt.tipo
                 );
-                // Mantener foto local en la entrada sincronizada
-                if (idx !== -1 && dbEntry) updated[idx] = { ...dbEntry, photoBase64: opt.photoBase64 };
+                if (i !== -1 && dbEntry) {
+                  updated[i] = { ...dbEntry, photoBase64: opt.photoBase64, photoUrl: photosUrls[idx] };
+                }
               });
               return { incomes: updated };
             });
