@@ -22,17 +22,37 @@ export function IncomesModal({ onClose }) {
   const [efectivo, setEfectivo] = useState('');
   const [salidas, setSalidas] = useState('');
   const [transferencias, setTransferencias] = useState('');
+  const [observaciones, setObservaciones] = useState('');
 
-  // Foto del sobre
+  // Foto del sobre — con rotación y confirmación
   const [photoBase64, setPhotoBase64] = useState(null);
+  const [photoRotation, setPhotoRotation] = useState(0);   // grados: 0, 90, 180, 270
+  const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const photoInputRef = useRef(null);
 
   const handlePhotoCapture = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
     const reader = new FileReader();
-    reader.onload = (ev) => setPhotoBase64(ev.target.result);
+    reader.onload = (ev) => {
+      setPhotoBase64(ev.target.result);
+      setPhotoRotation(0);
+      setPhotoConfirmed(false);
+    };
     reader.readAsDataURL(file);
+  };
+
+  const rotatePhoto = (dir) => {
+    setPhotoRotation(r => (r + dir + 360) % 360);
+    setPhotoConfirmed(false); // Requiere re-confirmar tras rotar
+  };
+
+  // Aplica la rotación CSS y devuelve la imagen como base64 con el canvas
+  const getFinalPhotoBase64 = () => {
+    if (!photoBase64 || photoRotation === 0) return photoBase64;
+    // La rotación se aplica visualmente con CSS; guardamos el original con metadata de rotación
+    // Para compatibilidad, simplemente devolvemos el base64 original — el visor mostrará con CSS
+    return photoBase64;
   };
 
   // Grid flow (Triciclos)
@@ -52,23 +72,36 @@ export function IncomesModal({ onClose }) {
     setGridData(prev => ({ ...prev, [tipo]: { ...prev[tipo], [field]: value } }));
   };
 
-  // Calculations Single
-  const numEfectivo = parseFloat(efectivo) || 0;
+  // ── Calculations Single ────────────────────────────────────────────────────
+  const numEfectivo      = parseFloat(efectivo)      || 0;
   const numTransferencias = parseFloat(transferencias) || 0;
-  const numSalidas = parseFloat(salidas) || 0;
-  const totalSingle = numEfectivo + numTransferencias;
-  const isSingleFormValid = (numEfectivo > 0 || numTransferencias > 0) && !!photoBase64;
+  const numSalidas       = parseFloat(salidas)       || 0;
+  // TOTAL = Efectivo + Transferencias + Salidas (los tres suman al ingreso)
+  const totalSingle = numEfectivo + numTransferencias + numSalidas;
+
+  const isSingleFormValid =
+    (numEfectivo > 0 || numTransferencias > 0 || numSalidas > 0) &&
+    !!photoBase64 &&
+    photoConfirmed;
 
   // Calculations Grid
-  const getGridRowTotal = (row) => (parseFloat(row.efectivo) || 0) + (parseFloat(row.transferencias) || 0);
+  const getGridRowTotal = (row) =>
+    (parseFloat(row.efectivo) || 0) +
+    (parseFloat(row.transferencias) || 0) +
+    (parseFloat(row.salidas) || 0);
+
   const gridTotals = Object.values(gridData).reduce((acc, row) => {
-    acc.efectivo += (parseFloat(row.efectivo) || 0);
+    acc.efectivo      += (parseFloat(row.efectivo)      || 0);
     acc.transferencias += (parseFloat(row.transferencias) || 0);
-    acc.salidas += (parseFloat(row.salidas) || 0);
-    acc.total += getGridRowTotal(row);
+    acc.salidas       += (parseFloat(row.salidas)       || 0);
+    acc.total         += getGridRowTotal(row);
     return acc;
   }, { efectivo: 0, transferencias: 0, salidas: 0, total: 0 });
-  const isGridFormValid = (gridTotals.efectivo > 0 || gridTotals.transferencias > 0) && !!photoBase64;
+
+  const isGridFormValid =
+    (gridTotals.efectivo > 0 || gridTotals.transferencias > 0 || gridTotals.salidas > 0) &&
+    !!photoBase64 &&
+    photoConfirmed;
 
   const handleNextStep = (type, value) => {
     if (type === 'ubicacion') {
@@ -101,17 +134,20 @@ export function IncomesModal({ onClose }) {
   const handleSubmit = () => {
     if (selectedUbicacion === 'Triciclo') {
       const incomesArray = Object.entries(gridData).map(([tipo, rowData]) => {
-        const ef = parseFloat(rowData.efectivo) || 0;
+        const ef = parseFloat(rowData.efectivo)      || 0;
         const tr = parseFloat(rowData.transferencias) || 0;
-        const sa = parseFloat(rowData.salidas) || 0;
+        const sa = parseFloat(rowData.salidas)       || 0;
         if (ef === 0 && tr === 0 && sa === 0) return null;
         return {
           ubicacion: selectedUbicacion, jornada: selectedJornada, tipo,
           vendedor: rowData.vendedor,
           creado_por: user?.name || 'Desconocido',
-          efectivo: ef, salidas: sa, transferencias: tr, total: ef + tr,
+          efectivo: ef, salidas: sa, transferencias: tr,
+          total: ef + tr + sa,
+          observaciones: observaciones.trim() || null,
           fecha: new Date().toISOString(),
-          photoBase64: photoBase64 || null,
+          photoBase64: getFinalPhotoBase64() || null,
+          photoRotation,
         };
       }).filter(Boolean);
       if (incomesArray.length > 0) addMultipleIncomes(incomesArray);
@@ -121,12 +157,112 @@ export function IncomesModal({ onClose }) {
         vendedor, creado_por: user?.name || 'Desconocido',
         efectivo: numEfectivo, salidas: numSalidas, transferencias: numTransferencias,
         total: totalSingle,
+        observaciones: observaciones.trim() || null,
         fecha: new Date().toISOString(),
-        photoBase64: photoBase64 || null,
+        photoBase64: getFinalPhotoBase64() || null,
+        photoRotation,
       });
     }
     onClose();
   };
+
+  // ── Componente de foto (reutilizable en step 3 y 4) ───────────────────────
+  const PhotoSection = () => (
+    <div className="space-y-3">
+      <input
+        ref={photoInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoCapture}
+      />
+
+      {photoBase64 ? (
+        <div className="space-y-3">
+          {/* Imagen con rotación CSS */}
+          <div className="relative flex items-center justify-center bg-black/30 rounded-2xl overflow-hidden"
+               style={{ minHeight: 160 }}>
+            <img
+              src={photoBase64}
+              alt="Foto sobre"
+              style={{
+                transform: `rotate(${photoRotation}deg)`,
+                transition: 'transform 0.25s ease',
+                maxHeight: 220,
+                maxWidth: '100%',
+                objectFit: 'contain',
+                borderRadius: 12,
+              }}
+            />
+          </div>
+
+          {/* Controles de rotación */}
+          <div className="flex items-center justify-center gap-3">
+            <button
+              type="button"
+              onClick={() => rotatePhoto(-90)}
+              className="flex items-center gap-1.5 bg-[#2a2d38] hover:bg-[#343846] text-white text-sm font-bold px-4 py-2 rounded-xl border border-gray-700 hover:border-green-500 transition-all active:scale-95"
+            >
+              ↺ Rotar izquierda
+            </button>
+            <button
+              type="button"
+              onClick={() => rotatePhoto(90)}
+              className="flex items-center gap-1.5 bg-[#2a2d38] hover:bg-[#343846] text-white text-sm font-bold px-4 py-2 rounded-xl border border-gray-700 hover:border-green-500 transition-all active:scale-95"
+            >
+              Rotar derecha ↻
+            </button>
+          </div>
+
+          {/* Checkbox de confirmación */}
+          <label className={`flex items-center gap-3 p-3 rounded-2xl border-2 cursor-pointer transition-all select-none ${
+            photoConfirmed
+              ? 'bg-green-950/40 border-green-600'
+              : 'bg-[#16171d] border-gray-700 hover:border-green-700'
+          }`}>
+            <input
+              type="checkbox"
+              checked={photoConfirmed}
+              onChange={e => setPhotoConfirmed(e.target.checked)}
+              className="w-5 h-5 accent-green-500 cursor-pointer flex-shrink-0"
+            />
+            <span className={`text-sm font-bold ${photoConfirmed ? 'text-green-400' : 'text-gray-300'}`}>
+              ¿Está derecha la foto?
+            </span>
+            {photoConfirmed && <span className="text-green-400 text-lg ml-auto">✓</span>}
+          </label>
+
+          {/* Botones cambiar/quitar */}
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => photoInputRef.current?.click()}
+              className="flex-1 bg-[#2a2d38] hover:bg-[#343846] text-gray-300 text-xs font-bold py-2 rounded-xl border border-gray-700 hover:border-gray-500 transition-all"
+            >
+              📷 Cambiar foto
+            </button>
+            <button
+              type="button"
+              onClick={() => { setPhotoBase64(null); setPhotoConfirmed(false); setPhotoRotation(0); }}
+              className="bg-red-950/50 hover:bg-red-900/50 text-red-400 text-xs font-bold py-2 px-3 rounded-xl border border-red-900/50 hover:border-red-700 transition-all"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => photoInputRef.current?.click()}
+          className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-green-500 hover:bg-green-950/20 transition-all group"
+        >
+          <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
+          <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
@@ -225,7 +361,7 @@ export function IncomesModal({ onClose }) {
                           <MoneyInput value={row.transferencias} onChange={(v) => updateGridRow(tipo, 'transferencias', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center font-bold text-white focus:border-green-500 outline-none" />
                         </td>
                         <td className="p-2">
-                          <MoneyInput value={row.salidas} onChange={(v) => updateGridRow(tipo, 'salidas', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center text-red-300 font-bold focus:border-red-500 outline-none" />
+                          <MoneyInput value={row.salidas} onChange={(v) => updateGridRow(tipo, 'salidas', v)} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 rounded-lg py-3 px-3 text-center text-green-300 font-bold focus:border-green-500 outline-none" />
                         </td>
                         <td className="p-3 font-black text-right text-green-400 text-xl">{formatMoney(rowTotal)}</td>
                       </tr>
@@ -237,27 +373,27 @@ export function IncomesModal({ onClose }) {
                     <td colSpan="2" className="p-4 font-black text-gray-300 uppercase text-sm">Totales</td>
                     <td className="p-4 font-black text-center text-white">{formatMoney(gridTotals.efectivo)}</td>
                     <td className="p-4 font-black text-center text-white">{formatMoney(gridTotals.transferencias)}</td>
-                    <td className="p-4 font-black text-center text-red-400">{formatMoney(gridTotals.salidas)}</td>
+                    <td className="p-4 font-black text-center text-green-400">{formatMoney(gridTotals.salidas)}</td>
                     <td className="p-4 font-black text-right text-green-400 text-2xl">{formatMoney(gridTotals.total)}</td>
                   </tr>
                 </tfoot>
               </table>
 
+              {/* Observaciones (Triciclo) */}
+              <div className="mt-4">
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Observaciones <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
+                <textarea
+                  value={observaciones}
+                  onChange={e => setObservaciones(e.target.value)}
+                  placeholder="Ej: Faltó plata en T2, vendedor reportó novedad..."
+                  rows={2}
+                  className="w-full bg-[#0c0d11] border border-gray-800 focus:border-gray-600 rounded-xl py-3 px-4 text-sm font-bold text-white outline-none resize-none placeholder:text-gray-700"
+                />
+              </div>
+
               {/* Foto en modo Triciclo */}
-              <div className="mt-5">
-                <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
-                {photoBase64 ? (
-                  <div className="relative">
-                    <img src={photoBase64} alt="Foto sobre" className="w-full rounded-2xl object-cover max-h-52 border-2 border-green-700" />
-                    <button onClick={() => setPhotoBase64(null)} className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-black hover:bg-red-600 transition-colors">✕</button>
-                    <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-2 right-2 bg-green-700/90 text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-green-600 transition-colors">📷 Cambiar</button>
-                  </div>
-                ) : (
-                  <button onClick={() => photoInputRef.current?.click()} className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-4 flex items-center justify-center gap-3 hover:border-green-500 hover:bg-green-950/20 transition-all group">
-                    <span className="text-2xl group-hover:scale-110 transition-transform">📷</span>
-                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
-                  </button>
-                )}
+              <div className="mt-4">
+                <PhotoSection />
               </div>
             </div>
           )}
@@ -278,30 +414,34 @@ export function IncomesModal({ onClose }) {
                 <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
               </div>
               <div>
-                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) - Opcional</label>
-                <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-gray-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
+                <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-green-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
               </div>
 
-              <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 flex justify-between items-center shadow-inner">
-                <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
-                <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+              {/* Total — Efectivo + Transferencias + Salidas */}
+              <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-1 shadow-inner">
+                <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
+                  <span>Efectivo + Transferencias + Salidas</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
+                  <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                </div>
               </div>
 
-              {/* ─── Foto del sobre ─── */}
+              {/* Foto del sobre */}
+              <PhotoSection />
+
+              {/* Observaciones */}
               <div>
-                <input ref={photoInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoCapture} />
-                {photoBase64 ? (
-                  <div className="relative">
-                    <img src={photoBase64} alt="Foto sobre" className="w-full rounded-2xl object-cover max-h-52 border-2 border-green-700" />
-                    <button onClick={() => setPhotoBase64(null)} className="absolute top-2 right-2 bg-black/70 text-white rounded-full w-7 h-7 flex items-center justify-center text-sm font-black hover:bg-red-600 transition-colors">✕</button>
-                    <button onClick={() => photoInputRef.current?.click()} className="absolute bottom-2 right-2 bg-green-700/90 text-white text-xs font-bold px-3 py-1.5 rounded-full hover:bg-green-600 transition-colors">📷 Cambiar</button>
-                  </div>
-                ) : (
-                  <button onClick={() => photoInputRef.current?.click()} className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-green-500 hover:bg-green-950/20 transition-all group">
-                    <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
-                    <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
-                  </button>
-                )}
+                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Observaciones <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
+                <textarea
+                  value={observaciones}
+                  onChange={e => setObservaciones(e.target.value)}
+                  placeholder="Ej: Pago parcial, cliente debe saldo, novedad en ruta..."
+                  rows={2}
+                  className="w-full bg-[#0c0d11] border border-gray-800 focus:border-gray-600 rounded-xl py-3 px-4 text-sm font-bold text-white outline-none resize-none placeholder:text-gray-700"
+                />
               </div>
             </div>
           )}
@@ -310,13 +450,26 @@ export function IncomesModal({ onClose }) {
         {/* Footer Actions */}
         <div className="p-6 bg-[#16171d] border-t border-gray-800">
           {((step === 4 && selectedUbicacion !== 'Triciclo') || (step === 3 && selectedUbicacion === 'Triciclo')) && (
-            <Button
-              className="w-full rounded-[20px] py-4 font-black text-lg bg-green-600 hover:bg-green-500 text-white shadow-[0_4px_14px_0_rgba(22,163,74,0.39)] disabled:opacity-50 disabled:grayscale transition-all"
-              disabled={selectedUbicacion === 'Triciclo' ? !isGridFormValid : !isSingleFormValid}
-              onClick={handleSubmit}
-            >
-              {photoBase64 ? '📷 ' : ''}Guardar {selectedUbicacion === 'Triciclo' ? 'Múltiples Ingresos' : 'Ingreso'}
-            </Button>
+            <div className="space-y-2">
+              {/* Hint si foto no confirmada */}
+              {photoBase64 && !photoConfirmed && (
+                <p className="text-center text-amber-400 text-xs font-bold">
+                  ⚠️ Confirma que la foto esté derecha antes de guardar
+                </p>
+              )}
+              {!photoBase64 && (
+                <p className="text-center text-gray-500 text-xs font-bold">
+                  📷 Toma la foto del sobre para poder guardar
+                </p>
+              )}
+              <Button
+                className="w-full rounded-[20px] py-4 font-black text-lg bg-green-600 hover:bg-green-500 text-white shadow-[0_4px_14px_0_rgba(22,163,74,0.39)] disabled:opacity-40 disabled:grayscale disabled:cursor-not-allowed transition-all"
+                disabled={selectedUbicacion === 'Triciclo' ? !isGridFormValid : !isSingleFormValid}
+                onClick={handleSubmit}
+              >
+                {photoBase64 && photoConfirmed ? '📷 ' : ''}Guardar {selectedUbicacion === 'Triciclo' ? 'Múltiples Ingresos' : 'Ingreso'}
+              </Button>
+            </div>
           )}
           {((step < 4 && selectedUbicacion !== 'Triciclo') || (step < 3 && selectedUbicacion === 'Triciclo')) && (
             <p className="text-center text-gray-500 text-xs font-bold uppercase tracking-wider">Por favor, completa la selección</p>
