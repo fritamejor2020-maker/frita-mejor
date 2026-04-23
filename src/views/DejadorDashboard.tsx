@@ -6,6 +6,7 @@ import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
+import { usePushSubscription } from '../lib/usePushSubscription';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 import { MapTrackingView } from './MapTrackingView';
@@ -139,6 +140,7 @@ export const DejadorDashboard = () => {
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const { playOnce, startLoop, stopAll, isLooping } = useDeliveryAlert();
+  const { unsubscribe: pushUnsubscribe } = usePushSubscription();
 
   // ─── Alarm state ───
   const [isAlertPlaying, setIsAlertPlaying] = useState(false);
@@ -603,6 +605,10 @@ export const DejadorDashboard = () => {
     } else {
       // Fallback: si no existe (sesión muy antigua), crear el registro de cierre
       addShift({ type: 'DEJADOR', shift, anotadorName, dejadorName, openedAt: sessionOpenedAt || closedAt, closedAt });
+    }
+    // Desuscribir del servicio de push — el Dejador ya no debe recibir notificaciones
+    if (sessionOpenedAt) {
+      pushUnsubscribe(sessionOpenedAt).catch(() => {});
     }
     endShift();
     signOut();
