@@ -10,8 +10,7 @@ export const useFinanceStore = create(
       isLoading: false,
       error: null,
 
-      // Intenta traer datos de Supabase (si las tablas existen).
-      // Si fallan, NO sobreescribe los datos locales para preservar el caché.
+      // ── Fetch inicial desde Supabase (datos compartidos de todos los usuarios) ──
       fetchFinances: async () => {
         set({ isLoading: true });
         try {
@@ -20,12 +19,12 @@ export const useFinanceStore = create(
             supabase.from('expenses').select('*').order('created_at', { ascending: false }),
           ]);
 
-          // Solo actualizar si vinieron datos reales (no sobreescribir con array vacío por error de tabla)
-          if (!incomesRes.error && incomesRes.data?.length > 0) {
-            set({ incomes: incomesRes.data });
+          // Actualizar siempre que no haya error (aunque el array esté vacío)
+          if (!incomesRes.error) {
+            set({ incomes: incomesRes.data || [] });
           }
-          if (!expensesRes.error && expensesRes.data?.length > 0) {
-            set({ expenses: expensesRes.data });
+          if (!expensesRes.error) {
+            set({ expenses: expensesRes.data || [] });
           }
         } catch (error) {
           console.warn('[FinanceStore] fetchFinances falló — usando datos locales:', error.message);
@@ -34,16 +33,62 @@ export const useFinanceStore = create(
         }
       },
 
+      // ── Realtime: escuchar cambios en incomes de todos los usuarios ────────────
+      subscribeToIncomes: () => {
+        const channel = supabase
+          .channel('incomes-realtime')
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'incomes' },
+            (payload) => {
+              const newRow = payload.new;
+              set((state) => {
+                // Reemplazar optimistic local o agregar nuevo
+                const exists = state.incomes.some((i) => i.id === newRow.id);
+                if (exists) {
+                  return { incomes: state.incomes.map((i) => i.id === newRow.id ? newRow : i) };
+                }
+                // También reemplazar el entry local temporal (id: local-...)
+                const withoutOptimistic = state.incomes.filter(
+                  (i) => !String(i.id).startsWith('local-')
+                    || i.ubicacion !== newRow.ubicacion
+                    || i.created_at?.slice(0, 16) !== newRow.created_at?.slice(0, 16)
+                );
+                return { incomes: [newRow, ...withoutOptimistic] };
+              });
+            }
+          )
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'incomes' },
+            (payload) => {
+              set((state) => ({
+                incomes: state.incomes.map((i) => i.id === payload.new.id ? payload.new : i),
+              }));
+            }
+          )
+          .on('postgres_changes',
+            { event: 'DELETE', schema: 'public', table: 'incomes' },
+            (payload) => {
+              set((state) => ({
+                incomes: state.incomes.filter((i) => i.id !== payload.old.id),
+              }));
+            }
+          )
+          .subscribe();
+
+        // Devolver función de cleanup para useEffect
+        return () => supabase.removeChannel(channel);
+      },
+
       addIncome: async (incomeData) => {
         const newIncome = {
-          id: Date.now().toString(),
+          id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
           ...incomeData,
         };
-        // Actualización optimista
+        // Actualización optimista local
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-        // Intentar persistir en Supabase (silencioso si falla)
+        // Persistir en Supabase — el Realtime propagará el INSERT a los demás
         try {
           const { data, error } = await supabase.from('incomes').insert([incomeData]).select();
           if (!error && data?.[0]) {
@@ -59,7 +104,7 @@ export const useFinanceStore = create(
       addMultipleIncomes: async (incomesArray) => {
         const timestamp = new Date().toISOString();
         const newIncomes = incomesArray.map((inc, idx) => ({
-          id: `${Date.now()}-${idx}`,
+          id: `local-${Date.now()}-${idx}`,
           created_at: timestamp,
           ...inc,
         }));
@@ -88,7 +133,7 @@ export const useFinanceStore = create(
 
       addExpense: async (expenseData) => {
         const newExpense = {
-          id: Date.now().toString(),
+          id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
           ...expenseData,
         };
@@ -108,7 +153,6 @@ export const useFinanceStore = create(
     }),
     {
       name: 'frita-mejor-finances',
-      // Solo persistir los arrays de datos (no isLoading, error)
       partialize: (state) => ({
         incomes:  state.incomes,
         expenses: state.expenses,

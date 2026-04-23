@@ -196,7 +196,16 @@ function IncomesBubble({ income }) {
 // ── Chat completo de ingresos ─────────────────────────────────────────────────
 export function IncomesChatView({ onClose }) {
   const incomes = useFinanceStore((s) => s.incomes);
+  const fetchFinances = useFinanceStore((s) => s.fetchFinances);
+  const subscribeToIncomes = useFinanceStore((s) => s.subscribeToIncomes);
   const bottomRef = useRef(null);
+
+  // Cargar todos los ingresos de Supabase y suscribir Realtime al abrir
+  useEffect(() => {
+    fetchFinances();
+    const unsubscribe = subscribeToIncomes();
+    return () => unsubscribe?.();
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
