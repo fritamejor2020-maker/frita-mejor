@@ -51,7 +51,7 @@ serve(async (req: Request) => {
     // ── Obtener todas las suscripciones activas de Dejadores ──
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SERVICE_ROLE_KEY') ?? '',
     );
 
     const { data: subscriptions, error } = await supabaseAdmin
