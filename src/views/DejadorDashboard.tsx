@@ -1069,18 +1069,28 @@ export const DejadorDashboard = () => {
                           </div>
                         )}
                         {/* Botón de ubicación GPS del vendedor */}
-                        {req.location && req.location.lat && req.location.lng && (
-                          <button
-                            onClick={() => window.open(`https://www.google.com/maps/search/?api=1&query=${req.location.lat},${req.location.lng}`, '_blank')}
-                            className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 font-black text-sm py-3 px-4 rounded-xl transition-all active:scale-95 shadow-sm"
-                          >
-                            <span className="text-base">📍</span>
-                            Ver Ubicación del Vendedor
-                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="ml-1 opacity-60">
-                              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>
-                            </svg>
-                          </button>
-                        )}
+                        {req.location && req.location.lat && req.location.lng && (() => {
+                          const lat = req.location.lat;
+                          const lng = req.location.lng;
+                          // URL universal: abre Google Maps en Android/Windows,
+                          // Apple Maps en iOS (via geo: scheme que el sistema redirige)
+                          const mapsUrl = `https://www.google.com/maps?q=${lat},${lng}`;
+                          return (
+                            <a
+                              href={mapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="mt-3 w-full flex items-center justify-center gap-2 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-600 font-black text-sm py-3 px-4 rounded-xl transition-all active:scale-95 shadow-sm"
+                            >
+                              <span className="text-base">📍</span>
+                              Ver Ubicación del Vendedor
+                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24" className="ml-1 opacity-60">
+                                <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" x2="21" y1="14" y2="3"/>
+                              </svg>
+                            </a>
+                          );
+                        })()}
+
                       </div>
                     </div>
                     );
