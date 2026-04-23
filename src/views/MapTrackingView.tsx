@@ -14,6 +14,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 import { useNavigate } from 'react-router-dom';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 
@@ -120,56 +121,46 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     setVendors(Array.from(merged.values()));
   };
 
-  // ── Cargar últimas ubicaciones guardadas de la BD al montar ────────────────
+  // ── Leer ubicaciones desde el store (sincronizado vía app_state) ──────────
+  // Esto reemplaza la consulta a vendor_locations para mayor fiabilidad.
+  const vendorLocationsFromStore = useInventoryStore((s: any) => s.vendorLocations || {});
+  const posShiftsFromStore       = useInventoryStore((s: any) => s.posShifts || []);
+
   useEffect(() => {
-    const loadSavedLocations = async () => {
-      try {
-        // Traer TODAS las ubicaciones actualizadas hoy (sin filtrar por is_active)
-        // así los vendedores que cerraron la app siguen apareciendo en el mapa
-        // mientras su turno esté abierto.
-        const todayStart = new Date();
-        todayStart.setHours(0, 0, 0, 0);
+    const activeShiftPointIds = new Set(
+      posShiftsFromStore
+        .filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt)
+        .map((s: any) => s.pointId)
+    );
+    const activeShiftUserIds = new Set(
+      posShiftsFromStore
+        .filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt)
+        .map((s: any) => s.userId)
+    );
 
-        const { data } = await supabase
-          .from('vendor_locations')
-          .select('*')
-          .gte('updated_at', todayStart.toISOString())
-          .order('updated_at', { ascending: false });
+    dbRef.current.clear();
+    Object.entries(vendorLocationsFromStore).forEach(([vendorId, loc]: [string, any]) => {
+      if (!loc.lat || !loc.lng) return;
+      // Solo mostrar si hay turno activo para ese vendedor
+      const hasActiveShift =
+        activeShiftUserIds.has(vendorId) || activeShiftPointIds.has(loc.pointId);
+      if (!hasActiveShift) return;
+      // No sobreescribir si Presence ya tiene dato en vivo
+      if (presenceRef.current.has(vendorId)) return;
 
-        if (data) {
-          dbRef.current.clear();
-          data.forEach((row: any) => {
-            // Determinar si el vendedor está online (Presence) o sólo tenemos su última pos
-            const isOnline = presenceRef.current.has(row.vendor_id);
-            // Cruzar con shifts activos para saber si el turno sigue abierto
-            const hasActiveShift = activeShifts.some(
-              (s: any) => s.type === 'VENDEDOR' && s.pointId === row.vendor_id && !s.closedAt
-            );
-            // Solo mostrar si hay turno activo (evitar mostrar ubicaciones de turnos anteriores)
-            if (!hasActiveShift && !row.is_active) return;
+      dbRef.current.set(vendorId, {
+        vendorId,
+        name: loc.name || loc.pointId || 'Vendedor',
+        lat: loc.lat,
+        lng: loc.lng,
+        updatedAt: loc.updatedAt,
+        source: 'offline',
+      });
+    });
+    mergeVendors();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [vendorLocationsFromStore, posShiftsFromStore]);
 
-            if (!isOnline) {
-              // No está en Presence → mostrar última ubicación como 'offline'
-              dbRef.current.set(row.vendor_id, {
-                vendorId: row.vendor_id,
-                name: row.vendor_name,
-                lat: row.lat,
-                lng: row.lng,
-                updatedAt: row.updated_at,
-                source: 'offline',
-              });
-            }
-          });
-          mergeVendors();
-        }
-      } catch (_) {}
-    };
-
-
-    loadSavedLocations();
-    const dbInterval = setInterval(loadSavedLocations, 30_000); // refrescar cada 30s
-    return () => clearInterval(dbInterval);
-  }, [activeShifts]);
 
   // ── Suscripción a Presence (tiempo real) ──────────────────────────────────
   useEffect(() => {

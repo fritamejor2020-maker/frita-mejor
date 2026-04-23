@@ -64,7 +64,8 @@ export const VendedorDashboard = () => {
   const { status: gpsStatus, retry: gpsRetry, stop: gpsStop } = useVendorTracking(
     trackingId,
     trackingName,
-    isSetupComplete // Solo activo cuando el turno está abierto
+    pointId || 'unknown',    // pointId (T1, T2…) para cruzar con posShifts en el mapa
+    isSetupComplete          // Solo activo cuando el turno está abierto
   );
 
   const [activeTab, setActiveTab] = useState('pos');

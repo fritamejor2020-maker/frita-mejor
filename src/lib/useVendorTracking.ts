@@ -2,64 +2,51 @@
  * useVendorTracking — hook para VENDEDORES
  * Pide permiso GPS y transmite la ubicación cada 30s
  * al canal de Supabase Realtime Presence 'vendor-tracking'.
- * 
- * ADEMÁS: guarda cada ubicación en la tabla `vendor_locations`
- * para que la última posición quede persistida incluso si
- * el vendedor pierde conexión o cierra la app.
+ *
+ * ADEMÁS: guarda cada ubicación en useInventoryStore.vendorLocations
+ * (sincronizado vía app_state) para que la última posición quede
+ * persistida incluso si el vendedor pierde conexión o cierra la app.
  */
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from './supabase';
+import { useInventoryStore } from '../store/useInventoryStore';
 
-const CHANNEL   = 'vendor-tracking';
-const INTERVAL  = 30_000; // 30 segundos
+const CHANNEL  = 'vendor-tracking';
+const INTERVAL = 30_000; // 30 segundos
 
 export type TrackingStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'error';
 
-export function useVendorTracking(vendorId: string, vendorName: string, enabled: boolean) {
+export function useVendorTracking(
+  vendorId: string,
+  vendorName: string,
+  pointId: string,
+  enabled: boolean,
+) {
   const [status, setStatus]     = useState<TrackingStatus>('idle');
   const [lastSent, setLastSent] = useState<Date | null>(null);
   const channelRef  = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // ── Guardar en Presence (tiempo real) + tabla vendor_locations (persistente) ──
+  // ── Guardar en Presence (tiempo real) + Store (persistente vía app_state) ──
   const sendLocation = async (lat: number, lng: number) => {
     const now = new Date().toISOString();
 
-    // 1) Enviar a Presence (en vivo para el mapa)
+    // 1) Presence → mapa en vivo
     if (channelRef.current) {
       await channelRef.current.track({
         vendorId,
+        pointId,
         name: vendorName,
         lat,
         lng,
         updatedAt: now,
-      });
+      }).catch(() => {});
     }
 
-    // 2) Upsert en tabla vendor_locations (persiste la última ubicación)
-    try {
-      await supabase.from('vendor_locations').upsert({
-        vendor_id: vendorId,
-        vendor_name: vendorName,
-        lat,
-        lng,
-        updated_at: now,
-        is_active: true,
-      }, { onConflict: 'vendor_id' });
-    } catch (_) {
-      // Silencioso: si falla la BD, al menos Presence sigue funcionando
-    }
+    // 2) Store → persiste aunque la app se cierre (sincronizado vía Supabase app_state)
+    useInventoryStore.getState().updateVendorLocation(vendorId, lat, lng, vendorName, pointId);
 
     setLastSent(new Date());
-  };
-
-  // ── Marcar como inactivo al dejar de rastrear ──
-  const markInactive = async () => {
-    try {
-      await supabase.from('vendor_locations')
-        .update({ is_active: false })
-        .eq('vendor_id', vendorId);
-    } catch (_) {}
   };
 
   const startTracking = () => {
@@ -102,11 +89,12 @@ export function useVendorTracking(vendorId: string, vendorName: string, enabled:
   const stopTracking = async () => {
     if (intervalRef.current) clearInterval(intervalRef.current);
     if (channelRef.current) {
-      await channelRef.current.untrack();
+      await channelRef.current.untrack().catch(() => {});
       await supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    await markInactive();
+    // NO limpiamos la ubicación del store — queremos que persista en el mapa
+    // mientras el turno esté activo.
     setStatus('idle');
   };
 

@@ -186,6 +186,7 @@ export const useInventoryStore = create(
       posExpenses:      [],
       loadTemplates:    INITIAL_LOAD_TEMPLATES,
       deletedShiftIds:  [],  // tombstone: IDs de cierres eliminados por el admin
+      vendorLocations:  {},  // { [vendorId]: { lat, lng, name, pointId, updatedAt } }
 
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
@@ -204,6 +205,7 @@ export const useInventoryStore = create(
             'warehouses', 'inventory', 'movements', 'products', 'recipes',
             'fritadoRecipes', 'posCategories', 'posSettings', 'posShifts',
             'posSales', 'posExpenses', 'customers', 'customerTypes', 'loadTemplates',
+            'vendorLocations',
           ];
           const updates = {};
           for (const key of SYNC_KEYS) {
@@ -741,6 +743,30 @@ export const useInventoryStore = create(
       },
 
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
+
+      /**
+       * Guarda la última ubicación conocida del vendedor en app_state.
+       * Esto permite mostrarla en el mapa aunque la app esté cerrada.
+       */
+      updateVendorLocation: (vendorId, lat, lng, name, pointId) => {
+        const now = new Date().toISOString();
+        set((s) => ({
+          vendorLocations: {
+            ...(s.vendorLocations || {}),
+            [vendorId]: { lat, lng, name, pointId, updatedAt: now, isActive: true },
+          }
+        }));
+        syncKey('vendorLocations', useInventoryStore.getState().vendorLocations);
+      },
+
+      clearVendorLocation: (vendorId) => {
+        set((s) => {
+          const locs = { ...(s.vendorLocations || {}) };
+          if (locs[vendorId]) locs[vendorId] = { ...locs[vendorId], isActive: false };
+          return { vendorLocations: locs };
+        });
+        syncKey('vendorLocations', useInventoryStore.getState().vendorLocations);
+      },
     }),
     {
       name: 'frita-mejor-inventory',
@@ -763,6 +789,7 @@ export const useInventoryStore = create(
         posExpenses:      state.posExpenses,
         loadTemplates:    state.loadTemplates,
         deletedShiftIds:  state.deletedShiftIds || [],  // persistir tombstones
+        vendorLocations:  state.vendorLocations  || {},
       }),
       // Al rehidratar desde localStorage, filtrar posShifts borrados
       onRehydrateStorage: () => (state) => {
