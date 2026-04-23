@@ -494,6 +494,8 @@ export const VendedorDashboard = () => {
                     <div className="mt-2 space-y-2">
                       {allMine.map((req: any) => {
                         const isPending   = req._status === 'pending';
+                        const isRead      = isPending && !!req.readAt;   // Leído pero aún no surtido
+                        const isUnread    = isPending && !req.readAt;    // En espera sin leer
                         const isCompleted = req._status === 'completed';
                         const isRejected  = req._status === 'rejected';
 
@@ -501,7 +503,8 @@ export const VendedorDashboard = () => {
                           <div
                             key={req.id}
                             className={`rounded-2xl border-2 px-4 py-3 ${
-                              isPending   ? 'bg-amber-50 border-amber-200' :
+                              isRead      ? 'bg-blue-50 border-blue-200' :
+                              isUnread    ? 'bg-amber-50 border-amber-200' :
                               isCompleted ? 'bg-green-50 border-green-100' :
                                             'bg-red-50 border-red-100'
                             }`}
@@ -509,7 +512,16 @@ export const VendedorDashboard = () => {
                             {/* Fila superior: estado + hora */}
                             <div className="flex items-center justify-between mb-2">
                               <div className="flex items-center gap-1.5">
-                                {isPending && (
+                                {isRead && (
+                                  <>
+                                    <span className="text-base">👁️</span>
+                                    <span className="text-blue-700 font-black text-xs"><span>Leído</span></span>
+                                    {req.readByDejador && (
+                                      <span className="text-blue-500 font-bold text-xs"><span>· {req.readByDejador}</span></span>
+                                    )}
+                                  </>
+                                )}
+                                {isUnread && (
                                   <>
                                     <Clock size={13} className="text-amber-500" />
                                     <span className="text-amber-700 font-black text-xs"><span>En espera</span></span>
@@ -543,7 +555,8 @@ export const VendedorDashboard = () => {
                                 <span
                                   key={i}
                                   className={`text-xs font-black px-2.5 py-1 rounded-full ${
-                                    isPending   ? 'bg-amber-100 text-amber-800' :
+                                    isRead      ? 'bg-blue-100 text-blue-800' :
+                                    isUnread    ? 'bg-amber-100 text-amber-800' :
                                     isCompleted ? 'bg-green-100 text-green-800' :
                                                   'bg-red-100 text-red-700'
                                   }`}
@@ -558,16 +571,22 @@ export const VendedorDashboard = () => {
                               <p className="text-xs font-bold text-gray-500 mt-1.5 italic">📝 <span>{req.observacion}</span></p>
                             )}
 
-                            {/* Mensaje de estado para pendientes */}
-                            {isPending && (
+                            {/* Mensaje de estado */}
+                            {isUnread && (
                               <div className="flex items-center gap-1 mt-2">
                                 <AlertCircle size={11} className="text-amber-400" />
-                                <span className="text-amber-600 font-bold text-[10px]"><span>El Dejador aún no ha atendido este pedido</span></span>
+                                <span className="text-amber-600 font-bold text-[10px]"><span>El Dejador aún no ha visto este pedido</span></span>
+                              </div>
+                            )}
+                            {isRead && (
+                              <div className="flex items-center gap-1 mt-2">
+                                <span className="text-blue-500 font-bold text-[10px]"><span>✓ El Dejador lo vio — en camino pronto</span></span>
                               </div>
                             )}
                           </div>
                         );
                       })}
+
                     </div>
                   )}
                 </div>

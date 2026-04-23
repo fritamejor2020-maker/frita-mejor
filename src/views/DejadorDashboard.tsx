@@ -133,7 +133,7 @@ function useDeliveryAlert() {
 export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
-  const { pendingRequests, completedRequests, rejectedRequests, loadHistory, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest } = useLogisticsStore();
+  const { pendingRequests, completedRequests, rejectedRequests, loadHistory, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest, markRequestRead } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, posShifts, addPosShift } = useInventoryStore();
   const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
@@ -845,12 +845,24 @@ export const DejadorDashboard = () => {
                     const isPostponedCard = !!req.isPostponed;
 
                     return (
-                    <div key={req.id} className={`rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed relative overflow-hidden transition-all hover:shadow-md ${
-                      isPostponedCard
-                        ? 'bg-orange-50 border-orange-300 hover:border-orange-400'
-                        : 'bg-white border-gray-300 hover:border-gray-400'
-                    }`}>
-
+                    <div key={req.id}
+                      className={`rounded-3xl sm:rounded-[32px] p-4 sm:p-8 shadow-sm border-2 border-dashed relative overflow-hidden transition-all hover:shadow-md ${
+                        isPostponedCard
+                          ? 'bg-orange-50 border-orange-300 hover:border-orange-400'
+                          : req.readAt
+                            ? 'bg-blue-50 border-blue-200 hover:border-blue-300'
+                            : 'bg-white border-gray-300 hover:border-gray-400'
+                      }`}
+                      onPointerDown={() => {
+                        // Al tocar la tarjeta: marcar como leído y parar el loop
+                        if (!req.readAt) {
+                          markRequestRead(req.id);
+                          stopAll();
+                          clearInactivityTimer();
+                          setIsAlertPlaying(false);
+                        }
+                      }}
+                    >
                       {/* ── Botón Rechazar — esquina superior derecha ── */}
                       <button
                         onClick={() => handleReject(req.id, req.requester_point_id)}

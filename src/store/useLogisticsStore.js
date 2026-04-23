@@ -198,6 +198,26 @@ export const useLogisticsStore = create(
   },
 
   /**
+   * Acción Dejador: Marcar un pedido como leído.
+   * El vendedor verá "Leído" en lugar de "En espera".
+   * Esto también sirve como señal para detener el loop de sonido.
+   */
+  markRequestRead: (requestId) => {
+    const { pendingRequests } = get();
+    const req = pendingRequests.find(r => r.id === requestId);
+    if (!req || req.readAt) return; // Ya estaba leído
+
+    const { dejadorName } = useDejadorSessionStore.getState();
+    const updated = pendingRequests.map(r =>
+      r.id === requestId
+        ? { ...r, readAt: new Date().toISOString(), readByDejador: dejadorName || 'Dejador' }
+        : r
+    );
+    set({ pendingRequests: updated });
+    syncKey('pendingRequests', updated);
+  },
+
+  /**
    * Acción Dejador: Posponer un pedido completo.
    * Re-encola el pedido como nuevo pendiente con isPostponed: true
    */
