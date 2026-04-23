@@ -431,15 +431,22 @@ export const VendedorDashboard = () => {
 
             {/* ── MIS PEDIDOS ── */}
             {(() => {
-              const myPending   = (pendingRequests   || []).filter((r: any) => r.requester_point_id === pointId);
-              const myCompleted = (completedRequests || []).filter((r: any) => r.requester_point_id === pointId);
-              const myRejected  = (rejectedRequests  || []).filter((r: any) => r.requester_point_id === pointId);
+              // Filtrar por punto de venta Y por jornada actual (solo desde que abrió este turno)
+              // Esto evita mostrar pedidos de jornadas anteriores o de otros vendedores
+              const shiftStart = openedAt ? new Date(openedAt).getTime() : 0;
+              const isThisShift = (r: any) =>
+                r.requester_point_id === pointId &&
+                new Date(r.created_at).getTime() >= shiftStart;
+
+              const myPending   = (pendingRequests   || []).filter(isThisShift);
+              const myCompleted = (completedRequests || []).filter(isThisShift);
+              const myRejected  = (rejectedRequests  || []).filter(isThisShift);
               const allMine = [
                 ...myPending.map((r: any) => ({ ...r, _status: 'pending' })),
                 ...myCompleted.map((r: any) => ({ ...r, _status: 'completed' })),
                 ...myRejected.map((r: any) => ({ ...r, _status: 'rejected' })),
               ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-              ).slice(0, 15); // Mostrar máx. 15 pedidos recientes
+              ).slice(0, 15);
 
               if (allMine.length === 0) return null;
 
