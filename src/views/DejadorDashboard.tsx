@@ -840,7 +840,19 @@ export const DejadorDashboard = () => {
 
         {/* ─── TAB: PEDIDOS ─── */}
         {activeTab === 'surtir' && (
-          <div className="space-y-4 sm:space-y-6 mt-2">
+          <div
+            className="space-y-4 sm:space-y-6 mt-2"
+            onPointerDown={() => {
+              // Cualquier toque dentro del tab Pedidos marca como leído
+              const unread = truePendingRequests.filter((r: any) => !r.readAt && !r.isPostponed);
+              if (unread.length > 0) {
+                unread.forEach((r: any) => markRequestRead(r.id));
+                stopAll();
+                clearInactivityTimer();
+                setIsAlertPlaying(false);
+              }
+            }}
+          >
             <h2 className="text-gray-700 font-black tracking-wide text-base sm:text-lg mb-3 sm:mb-4 px-2">Solicitudes Recientes</h2>
             
              {truePendingRequests.length === 0 ? (
