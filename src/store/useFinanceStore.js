@@ -88,12 +88,19 @@ export const useFinanceStore = create(
         // Actualización optimista local
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-        // Persistir en Supabase — el Realtime propagará el INSERT a los demás
+        // Persistir en Supabase — excluir photoBase64 (muy grande para la API REST)
+        // La foto se guarda solo en localStorage de quien registró el ingreso
         try {
-          const { data, error } = await supabase.from('incomes').insert([incomeData]).select();
-          if (!error && data?.[0]) {
+          const { photoBase64: _photo, ...incomeForDB } = incomeData;
+          const { data, error } = await supabase.from('incomes').insert([incomeForDB]).select();
+          if (error) {
+            console.warn('[FinanceStore] addIncome error Supabase:', error.message);
+          } else if (data?.[0]) {
+            // Mantener la foto local aunque el registro venga de Supabase
             set((state) => ({
-              incomes: state.incomes.map((i) => (i.id === newIncome.id ? data[0] : i)),
+              incomes: state.incomes.map((i) =>
+                i.id === newIncome.id ? { ...data[0], photoBase64: incomeData.photoBase64 } : i
+              ),
             }));
           }
         } catch (e) {
@@ -112,8 +119,12 @@ export const useFinanceStore = create(
         set((state) => ({ incomes: [...newIncomes, ...state.incomes] }));
 
         try {
-          const { data, error } = await supabase.from('incomes').insert(incomesArray).select();
-          if (!error && data?.length) {
+          // Excluir photoBase64 de todos los registros para Supabase
+          const incomesForDB = incomesArray.map(({ photoBase64: _p, ...rest }) => rest);
+          const { data, error } = await supabase.from('incomes').insert(incomesForDB).select();
+          if (error) {
+            console.warn('[FinanceStore] addMultipleIncomes error Supabase:', error.message);
+          } else if (data?.length) {
             set((state) => {
               const updated = [...state.incomes];
               newIncomes.forEach((opt) => {
@@ -121,7 +132,8 @@ export const useFinanceStore = create(
                 const dbEntry = data.find(
                   (d) => d.ubicacion === opt.ubicacion && d.jornada === opt.jornada && d.tipo === opt.tipo
                 );
-                if (idx !== -1 && dbEntry) updated[idx] = dbEntry;
+                // Mantener foto local en la entrada sincronizada
+                if (idx !== -1 && dbEntry) updated[idx] = { ...dbEntry, photoBase64: opt.photoBase64 };
               });
               return { incomes: updated };
             });
