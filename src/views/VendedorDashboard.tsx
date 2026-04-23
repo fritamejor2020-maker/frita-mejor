@@ -552,7 +552,7 @@ export const VendedorDashboard = () => {
 
                             {/* Productos del pedido */}
                             <div className="flex flex-wrap gap-1.5">
-                              {(req.items_payload || []).map((item: any, i: number) => (
+                              {(req.items_payload || []).filter((item: any) => item.qty > 0).map((item: any, i: number) => (
                                 <span
                                   key={i}
                                   className={`text-xs font-black px-2.5 py-1 rounded-full ${

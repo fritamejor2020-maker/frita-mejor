@@ -88,7 +88,7 @@ export const useLogisticsStore = create(
       id: `REQ-${Date.now()}`,
       requester_point_id: pointId,
       requester_name: requesterName || 'Desconocido',
-      items_payload: restockCart,
+      items_payload: restockCart.filter(item => item.qty > 0),
       observacion: observacion?.trim() || null,
       location,
       status: 'pending',
