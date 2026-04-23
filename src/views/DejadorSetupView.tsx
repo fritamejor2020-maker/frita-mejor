@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 
 export const DejadorSetupView = () => {
@@ -17,11 +18,31 @@ export const DejadorSetupView = () => {
       alert('Ingresa el nombre del Anotador y del Dejador para continuar');
       return;
     }
+    const openedAt = new Date().toISOString();
     startShift({
       shift,
       anotadorName: anotadorName.trim(),
       dejadorName: dejadorName.trim(),
+      openedAt,
     });
+
+    // Crear el posShift aquí — el store está 100% hidratado en este punto.
+    // El admin verá la jornada activa en tiempo real desde que inicia.
+    const { posShifts, addPosShift } = useInventoryStore.getState();
+    const alreadyExists = (posShifts || []).some(
+      (s: any) => s.type === 'DEJADOR' && s.openedAt === openedAt && !s.closedAt
+    );
+    if (!alreadyExists) {
+      addPosShift({
+        type: 'DEJADOR',
+        shift,
+        anotadorName: anotadorName.trim(),
+        dejadorName: dejadorName.trim(),
+        openedAt,
+        closedAt: null,
+      });
+    }
+
     navigate('/dejador');
   };
 

@@ -590,14 +590,20 @@ export const DejadorDashboard = () => {
 
   const confirmEndShift = () => {
     setShowEndShiftConfirm(false);
-    // Guardar registro del cierre para el admin
-    addPosShift({
-      type: 'DEJADOR',
-      shift,
-      anotadorName,
-      dejadorName,
-      closedAt: new Date().toISOString(),
-    });
+    // Buscar el posShift activo de esta jornada para actualizarlo (no crear uno nuevo)
+    const { posShifts: currentShifts, updatePosShift: updateShift, addPosShift: addShift } = useInventoryStore.getState();
+    const { openedAt: sessionOpenedAt } = useDejadorSessionStore.getState();
+    const activeRecord = (currentShifts || []).find(
+      (s: any) => s.type === 'DEJADOR' && s.openedAt === sessionOpenedAt && !s.closedAt
+    );
+    const closedAt = new Date().toISOString();
+    if (activeRecord) {
+      // Actualizar el registro existente con el cierre
+      updateShift(activeRecord.id, { closedAt, shift, anotadorName, dejadorName });
+    } else {
+      // Fallback: si no existe (sesión muy antigua), crear el registro de cierre
+      addShift({ type: 'DEJADOR', shift, anotadorName, dejadorName, openedAt: sessionOpenedAt || closedAt, closedAt });
+    }
     endShift();
     signOut();
     navigate('/login');

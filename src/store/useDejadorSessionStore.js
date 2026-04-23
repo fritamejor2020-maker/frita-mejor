@@ -25,7 +25,7 @@ export const useDejadorSessionStore = create(
           shift: sessionData.shift,
           anotadorName: sessionData.anotadorName,
           dejadorName: sessionData.dejadorName,
-          openedAt: new Date().toISOString(),
+          openedAt: sessionData.openedAt || new Date().toISOString(),
         });
       },
 
