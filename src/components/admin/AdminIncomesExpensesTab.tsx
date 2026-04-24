@@ -165,6 +165,7 @@ function IncomesTable() {
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Fecha</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Ubicación / Jornada</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-amber-500 uppercase tracking-widest text-left">Tipo</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Vendedor</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Efectivo</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-blue-500 uppercase tracking-widest text-right">Transfer.</th>
@@ -186,6 +187,20 @@ function IncomesTable() {
                         <span className="font-black text-gray-800 text-xs">{income.ubicacion || '—'}</span>
                         {income.jornada && <span className="text-[10px] font-bold text-gray-400">Jornada {income.jornada}{income.tipo && income.tipo !== income.jornada ? ` · ${income.tipo}` : ''}</span>}
                       </div>
+                    </td>
+                    {/* Columna Tipo — badge de descargue */}
+                    <td className="py-3 px-4">
+                      {income.subtipo ? (
+                        <span className={`inline-flex items-center gap-1 text-[10px] font-black px-2.5 py-1 rounded-full border whitespace-nowrap ${
+                          income.subtipo.startsWith('Descargue')
+                            ? 'bg-amber-50 border-amber-200 text-amber-700'
+                            : 'bg-green-50 border-green-200 text-green-700'
+                        }`}>
+                          {income.subtipo.startsWith('Descargue') ? '💵' : '🔒'} {income.subtipo}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-gray-300 font-bold">—</span>
+                      )}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex flex-col gap-0.5">
@@ -233,7 +248,7 @@ function IncomesTable() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr className="bg-amber-50 border-t-2 border-amber-100">
-                  <td colSpan={3} className="py-3 px-4 font-black text-amber-700 text-sm uppercase tracking-wider">Totales ({filtered.length} registros)</td>
+                  <td colSpan={4} className="py-3 px-4 font-black text-amber-700 text-sm uppercase tracking-wider">Totales ({filtered.length} registros)</td>
                   <td className="py-3 px-4 text-right font-black text-green-700">{fmt(filtered.reduce((s: number, i: any) => s + (i.efectivo||0), 0))}</td>
                   <td className="py-3 px-4 text-right font-black text-blue-700">{fmt(filtered.reduce((s: number, i: any) => s + (i.transferencias||0), 0))}</td>
                   <td className="py-3 px-4 text-right font-black text-purple-700">{fmt(filtered.reduce((s: number, i: any) => s + (i.salidas||0), 0))}</td>
