@@ -3,7 +3,6 @@ import { usePayrollStore } from '../../../store/usePayrollStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { formatMoney as fmt } from '../../../utils/formatUtils';
 
-const MESES = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
 const TIPOS = [
   { key: 'nomina',      label: 'Nómina',      color: 'text-violet-700', bg: 'bg-violet-50',  border: 'border-violet-200', placeholder: '0' },
   { key: 'extras',      label: 'Extras',       color: 'text-blue-700',   bg: 'bg-blue-50',    border: 'border-blue-200',   placeholder: '0' },
@@ -93,75 +92,49 @@ function HistorialCard({ rec, deletePayroll, fmt }) {
 
 export function PayrollView({ onClose }) {
   const { user } = useAuthStore();
-  const { payrollEmployees, payrollRecords, addEmployee, removeEmployee, renameEmployee, savePayroll, deletePayroll, getPayrollByPeriod } = usePayrollStore();
+  const { payrollEmployees, payrollRecords, addEmployee, removeEmployee, renameEmployee, savePayroll, deletePayroll } = usePayrollStore();
 
-  const now = new Date();
-  const [mes, setMes]   = useState(now.getMonth());
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [vista, setVista] = useState('editor'); // 'editor' | 'historial' | 'empleados'
+  const todayISO = new Date().toISOString().split('T')[0];
+  const [fechaDesde, setFechaDesde] = useState(todayISO);
+  const [fechaHasta, setFechaHasta] = useState(todayISO);
+  const [vista, setVista] = useState('editor');
 
-  const periodo = `${MESES[mes]} ${anio}`;
+  const fmtFecha = (iso) => { if (!iso) return ''; const [y, m, d] = iso.split('-'); return `${d}/${m}/${y}`; };
+  const periodo = fechaDesde === fechaHasta
+    ? fmtFecha(fechaDesde)
+    : `${fmtFecha(fechaDesde)} — ${fmtFecha(fechaHasta)}`;
 
-  // ── Inicializar filas desde el período guardado o desde lista de empleados ──
-  const initFilas = (p) => {
-    const rec = getPayrollByPeriod(p);
-    if (rec) return rec.filas.map(f => ({ ...f, nomina: f.nomina||'', extras: f.extras||'', vacaciones: f.vacaciones||'', liquidacion: f.liquidacion||'' }));
-    return payrollEmployees.map(EMPTY_FILA);
-  };
-
-  const [filas, setFilas] = useState(() => initFilas(periodo));
+  const [filas, setFilas] = useState(() => payrollEmployees.map(EMPTY_FILA));
   const [toast, setToast] = useState(null);
   const [guardando, setGuardando] = useState(false);
-  // Empleados: gestión
   const [nuevoEmp, setNuevoEmp] = useState('');
   const [editEmpId, setEditEmpId] = useState(null);
   const [editEmpName, setEditEmpName] = useState('');
 
   const showToast = (msg) => { setToast(msg); setTimeout(() => setToast(null), 3000); };
+  const updateFila = (idx, campo, val) => setFilas(prev => prev.map((f, i) => i === idx ? { ...f, [campo]: val } : f));
+  const agregarFilaLibre = () => setFilas(prev => [...prev, EMPTY_FILA()]);
+  const eliminarFila = (idx) => setFilas(prev => prev.filter((_, i) => i !== idx));
 
-  // Cambiar período → recargar filas
-  const cambiarPeriodo = (nuevoMes, nuevoAnio) => {
-    setMes(nuevoMes); setAnio(nuevoAnio);
-    const p = `${MESES[nuevoMes]} ${nuevoAnio}`;
-    setFilas(initFilas(p));
-  };
-
-  // Editar celda
-  const updateFila = (idx, campo, val) => {
-    setFilas(prev => prev.map((f, i) => i === idx ? { ...f, [campo]: val } : f));
-  };
-
-  // Agregar fila libre (sin empleado de la lista)
-  const agregarFilaLibre = () => {
-    setFilas(prev => [...prev, EMPTY_FILA()]);
-  };
-
-  // Eliminar fila
-  const eliminarFila = (idx) => {
-    setFilas(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // Guardar nómina
   const handleGuardar = () => {
     const filasValidas = filas.filter(f => f.empleadoNombre.trim());
     if (!filasValidas.length) { showToast('⚠️ Agrega al menos un empleado'); return; }
+    if (!fechaDesde) { showToast('⚠️ Elige una fecha'); return; }
     setGuardando(true);
     try {
       savePayroll(periodo, filasValidas, user?.name || '');
-      showToast(`✅ Nómina de ${periodo} guardada`);
+      showToast(`✅ Nómina del ${periodo} guardada`);
+      setFilas(payrollEmployees.map(EMPTY_FILA));
     } finally {
       setGuardando(false);
     }
   };
 
-  // Totales por columna
   const totales = useMemo(() => TIPOS.reduce((acc, t) => {
     acc[t.key] = filas.reduce((s, f) => s + (Number(f[t.key]) || 0), 0);
     return acc;
   }, { total: filas.reduce((s, f) => s + rowTotal(f), 0) }), [filas]);
 
-  // ── Años disponibles ──────────────────────────────────────────────────────
-  const anios = Array.from({ length: 5 }, (_, i) => now.getFullYear() - 2 + i);
 
   return (
     <div className="fixed inset-0 z-[100] bg-[#0f0f17] flex flex-col font-sans">
@@ -205,22 +178,29 @@ export function PayrollView({ onClose }) {
       {vista === 'editor' && (
         <div className="flex-1 overflow-auto p-4 flex flex-col gap-4">
 
-          {/* Selector de período */}
+          {/* Selector de fechas */}
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-2 bg-[#1a1b25] border border-gray-700 rounded-2xl px-4 py-2">
-              <span className="text-xs font-bold text-gray-400 uppercase">Período</span>
-              <select value={mes} onChange={e => cambiarPeriodo(Number(e.target.value), anio)}
-                className="bg-transparent text-white font-black text-sm outline-none cursor-pointer">
-                {MESES.map((m, i) => <option key={m} value={i} className="bg-gray-900">{m}</option>)}
-              </select>
-              <select value={anio} onChange={e => cambiarPeriodo(mes, Number(e.target.value))}
-                className="bg-transparent text-white font-black text-sm outline-none cursor-pointer">
-                {anios.map(a => <option key={a} value={a} className="bg-gray-900">{a}</option>)}
-              </select>
+            <div className="flex items-center gap-2 bg-[#1a1b25] border border-gray-700 rounded-2xl px-4 py-2.5">
+              <span className="text-xs font-bold text-gray-400 uppercase">Desde</span>
+              <input
+                type="date"
+                value={fechaDesde}
+                onChange={e => setFechaDesde(e.target.value)}
+                className="bg-transparent text-white font-black text-sm outline-none cursor-pointer"
+              />
             </div>
-            {getPayrollByPeriod(periodo) && (
+            <div className="flex items-center gap-2 bg-[#1a1b25] border border-gray-700 rounded-2xl px-4 py-2.5">
+              <span className="text-xs font-bold text-gray-400 uppercase">Hasta</span>
+              <input
+                type="date"
+                value={fechaHasta}
+                onChange={e => setFechaHasta(e.target.value)}
+                className="bg-transparent text-white font-black text-sm outline-none cursor-pointer"
+              />
+            </div>
+            {periodo && (
               <span className="text-xs font-bold text-violet-400 bg-violet-900/20 border border-violet-800/40 px-3 py-1.5 rounded-full">
-                ✅ Guardado
+                📅 {periodo}
               </span>
             )}
             <button onClick={handleGuardar} disabled={guardando}
@@ -251,7 +231,7 @@ export function PayrollView({ onClose }) {
                     </td></tr>
                   )}
                   {filas.map((fila, idx) => (
-                    <tr key={idx} className="hover:bg-gray-800/20 transition-colors group">
+                    <tr key={idx} className="hover:bg-gray-800/20 transition-colors">
                       {/* Nombre */}
                       <td className="py-2 px-4">
                         <input
@@ -290,7 +270,7 @@ export function PayrollView({ onClose }) {
                       {/* Eliminar */}
                       <td className="py-2 px-2">
                         <button onClick={() => eliminarFila(idx)}
-                          className="w-6 h-6 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-full text-gray-600 hover:bg-red-500/20 hover:text-red-400 transition-all text-xs">
+                          className="w-7 h-7 flex items-center justify-center rounded-full text-red-400 hover:bg-red-500/20 transition-all text-sm font-black">
                           ✕
                         </button>
                       </td>

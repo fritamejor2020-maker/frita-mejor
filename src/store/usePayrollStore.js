@@ -134,6 +134,21 @@ export const usePayrollStore = create(
         syncKey('payrollRecords', updated);
       },
 
+      deletePayrollRow: (recordId, filaId) => {
+        const updated = get().payrollRecords.map(rec => {
+          if (rec.id !== recordId) return rec;
+          return {
+            ...rec,
+            filas: rec.filas.filter((f, idx) => {
+              const key = f.id || `idx-${idx}`;
+              return key !== filaId;
+            }),
+          };
+        });
+        set({ payrollRecords: updated });
+        syncKey('payrollRecords', updated);
+      },
+
       /** Devuelve el registro del período dado, o null si no existe. */
       getPayrollByPeriod: (periodo) => {
         return get().payrollRecords.find(r => r.periodo === periodo) || null;

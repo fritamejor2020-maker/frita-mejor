@@ -2225,7 +2225,7 @@ function useDbSize() {
 // ─── Panel de Nómina para Admin ───────────────────────────────────────────────
 function NominaAdminPanel({ fmtMoney }) {
   const payrollRecords = usePayrollStore(s => s.payrollRecords);
-  const { updatePayrollRow, deletePayrollRecord } = usePayrollStore.getState();
+  const { updatePayrollRow, deletePayrollRecord, deletePayrollRow } = usePayrollStore.getState();
   const fmt = fmtMoney || ((v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0));
 
   if (payrollRecords.length === 0) {
@@ -2286,6 +2286,7 @@ function NominaAdminPanel({ fmtMoney }) {
                     <th className="py-3 px-4 text-[10px] font-bold text-red-500 uppercase text-right">Liquidación</th>
                     <th className="py-3 px-4 text-[10px] font-bold text-violet-600 uppercase text-right">Total</th>
                     <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Observaciones</th>
+                    <th className="w-8" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -2325,6 +2326,13 @@ function NominaAdminPanel({ fmtMoney }) {
                             onBlur={(e) => updatePayrollRow(rec.id, filaKey, { observacion: e.target.value })}
                           />
                         </td>
+                        <td className="py-2 px-2">
+                          <button
+                            onClick={() => deletePayrollRow(rec.id, filaKey)}
+                            className="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center transition-colors text-sm font-black"
+                            title="Eliminar empleado"
+                          >✕</button>
+                        </td>
                       </tr>
                     );
                   })}
@@ -2339,6 +2347,7 @@ function NominaAdminPanel({ fmtMoney }) {
                       </td>
                     ))}
                     <td className="py-3 px-4 text-right font-black text-violet-900 text-base">{fmt(totalRec)}</td>
+                    <td />
                     <td />
                   </tr>
                 </tfoot>
