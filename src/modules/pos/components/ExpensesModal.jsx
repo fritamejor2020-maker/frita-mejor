@@ -35,6 +35,11 @@ export function ExpensesModal({ onClose }) {
   const [valor, setValor]               = useState('');
   const [facturaPreview, setFacturaPreview] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // Campos adicionales
+  const [cantidad, setCantidad]         = useState('');
+  const [unidades, setUnidades]         = useState('');
+  const [observacion, setObservacion]   = useState('');
+  const [showDetalles, setShowDetalles] = useState(false);
 
   // ── Visibilidad de dropdowns ────────────────────────────────────────────────
   const [showDescSugg, setShowDescSugg] = useState(false);
@@ -213,6 +218,9 @@ export function ExpensesModal({ onClose }) {
       valor: numValor,
       facturaUrl: finalFacturaUrl,
       creado_por: user?.name || 'Desconocido',
+      cantidad: cantidad ? parseFloat(cantidad) : null,
+      unidades: unidades.trim() || null,
+      observacion: observacion.trim() || null,
     });
 
     setIsSubmitting(false);
@@ -324,6 +332,60 @@ export function ExpensesModal({ onClose }) {
                 )}
               </div>
             )}
+          </div>
+
+          {/* ── Más detalles (desplegable) ── */}
+          <div className="border border-gray-800 rounded-2xl overflow-hidden">
+            <button
+              type="button"
+              className="w-full flex items-center justify-between px-4 py-3 text-sm font-black text-gray-400 hover:text-white hover:bg-gray-800/40 transition-colors"
+              onClick={() => setShowDetalles(v => !v)}
+            >
+              <span className="flex items-center gap-2">📋 Más detalles <span className="text-[10px] font-bold text-gray-600">(cantidad, unidades)</span></span>
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                style={{ transform: showDetalles ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
+                <path d="M6 9l6 6 6-6"/>
+              </svg>
+            </button>
+            {showDetalles && (
+              <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-800">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Cantidad</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Ej: 5"
+                      value={cantidad}
+                      onChange={e => setCantidad(e.target.value)}
+                      className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-2.5 px-3 font-bold text-white outline-none"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Unidades</label>
+                    <input
+                      type="text"
+                      placeholder="kg, lbs, unid..."
+                      value={unidades}
+                      onChange={e => setUnidades(e.target.value)}
+                      className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-2.5 px-3 font-bold text-white outline-none"
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Observación ── */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Observación</label>
+            <textarea
+              className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-3 px-4 font-bold text-white outline-none resize-none h-16 text-sm"
+              placeholder="Notas adicionales..."
+              value={observacion}
+              onChange={e => setObservacion(e.target.value)}
+            />
           </div>
 
           {/* ── Foto de factura ── */}

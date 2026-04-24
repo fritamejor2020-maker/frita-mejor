@@ -268,6 +268,9 @@ function ExpensesTable() {
   const [editExpense, setEditExpense] = useState<any|null>(null);
   const [editDesc, setEditDesc]       = useState('');
   const [editMonto, setEditMonto]     = useState('');
+  const [editCantidad, setEditCantidad] = useState('');
+  const [editUnidades, setEditUnidades] = useState('');
+  const [editObservacion, setEditObservacion] = useState('');
 
   const proveedores = [...new Set(expenses.map((e: any) => e.proveedor).filter(Boolean))] as string[];
 
@@ -290,10 +293,25 @@ function ExpensesTable() {
 
   const handleSave = async () => {
     try {
-      await supabase.from('expenses').update({ descripcion: editDesc, monto: parseFloat(editMonto)||0 }).eq('id', editExpense.id);
+      await supabase.from('expenses').update({
+        descripcion: editDesc,
+        monto: parseFloat(editMonto) || 0,
+        cantidad: editCantidad ? parseFloat(editCantidad) : null,
+        unidades: editUnidades.trim() || null,
+        observacion: editObservacion.trim() || null,
+      }).eq('id', editExpense.id);
       await fetchFinances();
     } catch (e) { console.error(e); }
     setEditExpense(null);
+  };
+
+  const openEdit = (expense: any) => {
+    setEditExpense(expense);
+    setEditDesc(expense.descripcion || '');
+    setEditMonto(String(expense.monto ?? expense.valor ?? expense.amount ?? 0));
+    setEditCantidad(expense.cantidad != null ? String(expense.cantidad) : '');
+    setEditUnidades(expense.unidades || '');
+    setEditObservacion(expense.observacion || '');
   };
 
   const hasFilters = filterDate || filterProv || filterProd;
@@ -339,6 +357,7 @@ function ExpensesTable() {
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Fecha</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Descripción / Producto</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Proveedor</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Cantidad</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Registrado por</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-red-500 uppercase tracking-widest text-right">Monto</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Foto</th>
@@ -352,11 +371,21 @@ function ExpensesTable() {
                 filtered.map((expense: any) => (
                   <tr key={expense.id} className="hover:bg-red-50/20 transition-colors">
                     <td className="py-3 px-4 font-bold text-gray-600 text-xs whitespace-nowrap">{fmtDate(expense.fecha || expense.created_at)}</td>
-                    <td className="py-3 px-4 font-bold text-gray-800 text-sm max-w-[200px]">{expense.descripcion || '—'}</td>
+                    <td className="py-3 px-4 max-w-[180px]">
+                      <p className="font-bold text-gray-800 text-sm truncate">{expense.descripcion || '—'}</p>
+                      {expense.observacion && <p className="text-[10px] text-gray-400 font-bold truncate mt-0.5">📝 {expense.observacion}</p>}
+                    </td>
                     <td className="py-3 px-4">
                       {expense.proveedor ? (
                         <span className="text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full whitespace-nowrap">
                           🏪 {expense.proveedor}
+                        </span>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      {expense.cantidad != null ? (
+                        <span className="text-xs font-bold text-gray-700">
+                          {expense.cantidad} <span className="text-gray-400">{expense.unidades || ''}</span>
                         </span>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
@@ -377,7 +406,7 @@ function ExpensesTable() {
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
-                          onClick={() => { setEditExpense(expense); setEditDesc(expense.descripcion||''); setEditMonto(String(expense.monto ?? expense.valor ?? expense.amount ?? 0)); }}
+                          onClick={() => openEdit(expense)}
                           className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-200 transition-colors"
                         >✏️</button>
                         <button
@@ -421,6 +450,20 @@ function ExpensesTable() {
               <div>
                 <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Monto</label>
                 <input type="number" value={editMonto} onChange={e => setEditMonto(e.target.value)} className="w-full border-2 border-gray-200 focus:border-red-400 rounded-xl px-3 py-2.5 font-black text-gray-800 outline-none" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Cantidad</label>
+                  <input type="number" value={editCantidad} onChange={e => setEditCantidad(e.target.value)} placeholder="—" className="w-full border-2 border-gray-200 focus:border-blue-400 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidades</label>
+                  <input type="text" value={editUnidades} onChange={e => setEditUnidades(e.target.value)} placeholder="kg, unid..." className="w-full border-2 border-gray-200 focus:border-blue-400 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Observación</label>
+                <textarea value={editObservacion} onChange={e => setEditObservacion(e.target.value)} rows={2} placeholder="Notas..." className="w-full border-2 border-gray-200 focus:border-amber-400 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none resize-none" />
               </div>
             </div>
             <div className="flex gap-2 mt-5">
