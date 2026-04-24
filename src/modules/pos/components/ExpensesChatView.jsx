@@ -67,12 +67,14 @@ function ExpenseBubble({ expense }) {
   const time  = timeAgo(expense.fecha || expense.created_at);
   const color = avatarColor(name);
 
+  const monto = expense.monto ?? expense.valor ?? 0;
+
   const shareText =
     `💸 *GASTO REGISTRADO*\n` +
     `👤 ${name}\n` +
     `📋 ${expense.descripcion || ''}\n` +
     `🏪 Proveedor: ${expense.proveedor || '—'}\n` +
-    `💰 Valor: ${formatMoney(expense.valor || 0)}\n` +
+    `💰 Valor: ${formatMoney(monto)}\n` +
     (expense.observaciones ? `📝 ${expense.observaciones}\n` : '') +
     `🕐 ${new Date(expense.created_at || expense.fecha).toLocaleString('es-CO')}`;
 
@@ -135,7 +137,7 @@ function ExpenseBubble({ expense }) {
           {/* Monto */}
           <div className="flex justify-between items-center pt-2 mt-2 border-t border-red-900/30">
             <span className="text-gray-400 font-bold text-xs uppercase tracking-wider">Valor</span>
-            <span className="font-black text-red-400 text-xl">{formatMoney(expense.valor || 0)}</span>
+            <span className="font-black text-red-400 text-xl">{formatMoney(monto)}</span>
           </div>
         </div>
 
@@ -169,14 +171,15 @@ export function ExpensesChatView({ onClose }) {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [expenses.length]);
 
-  const total = expenses.reduce((s, e) => s + (e.valor || 0), 0);
+  const total = expenses.reduce((s, e) => s + (e.monto ?? e.valor ?? 0), 0);
 
   const handleShareResumen = async () => {
     const text =
       `📊 *RESUMEN DE GASTOS*\n\n` +
-      expenses.slice(0, 20).map(e =>
-        `• ${e.descripcion || '—'} (${e.proveedor || '—'}): ${formatMoney(e.valor || 0)}`
-      ).join('\n') +
+      expenses.slice(0, 20).map(e => {
+        const v = e.monto ?? e.valor ?? 0;
+        return `• ${e.descripcion || '—'} (${e.proveedor || '—'}): ${formatMoney(v)}`;
+      }).join('\n') +
       `\n\n💸 *TOTAL GASTADO: ${formatMoney(total)}*\n` +
       `📅 ${new Date().toLocaleDateString('es-CO')}`;
 
