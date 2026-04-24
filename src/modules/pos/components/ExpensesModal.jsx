@@ -6,14 +6,18 @@ import { uploadFactura } from '../../../lib/storageUtils';
 import { Button } from '../../../components/ui/Button';
 import { MoneyInput } from '../../../components/ui/MoneyInput';
 
+// Normaliza texto para comparar (sin tildes, minúsculas)
+const norm = (s = '') =>
+  s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
 export function ExpensesModal({ onClose }) {
   const { addExpense } = useFinanceStore();
   const { user } = useAuthStore();
+  const { expenses } = useFinanceStore();
   const {
     suppliers,
     addSupplier,
     learnProductForSupplier,
-    suggestProducts,
     getSuppliersForProduct,
   } = useSupplierStore();
 
@@ -36,19 +40,58 @@ export function ExpensesModal({ onClose }) {
   const [showDescSugg, setShowDescSugg] = useState(false);
   const [showProvSugg, setShowProvSugg] = useState(false);
 
-  // ── Sugerencias de descripción (productos conocidos) ────────────────────────
-  const descSuggestions = useMemo(
-    () => suggestProducts(descripcion),
-    [descripcion, suppliers]
-  );
+  // ── Sugerencias de descripción: gastos pasados + commonProducts ─────────────
+  const descSuggestions = useMemo(() => {
+    if (!descripcion || norm(descripcion).length < 2) return [];
+    const q = norm(descripcion);
+
+    // 1. Descripciones únicas de gastos pasados
+    const pastDescs = [...new Set(
+      expenses.map(e => e.descripcion).filter(Boolean)
+    )];
+
+    // 2. Productos de la BD de proveedores
+    const provProds = [...new Set(
+      suppliers.flatMap(s => s.commonProducts || [])
+    )];
+
+    // Combinar, filtrar y ordenar
+    return [...new Set([...pastDescs, ...provProds])]
+      .filter(p => norm(p).includes(q))
+      .sort((a, b) => {
+        const aStart = norm(a).startsWith(q) ? 0 : 1;
+        const bStart = norm(b).startsWith(q) ? 0 : 1;
+        return aStart - bStart || a.localeCompare(b, 'es');
+      })
+      .slice(0, 8);
+  }, [descripcion, expenses, suppliers]);
 
   // ── Sugerencias de proveedor: filtrados por descripción + texto escrito ──────
   const provSuggestions = useMemo(() => {
-    const forProduct = getSuppliersForProduct(descripcion);
-    if (!proveedor.trim()) return forProduct.slice(0, 8);
-    const q = proveedor.toLowerCase();
-    return forProduct.filter(s => s.name.toLowerCase().includes(q)).slice(0, 8);
-  }, [proveedor, descripcion, suppliers]);
+    // Proveedores que vendieron este producto en gastos pasados
+    const q = norm(descripcion);
+    const fromExpenses = q.length >= 2
+      ? [...new Set(
+          expenses
+            .filter(e => norm(e.descripcion || '').includes(q) && e.proveedor)
+            .map(e => e.proveedor)
+        )]
+      : [];
+
+    // Proveedores del store que tienen ese producto en commonProducts
+    const fromStore = getSuppliersForProduct(descripcion).map(s => s.name);
+
+    // Combinar fuentes únicas → buscar objetos completos
+    const allNames = [...new Set([...fromExpenses, ...fromStore])];
+    const allSuppliers = allNames.map(name => {
+      const found = suppliers.find(s => s.name.toLowerCase() === name.toLowerCase());
+      return found || { id: name, name, commonProducts: [] };
+    });
+
+    if (!proveedor.trim()) return allSuppliers.slice(0, 8);
+    const pq = norm(proveedor);
+    return allSuppliers.filter(s => norm(s.name).includes(pq)).slice(0, 8);
+  }, [proveedor, descripcion, suppliers, expenses]);
 
   const numValor   = parseFloat(valor) || 0;
   const isFormValid = descripcion.trim() !== '' && (proveedor.trim() !== '' || selectedSupplierId !== '') && numValor > 0;
