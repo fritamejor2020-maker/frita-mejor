@@ -187,6 +187,24 @@ export const useFinanceStore = create(
         }
       },
 
+      /**
+       * Retorna los descargues del día para una franja horaria específica.
+       * Filtra incomes de hoy con tipo que empiece con "Descargue".
+       */
+      getTodayDescarguesFor: (ubicacion, jornada, slot) => {
+        const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        return get().incomes.filter(inc => {
+          const incDate = (inc.fecha || inc.created_at || '').slice(0, 10);
+          return (
+            incDate === today &&
+            inc.ubicacion === ubicacion &&
+            inc.jornada === jornada &&
+            inc.tipo === slot &&            // slot es el tipo de franja "4-7 pm"
+            inc.esDescargue === true
+          );
+        }).sort((a, b) => new Date(a.fecha || a.created_at) - new Date(b.fecha || b.created_at));
+      },
+
       addExpense: async (expenseData) => {
         const newExpense = {
           id: `local-${Date.now()}`,

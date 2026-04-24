@@ -8,14 +8,18 @@ import { MoneyInput } from '../../../components/ui/MoneyInput';
 import { formatMoney } from '../../../utils/formatUtils';
 
 export function IncomesModal({ onClose }) {
-  const { addIncome, addMultipleIncomes } = useFinanceStore();
+  const { addIncome, addMultipleIncomes, getTodayDescarguesFor } = useFinanceStore();
   const incomeHierarchy = useIncomeConfigStore(state => state.hierarchy);
+  const isDescarguesEnabled = useIncomeConfigStore(state => state.isDescarguesEnabled);
   const { user } = useAuthStore();
   const [step, setStep] = useState(1);
 
   const [selectedUbicacion, setSelectedUbicacion] = useState('');
-  const [selectedJornada, setSelectedJornada] = useState('');
-  const [selectedTipo, setSelectedTipo] = useState('');
+  const [selectedJornada, setSelectedJornada]     = useState('');
+  const [selectedTipo, setSelectedTipo]           = useState(''); // franja horaria
+  // Descargues
+  const [selectedSubtipo, setSelectedSubtipo]     = useState(''); // 'Descargue N' o 'Cierre Final'
+  const [descarguesPrevios, setDescarguesPrevios] = useState([]);
 
   // Single form state
   const [vendedor, setVendedor] = useState('');
@@ -93,10 +97,6 @@ export function IncomesModal({ onClose }) {
   // TOTAL = Efectivo + Transferencias + Salidas (los tres suman al ingreso)
   const totalSingle = numEfectivo + numTransferencias + numSalidas;
 
-  const isSingleFormValid =
-    (numEfectivo > 0 || numTransferencias > 0 || numSalidas > 0) &&
-    !!photoBase64 &&
-    photoConfirmed;
 
   // Calculations Grid
   const getGridRowTotal = (row) =>
@@ -117,11 +117,26 @@ export function IncomesModal({ onClose }) {
     !!photoBase64 &&
     photoConfirmed;
 
+  // ── Descargues ─────────────────────────────────────────────────────────────
+  const hasDescargues    = !!(selectedUbicacion && selectedJornada && selectedTipo &&
+    isDescarguesEnabled(selectedUbicacion, selectedJornada, selectedTipo));
+  const isDescargueMode  = selectedSubtipo.startsWith('Descargue');
+  const isCierreMode     = selectedSubtipo === 'Cierre Final';
+
+  // Número siguiente de descargue (contar los del día actual)
+  const nextDescargueNum = descarguesPrevios.filter(d => d.esDescargue).length + 1;
+
+  // Validaciones adaptadas al subtipo
+  const isSingleFormValid = isDescargueMode
+    ? numEfectivo > 0 && !!photoBase64 && photoConfirmed          // descargue: solo efectivo + foto
+    : (numEfectivo > 0 || numTransferencias > 0 || numSalidas > 0) && !!photoBase64 && photoConfirmed;
+
   const handleNextStep = (type, value) => {
     if (type === 'ubicacion') {
       setSelectedUbicacion(value);
       setSelectedJornada('');
       setSelectedTipo('');
+      setSelectedSubtipo('');
       setGridData({});
       if (value === 'Venta') {
         setSelectedJornada('Extra');
@@ -133,6 +148,7 @@ export function IncomesModal({ onClose }) {
     } else if (type === 'jornada') {
       setSelectedJornada(value);
       setSelectedTipo('');
+      setSelectedSubtipo('');
       if (selectedUbicacion === 'Triciclo') {
         initGridData();
         setStep(3);
@@ -140,15 +156,28 @@ export function IncomesModal({ onClose }) {
         setStep(3);
       }
     } else if (type === 'tipo') {
+      // Franja horaria seleccionada
       setSelectedTipo(value);
+      setSelectedSubtipo('');
+      if (selectedUbicacion !== 'Triciclo' && isDescarguesEnabled(selectedUbicacion, selectedJornada, value)) {
+        // Ir al step de elección descargue/cierre
+        setStep(35); // step intermedio
+      } else {
+        setStep(4);
+      }
+    } else if (type === 'subtipo') {
+      setSelectedSubtipo(value);
+      // Cargar descargues previos del día para mostrar en Cierre Final
+      const previos = getTodayDescarguesFor(selectedUbicacion, selectedJornada, selectedTipo);
+      setDescarguesPrevios(previos);
       setStep(4);
     }
   };
 
   const handleSubmit = async () => {
-    // Hornear la rotación en el canvas ANTES de guardar/subir
-    // Así la foto almacenada y compartida ya tiene la orientación correcta
     const bakedPhoto = await getBakedPhoto(photoBase64, photoRotation);
+    const esDescargue  = selectedSubtipo.startsWith('Descargue');
+    const esCierre     = selectedSubtipo === 'Cierre Final';
 
     if (selectedUbicacion === 'Triciclo') {
       const incomesArray = Object.entries(gridData).map(([tipo, rowData]) => {
@@ -165,20 +194,31 @@ export function IncomesModal({ onClose }) {
           observaciones: observaciones.trim() || null,
           fecha: new Date().toISOString(),
           photoBase64: bakedPhoto || null,
-          photoRotation: 0, // ya horneada, no se necesita rotar al mostrar
+          photoRotation: 0,
         };
       }).filter(Boolean);
       if (incomesArray.length > 0) addMultipleIncomes(incomesArray);
     } else {
+      // Determinar subtipo real: para franja sin descargues, selectedSubtipo está vacío
+      // El tipo guardado es la franja si es ingreso normal, o selectedSubtipo si hay descargues
+      const tipoFinal = hasDescargues ? selectedSubtipo : selectedTipo;
       addIncome({
-        ubicacion: selectedUbicacion, jornada: selectedJornada, tipo: selectedTipo,
-        vendedor, creado_por: user?.name || 'Desconocido',
-        efectivo: numEfectivo, salidas: numSalidas, transferencias: numTransferencias,
-        total: totalSingle,
+        ubicacion: selectedUbicacion,
+        jornada: selectedJornada,
+        tipo: hasDescargues ? selectedTipo : selectedTipo,   // franja horaria siempre
+        subtipo: hasDescargues ? selectedSubtipo : null,     // 'Descargue 1', 'Cierre Final', null
+        esDescargue: esDescargue || undefined,
+        esCierre: esCierre || undefined,
+        vendedor,
+        creado_por: user?.name || 'Desconocido',
+        efectivo: numEfectivo,
+        salidas: esDescargue ? 0 : numSalidas,
+        transferencias: esDescargue ? 0 : numTransferencias,
+        total: esDescargue ? numEfectivo : totalSingle,
         observaciones: observaciones.trim() || null,
         fecha: new Date().toISOString(),
         photoBase64: bakedPhoto || null,
-        photoRotation: 0, // ya horneada
+        photoRotation: 0,
       });
     }
     onClose();
@@ -416,34 +456,113 @@ export function IncomesModal({ onClose }) {
             </div>
           )}
 
-          {/* Step 4: Formulario Single */}
+          {/* ── Step 35: Descargue o Cierre Final ── */}
+          {step === 35 && (
+            <div className="space-y-4">
+              <div className="bg-amber-950/30 border border-amber-800/50 rounded-2xl p-4">
+                <p className="text-amber-400 font-black text-sm mb-1">📦 Descargues activos para esta franja</p>
+                <p className="text-gray-400 text-xs">
+                  Hay {descarguesPrevios.filter(d => d.esDescargue).length} descargue(s) registrado(s) hoy en esta franja.
+                </p>
+              </div>
+              <div className="grid grid-cols-1 gap-3">
+                {/* Botón Descargue N */}
+                <Button
+                  className="py-6 rounded-[20px] text-xl font-black bg-amber-600/20 hover:bg-amber-600/30 text-amber-400 border-2 border-amber-700 hover:border-amber-500 shadow-chunky hover:scale-[1.02] active:scale-95 transition-all flex flex-col items-center gap-1"
+                  onClick={() => handleNextStep('subtipo', `Descargue ${nextDescargueNum}`)}
+                >
+                  <span>💵 Descargue {nextDescargueNum}</span>
+                  <span className="text-xs font-bold text-amber-600">Solo efectivo — sin salidas ni transferencias</span>
+                </Button>
+                {/* Botón Cierre Final */}
+                <Button
+                  className="py-6 rounded-[20px] text-xl font-black bg-green-600/20 hover:bg-green-600/30 text-green-400 border-2 border-green-700 hover:border-green-500 shadow-chunky hover:scale-[1.02] active:scale-95 transition-all flex flex-col items-center gap-1"
+                  onClick={() => handleNextStep('subtipo', 'Cierre Final')}
+                >
+                  <span>🔒 Cierre Final</span>
+                  <span className="text-xs font-bold text-green-600">Incluye transferencias y salidas</span>
+                </Button>
+              </div>
+            </div>
+          )}
+
           {step === 4 && selectedUbicacion !== 'Triciclo' && (
             <div className="space-y-4">
+
+              {/* Badge de subtipo */}
+              {hasDescargues && selectedSubtipo && (
+                <div className={`rounded-2xl px-4 py-2.5 border flex items-center gap-2 ${
+                  isDescargueMode ? 'bg-amber-950/30 border-amber-700/50' : 'bg-green-950/30 border-green-700/50'
+                }`}>
+                  <span className="text-lg">{isDescargueMode ? '💵' : '🔒'}</span>
+                  <div>
+                    <p className={`font-black text-sm ${isDescargueMode ? 'text-amber-400' : 'text-green-400'}`}>{selectedSubtipo}</p>
+                    <p className="text-[10px] text-gray-500 font-bold">
+                      {isDescargueMode ? 'Retiro parcial de caja — solo efectivo' : 'Cierre completo del turno'}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Panel de descargues previos (solo en Cierre Final) */}
+              {isCierreMode && (
+                <div className="bg-[#16171d] rounded-2xl border border-amber-900/30 p-3 space-y-2">
+                  <p className="text-xs font-black text-amber-400 uppercase tracking-wider">📦 Descargues previos hoy</p>
+                  {descarguesPrevios.length === 0 ? (
+                    <p className="text-xs font-bold text-gray-500 text-center py-1">Sin descargues registrados en esta franja hoy</p>
+                  ) : (
+                    <>
+                      {descarguesPrevios.map((d, i) => (
+                        <div key={d.id || i} className="flex justify-between items-center text-sm border-b border-gray-800/50 pb-1 last:border-0">
+                          <span className="font-bold text-amber-300">{d.subtipo || `Descargue ${i + 1}`}</span>
+                          <span className="font-black text-green-400">{formatMoney(d.efectivo || 0)}</span>
+                        </div>
+                      ))}
+                      <div className="flex justify-between items-center pt-1">
+                        <span className="text-xs font-black text-gray-400 uppercase">Total descargado</span>
+                        <span className="font-black text-amber-400">
+                          {formatMoney(descarguesPrevios.reduce((s, d) => s + (d.efectivo || 0), 0))}
+                        </span>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* Vendedor */}
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Vendedor / Responsable</label>
                 <input type="text" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-lg font-bold text-white outline-none" placeholder="Nombre completo" value={vendedor} onChange={e => setVendedor(e.target.value)} />
               </div>
+
+              {/* Efectivo (siempre) */}
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Efectivo ($)</label>
                 <MoneyInput value={efectivo} onChange={setEfectivo} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
               </div>
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
-                <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
-                <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-green-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
-              </div>
 
-              {/* Total — Efectivo + Transferencias + Salidas */}
+              {/* Transferencias y Salidas solo en Cierre Final o cuando no hay descargues */}
+              {(!hasDescargues || isCierreMode) && (
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
+                    <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
+                    <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-green-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                  </div>
+                </>
+              )}
+
+              {/* Total */}
               <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-1 shadow-inner">
                 <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
-                  <span>Efectivo + Transferencias + Salidas</span>
+                  <span>{isDescargueMode ? 'Solo Efectivo' : 'Efectivo + Transferencias + Salidas'}</span>
                 </div>
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
-                  <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                  <span className="text-sm font-bold text-gray-400 uppercase">{isDescargueMode ? selectedSubtipo : 'Total Ingreso'}</span>
+                  <span className="text-3xl font-black text-green-400">{formatMoney(isDescargueMode ? numEfectivo : totalSingle)}</span>
                 </div>
               </div>
 

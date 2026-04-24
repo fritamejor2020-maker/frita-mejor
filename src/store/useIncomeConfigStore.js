@@ -22,8 +22,32 @@ const defaultIncomeHierarchy = {
 
 export const useIncomeConfigStore = create(
   persist(
-    (set) => ({
+    (set, get) => ({
       hierarchy: defaultIncomeHierarchy,
+
+      // Mapa de franjas con descargues activos: "Ubicacion|Jornada|slot" → boolean
+      // Por defecto activo para Local PM jornadas 4-7pm y 7-9pm
+      descarguesEnabled: {
+        'Local|PM|4-7 pm': true,
+        'Local|PM|7-9 pm': true,
+      },
+
+      /** Activa o desactiva descargues para una franja horaria */
+      toggleDescargues: (ubicacion, jornada, slot) => {
+        const key = `${ubicacion}|${jornada}|${slot}`;
+        set(state => ({
+          descarguesEnabled: {
+            ...state.descarguesEnabled,
+            [key]: !state.descarguesEnabled[key],
+          },
+        }));
+      },
+
+      /** Retorna true si la franja tiene descargues activos */
+      isDescarguesEnabled: (ubicacion, jornada, slot) => {
+        const key = `${ubicacion}|${jornada}|${slot}`;
+        return !!get().descarguesEnabled[key];
+      },
 
       updateHierarchy: (newHierarchy) => {
         set({ hierarchy: newHierarchy });
