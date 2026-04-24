@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../store/useAuthStore';
 import { Button } from '../../components/ui/Button';
 import { IncomesModal } from './components/IncomesModal';
@@ -28,6 +29,14 @@ export function FinanceDashboard() {
   const canIngresos  = isAdmin || userAccess.includes('finanzas-ingresos') || userAccess.includes('finanzas');
   const canGastos    = isAdmin || userAccess.includes('finanzas-gastos')   || userAccess.includes('finanzas');
   const canNomina    = isAdmin || userAccess.includes('finanzas-nomina');
+
+  // Si el usuario llegó desde el selector eligiendo un módulo específico,
+  // solo mostrar ese bloque (aunque tenga permiso para más).
+  const location = useLocation();
+  const finanzasKey = location.state?.finanzasKey || null;
+  const showIngresos = canIngresos && (!finanzasKey || finanzasKey === 'finanzas-ingresos');
+  const showGastos   = canGastos   && (!finanzasKey || finanzasKey === 'finanzas-gastos');
+  const showNomina   = canNomina   && (!finanzasKey || finanzasKey === 'finanzas-nomina');
 
   const totalIngresos = incomes.reduce((s, i) => s + (i.total || 0), 0);
   const totalGastos   = expenses.reduce((s, e) => s + (e.valor || 0), 0);
@@ -72,7 +81,7 @@ export function FinanceDashboard() {
         <div className="flex flex-wrap justify-center gap-6 w-full max-w-2xl">
 
           {/* ── BLOQUE INGRESOS ── */}
-          {canIngresos && (
+          {showIngresos && (
             <div className="flex flex-col gap-3 w-full sm:w-[300px]">
               {/* Botón principal */}
               <button
@@ -109,7 +118,7 @@ export function FinanceDashboard() {
           )}
 
           {/* ── BLOQUE GASTOS ── */}
-          {canGastos && (
+          {showGastos && (
             <div className="flex flex-col gap-3 w-full sm:w-[300px]">
               {/* Botón principal */}
               <button
@@ -146,7 +155,7 @@ export function FinanceDashboard() {
 
 
           {/* ── BLOQUE NÓMINA ── */}
-          {canNomina && (
+          {showNomina && (
             <div className="flex flex-col gap-3 w-full sm:w-[300px]">
               <button
                 className="w-full bg-violet-500/10 hover:bg-violet-500/20 border-2 border-violet-500/30 hover:border-violet-500 rounded-[32px] p-8 flex flex-col items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-95 group"

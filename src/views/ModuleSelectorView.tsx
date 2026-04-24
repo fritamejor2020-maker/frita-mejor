@@ -75,7 +75,7 @@ export const ModuleSelectorView = () => {
       navigate('/dejador-setup', { replace: true });
       return;
     }
-    navigate(route, { replace: true });
+    navigate(route, { replace: true, state: { finanzasKey: key } });
   };
 
   return (
