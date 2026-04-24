@@ -47,13 +47,27 @@ export function IncomesModal({ onClose }) {
     setPhotoConfirmed(false); // Requiere re-confirmar tras rotar
   };
 
-  // Aplica la rotación CSS y devuelve la imagen como base64 con el canvas
-  const getFinalPhotoBase64 = () => {
-    if (!photoBase64 || photoRotation === 0) return photoBase64;
-    // La rotación se aplica visualmente con CSS; guardamos el original con metadata de rotación
-    // Para compatibilidad, simplemente devolvemos el base64 original — el visor mostrará con CSS
-    return photoBase64;
-  };
+  // ── Aplica la rotación físicamente en un Canvas y devuelve base64 rotado ────
+  const getBakedPhoto = (base64, degrees) => new Promise((resolve) => {
+    if (!base64 || degrees === 0) { resolve(base64); return; }
+    const img = new Image();
+    img.onload = () => {
+      const rad  = (degrees * Math.PI) / 180;
+      const swap = degrees === 90 || degrees === 270;
+      const w    = swap ? img.height : img.width;
+      const h    = swap ? img.width  : img.height;
+      const canvas = document.createElement('canvas');
+      canvas.width  = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      resolve(canvas.toDataURL('image/jpeg', 0.92));
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
 
   // Grid flow (Triciclos)
   const [gridData, setGridData] = useState({});
@@ -131,7 +145,11 @@ export function IncomesModal({ onClose }) {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    // Hornear la rotación en el canvas ANTES de guardar/subir
+    // Así la foto almacenada y compartida ya tiene la orientación correcta
+    const bakedPhoto = await getBakedPhoto(photoBase64, photoRotation);
+
     if (selectedUbicacion === 'Triciclo') {
       const incomesArray = Object.entries(gridData).map(([tipo, rowData]) => {
         const ef = parseFloat(rowData.efectivo)      || 0;
@@ -146,8 +164,8 @@ export function IncomesModal({ onClose }) {
           total: ef + tr + sa,
           observaciones: observaciones.trim() || null,
           fecha: new Date().toISOString(),
-          photoBase64: getFinalPhotoBase64() || null,
-          photoRotation,
+          photoBase64: bakedPhoto || null,
+          photoRotation: 0, // ya horneada, no se necesita rotar al mostrar
         };
       }).filter(Boolean);
       if (incomesArray.length > 0) addMultipleIncomes(incomesArray);
@@ -159,8 +177,8 @@ export function IncomesModal({ onClose }) {
         total: totalSingle,
         observaciones: observaciones.trim() || null,
         fecha: new Date().toISOString(),
-        photoBase64: getFinalPhotoBase64() || null,
-        photoRotation,
+        photoBase64: bakedPhoto || null,
+        photoRotation: 0, // ya horneada
       });
     }
     onClose();
