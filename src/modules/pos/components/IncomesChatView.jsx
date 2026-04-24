@@ -52,6 +52,7 @@ function PhotoThumbnail({ src, rotation = 0 }) {
       {expanded && (
         <div
           className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center gap-4"
+          style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden' }}
           onClick={() => setExpanded(false)}
         >
           <img
@@ -250,7 +251,10 @@ export function IncomesChatView({ onClose }) {
   );
 
   return (
-    <div className="fixed inset-0 z-[90] bg-[#0a0f0a] flex flex-col">
+    <div
+      className="fixed inset-0 z-[90] bg-[#0a0f0a] flex flex-col"
+      style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden', overscrollBehavior: 'none' }}
+    >
       {/* Header estilo WhatsApp */}
       <div className="bg-[#128C7E] px-4 py-3 flex items-center gap-3 shadow-lg flex-shrink-0">
         <button onClick={onClose} className="text-white hover:text-green-200 transition-colors p-1">
@@ -274,7 +278,10 @@ export function IncomesChatView({ onClose }) {
       </div>
 
       {/* Fondo de chat */}
-      <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: 'linear-gradient(rgba(0,0,0,0.7) 0%, rgba(0,20,5,0.95) 100%)' }}>
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4"
+        style={{ background: 'linear-gradient(rgba(0,0,0,0.7) 0%, rgba(0,20,5,0.95) 100%)', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+      >
         {incomes.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
             <span className="text-6xl opacity-30">💰</span>

@@ -190,7 +190,10 @@ export function ExpensesChatView({ onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 z-[90] bg-[#0f0a0a] flex flex-col">
+    <div
+      className="fixed inset-0 z-[90] bg-[#0f0a0a] flex flex-col"
+      style={{ transform: 'translateZ(0)', willChange: 'transform', backfaceVisibility: 'hidden', overscrollBehavior: 'none' }}
+    >
       {/* Header */}
       <div className="bg-[#a72020] px-4 py-3 flex items-center gap-3 shadow-lg flex-shrink-0">
         <button onClick={onClose} className="text-white hover:text-red-200 transition-colors p-1">
@@ -211,7 +214,10 @@ export function ExpensesChatView({ onClose }) {
       </div>
 
       {/* Mensajes */}
-      <div className="flex-1 overflow-y-auto px-4 py-4" style={{ background: 'linear-gradient(rgba(0,0,0,0.75) 0%, rgba(20,0,0,0.95) 100%)' }}>
+      <div
+        className="flex-1 overflow-y-auto px-4 py-4"
+        style={{ background: 'linear-gradient(rgba(0,0,0,0.75) 0%, rgba(20,0,0,0.95) 100%)', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch' }}
+      >
         {expenses.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-4 text-center">
             <span className="text-6xl opacity-30">💸</span>
