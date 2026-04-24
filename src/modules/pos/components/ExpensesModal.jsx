@@ -211,17 +211,27 @@ export function ExpensesModal({ onClose }) {
     let finalSupplierName = proveedor;
     let finalSupplierId   = selectedSupplierId;
 
+    // Extraer cada producto individual de la descripción (puede ser "papas, aceite, sal")
+    const productosIndividuales = descripcion
+      .split(',')
+      .map(p => p.trim())
+      .filter(p => p.length > 0);
+
     if (!finalSupplierId) {
       const existing = suppliers.find(s => s.name.toLowerCase() === finalSupplierName.toLowerCase());
       if (existing) {
         finalSupplierId   = existing.id;
         finalSupplierName = existing.name;
+        // Proveedor existente encontrado por nombre: aprender todos los productos
+        productosIndividuales.forEach(prod => learnProductForSupplier(finalSupplierId, prod));
       } else {
-        const newSup = addSupplier({ name: finalSupplierName, commonProducts: [descripcion] });
+        // Proveedor nuevo: crear con todos los productos de la descripción
+        const newSup = addSupplier({ name: finalSupplierName, commonProducts: productosIndividuales });
         finalSupplierId = newSup.id;
       }
     } else {
-      learnProductForSupplier(finalSupplierId, descripcion);
+      // Proveedor seleccionado explícitamente: aprender todos los productos nuevos
+      productosIndividuales.forEach(prod => learnProductForSupplier(finalSupplierId, prod));
     }
 
     await addExpense({
@@ -237,9 +247,11 @@ export function ExpensesModal({ onClose }) {
       observacion: observacion.trim() || null,
       tipoGasto,
     });
-    // Aprender: si el usuario cambió el tipo manualmente, guardarlo para futuros
-    if (tipoGasto !== 'por_definir' && descripcion.trim()) {
-      setTipoGasto(descripcion.toLowerCase().trim(), tipoGasto);
+    // Aprender tipo de gasto para cada producto individual
+    if (tipoGasto !== 'por_definir') {
+      productosIndividuales.forEach(prod => {
+        if (prod) setTipoGasto(prod.toLowerCase().trim(), tipoGasto);
+      });
     }
 
     setIsSubmitting(false);
