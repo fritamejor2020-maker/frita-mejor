@@ -20,6 +20,77 @@ const EMPTY_FILA = (emp) => ({
 const rowTotal = (f) =>
   (Number(f.nomina)||0) + (Number(f.extras)||0) + (Number(f.vacaciones)||0) + (Number(f.liquidacion)||0);
 
+// ─── Tarjeta colapsable del historial (necesita su propio estado) ─────────────
+function HistorialCard({ rec, deletePayroll, fmt }) {
+  const [open, setOpen] = React.useState(false);
+  const total = rec.filas.reduce((s, f) => s + rowTotal(f), 0);
+  return (
+    <div className="bg-[#1a1b25] rounded-3xl border border-gray-800 overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-800/20 transition-colors" onClick={() => setOpen(o => !o)}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-violet-600/20 rounded-2xl flex items-center justify-center">
+            <span className="text-lg">📅</span>
+          </div>
+          <div>
+            <p className="font-black text-white text-base">{rec.periodo}</p>
+            <p className="text-xs text-gray-500 font-bold">{rec.filas.length} empleados · {rec.creadoPor || '—'}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-lg font-black text-violet-300">{fmt(total)}</span>
+          <button
+            onClick={e => { e.stopPropagation(); if (window.confirm(`¿Eliminar nómina de ${rec.periodo}?`)) deletePayroll(rec.id); }}
+            className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm"
+          >🗑️</button>
+          <span className={`text-gray-500 text-sm transition-transform duration-200 inline-block ${open ? 'rotate-180' : ''}`}>▾</span>
+        </div>
+      </div>
+      {/* Detalle expandible */}
+      {open && (
+        <div className="border-t border-gray-800 overflow-x-auto">
+          <table className="w-full text-sm min-w-[600px]">
+            <thead>
+              <tr className="bg-gray-800/30">
+                <th className="py-2 px-4 text-left text-[10px] font-bold text-gray-500 uppercase">Empleado</th>
+                {TIPOS.map(t => <th key={t.key} className={`py-2 px-3 text-right text-[10px] font-bold uppercase ${t.color}`}>{t.label}</th>)}
+                <th className="py-2 px-3 text-right text-[10px] font-bold text-violet-400 uppercase">Total</th>
+                <th className="py-2 px-3 text-left text-[10px] font-bold text-gray-500 uppercase">Obs.</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-800/40">
+              {rec.filas.map((f, i) => (
+                <tr key={i} className="hover:bg-gray-800/10">
+                  <td className="py-2.5 px-4 font-bold text-white text-sm">{f.empleadoNombre || f.nombre || '—'}</td>
+                  {TIPOS.map(t => (
+                    <td key={t.key} className={`py-2.5 px-3 text-right font-black text-sm ${t.color}`}>
+                      {f[t.key] > 0 ? fmt(f[t.key]) : <span className="text-gray-700">—</span>}
+                    </td>
+                  ))}
+                  <td className="py-2.5 px-3 text-right font-black text-violet-300">{fmt(rowTotal(f))}</td>
+                  <td className="py-2.5 px-3 text-gray-500 text-xs font-bold">{f.observacion || f.notas || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot>
+              <tr className="border-t border-violet-800/30 bg-violet-900/10">
+                <td className="py-2 px-4 text-xs font-black text-violet-400 uppercase">Total</td>
+                {TIPOS.map(t => (
+                  <td key={t.key} className={`py-2 px-3 text-right font-black text-sm ${t.color}`}>
+                    {fmt(rec.filas.reduce((s, f) => s + (Number(f[t.key]) || 0), 0))}
+                  </td>
+                ))}
+                <td className="py-2 px-3 text-right font-black text-violet-300 text-base">{fmt(total)}</td>
+                <td />
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function PayrollView({ onClose }) {
   const { user } = useAuthStore();
   const { payrollEmployees, payrollRecords, addEmployee, removeEmployee, renameEmployee, savePayroll, deletePayroll, getPayrollByPeriod } = usePayrollStore();
@@ -267,73 +338,9 @@ export function PayrollView({ onClose }) {
             </div>
           ) : (
             <div className="space-y-4">
-              {payrollRecords.map(rec => {
-                const total = rec.filas.reduce((s,f)=>s+rowTotal(f),0);
-                const [open, setOpen] = React.useState(false);
-                return (
-                  <div key={rec.id} className="bg-[#1a1b25] rounded-3xl border border-gray-800 overflow-hidden">
-                    {/* Header del registro */}
-                    <div className="flex items-center justify-between px-5 py-4 cursor-pointer hover:bg-gray-800/20 transition-colors" onClick={()=>setOpen(o=>!o)}>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-violet-600/20 rounded-2xl flex items-center justify-center">
-                          <span className="text-lg">📅</span>
-                        </div>
-                        <div>
-                          <p className="font-black text-white text-base">{rec.periodo}</p>
-                          <p className="text-xs text-gray-500 font-bold">{rec.filas.length} empleados · {rec.creadoPor || '—'}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-lg font-black text-violet-300">{fmt(total)}</span>
-                        <button onClick={e=>{e.stopPropagation();if(confirm(`¿Eliminar nómina de ${rec.periodo}?`))deletePayroll(rec.id);}}
-                          className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 transition-colors text-sm">🗑️</button>
-                        <span className={`text-gray-500 text-sm transition-transform ${open?'rotate-180':''}`}>▾</span>
-                      </div>
-                    </div>
-                    {/* Detalle expandible */}
-                    {open && (
-                      <div className="border-t border-gray-800 overflow-x-auto">
-                        <table className="w-full text-sm min-w-[600px]">
-                          <thead>
-                            <tr className="bg-gray-800/30">
-                              <th className="py-2 px-4 text-left text-[10px] font-bold text-gray-500 uppercase">Empleado</th>
-                              {TIPOS.map(t=><th key={t.key} className={`py-2 px-3 text-right text-[10px] font-bold uppercase ${t.color}`}>{t.label}</th>)}
-                              <th className="py-2 px-3 text-right text-[10px] font-bold text-violet-400 uppercase">Total</th>
-                              <th className="py-2 px-3 text-left text-[10px] font-bold text-gray-500 uppercase">Obs.</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-800/40">
-                            {rec.filas.map((f,i)=>(
-                              <tr key={i} className="hover:bg-gray-800/10">
-                                <td className="py-2.5 px-4 font-bold text-white text-sm">{f.empleadoNombre}</td>
-                                {TIPOS.map(t=>(
-                                  <td key={t.key} className={`py-2.5 px-3 text-right font-black text-sm ${t.color}`}>
-                                    {f[t.key]>0?fmt(f[t.key]):<span className="text-gray-700">—</span>}
-                                  </td>
-                                ))}
-                                <td className="py-2.5 px-3 text-right font-black text-violet-300">{fmt(rowTotal(f))}</td>
-                                <td className="py-2.5 px-3 text-gray-500 text-xs font-bold">{f.observacion||'—'}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                          <tfoot>
-                            <tr className="border-t border-violet-800/30 bg-violet-900/10">
-                              <td className="py-2 px-4 text-xs font-black text-violet-400 uppercase">Total</td>
-                              {TIPOS.map(t=>(
-                                <td key={t.key} className={`py-2 px-3 text-right font-black text-sm ${t.color}`}>
-                                  {fmt(rec.filas.reduce((s,f)=>s+(f[t.key]||0),0))}
-                                </td>
-                              ))}
-                              <td className="py-2 px-3 text-right font-black text-violet-300 text-base">{fmt(total)}</td>
-                              <td/>
-                            </tr>
-                          </tfoot>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {payrollRecords.map(rec => (
+                <HistorialCard key={rec.id} rec={rec} deletePayroll={deletePayroll} fmt={fmt} />
+              ))}
             </div>
           )}
         </div>
