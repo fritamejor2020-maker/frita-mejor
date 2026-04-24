@@ -10,6 +10,7 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'pos':              { label: 'Caja POS',         icon: '🛒', route: '/pos',           color: 'from-green-500 to-green-600',  bg: 'bg-green-50' },
   'finanzas-ingresos':{ label: 'Ingresos',         icon: '💵', route: '/finanzas',      color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
   'finanzas-gastos':  { label: 'Gastos',           icon: '💸', route: '/finanzas',      color: 'from-red-500 to-rose-600',     bg: 'bg-red-50' },
+  'finanzas-nomina':  { label: 'Nómina',            icon: '👥', route: '/finanzas',      color: 'from-violet-500 to-purple-600',bg: 'bg-violet-50' },
   'vendedor-setup':   { label: 'Vendedor Móvil',  icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
   'dejador':          { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
   'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
