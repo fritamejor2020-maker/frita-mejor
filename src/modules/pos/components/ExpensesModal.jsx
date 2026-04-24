@@ -238,16 +238,16 @@ export function ExpensesModal({ onClose }) {
         <div className="p-6 overflow-y-auto space-y-5">
 
           {/* Fecha + Valor */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-[3fr_2fr] gap-3">
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Fecha</label>
-              <input type="date" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-3 px-4 font-bold text-white outline-none"
+              <input type="date" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-3 px-3 text-sm font-bold text-white outline-none"
                 value={fecha} onChange={e => setFecha(e.target.value)} />
             </div>
             <div>
               <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Valor ($)</label>
               <MoneyInput value={valor} onChange={setValor} placeholder="0"
-                className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-red-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none text-right" />
+                className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-red-500 rounded-xl py-3 px-3 text-lg font-black text-white outline-none text-right" />
             </div>
           </div>
 
