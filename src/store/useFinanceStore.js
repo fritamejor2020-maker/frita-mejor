@@ -118,24 +118,31 @@ export const useFinanceStore = create(
           created_at: new Date().toISOString(),
           ...incomeData,
         };
-        // Actualización optimista local
+        // Actualización optimista local (incluye todos los campos para el chat)
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-        // Subir foto a Storage y obtener URL pública (visible en todos los dispositivos)
         try {
           const photoUrl = await uploadPhoto(incomeData.photoBase64);
-          const { photoBase64: _pb, ...incomeForDB } = incomeData;
+          // Quitar campos que no existen en la tabla de Supabase
+          const {
+            photoBase64: _pb,
+            esDescargue: _ed,
+            esCierre: _ec,
+            ...incomeForDB
+          } = incomeData;
           const incomeWithPhoto = { ...incomeForDB, ...(photoUrl ? { photoUrl } : {}) };
 
           const { data, error } = await supabase.from('incomes').insert([incomeWithPhoto]).select();
           if (error) {
             console.warn('[FinanceStore] addIncome error Supabase:', error.message);
           } else if (data?.[0]) {
-            // Mantener base64 local Y agregar la URL remota
             set((state) => ({
               incomes: state.incomes.map((i) =>
                 i.id === newIncome.id
-                  ? { ...data[0], photoBase64: incomeData.photoBase64, photoUrl }
+                  ? { ...data[0], photoBase64: incomeData.photoBase64, photoUrl,
+                      subtipo: incomeData.subtipo,
+                      esDescargue: incomeData.esDescargue,
+                      esCierre: incomeData.esCierre }
                   : i
               ),
             }));
@@ -144,6 +151,7 @@ export const useFinanceStore = create(
           console.warn('[FinanceStore] addIncome Supabase falló — guardado localmente.');
         }
       },
+
 
       addMultipleIncomes: async (incomesArray) => {
         const timestamp = new Date().toISOString();
