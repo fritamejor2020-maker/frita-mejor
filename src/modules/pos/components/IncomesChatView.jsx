@@ -81,16 +81,26 @@ function IncomesBubble({ income }) {
 
   // ── Compartir con Web Share API (incluye foto en móviles) ──────────────────
   const handleShare = async () => {
-    const shareData = { text: shareText };
+    // La foto puede estar como URL de Storage (todos los dispositivos)
+    // o como base64 local (solo quien la tomó)
+    const photoSrc = income.photoUrl || income.photoBase64;
 
-    // Si hay foto y el navegador soporta compartir archivos, adjuntarla
-    if (income.photoBase64 && navigator.canShare) {
+    if (photoSrc && navigator.canShare) {
       try {
-        // Convertir base64 a File
-        const res   = await fetch(income.photoBase64);
-        const blob  = await res.blob();
-        const ext   = blob.type.includes('png') ? 'png' : 'jpg';
-        const file  = new File([blob], `ingreso_${Date.now()}.${ext}`, { type: blob.type });
+        let file;
+        if (photoSrc.startsWith('http')) {
+          // Es URL de Storage → descargar primero
+          const res  = await fetch(photoSrc);
+          const blob = await res.blob();
+          const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+          file = new File([blob], `ingreso_${Date.now()}.${ext}`, { type: blob.type });
+        } else {
+          // Es base64 local
+          const res  = await fetch(photoSrc);
+          const blob = await res.blob();
+          const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+          file = new File([blob], `ingreso_${Date.now()}.${ext}`, { type: blob.type });
+        }
 
         if (navigator.canShare({ files: [file] })) {
           await navigator.share({ files: [file], text: shareText });
