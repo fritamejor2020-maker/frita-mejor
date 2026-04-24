@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useIncomeConfigStore } from '../../store/useIncomeConfigStore';
 
 export function AdminIncomeSourcesTab() {
-  const { hierarchy, addLocation, removeLocation, addShift, removeShift, addTimeSlot, removeTimeSlot } = useIncomeConfigStore();
+  const { hierarchy, addLocation, removeLocation, addShift, removeShift, addTimeSlot, removeTimeSlot, toggleDescargues, isDescarguesEnabled } = useIncomeConfigStore();
 
   const [newLocation, setNewLocation] = useState('');
   const [newShifts, setNewShifts] = useState<{ [location: string]: string }>({});
@@ -111,6 +111,33 @@ export function AdminIncomeSourcesTab() {
                                </div>
                              ))}
                              {timeSlots.length === 0 && <span className="text-gray-400 text-xs font-bold bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100">Sin horarios definidos</span>}
+                           </div>
+
+                           {/* Toggle descargues por franja */}
+                           <div className="flex flex-wrap gap-2 pt-1">
+                             {timeSlots.map((ts: string, idx: number) => {
+                               const enabled = isDescarguesEnabled(location, shift, ts);
+                               return (
+                                 <button
+                                   key={`desc-${idx}`}
+                                   onClick={() => toggleDescargues(location, shift, ts)}
+                                   title={enabled ? 'Descargues activos — click para desactivar' : 'Descargues inactivos — click para activar'}
+                                   className={`flex items-center gap-1.5 text-[10px] font-black px-2.5 py-1 rounded-full border transition-all ${
+                                     enabled
+                                       ? 'bg-amber-50 border-amber-300 text-amber-600 hover:bg-amber-100'
+                                       : 'bg-gray-50 border-gray-200 text-gray-400 hover:border-gray-300'
+                                   }`}
+                                 >
+                                   <span>{ts}</span>
+                                   <span>{enabled ? '💵 Desc.' : '○'}</span>
+                                 </button>
+                               );
+                             })}
+                             {timeSlots.length > 0 && (
+                               <p className="w-full text-[9px] text-gray-400 font-bold mt-0.5">
+                                 💡 Click en una franja para activar/desactivar descargues de efectivo
+                               </p>
+                             )}
                            </div>
 
                            {/* Add Time Slot Form */}
