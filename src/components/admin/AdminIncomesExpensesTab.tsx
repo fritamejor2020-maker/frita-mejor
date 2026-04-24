@@ -390,27 +390,9 @@ function ExpensesTable() {
 
 // ── Componente principal exportado ────────────────────────────────────────────
 export const AdminIncomesExpensesTab = ({ defaultTab = 'ingresos' }: { defaultTab?: 'ingresos' | 'gastos' }) => {
-  const [tab, setTab] = useState<'ingresos' | 'gastos'>(defaultTab);
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Sub-tabs */}
-      <div className="flex gap-2 bg-gray-100 rounded-2xl p-1 self-start">
-        <button
-          onClick={() => setTab('ingresos')}
-          className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${tab === 'ingresos' ? 'bg-white text-amber-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          💰 Ingresos
-        </button>
-        <button
-          onClick={() => setTab('gastos')}
-          className={`px-5 py-2.5 rounded-xl text-sm font-black transition-all ${tab === 'gastos' ? 'bg-white text-red-500 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-        >
-          📤 Gastos
-        </button>
-      </div>
-
-      {tab === 'ingresos' ? <IncomesTable /> : <ExpensesTable />}
+      {defaultTab === 'ingresos' ? <IncomesTable /> : <ExpensesTable />}
     </div>
   );
 };
