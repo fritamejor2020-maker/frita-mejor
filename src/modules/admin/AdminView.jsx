@@ -2526,7 +2526,7 @@ export function AdminView() {
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
-        { activeTab === 'NOMINA' && <NominaAdminPanel fmtMoney={fmtMoney} /> }
+        { activeTab === 'NOMINA' && <NominaAdminPanel /> }
       </div>
     </div>
   );
