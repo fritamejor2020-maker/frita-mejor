@@ -5,7 +5,9 @@ import { IncomesModal } from './components/IncomesModal';
 import { ExpensesModal } from './components/ExpensesModal';
 import { IncomesChatView } from './components/IncomesChatView';
 import { ExpensesChatView } from './components/ExpensesChatView';
+import { PayrollView } from './components/PayrollView';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { usePayrollStore } from '../../store/usePayrollStore';
 import { formatMoney } from '../../utils/formatUtils';
 
 export function FinanceDashboard() {
@@ -17,23 +19,27 @@ export function FinanceDashboard() {
   const [showExpensesModal, setShowExpensesModal] = useState(false);
   const [showIncomesChat,   setShowIncomesChat]   = useState(false);
   const [showExpensesChat,  setShowExpensesChat]  = useState(false);
+  const [showPayroll,       setShowPayroll]       = useState(false);
+
+  const payrollRecords = usePayrollStore((s) => s.payrollRecords);
 
   const isAdmin      = user?.role === 'ADMIN';
   const userAccess   = user?.access || [];
-  // Puede ver ingresos si tiene finanzas-ingresos, finanzas (acceso legacy), o es admin
   const canIngresos  = isAdmin || userAccess.includes('finanzas-ingresos') || userAccess.includes('finanzas');
-  // Puede ver gastos si tiene finanzas-gastos, finanzas (acceso legacy), o es admin
   const canGastos    = isAdmin || userAccess.includes('finanzas-gastos')   || userAccess.includes('finanzas');
+  const canNomina    = isAdmin || userAccess.includes('finanzas-nomina');
 
   const totalIngresos = incomes.reduce((s, i) => s + (i.total || 0), 0);
   const totalGastos   = expenses.reduce((s, e) => s + (e.valor || 0), 0);
+  const totalNomina   = payrollRecords.reduce((s, r) => s + r.filas.reduce((fs, f) => fs + (Number(f.nomina)||0) + (Number(f.extras)||0) + (Number(f.vacaciones)||0) + (Number(f.liquidacion)||0), 0), 0);
 
   return (
     <div className="min-h-screen bg-[#121318] flex flex-col font-sans">
 
-      {/* Chats (pantalla completa, se montan sobre todo) */}
+      {/* Chats y vistas fullscreen */}
       {showIncomesChat  && <IncomesChatView  onClose={() => setShowIncomesChat(false)} />}
       {showExpensesChat && <ExpensesChatView onClose={() => setShowExpensesChat(false)} />}
+      {showPayroll      && <PayrollView      onClose={() => setShowPayroll(false)} />}
 
       {/* Header */}
       <header className="bg-[#1e1f26] border-b border-gray-800 p-4 shrink-0 shadow-md flex items-center justify-between">
@@ -134,6 +140,40 @@ export function FinanceDashboard() {
                   </div>
                 </div>
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-600 group-hover:text-red-400 transition-colors"><path d="M9 18l6-6-6-6"/></svg>
+              </button>
+            </div>
+          )}
+
+
+          {/* ── BLOQUE NÓMINA ── */}
+          {canNomina && (
+            <div className="flex flex-col gap-3 w-full sm:w-[300px]">
+              <button
+                className="w-full bg-violet-500/10 hover:bg-violet-500/20 border-2 border-violet-500/30 hover:border-violet-500 rounded-[32px] p-8 flex flex-col items-center justify-center gap-4 transition-all hover:scale-[1.02] active:scale-95 group"
+                onClick={() => setShowPayroll(true)}
+              >
+                <div className="w-20 h-20 bg-violet-500/20 rounded-full flex items-center justify-center group-hover:bg-violet-500/40 transition-colors">
+                  <span className="text-4xl text-violet-400">👥</span>
+                </div>
+                <div className="text-center">
+                  <h3 className="text-2xl font-black text-violet-400">Nómina</h3>
+                  <p className="text-sm font-bold text-violet-800 mt-1">Pago a Personal</p>
+                </div>
+              </button>
+              <button
+                onClick={() => setShowPayroll(true)}
+                className="w-full flex items-center justify-between px-5 py-3 bg-[#1e1f26] hover:bg-[#25262e] border border-violet-900/40 hover:border-violet-700/60 rounded-2xl transition-all group"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-violet-500/15 flex items-center justify-center group-hover:bg-violet-500/25 transition-colors">
+                    <span className="text-sm">📋</span>
+                  </div>
+                  <div className="text-left">
+                    <p className="text-sm font-black text-gray-200 group-hover:text-white transition-colors">Ver historial</p>
+                    <p className="text-xs font-bold text-violet-600">{payrollRecords.length} períodos · {formatMoney(totalNomina)}</p>
+                  </div>
+                </div>
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-600 group-hover:text-violet-400 transition-colors"><path d="M9 18l6-6-6-6"/></svg>
               </button>
             </div>
           )}
