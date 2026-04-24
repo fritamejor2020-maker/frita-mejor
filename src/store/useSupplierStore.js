@@ -24,7 +24,7 @@ export const useSupplierStore = create(
         papas: 'insumo', aceite: 'insumo', sal: 'insumo',
         carne: 'insumo', pollo: 'insumo', chorizo: 'insumo',
         fundas: 'insumo', tarrinas: 'insumo', servilletas: 'insumo',
-      } as Record<string, string>,
+      },
 
       addSupplier: (supplierData) => {
         const newSupplier = {
