@@ -73,10 +73,25 @@ function PhotoThumbnail({ src, rotation = 0 }) {
 }
 
 // ── Burbuja de ingreso ────────────────────────────────────────────────────────
-function IncomesBubble({ income }) {
+function IncomesBubble({ income, allIncomes = [] }) {
   const name    = income.creado_por || income.vendedor || 'Sistema';
   const time    = timeAgo(income.fecha || income.created_at);
   const color   = avatarColor(name);
+
+  // Para Cierre Final: calcular los descargues del mismo día/franja
+  const isCierre = income.subtipo === 'Cierre Final';
+  const descarguesPrevios = isCierre ? allIncomes.filter(inc => {
+    const sameDay  = (inc.fecha || inc.created_at || '').slice(0, 10) ===
+                     (income.fecha || income.created_at || '').slice(0, 10);
+    return sameDay &&
+      inc.ubicacion === income.ubicacion &&
+      inc.jornada   === income.jornada &&
+      inc.tipo      === income.tipo &&
+      (inc.esDescargue === true || (inc.subtipo && String(inc.subtipo).startsWith('Descargue')));
+  }).sort((a, b) => new Date(a.fecha || a.created_at) - new Date(b.fecha || b.created_at)) : [];
+
+  const totalDescargues = descarguesPrevios.reduce((s, d) => s + (d.efectivo || 0), 0);
+  const totalCierre = (income.total || 0) + totalDescargues;
 
   const shareText =
     `${income.subtipo ? (income.subtipo.startsWith('Descargue') ? '💵' : '🔒') : '💰'} *${income.subtipo ? income.subtipo.toUpperCase() : 'INGRESO REGISTRADO'}*\n` +
@@ -87,7 +102,12 @@ function IncomesBubble({ income }) {
     (income.transferencias ? `📲 Transferencias: ${formatMoney(income.transferencias)}\n` : '') +
     (income.salidas ? `⬇️ Salidas: ${formatMoney(income.salidas)}\n` : '') +
     (income.observaciones ? `📝 Obs: ${income.observaciones}\n` : '') +
-    `✅ Total: ${formatMoney(income.total || 0)}\n` +
+    `✅ Total Ingreso: ${formatMoney(income.total || 0)}\n` +
+    // Desglose de descargues solo en Cierre Final
+    (isCierre && descarguesPrevios.length > 0
+      ? descarguesPrevios.map(d => `  💵 ${d.subtipo || 'Descargue'}: ${formatMoney(d.efectivo || 0)}`).join('\n') + '\n' +
+        `🏁 *TOTAL DEL CIERRE: ${formatMoney(totalCierre)}*\n`
+      : isCierre ? `🏁 *TOTAL DEL CIERRE: ${formatMoney(income.total || 0)}*\n` : '') +
     `🕐 ${new Date(income.fecha || income.created_at).toLocaleString('es-CO')}`;
 
   // ── Compartir con Web Share API (incluye foto en móviles) ──────────────────
@@ -302,7 +322,7 @@ export function IncomesChatView({ onClose }) {
           <>
             {/* Mostrar más antiguos primero (como WhatsApp) */}
             {[...incomes].reverse().map((income) => (
-              <IncomesBubble key={income.id || income.created_at} income={income} />
+              <IncomesBubble key={income.id || income.created_at} income={income} allIncomes={incomes} />
             ))}
             <div ref={bottomRef} />
           </>
