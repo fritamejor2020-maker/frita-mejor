@@ -50,8 +50,14 @@ export const useFinanceStore = create(
           if (!incomesRes.error) {
             set({ incomes: incomesRes.data || [] });
           }
+          // Normalizar facturaUrl (puede venir como factura_url desde Supabase)
+          const normalizeExpense = (e) => ({
+            ...e,
+            facturaUrl: e.facturaUrl || e.factura_url || null,
+            monto: e.monto ?? e.valor ?? 0,
+          });
           if (!expensesRes.error) {
-            set({ expenses: expensesRes.data || [] });
+            set({ expenses: (expensesRes.data || []).map(normalizeExpense) });
           }
         } catch (error) {
           console.warn('[FinanceStore] fetchFinances falló — usando datos locales:', error.message);
@@ -192,15 +198,22 @@ export const useFinanceStore = create(
         try {
           // Mapear campo 'valor' a 'monto' para que coincida con el schema de Supabase
           const { valor, ...rest } = expenseData;
-          const expenseForDB = { ...rest, monto: valor ?? expenseData.monto ?? 0 };
+          // Guardar facturaUrl como factura_url para compatibilidad con Supabase snake_case
+          const { facturaUrl: facturaUrlVal, ...restWithoutFactura } = rest;
+          const expenseForDB = {
+            ...restWithoutFactura,
+            monto: valor ?? expenseData.monto ?? 0,
+            factura_url: facturaUrlVal || null,
+          };
           const { data, error } = await supabase.from('expenses').insert([expenseForDB]).select();
           if (error) {
             console.warn('[FinanceStore] addExpense error Supabase:', error.message);
           } else if (data?.[0]) {
-            // Mantener 'valor' en la copia local para compatibilidad con el chat
             set((state) => ({
               expenses: state.expenses.map((e) =>
-                e.id === newExpense.id ? { ...data[0], valor: data[0].monto } : e
+                e.id === newExpense.id
+                  ? { ...data[0], valor: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || facturaUrlVal || null }
+                  : e
               ),
             }));
           }
@@ -216,7 +229,11 @@ export const useFinanceStore = create(
           .on('postgres_changes',
             { event: 'INSERT', schema: 'public', table: 'expenses' },
             (payload) => {
-              const row = { ...payload.new, valor: payload.new.monto };
+              const row = {
+                ...payload.new,
+                valor: payload.new.monto,
+                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
+              };
               set((state) => {
                 const exists = state.expenses.some((e) => e.id === row.id);
                 if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
@@ -231,7 +248,11 @@ export const useFinanceStore = create(
           .on('postgres_changes',
             { event: 'UPDATE', schema: 'public', table: 'expenses' },
             (payload) => {
-              const row = { ...payload.new, valor: payload.new.monto };
+              const row = {
+                ...payload.new,
+                valor: payload.new.monto,
+                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
+              };
               set((state) => ({ expenses: state.expenses.map((e) => e.id === row.id ? row : e) }));
             }
           )
