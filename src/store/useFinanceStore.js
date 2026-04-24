@@ -192,15 +192,16 @@ export const useFinanceStore = create(
        * Filtra incomes de hoy con tipo que empiece con "Descargue".
        */
       getTodayDescarguesFor: (ubicacion, jornada, slot) => {
-        const today = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+        const today = new Date().toISOString().slice(0, 10);
         return get().incomes.filter(inc => {
           const incDate = (inc.fecha || inc.created_at || '').slice(0, 10);
           return (
             incDate === today &&
             inc.ubicacion === ubicacion &&
             inc.jornada === jornada &&
-            inc.tipo === slot &&            // slot es el tipo de franja "4-7 pm"
-            inc.esDescargue === true
+            inc.tipo === slot &&
+            // Es un descargue si tiene esDescargue=true O si el subtipo empieza con 'Descargue'
+            (inc.esDescargue === true || (inc.subtipo && String(inc.subtipo).startsWith('Descargue')))
           );
         }).sort((a, b) => new Date(a.fecha || a.created_at) - new Date(b.fecha || b.created_at));
       },

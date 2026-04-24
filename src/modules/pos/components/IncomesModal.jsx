@@ -123,8 +123,10 @@ export function IncomesModal({ onClose }) {
   const isDescargueMode  = selectedSubtipo.startsWith('Descargue');
   const isCierreMode     = selectedSubtipo === 'Cierre Final';
 
-  // Número siguiente de descargue (contar los del día actual)
-  const nextDescargueNum = descarguesPrevios.filter(d => d.esDescargue).length + 1;
+  // Número siguiente de descargue — cuenta tanto por esDescargue como por subtipo (más robusto)
+  const nextDescargueNum = descarguesPrevios.filter(
+    d => d.esDescargue === true || (d.subtipo && String(d.subtipo).startsWith('Descargue'))
+  ).length + 1;
 
   // Validaciones adaptadas al subtipo
   const isSingleFormValid = isDescargueMode
@@ -160,14 +162,16 @@ export function IncomesModal({ onClose }) {
       setSelectedTipo(value);
       setSelectedSubtipo('');
       if (selectedUbicacion !== 'Triciclo' && isDescarguesEnabled(selectedUbicacion, selectedJornada, value)) {
-        // Ir al step de elección descargue/cierre
+        // Cargar ya los descargues del día para calcular el número correcto
+        const previos = getTodayDescarguesFor(selectedUbicacion, selectedJornada, value);
+        setDescarguesPrevios(previos);
         setStep(35); // step intermedio
       } else {
         setStep(4);
       }
     } else if (type === 'subtipo') {
       setSelectedSubtipo(value);
-      // Cargar descargues previos del día para mostrar en Cierre Final
+      // Re-cargar descargues previos (por si se registró otro mientras tanto)
       const previos = getTodayDescarguesFor(selectedUbicacion, selectedJornada, selectedTipo);
       setDescarguesPrevios(previos);
       setStep(4);
