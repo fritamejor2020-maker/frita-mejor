@@ -2285,8 +2285,8 @@ export function AdminView() {
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
 
-        { activeTab === 'INGRESOS' && <AdminIncomesExpensesTab /> }
-        { activeTab === 'EGRESOS'  && <AdminIncomesExpensesTab /> }
+        { activeTab === 'INGRESOS' && <AdminIncomesExpensesTab defaultTab="ingresos" /> }
+        { activeTab === 'EGRESOS'  && <AdminIncomesExpensesTab defaultTab="gastos" /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }
 
         { activeTab === 'INVENTARIO_FLOTA' && <AdminVehicleInventoryTab /> }

@@ -389,8 +389,8 @@ function ExpensesTable() {
 }
 
 // ── Componente principal exportado ────────────────────────────────────────────
-export const AdminIncomesExpensesTab = () => {
-  const [tab, setTab] = useState<'ingresos' | 'gastos'>('ingresos');
+export const AdminIncomesExpensesTab = ({ defaultTab = 'ingresos' }: { defaultTab?: 'ingresos' | 'gastos' }) => {
+  const [tab, setTab] = useState<'ingresos' | 'gastos'>(defaultTab);
 
   return (
     <div className="flex flex-col gap-6">
