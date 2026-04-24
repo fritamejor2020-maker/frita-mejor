@@ -66,31 +66,47 @@ export function ExpensesModal({ onClose }) {
       .slice(0, 8);
   }, [descripcion, expenses, suppliers]);
 
-  // ── Sugerencias de proveedor: filtrados por descripción + texto escrito ──────
+  // ── Sugerencias de proveedor: filtrados por producto escrito ─────────────────
   const provSuggestions = useMemo(() => {
-    // Proveedores que vendieron este producto en gastos pasados
     const q = norm(descripcion);
-    const fromExpenses = q.length >= 2
-      ? [...new Set(
-          expenses
-            .filter(e => norm(e.descripcion || '').includes(q) && e.proveedor)
-            .map(e => e.proveedor)
-        )]
-      : [];
-
-    // Proveedores del store que tienen ese producto en commonProducts
-    const fromStore = getSuppliersForProduct(descripcion).map(s => s.name);
-
-    // Combinar fuentes únicas → buscar objetos completos
-    const allNames = [...new Set([...fromExpenses, ...fromStore])];
-    const allSuppliers = allNames.map(name => {
-      const found = suppliers.find(s => s.name.toLowerCase() === name.toLowerCase());
-      return found || { id: name, name, commonProducts: [] };
-    });
-
-    if (!proveedor.trim()) return allSuppliers.slice(0, 8);
     const pq = norm(proveedor);
-    return allSuppliers.filter(s => norm(s.name).includes(pq)).slice(0, 8);
+    const activeAll = suppliers.filter(s => s.active);
+
+    let base;
+
+    if (q.length < 2) {
+      // Sin descripción → todos los proveedores
+      base = activeAll;
+    } else {
+      // 1. Proveedores de gastos pasados con esa descripción
+      const namesFromExpenses = [...new Set(
+        expenses
+          .filter(e => norm(e.descripcion || '').includes(q) && e.proveedor)
+          .map(e => e.proveedor)
+      )];
+
+      // 2. Proveedores del store con ese producto en commonProducts
+      const namesFromStore = activeAll
+        .filter(s => s.commonProducts?.some(p => norm(p).includes(q) || q.includes(norm(p))))
+        .map(s => s.name);
+
+      const matched = [...new Set([...namesFromExpenses, ...namesFromStore])];
+
+      if (matched.length === 0) {
+        // Producto no registrado → mostrar todos (comportamiento solicitado)
+        base = activeAll;
+      } else {
+        // Reconstruir objetos (incluyendo los que vienen de gastos y no están en el store)
+        base = matched.map(name => {
+          const found = suppliers.find(s => s.name.toLowerCase() === name.toLowerCase());
+          return found || { id: name, name, commonProducts: [] };
+        });
+      }
+    }
+
+    // Filtrar por texto escrito en el campo proveedor
+    if (!pq) return base.slice(0, 8);
+    return base.filter(s => norm(s.name).includes(pq)).slice(0, 8);
   }, [proveedor, descripcion, suppliers, expenses]);
 
   const numValor   = parseFloat(valor) || 0;
