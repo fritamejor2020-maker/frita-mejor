@@ -261,7 +261,7 @@ function IncomesTable() {
 // ── Tabla de Gastos ───────────────────────────────────────────────────────────
 function ExpensesTable() {
   const { expenses, fetchFinances } = useFinanceStore() as any;
-  const { setTipoGasto } = useSupplierStore() as any;
+  const { setTipoGasto, getTipoGasto } = useSupplierStore() as any;
 
   const TIPOS = [
     { value: 'por_definir', label: '⬜ Por definir', bg: 'bg-gray-100', text: 'text-gray-500' },
@@ -400,11 +400,16 @@ function ExpensesTable() {
                         </span>
                       ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
-                    {/* Columna Tipo */}
+                    {/* Columna Tipo: usa el campo del gasto O el productTypes del store */}
                     <td className="py-3 px-4 text-center">
-                      {(() => { const t = tipoLabel(expense.tipoGasto || 'por_definir'); return (
-                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${t.bg} ${t.text} whitespace-nowrap`}>{t.label}</span>
-                      ); })()}
+                      {(() => {
+                        const rawTipo = expense.tipoGasto
+                          || (expense.descripcion ? getTipoGasto(expense.descripcion) : 'por_definir');
+                        const t = tipoLabel(rawTipo);
+                        return (
+                          <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${t.bg} ${t.text} whitespace-nowrap`}>{t.label}</span>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {expense.cantidad != null ? (
@@ -447,9 +452,9 @@ function ExpensesTable() {
             {filtered.length > 0 && (
               <tfoot>
                 <tr className="bg-red-50 border-t-2 border-red-100">
-                  <td colSpan={4} className="py-3 px-4 font-black text-red-600 text-sm uppercase">Total ({filtered.length} gastos)</td>
+                  <td colSpan={5} className="py-3 px-4 font-black text-red-600 text-sm uppercase">Total ({filtered.length} gastos)</td>
                   <td className="py-3 px-4 text-right font-black text-red-700 text-base">{fmt(total)}</td>
-                  <td colSpan={2} />
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             )}
