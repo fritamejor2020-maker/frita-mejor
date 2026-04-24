@@ -19,6 +19,12 @@ export const useSupplierStore = create(
         { id: '2', name: 'Carnes el Primo', commonProducts: ['carne', 'pollo', 'chorizo'], active: true },
         { id: '3', name: 'Empaques del Norte', commonProducts: ['fundas', 'tarrinas', 'servilletas'], active: true },
       ],
+      // Mapa producto → tipo de gasto (persiste entre sesiones)
+      productTypes: {
+        papas: 'insumo', aceite: 'insumo', sal: 'insumo',
+        carne: 'insumo', pollo: 'insumo', chorizo: 'insumo',
+        fundas: 'insumo', tarrinas: 'insumo', servilletas: 'insumo',
+      } as Record<string, string>,
 
       addSupplier: (supplierData) => {
         const newSupplier = {
@@ -79,9 +85,35 @@ export const useSupplierStore = create(
                 }
               }
               return s;
-            })
+            }),
+            // Si el producto es nuevo, registrarlo como 'por_definir'
+            productTypes: (state.productTypes || {})[normalizedProduct]
+              ? state.productTypes
+              : { ...state.productTypes, [normalizedProduct]: 'por_definir' },
           };
         });
+      },
+
+      /**
+       * Devuelve el tipo de gasto de un producto (por nombre).
+       * Si no existe, retorna 'por_definir'.
+       */
+      getTipoGasto: (productName) => {
+        if (!productName) return 'por_definir';
+        const key = productName.toLowerCase().trim();
+        return (get().productTypes || {})[key] || 'por_definir';
+      },
+
+      /**
+       * Asigna un tipo de gasto a un producto y persiste el cambio.
+       */
+      setTipoGasto: (productName, tipo) => {
+        if (!productName) return;
+        const key = productName.toLowerCase().trim();
+        set((state) => ({
+          productTypes: { ...(state.productTypes || {}), [key]: tipo },
+        }));
+        syncSuppliers(useSupplierStore.getState().suppliers);
       },
 
       /**

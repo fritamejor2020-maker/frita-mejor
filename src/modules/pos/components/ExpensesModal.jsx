@@ -19,6 +19,8 @@ export function ExpensesModal({ onClose }) {
     addSupplier,
     learnProductForSupplier,
     getSuppliersForProduct,
+    getTipoGasto,
+    setTipoGasto,
   } = useSupplierStore();
 
   const fileInputRef   = useRef(null);
@@ -39,7 +41,15 @@ export function ExpensesModal({ onClose }) {
   const [cantidad, setCantidad]         = useState('');
   const [unidades, setUnidades]         = useState('');
   const [observacion, setObservacion]   = useState('');
+  const [tipoGasto, setTipoGasto_]      = useState('por_definir');
   const [showDetalles, setShowDetalles] = useState(false);
+
+  const TIPOS = [
+    { value: 'por_definir', label: '⬜ Por definir', color: 'text-gray-400' },
+    { value: 'fijo',        label: '📌 Fijo',        color: 'text-blue-500' },
+    { value: 'variable',    label: '📈 Variable',    color: 'text-amber-500' },
+    { value: 'insumo',      label: '🧂 Insumo',      color: 'text-green-500' },
+  ];
 
   // ── Visibilidad de dropdowns ────────────────────────────────────────────────
   const [showDescSugg, setShowDescSugg] = useState(false);
@@ -131,6 +141,10 @@ export function ExpensesModal({ onClose }) {
   const selectDesc = (product) => {
     setDescripcion(product);
     setShowDescSugg(false);
+    // Auto-rellenar tipo de gasto desde el store de proveedores
+    const tipo = getTipoGasto(product);
+    setTipoGasto_(tipo);
+    if (tipo !== 'por_definir') setShowDetalles(true);
     // Auto-rellenar el primer proveedor que vende ese producto
     const forProduct = getSuppliersForProduct(product);
     if (forProduct.length === 1) {
@@ -221,7 +235,12 @@ export function ExpensesModal({ onClose }) {
       cantidad: cantidad ? parseFloat(cantidad) : null,
       unidades: unidades.trim() || null,
       observacion: observacion.trim() || null,
+      tipoGasto,
     });
+    // Aprender: si el usuario cambió el tipo manualmente, guardarlo para futuros
+    if (tipoGasto !== 'por_definir' && descripcion.trim()) {
+      setTipoGasto(descripcion.toLowerCase().trim(), tipoGasto);
+    }
 
     setIsSubmitting(false);
     onClose();
@@ -341,34 +360,58 @@ export function ExpensesModal({ onClose }) {
               className="w-full flex items-center justify-between px-4 py-3 text-sm font-black text-gray-400 hover:text-white hover:bg-gray-800/40 transition-colors"
               onClick={() => setShowDetalles(v => !v)}
             >
-              <span className="flex items-center gap-2">📋 Más detalles <span className="text-[10px] font-bold text-gray-600">(cantidad, unidades)</span></span>
+              <span className="flex items-center gap-2">
+                📋 Más detalles
+                <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                  tipoGasto === 'fijo'       ? 'bg-blue-900/40 text-blue-400' :
+                  tipoGasto === 'variable'   ? 'bg-amber-900/40 text-amber-400' :
+                  tipoGasto === 'insumo'     ? 'bg-green-900/40 text-green-400' :
+                  'bg-gray-800 text-gray-500'
+                }`}>{TIPOS.find(t => t.value === tipoGasto)?.label || '⬜ Por definir'}</span>
+              </span>
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                 style={{ transform: showDetalles ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                 <path d="M6 9l6 6 6-6"/>
               </svg>
             </button>
             {showDetalles && (
-              <div className="px-4 pb-4 pt-1 space-y-3 border-t border-gray-800">
+              <div className="px-4 pb-4 pt-3 space-y-3 border-t border-gray-800">
+                {/* Tipo de Gasto */}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase block mb-1.5">Tipo de Gasto</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {TIPOS.map(t => (
+                      <button
+                        key={t.value}
+                        type="button"
+                        onClick={() => setTipoGasto_(t.value)}
+                        className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition-all ${
+                          tipoGasto === t.value
+                            ? t.value === 'fijo'     ? 'border-blue-500 bg-blue-900/30 text-blue-300' :
+                              t.value === 'variable' ? 'border-amber-500 bg-amber-900/30 text-amber-300' :
+                              t.value === 'insumo'   ? 'border-green-500 bg-green-900/30 text-green-300' :
+                              'border-gray-600 bg-gray-800 text-gray-300'
+                            : 'border-gray-800 text-gray-600 hover:border-gray-700'
+                        }`}
+                      >{t.label}</button>
+                    ))}
+                  </div>
+                </div>
+                {/* Cantidad + Unidades */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Cantidad</label>
                     <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      placeholder="Ej: 5"
-                      value={cantidad}
-                      onChange={e => setCantidad(e.target.value)}
+                      type="number" min="0" step="0.01" placeholder="Ej: 5"
+                      value={cantidad} onChange={e => setCantidad(e.target.value)}
                       className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-2.5 px-3 font-bold text-white outline-none"
                     />
                   </div>
                   <div>
                     <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Unidades</label>
                     <input
-                      type="text"
-                      placeholder="kg, lbs, unid..."
-                      value={unidades}
-                      onChange={e => setUnidades(e.target.value)}
+                      type="text" placeholder="kg, lbs, unid..."
+                      value={unidades} onChange={e => setUnidades(e.target.value)}
                       className="w-full bg-[#0c0d11] border border-gray-800 focus:border-red-500 rounded-xl py-2.5 px-3 font-bold text-white outline-none"
                     />
                   </div>

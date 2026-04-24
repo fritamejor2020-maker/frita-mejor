@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
+import { useSupplierStore } from '../../store/useSupplierStore';
 import { supabase } from '../../lib/supabase';
 import { formatMoney as fmt } from '../../utils/formatUtils';
 
@@ -260,6 +261,15 @@ function IncomesTable() {
 // ── Tabla de Gastos ───────────────────────────────────────────────────────────
 function ExpensesTable() {
   const { expenses, fetchFinances } = useFinanceStore() as any;
+  const { setTipoGasto } = useSupplierStore() as any;
+
+  const TIPOS = [
+    { value: 'por_definir', label: '⬜ Por definir', bg: 'bg-gray-100', text: 'text-gray-500' },
+    { value: 'fijo',        label: '📌 Fijo',        bg: 'bg-blue-50',  text: 'text-blue-600' },
+    { value: 'variable',    label: '📈 Variable',    bg: 'bg-amber-50', text: 'text-amber-600' },
+    { value: 'insumo',      label: '🧂 Insumo',      bg: 'bg-green-50', text: 'text-green-600' },
+  ];
+  const tipoLabel = (v: string) => TIPOS.find(t => t.value === v) || TIPOS[0];
   const [filterDate, setFilterDate]   = useState('');
   const [filterProv, setFilterProv]   = useState('');
   const [filterProd, setFilterProd]   = useState('');
@@ -271,6 +281,7 @@ function ExpensesTable() {
   const [editCantidad, setEditCantidad] = useState('');
   const [editUnidades, setEditUnidades] = useState('');
   const [editObservacion, setEditObservacion] = useState('');
+  const [editTipo, setEditTipo]         = useState('por_definir');
 
   const proveedores = [...new Set(expenses.map((e: any) => e.proveedor).filter(Boolean))] as string[];
 
@@ -299,7 +310,12 @@ function ExpensesTable() {
         cantidad: editCantidad ? parseFloat(editCantidad) : null,
         unidades: editUnidades.trim() || null,
         observacion: editObservacion.trim() || null,
+        tipoGasto: editTipo,
       }).eq('id', editExpense.id);
+      // Aprender: guardar el tipo para futuros gastos del mismo producto
+      if (editTipo !== 'por_definir' && editDesc.trim()) {
+        setTipoGasto(editDesc.toLowerCase().trim(), editTipo);
+      }
       await fetchFinances();
     } catch (e) { console.error(e); }
     setEditExpense(null);
@@ -312,6 +328,7 @@ function ExpensesTable() {
     setEditCantidad(expense.cantidad != null ? String(expense.cantidad) : '');
     setEditUnidades(expense.unidades || '');
     setEditObservacion(expense.observacion || '');
+    setEditTipo(expense.tipoGasto || 'por_definir');
   };
 
   const hasFilters = filterDate || filterProv || filterProd;
@@ -357,6 +374,7 @@ function ExpensesTable() {
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Fecha</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Descripción / Producto</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Proveedor</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Tipo</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Cantidad</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Registrado por</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-red-500 uppercase tracking-widest text-right">Monto</th>
@@ -381,6 +399,12 @@ function ExpensesTable() {
                           🏪 {expense.proveedor}
                         </span>
                       ) : <span className="text-gray-300 text-xs">—</span>}
+                    </td>
+                    {/* Columna Tipo */}
+                    <td className="py-3 px-4 text-center">
+                      {(() => { const t = tipoLabel(expense.tipoGasto || 'por_definir'); return (
+                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${t.bg} ${t.text} whitespace-nowrap`}>{t.label}</span>
+                      ); })()}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {expense.cantidad != null ? (
@@ -459,6 +483,18 @@ function ExpensesTable() {
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase block mb-1">Unidades</label>
                   <input type="text" value={editUnidades} onChange={e => setEditUnidades(e.target.value)} placeholder="kg, unid..." className="w-full border-2 border-gray-200 focus:border-blue-400 rounded-xl px-3 py-2.5 font-bold text-gray-800 outline-none" />
+                </div>
+              </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase block mb-1.5">Tipo de Gasto</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {TIPOS.map((t: any) => (
+                    <button key={t.value} type="button" onClick={() => setEditTipo(t.value)}
+                      className={`py-2 px-3 rounded-xl border-2 font-black text-xs transition-all ${
+                        editTipo === t.value ? `${t.bg} ${t.text} border-current` : 'border-gray-200 text-gray-400 hover:border-gray-300'
+                      }`}
+                    >{t.label}</button>
+                  ))}
                 </div>
               </div>
               <div>
