@@ -30,31 +30,41 @@ function avatarColor(name = '') {
 }
 
 // ── Thumbnail de foto expandible ────────────────────────────────────────────
-// Prioriza photoUrl (Supabase Storage, visible en todos los dispositivos)
-// Fallback a photoBase64 (solo local, del dispositivo que tomó la foto)
 function PhotoThumbnail({ src, rotation = 0 }) {
   const [expanded, setExpanded] = useState(false);
   if (!src) return null;
   return (
     <>
-      <div className="mt-2 cursor-pointer" onClick={() => setExpanded(true)}>
+      <div
+        className="mt-3 cursor-pointer rounded-xl overflow-hidden border border-green-900/30"
+        onClick={() => setExpanded(true)}
+      >
         <img
           src={src}
           alt="Foto sobre"
           style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s' }}
-          className="w-full max-h-32 object-cover rounded-xl border border-green-800/50 hover:opacity-90 transition-opacity"
+          className="w-full max-h-48 object-contain bg-black/40"
         />
-        <p className="text-[9px] font-bold text-gray-600 mt-0.5 ml-0.5">Toca para ver completa</p>
+        <div className="text-[9px] font-bold text-gray-600 text-center py-1 bg-black/20">
+          Toca para ampliar
+        </div>
       </div>
       {expanded && (
-        <div className="fixed inset-0 z-[200] bg-black/95 flex items-center justify-center" onClick={() => setExpanded(false)}>
+        <div
+          className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center gap-4"
+          onClick={() => setExpanded(false)}
+        >
           <img
             src={src}
             alt="Foto sobre"
             style={{ transform: `rotate(${rotation}deg)`, transition: 'transform 0.2s' }}
-            className="max-w-full max-h-full object-contain rounded-xl"
+            className="max-w-[95vw] max-h-[85vh] object-contain rounded-xl"
           />
-          <button onClick={() => setExpanded(false)} className="absolute top-4 right-4 text-white bg-black/50 rounded-full w-10 h-10 flex items-center justify-center text-xl font-black">✕</button>
+          <button
+            onClick={() => setExpanded(false)}
+            className="absolute top-4 right-4 text-white bg-black/60 rounded-full w-10 h-10 flex items-center justify-center text-xl font-black"
+          >✕</button>
+          <p className="text-gray-400 text-xs font-bold">Toca para cerrar</p>
         </div>
       )}
     </>
