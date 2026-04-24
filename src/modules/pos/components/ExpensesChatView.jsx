@@ -156,10 +156,13 @@ function ExpenseBubble({ expense }) {
 export function ExpensesChatView({ onClose }) {
   const expenses = useFinanceStore((s) => s.expenses);
   const fetchFinances = useFinanceStore((s) => s.fetchFinances);
+  const subscribeToExpenses = useFinanceStore((s) => s.subscribeToExpenses);
   const bottomRef = useRef(null);
 
   useEffect(() => {
     fetchFinances();
+    const unsub = subscribeToExpenses();
+    return () => unsub?.();
   }, []);
 
   useEffect(() => {

@@ -190,15 +190,59 @@ export const useFinanceStore = create(
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
-          const { data, error } = await supabase.from('expenses').insert([expenseData]).select();
-          if (!error && data?.[0]) {
+          // Mapear campo 'valor' a 'monto' para que coincida con el schema de Supabase
+          const { valor, ...rest } = expenseData;
+          const expenseForDB = { ...rest, monto: valor ?? expenseData.monto ?? 0 };
+          const { data, error } = await supabase.from('expenses').insert([expenseForDB]).select();
+          if (error) {
+            console.warn('[FinanceStore] addExpense error Supabase:', error.message);
+          } else if (data?.[0]) {
+            // Mantener 'valor' en la copia local para compatibilidad con el chat
             set((state) => ({
-              expenses: state.expenses.map((e) => (e.id === newExpense.id ? data[0] : e)),
+              expenses: state.expenses.map((e) =>
+                e.id === newExpense.id ? { ...data[0], valor: data[0].monto } : e
+              ),
             }));
           }
         } catch (e) {
           console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.');
         }
+      },
+
+      // ── Realtime para gastos ─────────────────────────────────────────
+      subscribeToExpenses: () => {
+        const channel = supabase
+          .channel('expenses-realtime')
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'expenses' },
+            (payload) => {
+              const row = { ...payload.new, valor: payload.new.monto };
+              set((state) => {
+                const exists = state.expenses.some((e) => e.id === row.id);
+                if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
+                // Quitar el entry local temporal si coincide
+                const withoutLocal = state.expenses.filter(
+                  (e) => !String(e.id).startsWith('local-') || e.descripcion !== row.descripcion
+                );
+                return { expenses: [row, ...withoutLocal] };
+              });
+            }
+          )
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'expenses' },
+            (payload) => {
+              const row = { ...payload.new, valor: payload.new.monto };
+              set((state) => ({ expenses: state.expenses.map((e) => e.id === row.id ? row : e) }));
+            }
+          )
+          .on('postgres_changes',
+            { event: 'DELETE', schema: 'public', table: 'expenses' },
+            (payload) => {
+              set((state) => ({ expenses: state.expenses.filter((e) => e.id !== payload.old.id) }));
+            }
+          )
+          .subscribe();
+        return () => supabase.removeChannel(channel);
       },
     }),
     {
