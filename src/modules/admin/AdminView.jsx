@@ -7,6 +7,7 @@ import { useInventoryStore } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab, ResumenOperativoTab } from '../../components/admin/AdminFinancesTab';
+import { AdminIncomesExpensesTab } from '../../components/admin/AdminIncomesExpensesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
 import { AdminUsersTab } from '../../components/admin/AdminUsersTab';
 import { AdminVehiclesTab } from '../../components/admin/AdminVehiclesTab';
@@ -2284,8 +2285,8 @@ export function AdminView() {
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
 
-        { activeTab === 'INGRESOS' && <AdminIncomesTab /> }
-        { activeTab === 'EGRESOS' && <AdminExpensesTab /> }
+        { activeTab === 'INGRESOS' && <AdminIncomesExpensesTab /> }
+        { activeTab === 'EGRESOS'  && <AdminIncomesExpensesTab /> }
         { activeTab === 'PRECIOS' && <AdminPricesTab /> }
 
         { activeTab === 'INVENTARIO_FLOTA' && <AdminVehicleInventoryTab /> }
