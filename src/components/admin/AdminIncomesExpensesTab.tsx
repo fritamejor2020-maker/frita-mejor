@@ -260,14 +260,23 @@ function IncomesTable() {
 // ── Tabla de Gastos ───────────────────────────────────────────────────────────
 function ExpensesTable() {
   const { expenses, fetchFinances } = useFinanceStore() as any;
-  const [filterDate, setFilterDate] = useState('');
-  const [deleting, setDeleting]     = useState<string|null>(null);
+  const [filterDate, setFilterDate]   = useState('');
+  const [filterProv, setFilterProv]   = useState('');
+  const [filterProd, setFilterProd]   = useState('');
+  const [photoSrc, setPhotoSrc]       = useState<string|null>(null);
+  const [deleting, setDeleting]       = useState<string|null>(null);
   const [editExpense, setEditExpense] = useState<any|null>(null);
-  const [editDesc, setEditDesc]     = useState('');
-  const [editMonto, setEditMonto]   = useState('');
+  const [editDesc, setEditDesc]       = useState('');
+  const [editMonto, setEditMonto]     = useState('');
 
-  const filtered = expenses.filter((e: any) => !filterDate || dateOf(e.fecha || e.created_at) === filterDate);
-  const total = filtered.reduce((s: number, e: any) => s + (e.monto || e.amount || 0), 0);
+  const proveedores = [...new Set(expenses.map((e: any) => e.proveedor).filter(Boolean))] as string[];
+
+  const filtered = expenses
+    .filter((e: any) => !filterDate || dateOf(e.fecha || e.created_at) === filterDate)
+    .filter((e: any) => !filterProv || (e.proveedor || '').toLowerCase().includes(filterProv.toLowerCase()))
+    .filter((e: any) => !filterProd || (e.descripcion || '').toLowerCase().includes(filterProd.toLowerCase()));
+
+  const total = filtered.reduce((s: number, e: any) => s + (e.monto ?? e.valor ?? e.amount ?? 0), 0);
 
   const handleDelete = async (id: string) => {
     if (!confirm('¿Eliminar este gasto?')) return;
@@ -287,13 +296,34 @@ function ExpensesTable() {
     setEditExpense(null);
   };
 
+  const hasFilters = filterDate || filterProv || filterProd;
+
   return (
     <div className="space-y-4">
+      {/* ── Filtros ── */}
       <div className="flex flex-wrap items-center gap-3">
         <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
           className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer" />
-        {filterDate && (
-          <button onClick={() => setFilterDate('')} className="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100">✕ Limpiar</button>
+
+        <select value={filterProv} onChange={e => setFilterProv(e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer">
+          <option value="">Todos los proveedores</option>
+          {proveedores.map(p => <option key={p} value={p}>{p}</option>)}
+        </select>
+
+        <input
+          type="text"
+          placeholder="🔍 Buscar producto..."
+          value={filterProd}
+          onChange={e => setFilterProd(e.target.value)}
+          className="bg-white border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold text-gray-700 outline-none shadow-sm min-w-[180px]"
+        />
+
+        {hasFilters && (
+          <button onClick={() => { setFilterDate(''); setFilterProv(''); setFilterProd(''); }}
+            className="text-xs font-bold text-red-400 hover:text-red-600 bg-red-50 px-3 py-2 rounded-xl border border-red-100">
+            ✕ Limpiar
+          </button>
         )}
         <div className="ml-auto bg-red-50 border border-red-200 rounded-xl px-4 py-2">
           <span className="text-xs font-bold text-red-500 uppercase">Total gastos </span>
@@ -303,36 +333,51 @@ function ExpensesTable() {
 
       <div className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full text-sm min-w-[750px]">
             <thead>
               <tr className="bg-gray-50 border-b border-gray-100">
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Fecha</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Descripción</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Categoría</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Descripción / Producto</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Proveedor</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-left">Registrado por</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-red-500 uppercase tracking-widest text-right">Monto</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Foto</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase tracking-widest text-center">Acciones</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filtered.length === 0 ? (
-                <tr><td colSpan={6} className="py-12 text-center text-gray-400 font-bold">Sin gastos registrados</td></tr>
+                <tr><td colSpan={7} className="py-12 text-center text-gray-400 font-bold">Sin gastos registrados</td></tr>
               ) : (
                 filtered.map((expense: any) => (
                   <tr key={expense.id} className="hover:bg-red-50/20 transition-colors">
                     <td className="py-3 px-4 font-bold text-gray-600 text-xs whitespace-nowrap">{fmtDate(expense.fecha || expense.created_at)}</td>
                     <td className="py-3 px-4 font-bold text-gray-800 text-sm max-w-[200px]">{expense.descripcion || '—'}</td>
                     <td className="py-3 px-4">
-                      {expense.categoria && (
-                        <span className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">{expense.categoria}</span>
-                      )}
+                      {expense.proveedor ? (
+                        <span className="text-[10px] font-bold bg-orange-50 text-orange-600 border border-orange-100 px-2 py-0.5 rounded-full whitespace-nowrap">
+                          🏪 {expense.proveedor}
+                        </span>
+                      ) : <span className="text-gray-300 text-xs">—</span>}
                     </td>
                     <td className="py-3 px-4 font-bold text-gray-500 text-xs">{expense.creado_por || '—'}</td>
-                    <td className="py-3 px-4 text-right font-black text-red-600 text-base">{fmt(expense.monto || expense.amount || 0)}</td>
+                    <td className="py-3 px-4 text-right font-black text-red-600 text-base">{fmt(expense.monto ?? expense.valor ?? expense.amount ?? 0)}</td>
+                    <td className="py-3 px-4 text-center">
+                      {(expense.facturaUrl || expense.factura_url) ? (
+                        <button
+                          onClick={() => setPhotoSrc(expense.facturaUrl || expense.factura_url)}
+                          className="inline-flex items-center gap-1 bg-green-50 hover:bg-green-100 text-green-700 text-xs font-bold px-3 py-1.5 rounded-full border border-green-200 transition-colors"
+                        >
+                          📷 Ver
+                        </button>
+                      ) : (
+                        <span className="text-gray-300 text-xs font-bold">Sin foto</span>
+                      )}
+                    </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-1.5">
                         <button
-                          onClick={() => { setEditExpense(expense); setEditDesc(expense.descripcion||''); setEditMonto(String(expense.monto||expense.amount||0)); }}
+                          onClick={() => { setEditExpense(expense); setEditDesc(expense.descripcion||''); setEditMonto(String(expense.monto ?? expense.valor ?? expense.amount ?? 0)); }}
                           className="bg-amber-50 hover:bg-amber-100 text-amber-700 text-xs font-bold px-3 py-1.5 rounded-full border border-amber-200 transition-colors"
                         >✏️</button>
                         <button
@@ -351,7 +396,7 @@ function ExpensesTable() {
                 <tr className="bg-red-50 border-t-2 border-red-100">
                   <td colSpan={4} className="py-3 px-4 font-black text-red-600 text-sm uppercase">Total ({filtered.length} gastos)</td>
                   <td className="py-3 px-4 text-right font-black text-red-700 text-base">{fmt(total)}</td>
-                  <td />
+                  <td colSpan={2} />
                 </tr>
               </tfoot>
             )}
@@ -359,7 +404,8 @@ function ExpensesTable() {
         </div>
       </div>
 
-      {/* Modal edición gasto */}
+      {photoSrc && <PhotoModal src={photoSrc} onClose={() => setPhotoSrc(null)} />}
+
       {editExpense && (
         <div className="fixed inset-0 z-[200] bg-black/70 flex items-center justify-center p-4" onClick={() => setEditExpense(null)}>
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl" onClick={e => e.stopPropagation()}>
