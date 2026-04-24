@@ -27,7 +27,9 @@ export const useSellerSessionStore = create(
           shift: sessionData.shift,
           pointType: sessionData.pointType,
           responsibleName: sessionData.responsibleName,
-          openedAt: new Date().toISOString(),
+          // Usar el openedAt que viene del setup (ya generado antes de crear el posShift)
+          // para garantizar que ambos usen exactamente el mismo timestamp.
+          openedAt: sessionData.openedAt || new Date().toISOString(),
         });
       },
 

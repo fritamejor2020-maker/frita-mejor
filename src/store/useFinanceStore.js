@@ -2,6 +2,33 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
 
+// ── Sube una foto base64 a Supabase Storage y devuelve la URL pública ──────────
+async function uploadPhoto(base64) {
+  if (!base64) return null;
+  try {
+    // Convertir base64 a Blob
+    const res  = await fetch(base64);
+    const blob = await res.blob();
+    const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+    const path = `incomes/${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('income-photos')
+      .upload(path, blob, { contentType: blob.type, upsert: false });
+
+    if (error) {
+      console.warn('[FinanceStore] uploadPhoto error:', error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('income-photos').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (e) {
+    console.warn('[FinanceStore] uploadPhoto falló:', e.message);
+    return null;
+  }
+}
+
 export const useFinanceStore = create(
   persist(
     (set, get) => ({
@@ -10,8 +37,7 @@ export const useFinanceStore = create(
       isLoading: false,
       error: null,
 
-      // Intenta traer datos de Supabase (si las tablas existen).
-      // Si fallan, NO sobreescribe los datos locales para preservar el caché.
+      // ── Fetch inicial desde Supabase (datos compartidos de todos los usuarios) ──
       fetchFinances: async () => {
         set({ isLoading: true });
         try {
@@ -20,12 +46,18 @@ export const useFinanceStore = create(
             supabase.from('expenses').select('*').order('created_at', { ascending: false }),
           ]);
 
-          // Solo actualizar si vinieron datos reales (no sobreescribir con array vacío por error de tabla)
-          if (!incomesRes.error && incomesRes.data?.length > 0) {
-            set({ incomes: incomesRes.data });
+          // Actualizar siempre que no haya error (aunque el array esté vacío)
+          if (!incomesRes.error) {
+            set({ incomes: incomesRes.data || [] });
           }
-          if (!expensesRes.error && expensesRes.data?.length > 0) {
-            set({ expenses: expensesRes.data });
+          // Normalizar facturaUrl (puede venir como factura_url desde Supabase)
+          const normalizeExpense = (e) => ({
+            ...e,
+            facturaUrl: e.facturaUrl || e.factura_url || null,
+            monto: e.monto ?? e.valor ?? 0,
+          });
+          if (!expensesRes.error) {
+            set({ expenses: (expensesRes.data || []).map(normalizeExpense) });
           }
         } catch (error) {
           console.warn('[FinanceStore] fetchFinances falló — usando datos locales:', error.message);
@@ -34,21 +66,85 @@ export const useFinanceStore = create(
         }
       },
 
+      // ── Realtime: escuchar cambios en incomes de todos los usuarios ────────────
+      subscribeToIncomes: () => {
+        const channel = supabase
+          .channel('incomes-realtime')
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'incomes' },
+            (payload) => {
+              const newRow = payload.new;
+              set((state) => {
+                // Reemplazar optimistic local o agregar nuevo
+                const exists = state.incomes.some((i) => i.id === newRow.id);
+                if (exists) {
+                  return { incomes: state.incomes.map((i) => i.id === newRow.id ? newRow : i) };
+                }
+                // También reemplazar el entry local temporal (id: local-...)
+                const withoutOptimistic = state.incomes.filter(
+                  (i) => !String(i.id).startsWith('local-')
+                    || i.ubicacion !== newRow.ubicacion
+                    || i.created_at?.slice(0, 16) !== newRow.created_at?.slice(0, 16)
+                );
+                return { incomes: [newRow, ...withoutOptimistic] };
+              });
+            }
+          )
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'incomes' },
+            (payload) => {
+              set((state) => ({
+                incomes: state.incomes.map((i) => i.id === payload.new.id ? payload.new : i),
+              }));
+            }
+          )
+          .on('postgres_changes',
+            { event: 'DELETE', schema: 'public', table: 'incomes' },
+            (payload) => {
+              set((state) => ({
+                incomes: state.incomes.filter((i) => i.id !== payload.old.id),
+              }));
+            }
+          )
+          .subscribe();
+
+        // Devolver función de cleanup para useEffect
+        return () => supabase.removeChannel(channel);
+      },
+
       addIncome: async (incomeData) => {
         const newIncome = {
-          id: Date.now().toString(),
+          id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
           ...incomeData,
         };
-        // Actualización optimista
+        // Actualización optimista local (incluye todos los campos para el chat)
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
-        // Intentar persistir en Supabase (silencioso si falla)
         try {
-          const { data, error } = await supabase.from('incomes').insert([incomeData]).select();
-          if (!error && data?.[0]) {
+          const photoUrl = await uploadPhoto(incomeData.photoBase64);
+          // Quitar campos que no existen en la tabla de Supabase
+          const {
+            photoBase64: _pb,
+            esDescargue: _ed,
+            esCierre: _ec,
+            ...incomeForDB
+          } = incomeData;
+          const incomeWithPhoto = { ...incomeForDB, ...(photoUrl ? { photoUrl } : {}) };
+
+          const { data, error } = await supabase.from('incomes').insert([incomeWithPhoto]).select();
+          if (error) {
+            console.warn('[FinanceStore] addIncome error Supabase:', error.message);
+          } else if (data?.[0]) {
             set((state) => ({
-              incomes: state.incomes.map((i) => (i.id === newIncome.id ? data[0] : i)),
+              incomes: state.incomes.map((i) =>
+                i.id === newIncome.id
+                  ? { ...data[0], photoBase64: incomeData.photoBase64, photoUrl,
+                      subtipo: incomeData.subtipo,
+                      esDescargue: incomeData.esDescargue,
+                      esCierre: incomeData.esCierre }
+                  : i
+              ),
             }));
           }
         } catch (e) {
@@ -56,10 +152,11 @@ export const useFinanceStore = create(
         }
       },
 
+
       addMultipleIncomes: async (incomesArray) => {
         const timestamp = new Date().toISOString();
         const newIncomes = incomesArray.map((inc, idx) => ({
-          id: `${Date.now()}-${idx}`,
+          id: `local-${Date.now()}-${idx}`,
           created_at: timestamp,
           ...inc,
         }));
@@ -67,16 +164,28 @@ export const useFinanceStore = create(
         set((state) => ({ incomes: [...newIncomes, ...state.incomes] }));
 
         try {
-          const { data, error } = await supabase.from('incomes').insert(incomesArray).select();
-          if (!error && data?.length) {
+          // Subir todas las fotos a Storage en paralelo
+          const photosUrls = await Promise.all(
+            incomesArray.map((inc) => uploadPhoto(inc.photoBase64))
+          );
+          const incomesForDB = incomesArray.map(({ photoBase64: _p, ...rest }, i) => ({
+            ...rest,
+            ...(photosUrls[i] ? { photoUrl: photosUrls[i] } : {}),
+          }));
+          const { data, error } = await supabase.from('incomes').insert(incomesForDB).select();
+          if (error) {
+            console.warn('[FinanceStore] addMultipleIncomes error Supabase:', error.message);
+          } else if (data?.length) {
             set((state) => {
               const updated = [...state.incomes];
-              newIncomes.forEach((opt) => {
-                const idx = updated.findIndex((i) => i.id === opt.id);
+              newIncomes.forEach((opt, idx) => {
+                const i = updated.findIndex((x) => x.id === opt.id);
                 const dbEntry = data.find(
                   (d) => d.ubicacion === opt.ubicacion && d.jornada === opt.jornada && d.tipo === opt.tipo
                 );
-                if (idx !== -1 && dbEntry) updated[idx] = dbEntry;
+                if (i !== -1 && dbEntry) {
+                  updated[i] = { ...dbEntry, photoBase64: opt.photoBase64, photoUrl: photosUrls[idx] };
+                }
               });
               return { incomes: updated };
             });
@@ -86,29 +195,104 @@ export const useFinanceStore = create(
         }
       },
 
+      /**
+       * Retorna los descargues del día para una franja horaria específica.
+       * Filtra incomes de hoy con tipo que empiece con "Descargue".
+       */
+      getTodayDescarguesFor: (ubicacion, jornada, slot) => {
+        const today = new Date().toISOString().slice(0, 10);
+        return get().incomes.filter(inc => {
+          const incDate = (inc.fecha || inc.created_at || '').slice(0, 10);
+          return (
+            incDate === today &&
+            inc.ubicacion === ubicacion &&
+            inc.jornada === jornada &&
+            inc.tipo === slot &&
+            // Es un descargue si tiene esDescargue=true O si el subtipo empieza con 'Descargue'
+            (inc.esDescargue === true || (inc.subtipo && String(inc.subtipo).startsWith('Descargue')))
+          );
+        }).sort((a, b) => new Date(a.fecha || a.created_at) - new Date(b.fecha || b.created_at));
+      },
+
       addExpense: async (expenseData) => {
         const newExpense = {
-          id: Date.now().toString(),
+          id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
           ...expenseData,
         };
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
-          const { data, error } = await supabase.from('expenses').insert([expenseData]).select();
-          if (!error && data?.[0]) {
+          // Excluir campos que Supabase auto-genera o que no existen en la tabla
+          const { valor, created_at: _ca, id: _id, ...rest } = expenseData;
+          const expenseForDB = {
+            ...rest,
+            monto: valor ?? expenseData.monto ?? 0,
+          };
+          console.log('[FinanceStore] addExpense payload:', expenseForDB);
+          const { data, error } = await supabase.from('expenses').insert([expenseForDB]).select();
+          if (error) {
+            console.warn('[FinanceStore] addExpense error Supabase:', error.message, error.details, error.hint);
+          } else if (data?.[0]) {
             set((state) => ({
-              expenses: state.expenses.map((e) => (e.id === newExpense.id ? data[0] : e)),
+              expenses: state.expenses.map((e) =>
+                e.id === newExpense.id
+                  ? { ...data[0], valor: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null }
+                  : e
+              ),
             }));
           }
         } catch (e) {
-          console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.');
+          console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.', e.message);
         }
+      },
+
+      // ── Realtime para gastos ─────────────────────────────────────────
+      subscribeToExpenses: () => {
+        const channel = supabase
+          .channel('expenses-realtime')
+          .on('postgres_changes',
+            { event: 'INSERT', schema: 'public', table: 'expenses' },
+            (payload) => {
+              const row = {
+                ...payload.new,
+                valor: payload.new.monto,
+                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
+              };
+              set((state) => {
+                const exists = state.expenses.some((e) => e.id === row.id);
+                if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
+                // Quitar el entry local temporal si coincide
+                const withoutLocal = state.expenses.filter(
+                  (e) => !String(e.id).startsWith('local-') || e.descripcion !== row.descripcion
+                );
+                return { expenses: [row, ...withoutLocal] };
+              });
+            }
+          )
+          .on('postgres_changes',
+            { event: 'UPDATE', schema: 'public', table: 'expenses' },
+            (payload) => {
+              const row = {
+                ...payload.new,
+                valor: payload.new.monto,
+                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
+              };
+              set((state) => ({ expenses: state.expenses.map((e) => e.id === row.id ? row : e) }));
+            }
+          )
+          .on('postgres_changes',
+            { event: 'DELETE', schema: 'public', table: 'expenses' },
+            (payload) => {
+              set((state) => ({ expenses: state.expenses.filter((e) => e.id !== payload.old.id) }));
+            }
+          )
+          .subscribe();
+        return () => supabase.removeChannel(channel);
       },
     }),
     {
       name: 'frita-mejor-finances',
-      // Solo persistir los arrays de datos (no isLoading, error)
       partialize: (state) => ({
         incomes:  state.incomes,
         expenses: state.expenses,

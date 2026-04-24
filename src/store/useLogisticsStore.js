@@ -99,6 +99,24 @@ export const useLogisticsStore = create(
     set({ pendingRequests: updated });
     get().clearRestockCart();
     syncKey('pendingRequests', updated);
+
+    // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
+    try {
+      const itemsSummary = newRequest.items_payload
+        .map(i => `${i.abbreviation || i.name} ×${i.qty}`)
+        .join(', ');
+
+      supabase.functions.invoke('notify-dejadors', {
+        body: {
+          pointId:   pointId,
+          requestId: newRequest.id,
+          body:      `📦 ${pointId} necesita surtido`,
+          items:     itemsSummary,
+        },
+      }).catch(err => console.warn('[Push] No se pudo enviar notificación:', err?.message));
+    } catch (_) {
+      // No interrumpir el flujo si la notificación falla
+    }
   },
 
   // ===============================

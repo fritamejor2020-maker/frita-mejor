@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Prueba de Sonidos — Frita Mejor</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Segoe UI', sans-serif; background: #0f172a; color: #f1f5f9; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .card { background: #1e293b; border-radius: 20px; padding: 32px; max-width: 480px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.5); }
+    h1 { font-size: 1.5rem; font-weight: 800; color: #f8fafc; margin-bottom: 6px; }
+    p  { color: #94a3b8; font-size: 0.9rem; margin-bottom: 24px; }
+    .btn {
+      display: flex; align-items: center; gap: 14px;
+      width: 100%; padding: 16px 20px; margin-bottom: 10px;
+      background: #0f172a; border: 2px solid #1e3a5f;
+      border-radius: 14px; color: #f1f5f9;
+      font-size: 1rem; font-weight: 600; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .btn:hover  { background: #1e3a5f; border-color: #3b82f6; transform: translateY(-1px); }
+    .btn:active { transform: scale(0.98); }
+    .btn.playing { border-color: #10b981; background: #064e3b; }
+    .emoji { font-size: 1.4rem; }
+    .label { flex: 1; text-align: left; }
+    .tag { font-size: 0.72rem; background: #334155; color: #94a3b8; padding: 2px 8px; border-radius: 20px; }
+    .tag.rec { background: #1d4ed8; color: #bfdbfe; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>🔔 Prueba de Sonidos</h1>
+    <p>Haz click para escuchar cada opción y elige la que más te guste</p>
+
+    <button class="btn" onclick="play(this, '/sounds/3note_achievement.wav')">
+      <span class="emoji">🎵</span>
+      <span class="label">Achievement</span>
+      <span class="tag rec">⭐ 3 notas</span>
+    </button>
+
+    <button class="btn" onclick="play(this, '/sounds/3note_magic.wav')">
+      <span class="emoji">✨</span>
+      <span class="label">Magic</span>
+      <span class="tag">3 notas · corto</span>
+    </button>
+
+    <button class="btn" onclick="play(this, '/sounds/3note_success.wav')">
+      <span class="emoji">🏆</span>
+      <span class="label">Success</span>
+      <span class="tag">3 notas</span>
+    </button>
+
+    <button class="btn" onclick="play(this, '/sounds/3note_correct.wav')">
+      <span class="emoji">✅</span>
+      <span class="label">Correct</span>
+      <span class="tag">3 notas · largo</span>
+    </button>
+
+    <button class="btn" onclick="play(this, '/sounds/mixkit_bell.wav')">
+      <span class="emoji">🔔</span>
+      <span class="label">Bell</span>
+      <span class="tag">campana</span>
+    </button>
+  </div>
+
+  <script>
+    let current = null;
+    function play(btn, src) {
+      if (current) { current.pause(); current.currentTime = 0; }
+      document.querySelectorAll('.btn').forEach(b => b.classList.remove('playing'));
+      const a = new Audio(src);
+      a.volume = 1.0;
+      a.play();
+      current = a;
+      btn.classList.add('playing');
+      a.onended = () => btn.classList.remove('playing');
+    }
+  </script>
+</body>
+</html>

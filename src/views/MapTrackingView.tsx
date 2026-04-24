@@ -100,6 +100,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
   const [connected, setConnected] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
+  const [selectedVehicleLabel, setSelectedVehicleLabel] = useState<string | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   // Presence data — se fusiona con datos de la BD
   const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
@@ -328,7 +329,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
                 maxWidth: 320, width: '90vw',
               }}>
                 <div style={{ fontWeight: 900, fontSize: 11, color: '#6b7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                  📦 Inventario en Ruta · {selectedVehicleId}
+                  📦 Inventario en Ruta · {selectedVehicleLabel || selectedVehicleId}
                 </div>
                 <VehicleShiftCard vehicleId={selectedVehicleId} activeOnly />
               </div>
@@ -361,12 +362,12 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
                   {vendors.map((v) => {
                     const stale    = isStale(v.updatedAt);
                     const offline  = v.source === 'offline';
-                    const effectiveId = v.pointId || v.vendorId;
-                    const isSelected = selectedVehicleId === effectiveId;
+                    const vehicleKey = v.pointId || v.vendorId;
+                    const isSelected = selectedVehicleId === vehicleKey;
                     return (
                   <div
                         key={v.vendorId}
-                        onClick={() => setSelectedVehicleId(isSelected ? null : effectiveId)}
+                        onClick={() => { setSelectedVehicleId(isSelected ? null : vehicleKey); setSelectedVehicleLabel(isSelected ? null : (v.pointId || v.name)); }}
                         style={{
                           background: isSelected ? '#fef3c7' : offline ? '#f9fafb' : stale ? '#f9fafb' : 'white',
                           border: `2px solid ${isSelected ? '#f59e0b' : offline ? '#d1d5db' : stale ? '#e5e7eb' : '#d1fae5'}`,
