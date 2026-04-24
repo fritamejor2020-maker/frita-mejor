@@ -196,29 +196,27 @@ export const useFinanceStore = create(
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
-          // Mapear campo 'valor' a 'monto' para que coincida con el schema de Supabase
-          const { valor, ...rest } = expenseData;
-          // Guardar facturaUrl como factura_url para compatibilidad con Supabase snake_case
-          const { facturaUrl: facturaUrlVal, ...restWithoutFactura } = rest;
+          // Excluir campos que Supabase auto-genera o que no existen en la tabla
+          const { valor, created_at: _ca, id: _id, ...rest } = expenseData;
           const expenseForDB = {
-            ...restWithoutFactura,
+            ...rest,
             monto: valor ?? expenseData.monto ?? 0,
-            factura_url: facturaUrlVal || null,
           };
+          console.log('[FinanceStore] addExpense payload:', expenseForDB);
           const { data, error } = await supabase.from('expenses').insert([expenseForDB]).select();
           if (error) {
-            console.warn('[FinanceStore] addExpense error Supabase:', error.message);
+            console.warn('[FinanceStore] addExpense error Supabase:', error.message, error.details, error.hint);
           } else if (data?.[0]) {
             set((state) => ({
               expenses: state.expenses.map((e) =>
                 e.id === newExpense.id
-                  ? { ...data[0], valor: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || facturaUrlVal || null }
+                  ? { ...data[0], valor: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null }
                   : e
               ),
             }));
           }
         } catch (e) {
-          console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.');
+          console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.', e.message);
         }
       },
 
