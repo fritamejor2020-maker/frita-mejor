@@ -86,7 +86,8 @@ export const usePayrollStore = create(
           periodo,
           savedAt: new Date().toISOString(),
           creadoPor,
-          filas: filas.map(f => ({
+          filas: filas.map((f, idx) => ({
+            id: f.id || `FILA-${Date.now()}-${idx}`,
             ...f,
             nomina:      Number(f.nomina)      || 0,
             extras:      Number(f.extras)      || 0,
@@ -103,6 +104,32 @@ export const usePayrollStore = create(
 
       deletePayroll: (id) => {
         const updated = get().payrollRecords.filter(r => r.id !== id);
+        set({ payrollRecords: updated });
+        syncKey('payrollRecords', updated);
+      },
+
+      // Alias para el admin (mismo comportamiento)
+      deletePayrollRecord: (id) => {
+        const updated = get().payrollRecords.filter(r => r.id !== id);
+        set({ payrollRecords: updated });
+        syncKey('payrollRecords', updated);
+      },
+
+      /**
+       * Edita campos de una fila individual dentro de un registro ya guardado.
+       * Permite al admin corregir valores sin tener que re-guardar todo el período.
+       */
+      updatePayrollRow: (recordId, filaId, changes) => {
+        const updated = get().payrollRecords.map(rec => {
+          if (rec.id !== recordId) return rec;
+          return {
+            ...rec,
+            filas: rec.filas.map((f, idx) => {
+              const key = f.id || `idx-${idx}`;
+              return key === filaId ? { ...f, ...changes } : f;
+            }),
+          };
+        });
         set({ payrollRecords: updated });
         syncKey('payrollRecords', updated);
       },

@@ -6,6 +6,7 @@ import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
+import { usePayrollStore } from '../../store/usePayrollStore';
 import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab, ResumenOperativoTab } from '../../components/admin/AdminFinancesTab';
 import { AdminIncomesExpensesTab } from '../../components/admin/AdminIncomesExpensesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
@@ -631,6 +632,9 @@ function ReportsPanel() {
   // External stores
   const finIncomes = useFinanceStore(s => s.incomes) || [];
   const finExpenses = useFinanceStore(s => s.expenses) || [];
+  const payrollRecords   = usePayrollStore(s => s.payrollRecords);
+  const payrollEmployees = usePayrollStore(s => s.payrollEmployees);
+  const { updatePayrollRow, deletePayrollRecord } = usePayrollStore.getState();
   
   const logLoadHistory = useLogisticsStore(s => s.loadHistory) || [];
   const logCompleted = useLogisticsStore(s => s.completedRequests) || [];
@@ -1005,6 +1009,7 @@ function ReportsPanel() {
             <div className="flex gap-2 mb-4">
               <button onClick={() => setFinSubtab('ingresos')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${finSubtab === 'ingresos' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>💰 Ingresos ({finIncomes.length})</button>
               <button onClick={() => setFinSubtab('egresos')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${finSubtab === 'egresos' ? 'bg-red-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>💸 Egresos ({allExpenses.length})</button>
+              <button onClick={() => setFinSubtab('nomina')} className={`px-4 py-1.5 rounded-full text-xs font-bold transition-all ${finSubtab === 'nomina' ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>👥 Nómina ({payrollRecords.length})</button>
             </div>
             <div className="flex justify-end mb-3 gap-2">
               {finSubtab === 'ingresos' && (
@@ -1084,6 +1089,104 @@ function ReportsPanel() {
                 </div>
               )
             )}
+            {finSubtab === 'nomina' && (
+              payrollRecords.length === 0 ? (
+                <div className="text-center py-12"><span className="text-5xl block mb-3">👥</span><p className="font-bold text-gray-400">No hay registros de nómina.</p></div>
+              ) : (
+                <div className="space-y-6">
+                  {[...payrollRecords].sort((a,b) => b.periodo.localeCompare(a.periodo)).map((rec) => {
+                    const totalRec = rec.filas.reduce((s,f) => s + (Number(f.nomina)||0) + (Number(f.extras)||0) + (Number(f.vacaciones)||0) + (Number(f.liquidacion)||0), 0);
+                    return (
+                      <div key={rec.id} className="border border-violet-100 rounded-2xl overflow-hidden">
+                        {/* Header del período */}
+                        <div className="bg-violet-50 px-5 py-3 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg">📅</span>
+                            <div>
+                              <p className="font-black text-violet-800 text-sm">{rec.periodo}</p>
+                              <p className="text-xs font-bold text-violet-400">{rec.filas.length} empleados</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3">
+                            <span className="font-black text-violet-700">{fmtMoney(totalRec)}</span>
+                            <button onClick={() => deletePayrollRecord(rec.id)} className="w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center transition-colors" title="Eliminar período">✕</button>
+                          </div>
+                        </div>
+                        {/* Tabla editable */}
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-sm whitespace-nowrap">
+                            <thead className="bg-gray-50 border-b border-gray-100">
+                              <tr>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-left">Empleado</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Nómina</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Extras</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Vacaciones</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Liquidación</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Total</th>
+                                <th className="py-2 px-4 text-[10px] font-bold text-gray-400 uppercase">Notas</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-50">
+                              {rec.filas.map((fila, filaIdx) => {
+                                const totalFila = (Number(fila.nomina)||0)+(Number(fila.extras)||0)+(Number(fila.vacaciones)||0)+(Number(fila.liquidacion)||0);
+                                const filaKey = fila.id || `idx-${filaIdx}`;
+                                const EditCell = ({campo, color='text-gray-700'}) => (
+                                  <td className="py-2 px-2 text-right">
+                                    <input
+                                      type="number" min="0"
+                                      className={`w-24 text-right font-bold text-sm border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-violet-400 ${color}`}
+                                      defaultValue={fila[campo] || ''}
+                                      onBlur={(e) => updatePayrollRow(rec.id, filaKey, { [campo]: Number(e.target.value)||0 })}
+                                    />
+                                  </td>
+                                );
+                                return (
+                                  <tr key={filaKey} className="hover:bg-violet-50/30">
+                                    <td className="py-2 px-4">
+                                      <input
+                                        type="text"
+                                        className="font-bold text-sm border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-violet-400 w-36"
+                                        defaultValue={fila.empleadoNombre || fila.nombre || ''}
+                                        onBlur={(e) => updatePayrollRow(rec.id, filaKey, { empleadoNombre: e.target.value })}
+                                      />
+                                    </td>
+                                    <EditCell campo="nomina" color="text-emerald-700" />
+                                    <EditCell campo="extras" color="text-blue-700" />
+                                    <EditCell campo="vacaciones" color="text-amber-700" />
+                                    <EditCell campo="liquidacion" color="text-red-700" />
+                                    <td className="py-2 px-4 text-right font-black text-violet-700">{fmtMoney(totalFila)}</td>
+                                    <td className="py-2 px-4">
+                                      <input
+                                        type="text"
+                                        className="font-bold text-xs border border-gray-200 rounded-lg px-2 py-1 outline-none focus:border-violet-400 w-32 text-gray-500"
+                                        defaultValue={fila.observacion || fila.notas || ''}
+                                        onBlur={(e) => updatePayrollRow(rec.id, filaKey, { observacion: e.target.value })}
+                                      />
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {/* Fila de totales */}
+                              <tr className="bg-violet-50 font-black">
+                                <td className="py-2 px-4 text-violet-700 text-xs uppercase tracking-wider">TOTAL</td>
+                                {['nomina','extras','vacaciones','liquidacion'].map(campo => (
+                                  <td key={campo} className="py-2 px-4 text-right text-violet-800">
+                                    {fmtMoney(rec.filas.reduce((s,f) => s+(Number(f[campo])||0), 0))}
+                                  </td>
+                                ))}
+                                <td className="py-2 px-4 text-right text-violet-900">{fmtMoney(totalRec)}</td>
+                                <td />
+                              </tr>
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
           </div>
         );
       })()}
