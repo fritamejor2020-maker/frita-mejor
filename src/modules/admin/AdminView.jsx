@@ -2222,6 +2222,135 @@ function useDbSize() {
   return dbInfo;
 }
 
+// ─── Panel de Nómina para Admin ───────────────────────────────────────────────
+function NominaAdminPanel({ fmtMoney }) {
+  const payrollRecords = usePayrollStore(s => s.payrollRecords);
+  const { updatePayrollRow, deletePayrollRecord } = usePayrollStore.getState();
+  const fmt = fmtMoney || ((v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0));
+
+  if (payrollRecords.length === 0) {
+    return (
+      <div className="text-center py-16">
+        <span className="text-6xl block mb-4">👥</span>
+        <p className="font-black text-gray-400 text-lg">No hay registros de nómina aún</p>
+        <p className="text-gray-300 font-bold text-sm mt-1">Los registros aparecerán aquí cuando se guarden desde el módulo de Nómina</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-black text-chunky-dark text-xl">👥 Nómina y Pago a Personal</h3>
+          <p className="text-xs text-gray-400 font-bold mt-0.5">Edita directamente cualquier celda — los cambios se sincronizan automáticamente</p>
+        </div>
+        <span className="bg-violet-100 text-violet-700 text-xs font-black px-3 py-1.5 rounded-full">{payrollRecords.length} período(s)</span>
+      </div>
+
+      {[...payrollRecords].sort((a,b) => b.periodo.localeCompare(a.periodo)).map((rec) => {
+        const totalRec = rec.filas.reduce((s,f) => s + (Number(f.nomina)||0) + (Number(f.extras)||0) + (Number(f.vacaciones)||0) + (Number(f.liquidacion)||0), 0);
+        return (
+          <div key={rec.id} className="border border-violet-100 rounded-2xl overflow-hidden shadow-sm">
+            {/* Header del período */}
+            <div className="bg-gradient-to-r from-violet-50 to-purple-50 px-5 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-violet-100 rounded-xl flex items-center justify-center text-xl">📅</div>
+                <div>
+                  <p className="font-black text-violet-800">{rec.periodo}</p>
+                  <p className="text-xs font-bold text-violet-400">{rec.filas.length} empleados · Creado por {rec.creadoPor || '—'}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <div className="text-right">
+                  <p className="text-xs font-bold text-violet-400">Total período</p>
+                  <p className="font-black text-violet-700 text-lg">{fmt(totalRec)}</p>
+                </div>
+                <button
+                  onClick={() => { if (window.confirm(`¿Eliminar la nómina de ${rec.periodo}?`)) deletePayrollRecord(rec.id); }}
+                  className="w-8 h-8 rounded-full bg-red-50 text-red-400 hover:bg-red-100 flex items-center justify-center transition-colors"
+                  title="Eliminar período"
+                >✕</button>
+              </div>
+            </div>
+
+            {/* Tabla editable */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead className="bg-gray-50 border-b border-gray-100">
+                  <tr>
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase text-left">Empleado</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-emerald-500 uppercase text-right">Nómina</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-blue-500 uppercase text-right">Extras</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-amber-500 uppercase text-right">Vacaciones</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-red-500 uppercase text-right">Liquidación</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-violet-600 uppercase text-right">Total</th>
+                    <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Observaciones</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {rec.filas.map((fila, filaIdx) => {
+                    const totalFila = (Number(fila.nomina)||0)+(Number(fila.extras)||0)+(Number(fila.vacaciones)||0)+(Number(fila.liquidacion)||0);
+                    const filaKey = fila.id || `idx-${filaIdx}`;
+                    const EditCell = ({ campo, color }) => (
+                      <td className="py-2 px-2 text-right">
+                        <input
+                          type="number" min="0"
+                          className={`w-24 text-right font-bold text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200 transition-all ${color}`}
+                          defaultValue={fila[campo] || ''}
+                          onBlur={(e) => updatePayrollRow(rec.id, filaKey, { [campo]: Number(e.target.value)||0 })}
+                        />
+                      </td>
+                    );
+                    return (
+                      <tr key={filaKey} className="hover:bg-violet-50/30 transition-colors">
+                        <td className="py-2 px-4">
+                          <input
+                            type="text"
+                            className="font-bold text-sm border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400 focus:ring-1 focus:ring-violet-200 w-40 transition-all"
+                            defaultValue={fila.empleadoNombre || fila.nombre || ''}
+                            onBlur={(e) => updatePayrollRow(rec.id, filaKey, { empleadoNombre: e.target.value })}
+                          />
+                        </td>
+                        <EditCell campo="nomina"      color="text-emerald-700" />
+                        <EditCell campo="extras"      color="text-blue-700" />
+                        <EditCell campo="vacaciones"  color="text-amber-700" />
+                        <EditCell campo="liquidacion" color="text-red-700" />
+                        <td className="py-2 px-4 text-right font-black text-violet-700">{fmt(totalFila)}</td>
+                        <td className="py-2 px-4">
+                          <input
+                            type="text"
+                            className="font-bold text-xs border border-gray-200 rounded-lg px-2 py-1.5 outline-none focus:border-violet-400 w-36 text-gray-500 transition-all"
+                            defaultValue={fila.observacion || fila.notas || ''}
+                            onBlur={(e) => updatePayrollRow(rec.id, filaKey, { observacion: e.target.value })}
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+                {/* Fila de totales */}
+                <tfoot>
+                  <tr className="bg-violet-50 border-t-2 border-violet-200">
+                    <td className="py-3 px-4 font-black text-violet-700 text-xs uppercase tracking-wider">TOTAL</td>
+                    {['nomina','extras','vacaciones','liquidacion'].map(campo => (
+                      <td key={campo} className="py-3 px-4 text-right font-black text-violet-800">
+                        {fmt(rec.filas.reduce((s,f) => s+(Number(f[campo])||0), 0))}
+                      </td>
+                    ))}
+                    <td className="py-3 px-4 text-right font-black text-violet-900 text-base">{fmt(totalRec)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export function AdminView() {
   const signOut = useAuthStore((s) => s.signOut);
   const { inventory } = useInventoryStore();
@@ -2257,6 +2386,7 @@ export function AdminView() {
       { id: 'EGRESOS',    label: '💸 Egresos' },
       { id: 'FUENTES_ING',label: '💵 Fuentes de Ingreso' },
       { id: 'PROVEEDORES',label: '🤝 Proveedores (Gastos)' },
+      { id: 'NOMINA',     label: '👥 Nómina' },
     ],
     SISTEMA: [
       { id: 'USUARIOS',      label: '👥 Usuarios del Sistema' },
@@ -2396,6 +2526,7 @@ export function AdminView() {
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
+        { activeTab === 'NOMINA' && <NominaAdminPanel fmtMoney={fmtMoney} /> }
       </div>
     </div>
   );
