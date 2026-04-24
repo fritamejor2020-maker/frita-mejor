@@ -79,7 +79,7 @@ function IncomesBubble({ income }) {
   const color   = avatarColor(name);
 
   const shareText =
-    `💰 *INGRESO REGISTRADO*\n` +
+    `${income.subtipo ? (income.subtipo.startsWith('Descargue') ? '💵' : '🔒') : '💰'} *${income.subtipo ? income.subtipo.toUpperCase() : 'INGRESO REGISTRADO'}*\n` +
     `👤 ${name}\n` +
     `📍 ${income.ubicacion || ''} ${income.jornada ? `· Jornada ${income.jornada}` : ''} ${income.tipo ? `· ${income.tipo}` : ''}\n` +
     (income.vendedor ? `🛵 Vendedor: ${income.vendedor}\n` : '') +
@@ -148,6 +148,16 @@ function IncomesBubble({ income }) {
 
           {/* Etiquetas */}
           <div className="flex flex-wrap gap-1.5 mb-2">
+            {/* Badge de subtipo (Descargue N / Cierre Final) — va primero y destacado */}
+            {income.subtipo && (
+              <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full border ${
+                income.subtipo.startsWith('Descargue')
+                  ? 'bg-amber-950/60 border-amber-700/50 text-amber-400'
+                  : 'bg-green-950/60 border-green-700/50 text-green-400'
+              }`}>
+                {income.subtipo.startsWith('Descargue') ? '💵' : '🔒'} {income.subtipo}
+              </span>
+            )}
             {income.ubicacion && (
               <span className="text-[10px] font-bold bg-green-900/40 text-green-300 px-2 py-0.5 rounded-full">
                 {income.ubicacion}

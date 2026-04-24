@@ -560,14 +560,65 @@ export function IncomesModal({ onClose }) {
               )}
 
               {/* Total */}
-              <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-1 shadow-inner">
-                <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
-                  <span>{isDescargueMode ? 'Solo Efectivo' : 'Efectivo + Transferencias + Salidas'}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm font-bold text-gray-400 uppercase">{isDescargueMode ? selectedSubtipo : 'Total Ingreso'}</span>
-                  <span className="text-3xl font-black text-green-400">{formatMoney(isDescargueMode ? numEfectivo : totalSingle)}</span>
-                </div>
+              <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-2 shadow-inner">
+                {isDescargueMode ? (
+                  /* Descargue: solo muestra el monto del retiro */
+                  <>
+                    <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
+                      <span>Solo Efectivo — retiro de caja</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-amber-400 uppercase">{selectedSubtipo}</span>
+                      <span className="text-3xl font-black text-amber-400">{formatMoney(numEfectivo)}</span>
+                    </div>
+                  </>
+                ) : isCierreMode ? (
+                  /* Cierre Final: Total Ingreso + Descargues + Total del Cierre */
+                  <>
+                    {/* Total del formulario actual */}
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
+                      <span className="text-2xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                    </div>
+                    {/* Descargues previos */}
+                    {descarguesPrevios.length > 0 && (
+                      <>
+                        <div className="border-t border-gray-800 pt-2 space-y-1">
+                          {descarguesPrevios.map((d, i) => (
+                            <div key={d.id || i} className="flex justify-between items-center text-sm">
+                              <span className="text-amber-400 font-bold">💵 {d.subtipo || `Descargue ${i + 1}`}</span>
+                              <span className="font-black text-amber-300">{formatMoney(d.efectivo || 0)}</span>
+                            </div>
+                          ))}
+                        </div>
+                        {/* Total del Cierre = ingreso + todos los descargues */}
+                        <div className="flex justify-between items-center border-t-2 border-green-700/50 pt-2 mt-1">
+                          <span className="text-sm font-black text-green-300 uppercase">Total del Cierre</span>
+                          <span className="text-3xl font-black text-green-400">
+                            {formatMoney(totalSingle + descarguesPrevios.reduce((s, d) => s + (d.efectivo || 0), 0))}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                    {descarguesPrevios.length === 0 && (
+                      <div className="flex justify-between items-center border-t border-gray-800 pt-2">
+                        <span className="text-sm font-black text-green-300 uppercase">Total del Cierre</span>
+                        <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  /* Ingreso normal sin descargues */
+                  <>
+                    <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
+                      <span>Efectivo + Transferencias + Salidas</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
+                      <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Foto del sobre */}
