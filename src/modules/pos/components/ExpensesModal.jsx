@@ -12,9 +12,10 @@ export function ExpensesModal({ onClose }) {
   const { suppliers, addSupplier, learnProductForSupplier, suggestSuppliersForProduct } = useSupplierStore();
   const fileInputRef = useRef(null);     // galería
   const cameraInputRef = useRef(null);  // cámara directa
-  const [facturaFile, setFacturaFile] = useState(null); // archivo real para subir
+  const [facturaFile, setFacturaFile] = useState(null);
+  const [photoRotation, setPhotoRotation] = useState(0);
   
-  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]); // YYYY-MM-DD
+  const [fecha, setFecha] = useState(new Date().toISOString().split('T')[0]);
   const [descripcion, setDescripcion] = useState('');
   const [proveedor, setProveedor] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -44,22 +45,48 @@ export function ExpensesModal({ onClose }) {
     const file = e.target.files[0];
     if (file) {
       const previewUrl = URL.createObjectURL(file);
-      setFacturaFile(file);          // guardar el File real para subir
-      setFacturaUrl(file.name);      // nombre para referencia
-      setFacturaPreview(previewUrl); // preview local
+      setFacturaFile(file);
+      setFacturaUrl(file.name);
+      setFacturaPreview(previewUrl);
+      setPhotoRotation(0); // reiniciar rotación al cambiar foto
       e.target.value = '';
     }
   };
+
+  // ── Hornear rotación en canvas antes de subir ──────────────────────────────
+  const getBakedFile = (file, degrees) => new Promise((resolve) => {
+    if (!file || degrees === 0) { resolve(file); return; }
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      const rad  = (degrees * Math.PI) / 180;
+      const swap = degrees === 90 || degrees === 270;
+      const w    = swap ? img.height : img.width;
+      const h    = swap ? img.width  : img.height;
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.translate(w / 2, h / 2);
+      ctx.rotate(rad);
+      ctx.drawImage(img, -img.width / 2, -img.height / 2);
+      URL.revokeObjectURL(url);
+      canvas.toBlob((blob) => {
+        resolve(new File([blob], file.name, { type: file.type }));
+      }, file.type, 0.92);
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
 
   const handleSubmit = async () => {
     if (!isFormValid) return;
     setIsSubmitting(true);
 
-    // ── Subir foto a Supabase Storage si hay una seleccionada ──────────────
+    // ── Subir foto a Supabase Storage (horneando rotación primero) ────────────
     let finalFacturaUrl = null;
     if (facturaFile) {
-      finalFacturaUrl = await uploadFactura(facturaFile);
-      // Si falló la subida, usamos null (no bloqueamos el guardado del gasto)
+      const bakedFile = await getBakedFile(facturaFile, photoRotation);
+      finalFacturaUrl = await uploadFactura(bakedFile);
     }
 
     // ── Resolver proveedor ─────────────────────────────────────────────────
@@ -210,15 +237,35 @@ export function ExpensesModal({ onClose }) {
               {/* Previsualización si hay foto */}
               {facturaPreview && (
                 <div className="relative mb-3 rounded-xl overflow-hidden border border-green-500/30">
-                  <img src={facturaPreview} alt="Factura" className="w-full h-40 object-cover" />
+                  <img
+                    src={facturaPreview}
+                    alt="Factura"
+                    style={{ transform: `rotate(${photoRotation}deg)`, transition: 'transform 0.2s' }}
+                    className="w-full h-40 object-contain bg-black/40"
+                  />
+                  {/* Controles de rotación */}
+                  <div className="absolute top-2 left-2 flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setPhotoRotation(r => (r - 90 + 360) % 360)}
+                      className="bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-base hover:bg-blue-600 transition-colors"
+                      title="Girar izquierda"
+                    >↺</button>
+                    <button
+                      type="button"
+                      onClick={() => setPhotoRotation(r => (r + 90) % 360)}
+                      className="bg-black/70 text-white rounded-full w-8 h-8 flex items-center justify-center text-base hover:bg-blue-600 transition-colors"
+                      title="Girar derecha"
+                    >↻</button>
+                  </div>
                   <button
                     className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1.5 hover:bg-red-600 transition-colors"
-                    onClick={() => { setFacturaUrl(''); setFacturaPreview(''); }}
+                    onClick={() => { setFacturaUrl(''); setFacturaPreview(''); setPhotoRotation(0); }}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                   <div className="absolute bottom-0 left-0 right-0 bg-black/50 px-3 py-1.5">
-                    <p className="text-xs text-green-400 font-bold truncate">✓ {facturaUrl}</p>
+                    <p className="text-xs text-green-400 font-bold truncate">✓ Foto lista{photoRotation !== 0 ? ` · ${photoRotation}°` : ''}</p>
                   </div>
                 </div>
               )}

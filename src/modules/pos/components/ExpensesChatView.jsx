@@ -29,23 +29,81 @@ function avatarColor(name = '') {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
+// ── Thumbnail de foto expandible (reutilizado del chat de ingresos) ────────────
+function PhotoThumbnail({ src }) {
+  const [expanded, setExpanded] = useState(false);
+  if (!src) return null;
+  return (
+    <>
+      <div
+        className="mt-3 cursor-pointer rounded-xl overflow-hidden border border-red-900/30"
+        onClick={() => setExpanded(true)}
+      >
+        <img src={src} alt="Factura" className="w-full max-h-48 object-contain bg-black/40" />
+        <div className="text-[9px] font-bold text-gray-600 text-center py-1 bg-black/20">
+          Toca para ampliar
+        </div>
+      </div>
+      {expanded && (
+        <div
+          className="fixed inset-0 z-[200] bg-black/95 flex flex-col items-center justify-center gap-4"
+          onClick={() => setExpanded(false)}
+        >
+          <img src={src} alt="Factura" className="max-w-[95vw] max-h-[85vh] object-contain rounded-xl" />
+          <button
+            onClick={() => setExpanded(false)}
+            className="absolute top-4 right-4 text-white bg-black/60 rounded-full w-10 h-10 flex items-center justify-center text-xl font-black"
+          >✕</button>
+          <p className="text-gray-400 text-xs font-bold">Toca para cerrar</p>
+        </div>
+      )}
+    </>
+  );
+}
+
 // ── Burbuja de gasto ──────────────────────────────────────────────────────────
 function ExpenseBubble({ expense }) {
   const name  = expense.creado_por || 'Sistema';
   const time  = timeAgo(expense.fecha || expense.created_at);
   const color = avatarColor(name);
-  const [showPhoto, setShowPhoto] = useState(false);
 
-  const waText = encodeURIComponent(
+  const shareText =
     `💸 *GASTO REGISTRADO*\n` +
     `👤 ${name}\n` +
     `📋 ${expense.descripcion || ''}\n` +
     `🏪 Proveedor: ${expense.proveedor || '—'}\n` +
     `💰 Valor: ${formatMoney(expense.valor || 0)}\n` +
-    `📅 Fecha: ${expense.fecha || ''}\n` +
-    (expense.facturaUrl ? `🖼️ Factura: ${expense.facturaUrl}\n` : '') +
-    `🕐 Registrado: ${new Date(expense.created_at || expense.fecha).toLocaleString('es-CO')}`
-  );
+    (expense.observaciones ? `📝 ${expense.observaciones}\n` : '') +
+    `🕐 ${new Date(expense.created_at || expense.fecha).toLocaleString('es-CO')}`;
+
+  // ── Compartir con Web Share API (foto incluida en móviles) ──────────────────
+  const handleShare = async () => {
+    const photoSrc = expense.facturaUrl;
+
+    if (photoSrc && navigator.canShare) {
+      try {
+        const res  = await fetch(photoSrc);
+        const blob = await res.blob();
+        const ext  = blob.type.includes('png') ? 'png' : 'jpg';
+        const file = new File([blob], `gasto_${Date.now()}.${ext}`, { type: blob.type });
+
+        if (navigator.canShare({ files: [file] })) {
+          await navigator.share({ files: [file], text: shareText });
+          return;
+        }
+      } catch (_) {
+        // Falla silenciosa → fallback a texto
+      }
+    }
+
+    // Fallback 1: Web Share API solo texto
+    if (navigator.share) {
+      try { await navigator.share({ text: shareText }); return; } catch (_) {}
+    }
+
+    // Fallback 2: link WhatsApp (desktop)
+    window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, '_blank');
+  };
 
   return (
     <div className="flex items-end gap-2 mb-3">
@@ -71,52 +129,24 @@ function ExpenseBubble({ expense }) {
             </div>
           )}
 
-          {/* Foto de factura */}
-          {expense.facturaUrl && (
-            <div className="mb-2">
-              {showPhoto ? (
-                <div className="relative">
-                  <img
-                    src={expense.facturaUrl}
-                    alt="Factura"
-                    className="w-full max-h-48 object-cover rounded-xl border border-red-900/30"
-                  />
-                  <button
-                    onClick={() => setShowPhoto(false)}
-                    className="absolute top-2 right-2 bg-black/60 text-white rounded-full p-1 hover:bg-red-700 transition-colors"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => setShowPhoto(true)}
-                  className="flex items-center gap-2 text-xs font-bold text-red-400 hover:text-red-300 transition-colors bg-red-900/20 hover:bg-red-900/30 rounded-xl px-3 py-2 w-full"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                  Ver factura adjunta
-                </button>
-              )}
-            </div>
-          )}
+          {/* Foto de factura — usa facturaUrl de Supabase Storage */}
+          <PhotoThumbnail src={expense.facturaUrl || null} />
 
           {/* Monto */}
-          <div className="flex justify-between items-center pt-2 border-t border-red-900/30">
+          <div className="flex justify-between items-center pt-2 mt-2 border-t border-red-900/30">
             <span className="text-gray-400 font-bold text-xs uppercase tracking-wider">Valor</span>
             <span className="font-black text-red-400 text-xl">{formatMoney(expense.valor || 0)}</span>
           </div>
         </div>
 
         {/* Botón compartir */}
-        <a
-          href={`https://wa.me/?text=${waText}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleShare}
           className="flex items-center gap-1 text-[10px] font-bold text-gray-600 hover:text-green-400 transition-colors mt-1 ml-1"
         >
           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-          Compartir
-        </a>
+          {expense.facturaUrl ? 'Compartir con foto' : 'Compartir'}
+        </button>
       </div>
     </div>
   );
@@ -125,7 +155,12 @@ function ExpenseBubble({ expense }) {
 // ── Chat completo de gastos ───────────────────────────────────────────────────
 export function ExpensesChatView({ onClose }) {
   const expenses = useFinanceStore((s) => s.expenses);
+  const fetchFinances = useFinanceStore((s) => s.fetchFinances);
   const bottomRef = useRef(null);
+
+  useEffect(() => {
+    fetchFinances();
+  }, []);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -133,14 +168,20 @@ export function ExpensesChatView({ onClose }) {
 
   const total = expenses.reduce((s, e) => s + (e.valor || 0), 0);
 
-  const waResumen = encodeURIComponent(
-    `📊 *RESUMEN DE GASTOS*\n\n` +
-    expenses.slice(0, 20).map(e =>
-      `• ${e.descripcion || '—'} (${e.proveedor || '—'}): ${formatMoney(e.valor || 0)}`
-    ).join('\n') +
-    `\n\n💸 *TOTAL GASTADO: ${formatMoney(total)}*\n` +
-    `📅 ${new Date().toLocaleDateString('es-CO')}`
-  );
+  const handleShareResumen = async () => {
+    const text =
+      `📊 *RESUMEN DE GASTOS*\n\n` +
+      expenses.slice(0, 20).map(e =>
+        `• ${e.descripcion || '—'} (${e.proveedor || '—'}): ${formatMoney(e.valor || 0)}`
+      ).join('\n') +
+      `\n\n💸 *TOTAL GASTADO: ${formatMoney(total)}*\n` +
+      `📅 ${new Date().toLocaleDateString('es-CO')}`;
+
+    if (navigator.share) {
+      try { await navigator.share({ text }); return; } catch (_) {}
+    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
+  };
 
   return (
     <div className="fixed inset-0 z-[90] bg-[#0f0a0a] flex flex-col">
@@ -154,15 +195,13 @@ export function ExpensesChatView({ onClose }) {
           <h2 className="text-white font-black text-base leading-tight">Chat de Gastos</h2>
           <p className="text-red-200 text-xs font-bold">{expenses.length} registros · Total: {formatMoney(total)}</p>
         </div>
-        <a
-          href={`https://wa.me/?text=${waResumen}`}
-          target="_blank"
-          rel="noopener noreferrer"
+        <button
+          onClick={handleShareResumen}
           className="bg-white/20 hover:bg-white/30 text-white px-3 py-2 rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors"
         >
           <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
           Compartir resumen
-        </a>
+        </button>
       </div>
 
       {/* Mensajes */}
