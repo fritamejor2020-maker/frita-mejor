@@ -95,15 +95,15 @@ const DEFAULT_USERS = [
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'fritado', 'cierres'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
   CAJERO:    ['pos'],
   VENDEDOR:  ['vendedor-setup', 'vendedor'],
   DEJADOR:   ['dejador', 'tracking'],
-  // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los dos
-  FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos'],
+  // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los tres
+  FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina'],
 };
 
 // =============================================================================
@@ -252,7 +252,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 12, // v12: tracking agregado a ADMIN y DEJADOR en access[] y ROLE_ACCESS
+      version: 13, // v13: finanzas-nomina agregado a ADMIN y FINANZAS
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
@@ -287,6 +287,19 @@ export const useAuthStore = create(
           if (state.user && (state.user.role === 'ADMIN' || state.user.role === 'DEJADOR')
             && !state.user.access?.includes('tracking')) {
             state.user = { ...state.user, access: [...(state.user.access || []), 'tracking'] };
+          }
+        }
+
+        // v13: 'finanzas-nomina' para ADMIN
+        if (fromVersion < 13 && state.users) {
+          state.users = state.users.map((u) => {
+            if (u.role === 'ADMIN' && !u.access?.includes('finanzas-nomina')) {
+              return { ...u, access: [...(u.access || []), 'finanzas-nomina'] };
+            }
+            return u;
+          });
+          if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('finanzas-nomina')) {
+            state.user = { ...state.user, access: [...(state.user.access || []), 'finanzas-nomina'] };
           }
         }
 

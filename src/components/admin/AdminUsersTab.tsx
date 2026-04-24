@@ -11,6 +11,7 @@ const ALL_MODULES = [
   { key: 'pos',               label: 'Caja POS',        icon: '🛒', color: 'bg-green-100 text-green-700 border-green-200' },
   { key: 'finanzas-ingresos', label: 'Ingresos',        icon: '💵', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   { key: 'finanzas-gastos',   label: 'Gastos',          icon: '💸', color: 'bg-red-100 text-red-700 border-red-200' },
+  { key: 'finanzas-nomina',   label: 'Nómina',          icon: '👥', color: 'bg-violet-100 text-violet-700 border-violet-200' },
   { key: 'vendedor-setup',    label: 'Conf. Vendedor',  icon: '⚙️', color: 'bg-orange-100 text-orange-700 border-orange-200' },
   { key: 'vendedor',          label: 'Vendedor',        icon: '🛵', color: 'bg-rose-100 text-rose-700 border-rose-200' },
   { key: 'dejador',           label: 'Dejador',         icon: '🚚', color: 'bg-amber-100 text-amber-700 border-amber-200' },
