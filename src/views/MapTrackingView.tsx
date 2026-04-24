@@ -361,11 +361,12 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
                   {vendors.map((v) => {
                     const stale    = isStale(v.updatedAt);
                     const offline  = v.source === 'offline';
-                    const isSelected = selectedVehicleId === v.vendorId;
+                    const effectiveId = v.pointId || v.vendorId;
+                    const isSelected = selectedVehicleId === effectiveId;
                     return (
                   <div
                         key={v.vendorId}
-                        onClick={() => setSelectedVehicleId(isSelected ? null : v.vendorId)}
+                        onClick={() => setSelectedVehicleId(isSelected ? null : effectiveId)}
                         style={{
                           background: isSelected ? '#fef3c7' : offline ? '#f9fafb' : stale ? '#f9fafb' : 'white',
                           border: `2px solid ${isSelected ? '#f59e0b' : offline ? '#d1d5db' : stale ? '#e5e7eb' : '#d1fae5'}`,
