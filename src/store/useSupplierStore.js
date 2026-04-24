@@ -96,7 +96,44 @@ export const useSupplierStore = create(
           s.active && 
           s.commonProducts?.some(prod => prod.includes(query) || query.includes(prod))
         );
-      }
+      },
+
+      /**
+       * Returns unique product names across all suppliers that match the query.
+       * Used to autocomplete the "Motivo / Descripción" field.
+       */
+      suggestProducts: (searchString) => {
+        if (!searchString || searchString.trim().length < 2) return [];
+        const query = searchString.toLowerCase().trim();
+        const all = get().suppliers
+          .filter(s => s.active)
+          .flatMap(s => s.commonProducts || []);
+        const unique = [...new Set(all)];
+        return unique
+          .filter(p => p.includes(query))
+          .sort((a, b) => {
+            // Exact prefix match first
+            const aStarts = a.startsWith(query) ? 0 : 1;
+            const bStarts = b.startsWith(query) ? 0 : 1;
+            return aStarts - bStarts || a.localeCompare(b);
+          })
+          .slice(0, 8);
+      },
+
+      /**
+       * Returns suppliers that sell a specific product (exact / close match).
+       * Used to filter the "Proveedor" dropdown when description is already set.
+       */
+      getSuppliersForProduct: (descripcion) => {
+        if (!descripcion || !descripcion.trim()) return get().suppliers.filter(s => s.active);
+        const query = descripcion.toLowerCase().trim();
+        const matched = get().suppliers.filter(s =>
+          s.active &&
+          s.commonProducts?.some(p => p.includes(query) || query.includes(p))
+        );
+        // If no exact match, return all active suppliers as fallback
+        return matched.length > 0 ? matched : get().suppliers.filter(s => s.active);
+      },
     }),
     {
       name: 'frita-mejor-suppliers',
