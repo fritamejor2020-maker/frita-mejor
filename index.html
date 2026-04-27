@@ -9,6 +9,24 @@
   </head>
   <body>
     <div id="root"></div>
+    <script>
+      // Self-healing: force clear old service workers on version mismatch
+      (function(){
+        var V = 'frita-sw-v3';
+        if (localStorage.getItem('frita-sw-version') !== V) {
+          localStorage.setItem('frita-sw-version', V);
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              regs.forEach(function(r) { r.unregister(); });
+            });
+            caches.keys().then(function(keys) {
+              keys.forEach(function(k) { caches.delete(k); });
+            });
+          }
+          setTimeout(function() { location.reload(); }, 500);
+        }
+      })();
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
