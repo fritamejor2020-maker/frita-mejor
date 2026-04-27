@@ -86,8 +86,9 @@ const TextInput = ({ label, value, onChange, placeholder, hint, color = 'blue' }
 };
 
 export function AdminTicketConfigTab() {
-  const { posSettings, updatePosSettings } = useInventoryStore();
+  const { posSettings, updatePosSettings, posRegisters = [], addPosRegister, updatePosRegister, deletePosRegister } = useInventoryStore();
   const tc = posSettings?.ticketConfig || DEFAULTS;
+  const [newRegName, setNewRegName] = useState('');
 
   const [form, setForm] = useState({ ...DEFAULTS, ...tc });
   const [saved, setSaved] = useState(false);
@@ -113,6 +114,56 @@ export function AdminTicketConfigTab() {
         <h2 className="text-2xl font-black text-gray-800 flex items-center gap-2">🧾 Configuración de Tickets</h2>
         <p className="text-gray-500 text-sm mt-1">Personaliza la información que aparece en los tickets de venta y en el Cierre Z.</p>
       </div>
+
+      {/* ── Registros de Caja (Multi-Caja) ── */}
+      <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+        <h3 className="font-black text-lg text-gray-700 border-b pb-2 flex items-center gap-2">💻 Registros de Caja</h3>
+        <p className="text-xs text-gray-400">Administra las cajas del punto de venta. Cada caja puede tener su propio turno y cierre Z.</p>
+        
+        <div className="space-y-2">
+          {posRegisters.map(reg => (
+            <div key={reg.id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
+              <span className="text-lg">{reg.active !== false ? '🟢' : '🔴'}</span>
+              <input
+                className="flex-1 bg-transparent border-none outline-none font-bold text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-lg px-2 py-1 transition-all"
+                value={reg.name}
+                onChange={e => updatePosRegister(reg.id, { name: e.target.value })}
+              />
+              <button
+                className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${reg.active !== false ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
+                onClick={() => updatePosRegister(reg.id, { active: reg.active === false ? true : false })}
+              >
+                {reg.active !== false ? 'Desactivar' : 'Activar'}
+              </button>
+              {posRegisters.length > 1 && (
+                <button
+                  className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all"
+                  onClick={() => { if (confirm(`¿Eliminar "${reg.name}"? Las ventas existentes se mantendrán.`)) deletePosRegister(reg.id); }}
+                >
+                  🗑️
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="flex gap-2">
+          <input
+            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold focus:ring-blue-500 focus:border-blue-500 outline-none"
+            value={newRegName}
+            onChange={e => setNewRegName(e.target.value)}
+            placeholder="Nombre de la nueva caja..."
+            onKeyDown={e => { if (e.key === 'Enter' && newRegName.trim()) { addPosRegister({ name: newRegName.trim() }); setNewRegName(''); } }}
+          />
+          <button
+            className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            disabled={!newRegName.trim()}
+            onClick={() => { addPosRegister({ name: newRegName.trim() }); setNewRegName(''); }}
+          >
+            + Agregar
+          </button>
+        </div>
+      </section>
 
       {/* ── Información del Negocio ── */}
       <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
