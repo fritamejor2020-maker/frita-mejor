@@ -14,6 +14,7 @@ export function PosView() {
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
   const [showContratasPanel, setShowContratasPanel] = useState(false);
+  const [numPadTarget, setNumPadTarget] = useState(null); // { itemId, itemName, currentQty }
   const { user, signOut } = useAuthStore();
   const { 
     inventory = [], 
@@ -619,12 +620,7 @@ export function PosView() {
                         </button>
                         <span 
                           className="w-10 text-center font-black text-sm cursor-pointer text-chunky-main active:scale-90 transition-all select-none" 
-                          onClick={() => {
-                            const newQty = prompt(`Cantidad para ${item.name}:`, item.qty);
-                            if (newQty !== null && !isNaN(newQty) && parseInt(newQty) > 0) {
-                              setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: parseInt(newQty) } : i));
-                            }
-                          }}
+                          onClick={() => setNumPadTarget({ itemId: item.id, itemName: item.name, currentQty: item.qty })}
                         >{item.qty}</span>
                         <button className="w-8 h-8 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-700 rounded-r-lg transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -664,7 +660,7 @@ export function PosView() {
 
           <div className="grid grid-cols-3 gap-2 mt-4">
             <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>
-              <span className="text-lg">🗑</span>
+              <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
             <button
@@ -672,7 +668,7 @@ export function PosView() {
               disabled={ticketItems.length === 0}
               onClick={handlePrintOrder}
             >
-              <span className="text-lg">🖨</span>
+              <span className="text-lg">📋</span>
               <span className="text-[10px] font-black">Pedido</span>
             </button>
             <button className={`flex flex-col items-center justify-center gap-1 py-3 rounded-2xl active:scale-95 transition-all ${activeSuspendedId ? 'bg-orange-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'}`} onClick={handleSaveSale}>
@@ -682,6 +678,19 @@ export function PosView() {
           </div>
         </div>
       </div>
+
+      {/* NumPad Modal */}
+      {numPadTarget && (
+        <NumPadModal
+          itemName={numPadTarget.itemName}
+          currentQty={numPadTarget.currentQty}
+          onConfirm={(qty) => {
+            setTicketItems(prev => prev.map(i => i.id === numPadTarget.itemId ? { ...i, qty } : i));
+            setNumPadTarget(null);
+          }}
+          onClose={() => setNumPadTarget(null)}
+        />
+      )}
 
       {/* ─── PANEL DERECHO ─── */}
       <div className="flex-1 flex flex-col overflow-hidden">
@@ -937,6 +946,70 @@ export function PosView() {
           />
         );
       })()}
+    </div>
+  );
+}
+
+// ─── NumPad Modal (Touch Qty Input) ───
+function NumPadModal({ itemName, currentQty, onConfirm, onClose }) {
+  const [value, setValue] = useState(currentQty.toString());
+
+  const handleKey = (key) => {
+    if (key === 'C') { setValue(''); return; }
+    if (key === '⌫') { setValue(v => v.slice(0, -1)); return; }
+    setValue(v => (v === '0' ? key : v + key));
+  };
+
+  const handleConfirm = () => {
+    const num = parseInt(value);
+    if (num > 0) onConfirm(num);
+    else onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[28px] w-full max-w-xs overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+        {/* Header */}
+        <div className="p-4 border-b border-gray-800 text-center">
+          <p className="text-xs text-gray-400 font-bold uppercase tracking-wider">Cantidad para</p>
+          <p className="text-base font-black text-white mt-0.5">{itemName}</p>
+        </div>
+
+        {/* Display */}
+        <div className="px-6 py-5 flex items-center justify-center">
+          <span className={`text-5xl font-black ${value ? 'text-chunky-main' : 'text-gray-600'}`}>
+            {value || '0'}
+          </span>
+        </div>
+
+        {/* Keypad */}
+        <div className="grid grid-cols-3 gap-1.5 px-4 pb-2">
+          {['1','2','3','4','5','6','7','8','9','C','0','⌫'].map(key => (
+            <button
+              key={key}
+              className={`h-14 rounded-xl font-black text-xl active:scale-95 transition-all ${
+                key === 'C' ? 'bg-red-500/20 text-red-400 active:bg-red-500/40' :
+                key === '⌫' ? 'bg-amber-500/20 text-amber-400 active:bg-amber-500/40' :
+                'bg-[#2a2d38] text-white hover:bg-[#353845] active:bg-[#434758]'
+              }`}
+              onClick={() => handleKey(key)}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+
+        {/* Confirm */}
+        <div className="px-4 pb-4 pt-2">
+          <button
+            className="w-full py-4 rounded-xl bg-chunky-main text-chunky-dark font-black text-lg active:scale-[0.98] transition-all shadow-lg shadow-chunky-main/20 disabled:opacity-30"
+            disabled={!value || parseInt(value) <= 0}
+            onClick={handleConfirm}
+          >
+            ✓ Confirmar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
