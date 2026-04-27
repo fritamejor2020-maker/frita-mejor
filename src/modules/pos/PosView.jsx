@@ -193,7 +193,7 @@ export function PosView() {
     const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
     const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
     
-    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses);
+    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
 
     // Show prompt for logout
@@ -348,6 +348,11 @@ export function PosView() {
     ];
     const methodConfig = methods.find(m => m.name === methodName) || methods[0];
 
+    // Check if this is a contrata client
+    const saleCustomer = customers?.find(c => c.id === selectedCustomer);
+    const isContrata = saleCustomer && saleCustomer.typeId;
+    const contrataType = isContrata ? customerTypes?.find(t => t.id === saleCustomer.typeId) : null;
+
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
       customerId: selectedCustomer,
@@ -361,7 +366,14 @@ export function PosView() {
       amountProvided: amountProvided,
       change: amountProvided - total,
       timestamp: new Date().toISOString(),
-      shiftId: activeShift?.id
+      shiftId: activeShift?.id,
+      // Contrata fields
+      ...(isContrata && contrataType?.allowCredit ? {
+        contrataPaymentMethod: 'credit',
+        creditAmount: total,
+      } : isContrata ? {
+        contrataPaymentMethod: methodConfig.name,
+      } : {}),
     };
     
     // Add logic here to deduct from bodega using dispatchItem (Phase 4 later)
