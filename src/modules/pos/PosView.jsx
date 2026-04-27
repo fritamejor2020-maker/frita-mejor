@@ -446,11 +446,20 @@ export function PosView() {
         {/* ── Logo ── */}
         <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none">🍟 Caja FM</span>
 
-        {/* ── Buscador ── */}
-        <div className="relative shrink-0 w-36 sm:w-48">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input ref={searchInputRef} className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2 pl-9 pr-3 text-sm font-bold text-white outline-none focus:border-chunky-main placeholder-gray-600 transition-all" placeholder="Escáner..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleBarcodeSearch} />
-        </div>
+        {/* ── Separador ── */}
+        <div className="w-px h-7 bg-gray-700 shrink-0" />
+
+        {/* ── Botón Abrir Cajón ── */}
+        {activeShift && (
+          <button
+            className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
+            title="Abrir cajón"
+            onClick={() => {
+              const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
+              console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
+            }}
+          >🔓</button>
+        )}
 
         <div className="w-px h-7 bg-gray-700 shrink-0" />
 
@@ -732,20 +741,19 @@ export function PosView() {
       {/* ─── PANEL DERECHO ─── */}
       <div className="flex-1 flex flex-col overflow-hidden">
 
-        {/* Categorías */}
+        {/* Categorías + Buscador */}
         <div className="bg-[#111318] px-3 py-2 border-b border-[#1c1d24] flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
-          <Button
-            className={`rounded-full py-2.5 px-5 border-none font-black text-sm whitespace-nowrap active:scale-95 transition-transform min-h-[40px] ${!currentFolder ? 'bg-chunky-main text-chunky-dark' : 'bg-[#2a2d38] text-gray-400 active:bg-[#343846]'}`}
-            onClick={() => setCurrentFolder(null)}
-          >
-            🏠 Inicio (Todas)
-          </Button>
+          {/* Buscador inline */}
+          <div className="relative shrink-0 w-40">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input ref={searchInputRef} className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2.5 pl-9 pr-3 text-sm font-bold text-white outline-none focus:border-chunky-main placeholder-gray-600 transition-all" placeholder="Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleBarcodeSearch} />
+          </div>
           <div className="w-px h-6 bg-gray-800 shrink-0" />
           {posCategories?.map(cat => (
             <Button
                 key={cat.id}
                 className={`rounded-full py-2.5 px-5 font-black text-sm border-none whitespace-nowrap active:scale-95 transition-transform min-h-[40px] ${currentFolder === cat.id ? `${cat.color} text-white ring-2 ring-white/50 shadow-lg` : 'bg-[#21242d] text-gray-300 active:bg-[#3a3d48] ring-1 ring-gray-800'}`}
-                onClick={() => setCurrentFolder(cat.id)}
+                onClick={() => setCurrentFolder(prev => prev === cat.id ? null : cat.id)}
               >
                 {cat.name}
               </Button>
