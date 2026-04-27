@@ -348,6 +348,7 @@ export function PosView() {
     // Clear ticket
     setTicketItems([]);
     setActiveSuspendedId(null);
+    setSelectedCustomer('');
     
     // Print trigger logic based on config
     let autoPrint = methodConfig.printReceipt;
