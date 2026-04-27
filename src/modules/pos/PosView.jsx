@@ -275,6 +275,39 @@ export function PosView() {
     setActiveSuspendedId(null);
   };
 
+  const handlePrintOrder = () => {
+    if (ticketItems.length === 0) return;
+    const c = customers?.find(c => c.id === selectedCustomer);
+    const typeName = c?.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
+    const orderHtml = `
+      <div style="width:80mm;color:black;font-family:sans-serif;font-size:14px;padding:16px;margin:0 auto;">
+        <style>@page{size:auto;margin:0;}@media print{body{margin:0;}}</style>
+        <div style="text-align:center;margin-bottom:12px;border-bottom:2px dashed black;padding-bottom:8px;">
+          <h1 style="font-weight:900;font-size:20px;margin:0;">📋 PEDIDO</h1>
+          <p style="font-size:12px;margin:4px 0 0;">${new Date().toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'})}</p>
+        </div>
+        ${c ? `<div style="background:#f3f4f6;padding:8px;border-radius:8px;margin-bottom:12px;">
+          <p style="font-weight:900;margin:0;font-size:14px;">${c.name}</p>
+          ${typeName ? `<p style="margin:2px 0 0;font-size:12px;color:#666;">${typeName}</p>` : ''}
+          ${c.phone ? `<p style="margin:2px 0 0;font-size:12px;">Tel: ${c.phone}</p>` : ''}
+        </div>` : ''}
+        <table style="width:100%;border-collapse:collapse;font-size:13px;">
+          <thead><tr style="border-bottom:2px solid black;"><th style="text-align:left;padding:4px 0;">Producto</th><th style="text-align:center;width:40px;">Cant</th><th style="text-align:right;padding:4px 0;">Total</th></tr></thead>
+          <tbody>
+            ${ticketItems.map(i => `<tr style="border-bottom:1px dashed #ccc;"><td style="padding:4px 0;">${i.name}</td><td style="text-align:center;">${i.qty}</td><td style="text-align:right;font-weight:bold;">$${(i.price * i.qty).toLocaleString('es-CO')}</td></tr>`).join('')}
+          </tbody>
+        </table>
+        <div style="border-top:2px solid black;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:900;font-size:18px;">
+          <span>TOTAL</span><span>$${total.toLocaleString('es-CO')}</span>
+        </div>
+        <p style="text-align:center;margin-top:16px;font-size:12px;font-weight:bold;color:#666;">⏳ PENDIENTE DE PAGO</p>
+      </div>
+    `;
+    printHTML(orderHtml, 'Pedido');
+    // Also save as suspended
+    handleSaveSale();
+  };
+
   const handleLoadSuspended = (sale) => {
     setTicketItems(sale.items);
     setSelectedCustomer(sale.customerId);
@@ -620,11 +653,16 @@ export function PosView() {
             <span className="text-4xl font-black text-white">{formatMoney(total)}</span>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mt-4">
-            <Button variant="outline" className="border-red-900/50 text-red-500 hover:bg-red-500/10 rounded-2xl py-4 hover:scale-[1.02] transition-transform" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>Anular (Supr)</Button>
-            <Button variant="secondary" className={`rounded-2xl py-4 border-none shadow-md hover:scale-[1.02] transition-transform flex-col gap-0 leading-tight ${activeSuspendedId ? 'bg-orange-500 text-chunky-dark hover:bg-orange-400' : 'bg-[#2a2d38] text-white hover:bg-[#343846]'}`} onClick={handleSaveSale}>
-              <span className="text-base">Guardar</span>
-              <span className="text-[10px] opacity-70">Venta en Espera {activeSuspendedId && '(Actualizar)'}</span>
+          <div className="grid grid-cols-3 gap-2 mt-4">
+            <Button variant="outline" className="border-red-900/50 text-red-500 hover:bg-red-500/10 rounded-2xl py-3 text-xs hover:scale-[1.02] transition-transform" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>Anular</Button>
+            <button
+              className="bg-blue-600/20 text-blue-400 border border-blue-800/50 rounded-2xl py-3 text-xs font-bold hover:bg-blue-600/30 active:scale-95 transition-all disabled:opacity-30"
+              disabled={ticketItems.length === 0}
+              onClick={handlePrintOrder}
+            >🖨 Pedido</button>
+            <Button variant="secondary" className={`rounded-2xl py-3 border-none shadow-md hover:scale-[1.02] transition-transform flex-col gap-0 leading-tight text-xs ${activeSuspendedId ? 'bg-orange-500 text-chunky-dark hover:bg-orange-400' : 'bg-[#2a2d38] text-white hover:bg-[#343846]'}`} onClick={handleSaveSale}>
+              <span className="text-sm">Guardar</span>
+              <span className="text-[9px] opacity-70">Espera {activeSuspendedId && '✏️'}</span>
             </Button>
           </div>
         </div>
@@ -786,7 +824,10 @@ export function PosView() {
           total={total}
           paymentMethods={posSettings?.paymentMethods?.map(m => m.name) || ['EFECTIVO', 'NEQUI', 'DAVIPLATA', 'TARJETA']}
           onClose={() => setShowPaymentModal(false)} 
-          onConfirm={(methodName, amount) => handleProcessPayment(methodName, amount)} 
+          onConfirm={(methodName, amount) => {
+            setShowPaymentModal(false);
+            handleProcessPayment(methodName, amount);
+          }} 
         />
       )}
 
@@ -1327,11 +1368,11 @@ function PaymentModal({ total, paymentMethods, onClose, onConfirm }) {
         </div>
         
         <div className="p-6 space-y-6">
-          <div className={`grid gap-2 ${(paymentMethods || ['EFECTIVO']).length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
+          <div className="flex flex-wrap gap-2">
             {(paymentMethods || ['EFECTIVO']).map(m => (
               <button 
                 key={m}
-                className={`py-3 px-2 rounded-2xl font-black text-xs uppercase tracking-wide transition-all border-2 truncate ${method === m ? 'bg-chunky-main text-chunky-dark border-chunky-main shadow-lg shadow-chunky-main/20 scale-[1.02]' : 'bg-[#16171d] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-gray-300'}`}
+                className={`flex-1 min-w-[calc(25%-6px)] py-3.5 px-3 rounded-2xl font-black uppercase tracking-wide transition-all border-2 ${m.length > 8 ? 'text-[10px]' : 'text-xs'} ${method === m ? 'bg-chunky-main text-chunky-dark border-chunky-main shadow-lg shadow-chunky-main/20 scale-[1.02]' : 'bg-[#16171d] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-gray-300'}`}
                 onClick={() => { setMethod(m); setAmount(total.toString()); }}
               >
                 {m}
