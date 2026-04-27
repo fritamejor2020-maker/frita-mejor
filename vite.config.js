@@ -12,6 +12,13 @@ export default defineConfig({
         skipWaiting: true,       // Nuevo SW toma el control inmediatamente
         clientsClaim: true,      // Reclamar todos los clientes abiertos
         cleanupOutdatedCaches: true, // Borrar caches viejas automáticamente
+        navigateFallback: 'index.html',
+        runtimeCaching: [
+          {
+            urlPattern: /^https:\/\/.*supabase.*$/i,
+            handler: 'NetworkOnly',  // Nunca cachear llamadas a Supabase
+          },
+        ],
       },
       manifest: {
         name: 'Frita Mejor PWA',
