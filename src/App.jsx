@@ -196,8 +196,8 @@ function App() {
     });
     const unsubInventory = useInventoryStore.subscribe((state) => {
       if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
-      const { products, posSettings, loadTemplates, posShifts, posSales } = state;
-      broadcastState('frita-mejor-inventory', { products, posSettings, loadTemplates, posShifts, posSales });
+      const { products, posSettings, posRegisters, loadTemplates, posShifts, posSales } = state;
+      broadcastState('frita-mejor-inventory', { products, posSettings, posRegisters, loadTemplates, posShifts, posSales });
     });
 
     return () => {

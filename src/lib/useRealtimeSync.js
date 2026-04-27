@@ -40,6 +40,7 @@ function getApplicators() {
     fritadoRecipes:    (v) => useInventoryStore.setState({ fritadoRecipes: v }),
     posCategories:     (v) => useInventoryStore.setState({ posCategories: v }),
     posSettings:       (v) => useInventoryStore.setState({ posSettings: v }),
+    posRegisters:      (v) => useInventoryStore.setState({ posRegisters: v }),
     posShifts:         (v) => useInventoryStore.setState({ posShifts: v }),
     posSales:          (v) => useInventoryStore.setState({ posSales: v }),
     posExpenses:       (v) => useInventoryStore.setState({ posExpenses: v }),

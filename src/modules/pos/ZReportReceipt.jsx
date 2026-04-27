@@ -143,7 +143,8 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         ${tc.showPhone !== false && tc.phone ? `<p style="font-size: 11px; margin: 0;">Tel: ${tc.phone}</p>` : ''}
         ${tc.showAddress !== false && tc.address ? `<p style="font-size: 11px; margin: 0;">${tc.address}</p>` : ''}
         <div style="border-bottom: 1px dashed black; margin: 8px 0;"></div>
-        ${tc.zShowShiftId !== false ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Turno ID: ${shift.id.slice(-6)}</p>` : ''}
+        ${shift.registerName ? `<p style="font-size: 13px; font-weight: 900; line-height: 1.25; margin: 0; background: #E5E7EB; padding: 3px 6px; border-radius: 4px;">📋 ${shift.registerName}</p>` : ''}
+        ${tc.zShowShiftId !== false ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 4px 0 0 0;">Turno ID: ${shift.id.slice(-6)}</p>` : ''}
         ${tc.zShowCashier !== false ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Cajero: ${shift.userName || 'PRINCIPAL'}</p>` : ''}
         ${tc.zShowOpenDate !== false ? `<p style="font-size: 12px; margin: 4px 0 0 0;">Apertura: ${dateStrOpened}</p>` : ''}
         ${tc.zShowCloseDate !== false ? `<p style="font-size: 12px; margin: 0;">Cierre: ${dateStrClosed}</p>` : ''}

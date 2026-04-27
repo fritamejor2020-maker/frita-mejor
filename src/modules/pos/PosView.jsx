@@ -21,6 +21,7 @@ export function PosView() {
     posCategories = [], 
     customers = [], 
     posSettings,
+    posRegisters = [],
     posSales = [], 
     posShifts = [], 
     posExpenses = [], 
@@ -32,8 +33,35 @@ export function PosView() {
     addPosSale, updatePosSale, deletePosSale, addPosShift, updatePosShift, addPosExpense 
   } = useInventoryStore();
 
-  // Shift logic (find active shift)
-  const activeShift = (posShifts || []).find(s => !s.closedAt);
+  // Multi-register: selected register persisted in sessionStorage
+  const [selectedRegisterId, setSelectedRegisterId] = useState(() => {
+    return sessionStorage.getItem('frita-pos-register') || null;
+  });
+  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const activeRegisters = (posRegisters || []).filter(r => r.active !== false);
+  const selectedRegister = activeRegisters.find(r => r.id === selectedRegisterId);
+
+  // Auto-show register selector if no register selected and there are multiple
+  useEffect(() => {
+    if (activeRegisters.length === 0) return;
+    if (activeRegisters.length === 1 && !selectedRegisterId) {
+      // Solo una caja: seleccionar automáticamente
+      const regId = activeRegisters[0].id;
+      setSelectedRegisterId(regId);
+      sessionStorage.setItem('frita-pos-register', regId);
+    } else if (!selectedRegisterId || !activeRegisters.find(r => r.id === selectedRegisterId)) {
+      setShowRegisterModal(true);
+    }
+  }, [activeRegisters.length]);
+
+  const handleSelectRegister = (regId) => {
+    setSelectedRegisterId(regId);
+    sessionStorage.setItem('frita-pos-register', regId);
+    setShowRegisterModal(false);
+  };
+
+  // Shift logic (find active shift FOR THIS REGISTER)
+  const activeShift = (posShifts || []).find(s => !s.closedAt && (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001')));
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -172,6 +200,8 @@ export function PosView() {
       initialAmount: parseFloat(initialAmount) || 0,
       userId: user?.id,
       userName: user?.name,
+      registerId: selectedRegisterId,
+      registerName: selectedRegister?.name || 'Caja',
     });
     setShowShiftModal(false);
   };
@@ -206,6 +236,7 @@ export function PosView() {
   const handleAddExpense = (amount, reason) => {
     addPosExpense({
       shiftId: activeShift?.id || null,
+      registerId: selectedRegisterId,
       amount: parseFloat(amount),
       reason,
       timestamp: new Date().toISOString(),
@@ -369,6 +400,7 @@ export function PosView() {
       change: isCredit ? 0 : (amountProvided - total),
       timestamp: new Date().toISOString(),
       shiftId: activeShift?.id,
+      registerId: selectedRegisterId,
       // Contrata fields - only credit when explicitly requested
       ...(isCredit && isContrata ? {
         contrataPaymentMethod: 'credit',
@@ -448,7 +480,7 @@ export function PosView() {
       <div className="w-full shrink-0 bg-[#111318] border-b border-gray-800 flex items-center gap-2 px-3 h-14 shadow-lg shadow-black/40">
 
         {/* ── Logo ── */}
-        <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none">🍟 Caja FM</span>
+        <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none cursor-pointer hover:bg-yellow-300 active:scale-95 transition-all" onClick={() => activeRegisters.length > 1 && setShowRegisterModal(true)} title={activeRegisters.length > 1 ? 'Cambiar caja' : ''}>🍟 {selectedRegister?.name || 'Caja FM'}</span>
 
         {/* ── Separador ── */}
         <div className="w-px h-7 bg-gray-700 shrink-0" />
@@ -561,6 +593,12 @@ export function PosView() {
                 <span className="text-base">🤝</span> Contratas
               </button>
 
+              <div className="h-px bg-gray-800" />
+              {activeRegisters.length > 1 && (
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-purple-300 hover:bg-purple-950/40 transition-colors" onClick={() => { setShowRegisterModal(true); setShowHamburgerMenu(false); }}>
+                  <span className="text-base">💻</span> Cambiar Caja
+                </button>
+              )}
               <div className="h-px bg-gray-800" />
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-800 transition-colors" onClick={() => { signOut(); setShowHamburgerMenu(false); }}>
                 <span className="text-base">↩️</span> Cerrar sesión
@@ -972,8 +1010,18 @@ export function PosView() {
         />
       )}
 
-      {showShiftModal && !activeShift && (
-        <ShiftOpenModal onConfirm={handleOpenShift} />
+      {showRegisterModal && (
+        <RegisterSelectModal
+          registers={activeRegisters}
+          shifts={posShifts}
+          selectedId={selectedRegisterId}
+          onSelect={handleSelectRegister}
+          onClose={() => selectedRegisterId && setShowRegisterModal(false)}
+        />
+      )}
+
+      {showShiftModal && !activeShift && selectedRegisterId && (
+        <ShiftOpenModal onConfirm={handleOpenShift} registerName={selectedRegister?.name} />
       )}
 
       {showLogoutPromptModal && (
@@ -1649,14 +1697,68 @@ function NewClientModal({ customerTypes, onClose, onSave }) {
   );
 }
 
+// ─── Register Select Modal ───
+function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[65] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">💻 Seleccionar Caja</h2>
+            <p className="text-gray-400 text-sm font-bold mt-1">Elige en qué caja vas a trabajar.</p>
+          </div>
+          {selectedId && (
+            <button className="text-gray-400 hover:text-white bg-[#16171d] p-2 rounded-full hover:bg-gray-800 transition-colors" onClick={onClose}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          )}
+        </div>
+        <div className="p-4 overflow-y-auto space-y-3">
+          {registers.map(reg => {
+            const openShift = (shifts || []).find(s => !s.closedAt && (s.registerId === reg.id || (!s.registerId && reg.id === 'REG-001')));
+            const isSelected = reg.id === selectedId;
+            return (
+              <button
+                key={reg.id}
+                className={`w-full text-left bg-[#16171d] border-2 rounded-[24px] p-5 transition-all active:scale-[0.98] ${
+                  isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/10' : 'border-gray-800 hover:border-gray-600'
+                }`}
+                onClick={() => onSelect(reg.id)}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <span className="text-3xl">{openShift ? '🟢' : '🔴'}</span>
+                    <div>
+                      <h3 className="font-black text-white text-lg">{reg.name}</h3>
+                      {openShift ? (
+                        <p className="text-xs text-green-400 font-bold">
+                          Turno abierto por {openShift.userName || 'Desconocido'} — {new Date(openShift.openedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-gray-500 font-bold">Sin turno abierto</p>
+                      )}
+                    </div>
+                  </div>
+                  {isSelected && <span className="text-yellow-400 text-xl">✓</span>}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Shift Modals Component ───
-function ShiftOpenModal({ onConfirm }) {
+function ShiftOpenModal({ onConfirm, registerName }) {
   const [initialAmount, setInitialAmount] = useState('0');
   
   return (
     <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
-        <h2 className="text-2xl font-black text-white mb-2">Apertura de Caja</h2>
+        <h2 className="text-2xl font-black text-white mb-1">Apertura de Caja</h2>
+        {registerName && <p className="text-chunky-main text-sm font-black mb-1">{registerName}</p>}
         <p className="text-gray-400 text-sm font-bold mb-6 text-center">Ingresa el dinero base con el que empiezas el turno.</p>
         
         <div className="w-full relative mb-6">

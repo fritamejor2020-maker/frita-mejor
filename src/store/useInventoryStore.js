@@ -171,6 +171,10 @@ const INITIAL_POS_SETTINGS = {
   },
 };
 
+const INITIAL_POS_REGISTERS = [
+  { id: 'REG-001', name: 'Caja Principal', active: true },
+];
+
 // Templates vacíos — el usuario crea sus propias plantillas desde el Dejador
 const INITIAL_LOAD_TEMPLATES = [];
 
@@ -191,6 +195,7 @@ export const useInventoryStore = create(
       customers:          INITIAL_CUSTOMERS,
       customerTypes:      INITIAL_CUSTOMER_TYPES,
       posSettings:        INITIAL_POS_SETTINGS,
+      posRegisters:       INITIAL_POS_REGISTERS,
       fritadoRecipes:     INITIAL_FRITADO_RECIPES,
       movements:          [],
       posShifts:          [],
@@ -218,7 +223,7 @@ export const useInventoryStore = create(
           const remote = await pullAll();
           const SYNC_KEYS = [
             'warehouses', 'inventory', 'movements', 'products', 'recipes',
-            'fritadoRecipes', 'posCategories', 'posSettings', 'posShifts',
+            'fritadoRecipes', 'posCategories', 'posSettings', 'posRegisters', 'posShifts',
             'posSales', 'posExpenses', 'customers', 'customerTypes', 'loadTemplates',
             'vendorLocations', 'contrataPayments',
           ];
@@ -708,6 +713,11 @@ export const useInventoryStore = create(
       // Configuración POS y Global settings
       updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
 
+      // Registros de Caja (Multi-Caja)
+      addPosRegister: (reg) => { set((s) => ({ posRegisters: [...(s.posRegisters || INITIAL_POS_REGISTERS), { ...reg, id: `REG-${Date.now()}`, active: true }] })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
+      updatePosRegister: (id, data) => { set((s) => ({ posRegisters: (s.posRegisters || []).map(r => r.id === id ? { ...r, ...data } : r) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
+      deletePosRegister: (id) => { set((s) => ({ posRegisters: (s.posRegisters || []).filter(r => r.id !== id) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
+
       // Fritado Recipes
       addFritadoRecipe: (recipe) => set((s) => ({
         fritadoRecipes: [...(s.fritadoRecipes || []), { ...recipe, id: `FR-${Date.now()}` }]
@@ -827,6 +837,7 @@ export const useInventoryStore = create(
         customers:          state.customers,
         customerTypes:      state.customerTypes,
         posSettings:        state.posSettings,
+        posRegisters:       state.posRegisters || INITIAL_POS_REGISTERS,
         posShifts:          state.posShifts,
         posSales:           state.posSales,
         posExpenses:        state.posExpenses,
