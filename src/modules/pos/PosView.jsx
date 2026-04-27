@@ -663,21 +663,21 @@ export function PosView() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl border border-red-900/50 text-red-400 hover:bg-red-500/10 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>
               <span className="text-lg">🗑</span>
-              <span className="text-[10px] font-bold">Anular</span>
+              <span className="text-[10px] font-black">Anular</span>
             </button>
             <button
-              className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-blue-600/15 border border-blue-800/50 text-blue-400 hover:bg-blue-600/25 active:scale-95 transition-all disabled:opacity-30"
+              className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-sky-500/20 text-sky-300 border border-sky-500/30 hover:bg-sky-500/30 active:scale-95 transition-all disabled:opacity-30"
               disabled={ticketItems.length === 0}
               onClick={handlePrintOrder}
             >
               <span className="text-lg">🖨</span>
-              <span className="text-[10px] font-bold">Pedido</span>
+              <span className="text-[10px] font-black">Pedido</span>
             </button>
-            <button className={`flex flex-col items-center justify-center gap-1 py-3 rounded-2xl active:scale-95 transition-all ${activeSuspendedId ? 'bg-orange-500 text-chunky-dark' : 'bg-[#2a2d38] text-white hover:bg-[#343846]'}`} onClick={handleSaveSale}>
+            <button className={`flex flex-col items-center justify-center gap-1 py-3 rounded-2xl active:scale-95 transition-all ${activeSuspendedId ? 'bg-orange-500 text-white' : 'bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30'}`} onClick={handleSaveSale}>
               <span className="text-lg">{activeSuspendedId ? '✏️' : '💾'}</span>
-              <span className="text-[10px] font-bold">{activeSuspendedId ? 'Actualizar' : 'Espera'}</span>
+              <span className="text-[10px] font-black">{activeSuspendedId ? 'Actualizar' : 'Espera'}</span>
             </button>
           </div>
         </div>
