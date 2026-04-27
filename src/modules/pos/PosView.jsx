@@ -529,10 +529,8 @@ export function PosView() {
                 </>
               )}
 
+
               <div className="h-px bg-gray-800" />
-              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowSuspendedModal(true); setShowHamburgerMenu(false); }}>
-                <span className="text-base">🕑</span> Ventas en Espera
-              </button>
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowHistoryModal(true); setShowHamburgerMenu(false); }}>
                 <span className="text-base">📜</span> Historial
               </button>
