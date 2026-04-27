@@ -11,6 +11,7 @@ import { formatMoney }           from '../../utils/formatUtils';
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [showAddClientModal, setShowAddClientModal] = useState(false);
   const { user, signOut } = useAuthStore();
   const { 
     inventory = [], 
@@ -21,6 +22,7 @@ export function PosView() {
     posShifts = [], 
     posExpenses = [], 
     customerTypes = [],
+    addCustomer,
     addPosSale, updatePosSale, addPosShift, updatePosShift, addPosExpense 
   } = useInventoryStore();
 
@@ -492,21 +494,28 @@ export function PosView() {
             <span className="text-gray-500 text-xs">{new Date().toLocaleDateString('es-CO')}</span>
           </div>
           
-          <select 
-            className="w-full bg-[#1e1f26] text-white border border-gray-700 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main"
-            value={selectedCustomer || ''}
-            onChange={(e) => setSelectedCustomer(e.target.value)}
-          >
-            <option value="">Consumidor Final</option>
-            {customers.map(c => {
-              const typeName = c.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
-              return (
-                <option key={c.id} value={c.id}>
-                  {c.name} {typeName ? `[${typeName}]` : ''} {c.discountPercent > 0 ? `(-${c.discountPercent}%)` : ''}
-                </option>
-              );
-            })}
-          </select>
+          <div className="flex gap-2">
+            <select 
+              className="flex-1 min-w-0 bg-[#1e1f26] text-white border border-gray-700 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main"
+              value={selectedCustomer || ''}
+              onChange={(e) => setSelectedCustomer(e.target.value)}
+            >
+              <option value="">Consumidor Final</option>
+              {customers.map(c => {
+                const typeName = c.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
+                return (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {typeName ? `[${typeName}]` : ''} {c.discountPercent > 0 ? `(-${c.discountPercent}%)` : ''}
+                  </option>
+                );
+              })}
+            </select>
+            <button
+              className="shrink-0 w-10 h-10 flex items-center justify-center bg-chunky-main text-gray-900 rounded-lg font-black text-lg active:scale-95 transition-all"
+              onClick={() => setShowAddClientModal(true)}
+              title="Agregar nuevo cliente"
+            >+</button>
+          </div>
         </div>
 
         {/* Ticket Items List */}
@@ -793,6 +802,144 @@ export function PosView() {
           onConfirm={handleAddExpense}
         />
       )}
+
+      {showAddClientModal && (
+        <NewClientModal
+          customerTypes={customerTypes}
+          onClose={() => setShowAddClientModal(false)}
+          onSave={(clientData) => {
+            addCustomer(clientData);
+            // Auto-select the new client after a brief delay for state to update
+            setTimeout(() => {
+              const store = useInventoryStore.getState();
+              const newest = (store.customers || []).sort((a, b) => b.id.localeCompare(a.id))[0];
+              if (newest) setSelectedCustomer(newest.id);
+            }, 200);
+            setShowAddClientModal(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ─── New Client Modal (POS) ───
+function NewClientModal({ customerTypes, onClose, onSave }) {
+  const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
+  const [typeId, setTypeId] = useState('');
+  const [document, setDocument] = useState('');
+
+  const selectedType = customerTypes.find(t => t.id === typeId);
+
+  const handleSubmit = () => {
+    if (!name.trim()) return alert('El nombre es obligatorio');
+    onSave({
+      name: name.trim(),
+      phone: phone.trim(),
+      document: document.trim(),
+      typeId: typeId || null,
+      creditLimit: 0,
+      discountPercent: selectedType?.globalDiscountPercent || 0,
+      notes: '',
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-bounce-in">
+        <div className="p-6 border-b border-gray-800">
+          <h2 className="text-2xl font-black text-white">Nuevo Cliente</h2>
+          <p className="text-gray-400 text-sm font-bold mt-1">Registro rápido desde caja</p>
+        </div>
+
+        <div className="p-6 space-y-4">
+          {/* Nombre */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Nombre *</label>
+            <input
+              autoFocus
+              type="text"
+              className="w-full bg-[#0c0d11] border border-gray-700 focus:border-chunky-main rounded-2xl py-3 px-4 text-base font-bold text-white outline-none transition-colors"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              placeholder="Nombre del cliente"
+              onKeyDown={e => { if (e.key === 'Enter') handleSubmit(); }}
+            />
+          </div>
+
+          {/* Teléfono */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Teléfono</label>
+            <input
+              type="tel"
+              className="w-full bg-[#0c0d11] border border-gray-700 focus:border-chunky-main rounded-2xl py-3 px-4 text-base font-bold text-white outline-none transition-colors"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="300 123 4567"
+            />
+          </div>
+
+          {/* NIT / CC */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">NIT / CC</label>
+            <input
+              type="text"
+              className="w-full bg-[#0c0d11] border border-gray-700 focus:border-chunky-main rounded-2xl py-3 px-4 text-base font-bold text-white outline-none transition-colors"
+              value={document}
+              onChange={e => setDocument(e.target.value)}
+              placeholder="Opcional"
+            />
+          </div>
+
+          {/* Tipo de Contrata */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Tipo de Contrata</label>
+            {customerTypes.length === 0 ? (
+              <p className="text-gray-500 text-sm font-bold bg-[#0c0d11] rounded-2xl py-3 px-4 border border-gray-800">
+                ⚠️ No hay tipos definidos. El admin debe crearlos en Contratas → Niveles.
+              </p>
+            ) : (
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  className={`py-3 px-3 rounded-2xl border-2 text-sm font-bold transition-all ${!typeId ? 'border-chunky-main bg-chunky-main/10 text-chunky-main' : 'border-gray-700 text-gray-400 hover:border-gray-600'}`}
+                  onClick={() => setTypeId('')}
+                >
+                  Sin tipo
+                </button>
+                {customerTypes.map(t => (
+                  <button
+                    key={t.id}
+                    className={`py-3 px-3 rounded-2xl border-2 text-sm font-bold transition-all text-left ${
+                      typeId === t.id
+                        ? 'border-chunky-main bg-chunky-main/10 text-white'
+                        : 'border-gray-700 text-gray-300 hover:border-gray-600'
+                    }`}
+                    onClick={() => setTypeId(t.id)}
+                  >
+                    <span className={`inline-block w-3 h-3 rounded-full ${t.color || 'bg-blue-500'} mr-2`} />
+                    {t.name}
+                    {(t.globalDiscountPercent || 0) > 0 && (
+                      <span className="text-xs text-chunky-main ml-1">(-{t.globalDiscountPercent}%)</span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4">
+          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
+          <Button
+            className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-chunky-main text-chunky-dark shadow-[0_4px_14px_0_rgba(255,200,50,0.39)] hover:scale-105 active:scale-95 transition-all"
+            disabled={!name.trim()}
+            onClick={handleSubmit}
+          >
+            Registrar Cliente
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
