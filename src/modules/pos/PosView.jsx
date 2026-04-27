@@ -600,50 +600,44 @@ export function PosView() {
           ) : (
             <div className="space-y-1">
               {ticketItems.map(item => (
-                <div key={item.id} className="flex flex-col p-3 bg-[#1e1f26] rounded-2xl group relative border border-transparent hover:border-gray-700 shadow-sm transition-all">
-                  <div className="flex justify-between items-start">
-                    <span className="font-bold text-sm leading-tight flex-1 pr-2 truncate">{item.name}</span>
-                    <div className="flex flex-col items-end">
-                      <span className="font-black text-sm text-chunky-secondary">{formatMoney(item.price * item.qty)}</span>
-                      {item.isCustomPrice && (
-                        <span className="text-[10px] bg-amber-500/20 text-amber-500 font-bold px-1.5 py-0.5 rounded uppercase mt-0.5">Precio VIP</span>
-                      )}
+                <div key={item.id} className="flex items-center gap-2 p-2 bg-[#1e1f26] rounded-xl border border-transparent hover:border-gray-700 transition-all">
+                  {/* Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex justify-between items-center">
+                      <span className="font-bold text-sm truncate">{item.name}</span>
+                      <span className="font-black text-sm text-chunky-secondary shrink-0 ml-2">{formatMoney(item.price * item.qty)}</span>
                     </div>
-                  </div>
-                  
-                  <div className="flex justify-between items-center mt-2">
-                    <div className="flex flex-col">
-                      <span className={`text-xs font-bold ${item.isCustomPrice ? 'text-amber-500' : 'text-gray-500'}`}>
+                    <div className="flex items-center justify-between mt-1">
+                      <span className={`text-[10px] font-bold ${item.isCustomPrice ? 'text-amber-500' : 'text-gray-500'}`}>
                         {formatMoney(item.price)} c/u
+                        {item.isCustomPrice && <span className="ml-1 bg-amber-500/20 text-amber-500 px-1 rounded">VIP</span>}
                       </span>
-                      {item.isCustomPrice && (
-                        <span className="text-[10px] text-gray-600 line-through">Reg: {formatMoney(item.originalPrice || 0)}</span>
-                      )}
-                    </div>
-                    <div className="flex items-center bg-[#16171d] rounded-lg overflow-hidden border border-gray-800">
-                      <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      </button>
-                      <span 
-                        className="w-10 text-center font-black text-sm cursor-pointer hover:text-chunky-main active:scale-90 transition-all select-none" 
-                        onClick={() => {
-                          const newQty = prompt(`Cantidad para ${item.name}:`, item.qty);
-                          if (newQty !== null && !isNaN(newQty) && parseInt(newQty) > 0) {
-                            setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: parseInt(newQty) } : i));
-                          }
-                        }}
-                      >{item.qty}</span>
-                      <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                      </button>
+                      {/* Qty controls */}
+                      <div className="flex items-center bg-[#0c0d11] rounded-lg border border-gray-800">
+                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-700 rounded-l-lg transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                        <span 
+                          className="w-10 text-center font-black text-sm cursor-pointer text-chunky-main active:scale-90 transition-all select-none" 
+                          onClick={() => {
+                            const newQty = prompt(`Cantidad para ${item.name}:`, item.qty);
+                            if (newQty !== null && !isNaN(newQty) && parseInt(newQty) > 0) {
+                              setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: parseInt(newQty) } : i));
+                            }
+                          }}
+                        >{item.qty}</span>
+                        <button className="w-8 h-8 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-700 rounded-r-lg transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
+                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-
+                  {/* Delete */}
                   <button 
-                    className="absolute -top-1 -left-1 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform z-10"
+                    className="shrink-0 w-8 h-8 flex items-center justify-center bg-red-500/20 text-red-400 rounded-lg active:bg-red-500 active:text-white active:scale-90 transition-all"
                     onClick={() => setTicketItems(prev => prev.filter(i => i.id !== item.id))}
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                   </button>
                 </div>
               ))}
