@@ -459,6 +459,16 @@ export function PosView() {
               console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
             }}
           >🔓</button>
+
+          {/* ── Ventas en Espera ── */}
+          <button
+            className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative"
+            title="Ventas en Espera"
+            onClick={() => setShowSuspendedModal(true)}
+          >
+            🕐
+            {(() => { const count = (posSales || []).filter(s => s.status === 'SUSPENDED').length; return count > 0 ? <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{count}</span> : null; })()}
+          </button>
         )}
 
         <div className="w-px h-7 bg-gray-700 shrink-0" />
