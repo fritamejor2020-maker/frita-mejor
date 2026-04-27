@@ -226,7 +226,10 @@ export function AdminTicketConfigTab() {
             <p className="font-black text-sm">{form.saleFooterMsg || '...'}</p>
             <p className="text-[10px] text-gray-500">{form.saleSubFooterMsg || '...'}</p>
             {form.showBarcode && (
-              <div className="w-3/4 h-6 bg-black mx-auto my-2 opacity-80" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 2px, white 2px, white 4px)', backgroundSize: '4px 100%' }} />
+              <div className="my-2 text-center">
+                <div className="w-3/4 h-8 bg-black mx-auto opacity-90" style={{ backgroundImage: 'repeating-linear-gradient(90deg, transparent, transparent 1px, white 1px, white 2px, transparent 2px, transparent 4px, white 4px, white 5px)', backgroundSize: '5px 100%' }} />
+                <p className="text-[10px] font-bold tracking-[3px] mt-1">00A1B2</p>
+              </div>
             )}
             <p className="text-[9px] text-gray-400">{form.saleBottomLine || '...'}</p>
           </div>

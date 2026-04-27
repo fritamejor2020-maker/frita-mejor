@@ -1,5 +1,6 @@
 import React from 'react';
 import { LOGO_BASE64 } from './logoBase64';
+import { generateBarcodeSVG } from './barcodeUtils';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
@@ -41,7 +42,9 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
     </tr>
   `).join('');
 
-  return `
+  const ticketNo = (sale.id || 'N/A').replace('SALE-', '').slice(-6);
+
+    return `
     <div style="width: 78mm; color: black; font-family: 'Courier New', Courier, monospace; font-size: 12px; padding: 8px; margin: 0 auto;">
       <style>
         @page { size: 80mm auto; margin: 0; }
@@ -65,7 +68,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
 
       <!-- Transaction Info -->
       <div style="margin-bottom: 8px;">
-        <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${(sale.id || 'N/A').replace('SALE-', '').slice(-6)}</span></p>
+        <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${ticketNo}</span></p>
         <p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>
         ${tc.showCashier ? `<p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>` : ''}
       </div>
@@ -133,7 +136,12 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
       <div style="text-align: center;">
         ${tc.saleFooterMsg ? `<p style="font-weight: 900; font-size: 14px; margin: 0 0 4px 0;">${tc.saleFooterMsg}</p>` : ''}
         ${tc.saleSubFooterMsg ? `<p style="font-size: 10px; margin: 0 0 8px 0;">${tc.saleSubFooterMsg}</p>` : ''}
-        ${tc.showBarcode ? `<div style="width: 75%; height: 32px; background-color: black; margin: 0 auto 4px auto; opacity: 0.8; background-image: repeating-linear-gradient(90deg, transparent, transparent 2px, white 2px, white 4px); background-size: 4px 100%;"></div>` : ''}
+        ${tc.showBarcode ? `
+          <div style="margin: 8px auto 4px auto; text-align: center;">
+            ${generateBarcodeSVG(ticketNo, 36)}
+            <p style="font-size: 10px; margin: 4px 0 0 0; font-weight: bold; letter-spacing: 2px;">${ticketNo}</p>
+          </div>
+        ` : ''}
         ${tc.saleBottomLine ? `<p style="margin-top: 8px; font-size: 9px;">${tc.saleBottomLine}</p>` : ''}
       </div>
 

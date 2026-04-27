@@ -171,6 +171,7 @@ function ClientesTab() {
   const [nType, setNType] = useState('');
   const [nLimit, setNLimit] = useState('');
   const [nNotes, setNNotes] = useState('');
+  const [editClient, setEditClient] = useState<any>(null);
 
   const handleAddCustomer = () => {
     if (!nName.trim() || !nType) { alert('Nombre y nivel son obligatorios'); return; }
@@ -300,6 +301,7 @@ function ClientesTab() {
                       {contrataTypes.find((t: any) => t.id === selected.typeId)?.name}
                       {selected.document ? ` · ${selected.document}` : ''}
                       {selected.phone ? ` · ${selected.phone}` : ''}
+                      {selected.address ? ` · ${selected.address}` : ''}
                     </p>
                   </div>
                 </div>
@@ -313,7 +315,81 @@ function ClientesTab() {
                   )}
                 </div>
               </div>
+              {/* Edit / Delete buttons */}
+              <div className="flex gap-2 mt-4 border-t border-gray-100 pt-4">
+                <button onClick={() => { setEditClient(selected); }}
+                  className="flex-1 py-2.5 rounded-xl bg-blue-50 text-blue-600 font-bold text-sm hover:bg-blue-100 active:scale-95 transition-all">
+                  ✏️ Editar
+                </button>
+                <button onClick={() => {
+                  if (confirm(`¿Eliminar a "${selected.name}"? Esta acción no se puede deshacer.`)) {
+                    deleteCustomer(selected.id);
+                    setSelected(null);
+                  }
+                }}
+                  className="py-2.5 px-4 rounded-xl bg-red-50 text-red-500 font-bold text-sm hover:bg-red-100 active:scale-95 transition-all">
+                  🗑️
+                </button>
+              </div>
             </div>
+
+            {/* Inline Edit Modal */}
+            {editClient && (
+              <div className="bg-white rounded-3xl p-5 shadow-sm border-2 border-blue-400 space-y-3">
+                <h3 className="font-black text-gray-800 flex items-center gap-2">✏️ Editar Cliente</h3>
+                {[
+                  { key: 'name', label: 'Nombre', type: 'text' },
+                  { key: 'document', label: 'NIT / CC', type: 'text' },
+                  { key: 'phone', label: 'Teléfono', type: 'tel' },
+                  { key: 'address', label: 'Dirección', type: 'text' },
+                ].map(f => (
+                  <div key={f.key}>
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">{f.label}</label>
+                    <input type={f.type}
+                      value={(editClient as any)[f.key] || ''}
+                      onChange={e => setEditClient((prev: any) => ({ ...prev, [f.key]: e.target.value }))}
+                      className="w-full border-2 border-gray-100 rounded-2xl px-4 py-2.5 font-bold text-gray-800 text-sm outline-none focus:border-blue-400 bg-gray-50" />
+                  </div>
+                ))}
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Nivel</label>
+                  <select value={editClient.typeId || ''}
+                    onChange={e => setEditClient((prev: any) => ({ ...prev, typeId: e.target.value }))}
+                    className="w-full border-2 border-gray-100 rounded-2xl px-4 py-2.5 font-bold text-gray-700 text-sm outline-none focus:border-blue-400 bg-gray-50">
+                    {contrataTypes.map((t: any) => <option key={t.id} value={t.id}>{t.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Límite de Crédito ($)</label>
+                  <input type="number"
+                    value={editClient.creditLimit || 0}
+                    onChange={e => setEditClient((prev: any) => ({ ...prev, creditLimit: parseInt(e.target.value) || 0 }))}
+                    className="w-full border-2 border-gray-100 rounded-2xl px-4 py-2.5 font-bold text-gray-800 text-sm outline-none focus:border-blue-400 bg-gray-50" />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Notas</label>
+                  <textarea
+                    value={editClient.notes || ''}
+                    onChange={e => setEditClient((prev: any) => ({ ...prev, notes: e.target.value }))}
+                    rows={2}
+                    className="w-full border-2 border-gray-100 rounded-2xl px-4 py-2.5 font-bold text-gray-800 text-sm outline-none focus:border-blue-400 bg-gray-50 resize-none" />
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => {
+                    updateCustomer(editClient.id, editClient);
+                    setSelected(editClient);
+                    setEditClient(null);
+                  }}
+                    className="flex-1 bg-blue-600 text-white font-black py-3 rounded-2xl hover:bg-blue-500 active:scale-95 transition-all">
+                    💾 Guardar Cambios
+                  </button>
+                  <button onClick={() => setEditClient(null)}
+                    className="px-6 bg-gray-100 text-gray-600 font-bold py-3 rounded-2xl hover:bg-gray-200 active:scale-95 transition-all">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
 
             {/* Registrar Abono */}
             {balance > 0 && (
