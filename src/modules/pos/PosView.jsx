@@ -13,6 +13,7 @@ export function PosView() {
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
+  const [showContratasPanel, setShowContratasPanel] = useState(false);
   const { user, signOut } = useAuthStore();
   const { 
     inventory = [], 
@@ -495,6 +496,11 @@ export function PosView() {
               )}
 
               <div className="h-px bg-gray-800" />
+              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" onClick={() => { setShowContratasPanel(true); setShowHamburgerMenu(false); }}>
+                <span className="text-base">🤝</span> Contratas
+              </button>
+
+              <div className="h-px bg-gray-800" />
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-800 transition-colors" onClick={() => { signOut(); setShowHamburgerMenu(false); }}>
                 <span className="text-base">↩️</span> Cerrar sesión
               </button>
@@ -618,7 +624,15 @@ export function PosView() {
                       <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
-                      <span className="w-8 text-center font-black text-sm">{item.qty}</span>
+                      <span 
+                        className="w-10 text-center font-black text-sm cursor-pointer hover:text-chunky-main active:scale-90 transition-all select-none" 
+                        onClick={() => {
+                          const newQty = prompt(`Cantidad para ${item.name}:`, item.qty);
+                          if (newQty !== null && !isNaN(newQty) && parseInt(newQty) > 0) {
+                            setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, qty: parseInt(newQty) } : i));
+                          }
+                        }}
+                      >{item.qty}</span>
                       <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
@@ -626,7 +640,7 @@ export function PosView() {
                   </div>
 
                   <button 
-                    className="absolute -top-2 -left-2 w-7 h-7 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 flex items-center justify-center shadow-lg transition-all hover:scale-110 active:scale-95"
+                    className="absolute -top-1 -left-1 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg active:scale-90 transition-transform z-10"
                     onClick={() => setTicketItems(prev => prev.filter(i => i.id !== item.id))}
                   >
                     <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
@@ -661,9 +675,8 @@ export function PosView() {
               disabled={ticketItems.length === 0}
               onClick={handlePrintOrder}
             >🖨 Pedido</button>
-            <Button variant="secondary" className={`rounded-2xl py-3 border-none shadow-md hover:scale-[1.02] transition-transform flex-col gap-0 leading-tight text-xs ${activeSuspendedId ? 'bg-orange-500 text-chunky-dark hover:bg-orange-400' : 'bg-[#2a2d38] text-white hover:bg-[#343846]'}`} onClick={handleSaveSale}>
-              <span className="text-sm">Guardar</span>
-              <span className="text-[9px] opacity-70">Espera {activeSuspendedId && '✏️'}</span>
+            <Button variant="secondary" className={`rounded-2xl py-3 border-none shadow-md hover:scale-[1.02] transition-transform ${activeSuspendedId ? 'bg-orange-500 text-chunky-dark hover:bg-orange-400' : 'bg-[#2a2d38] text-white hover:bg-[#343846]'}`} onClick={handleSaveSale}>
+              <span className="text-xs font-bold">{activeSuspendedId ? '✏️ Actualizar' : '💾 Espera'}</span>
             </Button>
           </div>
         </div>
@@ -894,6 +907,20 @@ export function PosView() {
         />
       )}
 
+      {showContratasPanel && (
+        <ContratasPanelModal
+          customers={customers}
+          customerTypes={customerTypes}
+          posSales={posSales}
+          contrataPayments={contrataPayments}
+          getContrataBalance={getContrataBalance}
+          onAddPayment={addContrataPayment}
+          onClose={() => setShowContratasPanel(false)}
+          formatMoney={formatMoney}
+          updatePosSale={updatePosSale}
+        />
+      )}
+
       {showClientAccountModal && selectedCustomer && (() => {
         const c = customers.find(c => c.id === selectedCustomer);
         if (!c || !c.typeId) return null;
@@ -909,6 +936,249 @@ export function PosView() {
           />
         );
       })()}
+    </div>
+  );
+}
+
+// ─── Contratas Full Panel (POS) ───
+function ContratasPanelModal({ customers, customerTypes, posSales, contrataPayments, getContrataBalance, onAddPayment, onClose, formatMoney, updatePosSale }) {
+  const [selectedClientId, setSelectedClientId] = useState(null);
+  const [payAmt, setPayAmt] = useState('');
+  const [payMethod, setPayMethod] = useState('cash');
+  const [payNote, setPayNote] = useState('');
+  const [editingSaleId, setEditingSaleId] = useState(null);
+  const [editTotal, setEditTotal] = useState('');
+  const [filter, setFilter] = useState('all'); // all, debtors, clean
+
+  const contrataClients = (customers || []).filter(c => c.typeId);
+
+  const clientsWithBalance = contrataClients.map(c => {
+    const type = customerTypes.find(t => t.id === c.typeId);
+    const balance = getContrataBalance ? getContrataBalance(c.id) : 0;
+    const totalSales = (posSales || []).filter(s => s.customerId === c.id && s.status === 'PAID').length;
+    return { ...c, type, balance, totalSales };
+  }).sort((a, b) => b.balance - a.balance);
+
+  const filtered = filter === 'debtors' ? clientsWithBalance.filter(c => c.balance > 0)
+    : filter === 'clean' ? clientsWithBalance.filter(c => c.balance === 0)
+    : clientsWithBalance;
+
+  const totalDebt = clientsWithBalance.reduce((acc, c) => acc + c.balance, 0);
+  const totalDebtors = clientsWithBalance.filter(c => c.balance > 0).length;
+
+  const selectedClient = contrataClients.find(c => c.id === selectedClientId);
+  const selectedType = selectedClient ? customerTypes.find(t => t.id === selectedClient.typeId) : null;
+  const selectedBalance = selectedClient && getContrataBalance ? getContrataBalance(selectedClient.id) : 0;
+
+  const clientSales = selectedClient ? (posSales || [])
+    .filter(s => s.customerId === selectedClient.id && s.status === 'PAID')
+    .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp)) : [];
+
+  const clientPayments = selectedClient ? (contrataPayments || [])
+    .filter(p => p.customerId === selectedClient.id)
+    .sort((a, b) => new Date(b.date) - new Date(a.date)) : [];
+
+  const handlePay = () => {
+    const amt = parseFloat(payAmt);
+    if (!amt || amt <= 0 || !selectedClient) return;
+    onAddPayment({
+      customerId: selectedClient.id,
+      customerName: selectedClient.name,
+      amount: amt,
+      method: payMethod,
+      note: payNote.trim(),
+    });
+    setPayAmt('');
+    setPayNote('');
+  };
+
+  const handleSaveEditSale = (saleId) => {
+    const val = parseFloat(editTotal);
+    if (!val || val <= 0) return;
+    updatePosSale(saleId, { total: val, creditAmount: val });
+    setEditingSaleId(null);
+    setEditTotal('');
+  };
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-black/90 backdrop-blur-sm flex items-center justify-center p-2">
+      <div className="bg-[#13141a] border border-gray-700/50 rounded-[28px] w-full max-w-4xl max-h-[92vh] overflow-hidden shadow-2xl flex flex-col">
+
+        {/* Header */}
+        <div className="p-5 border-b border-gray-800 flex items-center justify-between shrink-0">
+          <div>
+            <h2 className="text-xl font-black text-white flex items-center gap-2">🤝 Control de Contratas</h2>
+            <p className="text-xs text-gray-500 font-bold mt-0.5">{contrataClients.length} clientes · {totalDebtors} deben · Total deuda: <span className="text-red-400">{formatMoney(totalDebt)}</span></p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white rounded-full hover:bg-gray-800 transition-colors text-lg">✕</button>
+        </div>
+
+        <div className="flex-1 flex overflow-hidden">
+
+          {/* Left: Client List */}
+          <div className="w-72 border-r border-gray-800 flex flex-col shrink-0 overflow-hidden">
+            {/* Filters */}
+            <div className="flex gap-1 p-3 border-b border-gray-800 shrink-0">
+              {[{k:'all', l:'Todos'}, {k:'debtors', l:'Deben'}, {k:'clean', l:'Al día'}].map(f => (
+                <button key={f.k} className={`flex-1 py-1.5 rounded-lg text-[10px] font-bold transition-all ${filter === f.k ? 'bg-chunky-main text-chunky-dark' : 'bg-gray-800 text-gray-400'}`} onClick={() => setFilter(f.k)}>
+                  {f.l}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {filtered.length === 0 && <p className="text-gray-600 text-sm font-bold text-center py-8">Sin clientes</p>}
+              {filtered.map(c => (
+                <button
+                  key={c.id}
+                  className={`w-full text-left px-4 py-3 border-b border-gray-800/50 transition-colors ${selectedClientId === c.id ? 'bg-chunky-main/10 border-l-2 border-l-chunky-main' : 'hover:bg-gray-800/50'}`}
+                  onClick={() => { setSelectedClientId(c.id); setEditingSaleId(null); }}
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className={`w-3 h-3 rounded-full shrink-0 ${c.type?.color || 'bg-blue-500'}`} />
+                      <span className="font-bold text-white text-sm truncate">{c.name}</span>
+                    </div>
+                    {c.balance > 0
+                      ? <span className="text-[10px] font-black text-red-400 bg-red-950/40 px-1.5 py-0.5 rounded-full shrink-0 ml-1">{formatMoney(c.balance)}</span>
+                      : <span className="text-[10px] font-bold text-green-400 shrink-0 ml-1">✓</span>
+                    }
+                  </div>
+                  <p className="text-[10px] text-gray-500 mt-0.5">{c.type?.name || 'Contrata'} · {c.totalSales} ventas</p>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Client Detail */}
+          <div className="flex-1 flex flex-col overflow-hidden">
+            {!selectedClient ? (
+              <div className="flex-1 flex flex-col items-center justify-center text-gray-600 opacity-50 p-8">
+                <span className="text-5xl mb-4">👈</span>
+                <p className="font-bold text-sm">Selecciona un cliente</p>
+              </div>
+            ) : (
+              <>
+                {/* Client header */}
+                <div className="p-4 border-b border-gray-800 flex items-center justify-between shrink-0">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl ${selectedType?.color || 'bg-blue-500'} flex items-center justify-center text-white font-black text-lg`}>
+                      {selectedClient.name.charAt(0)}
+                    </div>
+                    <div>
+                      <h3 className="font-black text-white text-base">{selectedClient.name}</h3>
+                      <p className="text-[10px] text-gray-500">{selectedType?.name} {selectedClient.phone ? `· ${selectedClient.phone}` : ''} {selectedClient.document ? `· ${selectedClient.document}` : ''}</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] text-gray-500 font-bold">SALDO</p>
+                    <p className={`text-xl font-black ${selectedBalance > 0 ? 'text-red-400' : 'text-green-400'}`}>
+                      {selectedBalance > 0 ? formatMoney(selectedBalance) : 'Al día ✓'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Scrollable content */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+
+                  {/* Quick Payment */}
+                  {selectedBalance > 0 && (
+                    <div className="bg-green-950/30 border border-green-800/50 rounded-2xl p-4 space-y-2">
+                      <h4 className="font-black text-green-300 text-xs">💵 Registrar Abono</h4>
+                      <div className="grid grid-cols-[1fr_auto] gap-2">
+                        <div className="relative">
+                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">$</span>
+                          <input type="number" placeholder="0" value={payAmt} onChange={e => setPayAmt(e.target.value)}
+                            className="w-full bg-[#0c0d11] border border-gray-700 focus:border-green-500 rounded-xl py-2.5 pl-8 pr-3 text-base font-black text-white outline-none"
+                            onKeyDown={e => { if (e.key === 'Enter') handlePay(); }}
+                          />
+                        </div>
+                        <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+                          className="bg-[#0c0d11] border border-gray-700 rounded-xl py-2.5 px-3 text-xs font-bold text-white outline-none">
+                          <option value="cash">💵 Efectivo</option>
+                          <option value="transfer">📲 Transfer</option>
+                        </select>
+                      </div>
+                      <input type="text" placeholder="Nota (opcional)" value={payNote} onChange={e => setPayNote(e.target.value)}
+                        className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl py-2 px-3 text-xs font-bold text-white outline-none" />
+                      <button onClick={handlePay} className="w-full bg-green-600 hover:bg-green-500 text-white rounded-xl py-3 font-black text-sm active:scale-[0.98] transition-all shadow-lg shadow-green-900/30">
+                        ✓ Registrar Abono
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Sales History */}
+                  <div>
+                    <h4 className="font-black text-white text-xs uppercase tracking-wider mb-2">📝 Historial de Pedidos ({clientSales.length})</h4>
+                    <div className="space-y-1.5 max-h-64 overflow-y-auto">
+                      {clientSales.length === 0 && <p className="text-gray-600 text-xs font-bold text-center py-6">Sin ventas</p>}
+                      {clientSales.map(s => (
+                        <div key={s.id} className="p-3 bg-[#1a1b22] rounded-xl border border-gray-800/50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              {editingSaleId === s.id ? (
+                                <div className="flex gap-2 items-center">
+                                  <span className="text-gray-500 text-xs">$</span>
+                                  <input type="number" value={editTotal} onChange={e => setEditTotal(e.target.value)}
+                                    className="w-24 bg-[#0c0d11] border border-chunky-main rounded-lg py-1 px-2 text-sm font-bold text-white outline-none"
+                                    autoFocus onKeyDown={e => { if (e.key === 'Enter') handleSaveEditSale(s.id); if (e.key === 'Escape') setEditingSaleId(null); }}
+                                  />
+                                  <button onClick={() => handleSaveEditSale(s.id)} className="text-green-400 text-xs font-bold">✓</button>
+                                  <button onClick={() => setEditingSaleId(null)} className="text-gray-500 text-xs">✕</button>
+                                </div>
+                              ) : (
+                                <p className="font-bold text-white text-sm">
+                                  {formatMoney(s.total)}
+                                  <button className="ml-2 text-[10px] text-gray-500 hover:text-chunky-main" onClick={() => { setEditingSaleId(s.id); setEditTotal(s.total.toString()); }}>✏️</button>
+                                </p>
+                              )}
+                              <p className="text-[10px] text-gray-500 mt-0.5">
+                                {new Date(s.timestamp).toLocaleDateString('es-CO')} {new Date(s.timestamp).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})}
+                                {s.items?.slice(0, 4).map(i => ` · ${i.qty}x ${i.name}`).join('')}
+                              </p>
+                            </div>
+                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full shrink-0 ml-2 ${
+                              s.contrataPaymentMethod === 'credit' ? 'bg-red-950/50 text-red-400'
+                              : s.paymentMethod === 'EFECTIVO' ? 'bg-green-950/50 text-green-400'
+                              : 'bg-blue-950/50 text-blue-400'
+                            }`}>
+                              {s.contrataPaymentMethod === 'credit' ? 'CRÉDITO' : s.paymentMethod}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Payments History */}
+                  <div>
+                    <h4 className="font-black text-white text-xs uppercase tracking-wider mb-2">💳 Historial de Abonos ({clientPayments.length})</h4>
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {clientPayments.length === 0 && <p className="text-gray-600 text-xs font-bold text-center py-6">Sin abonos</p>}
+                      {clientPayments.map(p => (
+                        <div key={p.id} className="flex items-center justify-between p-3 bg-green-950/20 rounded-xl">
+                          <div>
+                            <p className="font-black text-green-400 text-sm">+{formatMoney(p.amount)}</p>
+                            <p className="text-[10px] text-gray-500">
+                              {new Date(p.date).toLocaleDateString('es-CO')} {new Date(p.date).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})}
+                              {p.note ? ` · ${p.note}` : ''}
+                            </p>
+                          </div>
+                          <span className="text-[10px] font-bold text-green-400 bg-green-950/40 px-2 py-0.5 rounded-full">
+                            {p.method === 'cash' ? '💵 Efectivo' : '📲 Transfer'}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                </div>
+              </>
+            )}
+          </div>
+
+        </div>
+      </div>
     </div>
   );
 }
