@@ -1,4 +1,5 @@
 import React from 'react';
+import { LOGO_BASE64 } from './logoBase64';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
@@ -100,8 +101,8 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 16px;">
-        <h1 style="font-weight: 900; font-size: 20px; margin-bottom: 4px;">REPORTE Z (CIERRE)</h1>
-        <h2 style="font-weight: bold; font-size: 18px; margin-bottom: 4px;">FRITA MEJOR</h2>
+        <img src="${LOGO_BASE64}" alt="Frita Mejor" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto;" />
+        <h1 style="font-weight: 900; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">REPORTE Z — CIERRE DE TURNO</h1>
         <div style="border-bottom: 1px dashed black; margin: 8px 0;"></div>
         <p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Turno ID: ${shift.id.slice(-6)}</p>
         <p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Cajero: ${shift.userName || 'PRINCIPAL'}</p>

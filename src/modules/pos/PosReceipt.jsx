@@ -1,4 +1,5 @@
 import React from 'react';
+import { LOGO_BASE64 } from './logoBase64';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
@@ -38,16 +39,9 @@ export const generateReceiptHTML = (sale, customer) => {
 
       <!-- Header & Logo -->
       <div style="text-align: center; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: center; margin-bottom: 8px;">
-          <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: black;">
-            <path d="M3 11a9 9 0 0 1 18 0H3z"></path>
-            <path d="M21 15H3v1a4 4 0 0 0 4 4h10a4 4 0 0 0 4-4v-1z"></path>
-            <path d="M12 11v4"></path>
-            <path d="M8 11v4"></path>
-            <path d="M16 11v4"></path>
-          </svg>
+        <div style="display: flex; justify-content: center; margin-bottom: 6px;">
+          <img src="${LOGO_BASE64}" alt="Frita Mejor" style="width: 120px; height: auto; display: block; margin: 0 auto;" />
         </div>
-        <h1 style="font-weight: 900; font-size: 24px; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 4px; margin-top: 0;">FRITA MEJOR</h1>
         <p style="font-weight: bold; margin: 0;">NIT: 900.000.000-1</p>
         <p style="margin: 0;">Tel: 300 123 4567</p>
         <p style="margin: 0;">Cali, Colombia</p>
