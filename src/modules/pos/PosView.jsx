@@ -97,46 +97,70 @@ export function PosView() {
   const total = subtotal - discountAmount;
 
   // -- PRINT HELPER --
-  // Uses a hidden iframe to print the HTML string without locking the main POS
-  // and avoiding popup blockers or React crashes caused by window.open & document.write.
+  // Uses a hidden iframe to print the HTML string.
+  // Falls back to window.open if iframe printing fails.
   const printHTML = (htmlContent, title = 'Imprimir') => {
     if (!htmlContent) return;
 
-    // Create an invisible iframe
-    const iframe = document.createElement('iframe');
-    iframe.style.position = 'fixed';
-    iframe.style.right = '0';
-    iframe.style.bottom = '0';
-    iframe.style.width = '0';
-    iframe.style.height = '0';
-    iframe.style.border = 'none';
-    document.body.appendChild(iframe);
+    const fullHtml = `<!DOCTYPE html><html><head><title>${title}</title></head><body>${htmlContent}</body></html>`;
 
-    const doc = iframe.contentWindow.document;
-    doc.open();
-    doc.write(`
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <title>${title}</title>
-        </head>
-        <body>
-          ${htmlContent}
-        </body>
-      </html>
-    `);
-    doc.close();
+    // Try iframe method first
+    try {
+      const iframe = document.createElement('iframe');
+      iframe.style.position = 'fixed';
+      iframe.style.right = '0';
+      iframe.style.bottom = '0';
+      iframe.style.width = '1px';
+      iframe.style.height = '1px';
+      iframe.style.border = 'none';
+      iframe.style.opacity = '0.01';
+      document.body.appendChild(iframe);
 
-    // Give it a moment to load styles, then print and remove iframe
-    setTimeout(() => {
-      iframe.contentWindow.focus();
-      iframe.contentWindow.print();
-      
-      // Remove iframe after printing dialogue is closed (or immediately after it opens)
-      setTimeout(() => {
-        document.body.removeChild(iframe);
-      }, 1000);
-    }, 500);
+      const doc = iframe.contentWindow.document;
+      doc.open();
+      doc.write(fullHtml);
+      doc.close();
+
+      // Wait for content to fully render, then print
+      const doPrint = () => {
+        try {
+          iframe.contentWindow.focus();
+          iframe.contentWindow.print();
+        } catch (e) {
+          console.warn('Iframe print failed, using fallback:', e);
+          const win = window.open('', '_blank', 'width=400,height=600');
+          if (win) {
+            win.document.write(fullHtml);
+            win.document.close();
+            win.focus();
+            win.print();
+            setTimeout(() => win.close(), 2000);
+          }
+        }
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch(e) {}
+        }, 3000);
+      };
+
+      // Use onload for images, fallback to timeout
+      iframe.contentWindow.onafterprint = () => {
+        setTimeout(() => {
+          try { document.body.removeChild(iframe); } catch(e) {}
+        }, 500);
+      };
+      setTimeout(doPrint, 800);
+
+    } catch (e) {
+      // Fallback: open new window
+      console.warn('Iframe creation failed, using window.open:', e);
+      const win = window.open('', '_blank', 'width=400,height=600');
+      if (win) {
+        win.document.write(fullHtml);
+        win.document.close();
+        win.focus();
+        setTimeout(() => { win.print(); setTimeout(() => win.close(), 2000); }, 500);
+      }
+    }
   };
 
   // -- SHIFT ACTIONS --
