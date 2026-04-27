@@ -733,6 +733,7 @@ export const useInventoryStore = create(
       // Ventas / Caja
       addPosSale: (sale) => { set((s) => ({ posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])] })); syncKey('posSales', useInventoryStore.getState().posSales); },
       updatePosSale: (id, data) => { set((s) => ({ posSales: (s.posSales || []).map((sale) => sale.id === id ? { ...sale, ...data } : sale) })); syncKey('posSales', useInventoryStore.getState().posSales); },
+      deletePosSale: (id) => { set((s) => ({ posSales: (s.posSales || []).filter((sale) => sale.id !== id) })); syncKey('posSales', useInventoryStore.getState().posSales); },
 
       addPosShift: (shift) => {
         const deleted = useInventoryStore.getState().deletedShiftIds || [];

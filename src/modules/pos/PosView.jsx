@@ -29,7 +29,7 @@ export function PosView() {
     addContrataPayment,
     getContrataBalance,
     contrataPayments = [],
-    addPosSale, updatePosSale, addPosShift, updatePosShift, addPosExpense 
+    addPosSale, updatePosSale, deletePosSale, addPosShift, updatePosShift, addPosExpense 
   } = useInventoryStore();
 
   // Shift logic (find active shift)
@@ -56,6 +56,7 @@ export function PosView() {
   const [showSuspendedModal, setShowSuspendedModal] = useState(false);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLogoutPromptModal, setShowLogoutPromptModal] = useState(false);
+  const [showClientDropdown, setShowClientDropdown] = useState(false);
   const [lastSale, setLastSale] = useState(null); // Used for printing the receipt
   const [lastClosedShift, setLastClosedShift] = useState(null); // Used for printing Z Report
 
@@ -599,21 +600,60 @@ export function PosView() {
           </div>
           
           <div className="flex gap-2">
-            <select 
-              className="flex-1 min-w-0 bg-[#1e1f26] text-white border border-gray-700 rounded-lg px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main"
-              value={selectedCustomer || ''}
-              onChange={(e) => setSelectedCustomer(e.target.value)}
-            >
-              <option value="">Cliente General</option>
-              {customers.filter(c => c.typeId).map(c => {
-                const typeName = c.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
-                return (
-                  <option key={c.id} value={c.id}>
-                    {c.name} {typeName ? `[${typeName}]` : ''} {c.discountPercent > 0 ? `(-${c.discountPercent}%)` : ''}
-                  </option>
-                );
-              })}
-            </select>
+            <div className="flex-1 min-w-0 relative">
+              <button
+                type="button"
+                className="w-full bg-[#1e1f26] text-white border border-gray-700 rounded-lg px-3 py-2 text-sm font-bold outline-none text-left flex items-center justify-between gap-2 hover:border-gray-500 transition-all"
+                onClick={() => setShowClientDropdown(!showClientDropdown)}
+              >
+                <span className="truncate flex items-center gap-2">
+                  {(() => {
+                    if (!selectedCustomer) return <><span className="text-gray-400">👤</span> Cliente General</>;
+                    const c = customers.find(x => x.id === selectedCustomer);
+                    if (!c) return 'Cliente General';
+                    const t = customerTypes.find(x => x.id === c.typeId);
+                    return <><span className={`w-2.5 h-2.5 rounded-full shrink-0 ${t?.color || 'bg-gray-500'}`} />{c.name}</>;
+                  })()}
+                </span>
+                <span className="text-gray-500 text-[10px]">{showClientDropdown ? '▲' : '▼'}</span>
+              </button>
+              {showClientDropdown && (
+                <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowClientDropdown(false)} />
+                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#1a1b22] border border-gray-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden max-h-[240px] overflow-y-auto">
+                    <button
+                      className={`w-full text-left px-3 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all ${!selectedCustomer ? 'bg-yellow-400/10 text-yellow-300' : 'text-gray-300 hover:bg-gray-800'}`}
+                      onClick={() => { setSelectedCustomer(''); setShowClientDropdown(false); }}
+                    >
+                      <span className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-xs">👤</span>
+                      <span>Cliente General</span>
+                    </button>
+                    {customers.filter(c => c.typeId).map(c => {
+                      const type = customerTypes.find(t => t.id === c.typeId);
+                      const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
+                      const isActive = selectedCustomer === c.id;
+                      return (
+                        <button
+                          key={c.id}
+                          className={`w-full text-left px-3 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all border-t border-gray-800/50 ${isActive ? 'bg-yellow-400/10 text-yellow-300' : 'text-gray-300 hover:bg-gray-800'}`}
+                          onClick={() => { setSelectedCustomer(c.id); setShowClientDropdown(false); }}
+                        >
+                          <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>{c.name.charAt(0)}</span>
+                          <span className="flex-1 min-w-0 truncate">{c.name}</span>
+                          {bal > 0
+                            ? <span className="text-[10px] font-black text-red-400 bg-red-950/50 px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">Debe</span>
+                            : <span className="text-[10px] font-bold text-green-500 shrink-0">✓</span>
+                          }
+                        </button>
+                      );
+                    })}
+                    {customers.filter(c => c.typeId).length === 0 && (
+                      <div className="text-center py-4 text-gray-500 text-xs">Sin contratas registradas</div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
             <button
               className="shrink-0 w-10 h-10 flex items-center justify-center bg-chunky-main text-gray-900 rounded-lg font-black text-lg active:scale-95 transition-all"
               onClick={() => setShowAddClientModal(true)}
@@ -919,6 +959,7 @@ export function PosView() {
           customers={customers}
           onClose={() => setShowSuspendedModal(false)}
           onLoad={handleLoadSuspended}
+          onDelete={deletePosSale}
         />
       )}
 
@@ -1824,7 +1865,7 @@ function PaymentModal({ total, paymentMethods, onClose, onConfirm }) {
 }
 
 // ─── Suspended Sales Modal Component ───
-function SuspendedSalesModal({ sales, customers, onClose, onLoad }) {
+function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-bounce-in">
@@ -1846,20 +1887,27 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad }) {
               const custName = cust?.name || 'Cliente General';
               const isContrata = cust?.typeId;
               return (
-                <div key={s.id} className="bg-[#16171d] border border-gray-800 rounded-[24px] p-5 flex justify-between items-center hover:border-gray-600 transition-all hover:shadow-lg group">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${isContrata ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
-                        {isContrata ? '🤝' : '👤'} {custName}
-                      </span>
+                <div key={s.id} className="bg-[#16171d] border border-gray-800 rounded-[24px] p-5 hover:border-gray-600 transition-all hover:shadow-lg group">
+                  <div className="flex justify-between items-center">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${isContrata ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                          {isContrata ? '🤝' : '👤'} {custName}
+                        </span>
+                      </div>
+                      <h3 className="font-black text-white text-lg">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
+                      <p className="text-xs text-gray-400 font-bold">Fecha: {new Date(s.timestamp).toLocaleString('es-CO')}</p>
+                      <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items.length} ítem(s) guardados.</p>
                     </div>
-                    <h3 className="font-black text-white text-lg">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
-                    <p className="text-xs text-gray-400 font-bold">Fecha: {new Date(s.timestamp).toLocaleString('es-CO')}</p>
-                    <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items.length} ítem(s) guardados.</p>
+                    <div className="flex flex-col gap-2 shrink-0 ml-3">
+                      <Button className="rounded-[16px] bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] active:scale-95 transition-all text-sm" onClick={() => onLoad(s)}>
+                        Recuperar
+                      </Button>
+                      <button className="rounded-[16px] bg-red-950/40 hover:bg-red-900/60 text-red-400 font-bold px-5 py-2 active:scale-95 transition-all text-xs border border-red-900/30" onClick={() => { if (confirm('¿Eliminar esta venta en espera?')) onDelete(s.id); }}>
+                        🗑️ Eliminar
+                      </button>
+                    </div>
                   </div>
-                  <Button className="rounded-[16px] bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] group-hover:scale-105 active:scale-95 transition-all" onClick={() => onLoad(s)}>
-                    Recuperar
-                  </Button>
                 </div>
               );
             })
