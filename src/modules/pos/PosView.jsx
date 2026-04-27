@@ -7,6 +7,7 @@ import { generateZReportHTML }   from './ZReportReceipt';
 import { IncomesModal }          from './components/IncomesModal';
 import { ExpensesModal }         from './components/ExpensesModal';
 import { formatMoney }           from '../../utils/formatUtils';
+import { useFinanceStore }       from '../../store/useFinanceStore';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -225,7 +226,7 @@ export function PosView() {
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
 
-  const handleAddExpense = (amount, reason) => {
+  const handleAddExpense = (amount, reason, shareToGastos = false) => {
     addPosExpense({
       shiftId: activeShift?.id || null,
       registerId: selectedRegisterId,
@@ -233,7 +234,34 @@ export function PosView() {
       reason,
       timestamp: new Date().toISOString(),
       userId: user?.id,
-      userName: user?.name
+      userName: user?.name,
+      type: 'retiro',
+    });
+    // Opcionalmente compartir al módulo Gastos (Supabase)
+    if (shareToGastos) {
+      try {
+        useFinanceStore.getState().addExpense({
+          descripcion: reason,
+          monto: parseFloat(amount),
+          proveedor: 'Caja POS',
+          creado_por: user?.name || 'Cajero',
+          fecha: new Date().toISOString(),
+        });
+      } catch (e) { console.warn('No se pudo compartir al módulo Gastos:', e); }
+    }
+    setShowExpenseModal(false);
+  };
+
+  const handleAddDeposit = (amount, reason) => {
+    addPosExpense({
+      shiftId: activeShift?.id || null,
+      registerId: selectedRegisterId,
+      amount: parseFloat(amount),
+      reason,
+      timestamp: new Date().toISOString(),
+      userId: user?.id,
+      userName: user?.name,
+      type: 'deposito',
     });
     setShowExpenseModal(false);
   };
@@ -565,6 +593,9 @@ export function PosView() {
                   </button>
                   <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-red-300 hover:bg-red-950/40 transition-colors" onClick={() => { setPinPromptConfig({ message: 'Contraseña de Gastos', expectedPin: '8', onSuccess: () => setShowExpensesModal(true) }); setShowHamburgerMenu(false); }}>
                     <span className="text-base">💸</span> Gastos
+                  </button>
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-orange-300 hover:bg-orange-950/40 transition-colors" onClick={() => { setShowExpenseModal(true); setShowHamburgerMenu(false); }}>
+                    <span className="text-base">🔄</span> Retiros y Depósitos
                   </button>
                 </>
               )}
@@ -1040,6 +1071,9 @@ export function PosView() {
         <ShiftExpenseModal
           onClose={() => setShowExpenseModal(false)}
           onConfirm={handleAddExpense}
+          onDeposit={handleAddDeposit}
+          shiftExpenses={(posExpenses || []).filter(e => e.shiftId === activeShift?.id)}
+          formatMoney={formatMoney}
         />
       )}
 
@@ -1794,9 +1828,12 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   // Solo sumar efectivo para el cuadre (tarjetas y transferencias van a banco)
   const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
   const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
-  const totalExpenses = (expenses || []).reduce((acc, e) => acc + e.amount, 0);
+  const retiros = (expenses || []).filter(e => e.type !== 'deposito');
+  const depositos = (expenses || []).filter(e => e.type === 'deposito');
+  const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
+  const totalDepositos = depositos.reduce((acc, e) => acc + e.amount, 0);
 
-  const expectedCashInDrawer = initial + cashSales - totalExpenses;
+  const expectedCashInDrawer = initial + cashSales - totalRetiros + totalDepositos;
   const counted = parseFloat(realCount || 0);
   const difference = counted - expectedCashInDrawer;
 
@@ -1814,7 +1851,10 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
               <div className="flex justify-between"><span>Base Inicial:</span> <span>{formatMoney(initial)}</span></div>
               <div className="flex justify-between text-green-400"><span>Ventas Efectivo:</span> <span>+{formatMoney(cashSales)}</span></div>
               <div className="flex justify-between text-blue-400"><span>Ventas Electrónicas:</span> <span>+{formatMoney(otherSales)}</span></div>
-              <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>Retiros (Salidas):</span> <span>-{formatMoney(totalExpenses)}</span></div>
+              <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
+              {totalDepositos > 0 && (
+                <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
+              )}
               <div className="border-t border-gray-700 pt-3 flex justify-between text-xl text-white font-black mt-2">
                  <span>Efectivo Esperado en Cajón:</span> <span>{formatMoney(expectedCashInDrawer)}</span>
               </div>
@@ -1852,51 +1892,134 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   )
 }
 
-// ─── Expense Modal (Retiros / Pagos a proveedores) ───
-function ShiftExpenseModal({ onClose, onConfirm }) {
+// ─── Retiros y Depósitos Modal ───
+function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], formatMoney }) {
+  const [tab, setTab] = useState('retiro'); // 'retiro' | 'deposito'
   const [amount, setAmount] = useState('');
-  const [reason, setReason] = useState('Pago Proveedor');
+  const [reason, setReason] = useState('');
+  const [shareToGastos, setShareToGastos] = useState(false);
 
   const isValid = parseFloat(amount) > 0 && reason.trim() !== '';
 
+  const retiros = shiftExpenses.filter(e => e.type !== 'deposito');
+  const depositos = shiftExpenses.filter(e => e.type === 'deposito');
+  const totalRetiros = retiros.reduce((s, e) => s + (e.amount || 0), 0);
+  const totalDepositos = depositos.reduce((s, e) => s + (e.amount || 0), 0);
+
+  const handleSubmit = () => {
+    if (!isValid) return;
+    if (tab === 'retiro') {
+      onConfirm(amount, reason, shareToGastos);
+    } else {
+      onDeposit(amount, reason);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-bounce-in">
-        <div className="p-6 border-b border-gray-800">
-          <h2 className="text-2xl font-black text-white">Registrar Retiro Gasto</h2>
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-bounce-in max-h-[90vh]">
+        {/* Header with tabs */}
+        <div className="p-5 border-b border-gray-800">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-black text-white">🔄 Retiros y Depósitos</h2>
+            <button className="text-gray-400 hover:text-white p-1" onClick={onClose}>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div className="flex gap-2">
+            <button
+              className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'retiro' ? 'bg-red-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`}
+              onClick={() => setTab('retiro')}
+            >
+              ⬆️ Retiro (Salida)
+            </button>
+            <button
+              className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'deposito' ? 'bg-green-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`}
+              onClick={() => setTab('deposito')}
+            >
+              ⬇️ Depósito (Entrada)
+            </button>
+          </div>
         </div>
         
-        <div className="p-6 space-y-6">
+        {/* Form */}
+        <div className="p-5 space-y-4">
           <div>
-            <label className="text-sm font-bold text-gray-400 block mb-2 uppercase tracking-widest">Monto del Retiro</label>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Monto</label>
             <div className="relative">
-              <span className="absolute left-6 top-1/2 -translate-y-1/2 text-xl font-black text-gray-500">$</span>
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl font-black text-gray-500">$</span>
               <input 
                  autoFocus type="number" 
-                 className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[20px] py-4 pl-14 pr-4 text-2xl font-black text-white outline-none transition-colors shadow-inner"
+                 className={`w-full bg-[#0c0d11] border focus:border-orange-500 rounded-[18px] py-3.5 pl-12 pr-4 text-2xl font-black text-white outline-none transition-colors shadow-inner ${tab === 'retiro' ? 'border-red-800' : 'border-green-800'}`}
                  value={amount}
                  onChange={(e) => setAmount(e.target.value)}
+                 placeholder="0"
               />
             </div>
           </div>
           <div>
-            <label className="text-sm font-bold text-gray-400 block mb-2 uppercase tracking-widest">Motivo / Descripción</label>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Motivo / Descripción</label>
             <input 
                type="text" 
-               className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[20px] py-4 px-5 text-base font-bold text-white outline-none transition-colors shadow-inner"
+               className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[18px] py-3.5 px-4 text-sm font-bold text-white outline-none transition-colors shadow-inner"
                value={reason}
                onChange={(e) => setReason(e.target.value)}
-               placeholder="Ej: Pago de hielo, proveedor..."
+               placeholder={tab === 'retiro' ? 'Ej: Pago hielo, proveedor...' : 'Ej: Cambio, base adicional...'}
+               onKeyDown={(e) => e.key === 'Enter' && isValid && handleSubmit()}
             />
           </div>
+
+          {/* Share to Gastos toggle (only for retiros) */}
+          {tab === 'retiro' && (
+            <button
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-[18px] border transition-all text-left ${shareToGastos ? 'bg-red-900/30 border-red-700 text-red-300' : 'bg-[#0c0d11] border-gray-800 text-gray-500'}`}
+              onClick={() => setShareToGastos(!shareToGastos)}
+            >
+              <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${shareToGastos ? 'bg-red-600 border-red-600 text-white' : 'border-gray-600'}`}>
+                {shareToGastos && '✓'}
+              </span>
+              <div>
+                <p className="text-sm font-bold">Compartir al módulo Gastos</p>
+                <p className="text-xs opacity-60">Registra también en el chat de gastos general</p>
+              </div>
+            </button>
+          )}
         </div>
 
-        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4">
-          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-orange-600 text-white shadow-[0_4px_14px_0_rgba(234,88,12,0.39)] hover:scale-105 active:scale-95 hover:bg-orange-500 transition-all" disabled={!isValid} onClick={() => onConfirm(amount, reason)}>
-            Registrar Retiro
+        {/* Action button */}
+        <div className="px-5 pb-4">
+          <Button
+            className={`w-full rounded-[18px] py-4 font-black text-lg shadow-lg hover:scale-[1.02] active:scale-95 transition-all ${tab === 'retiro' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
+            disabled={!isValid}
+            onClick={handleSubmit}
+          >
+            {tab === 'retiro' ? '⬆️ Registrar Retiro' : '⬇️ Registrar Depósito'}
           </Button>
         </div>
+
+        {/* Mini history */}
+        {shiftExpenses.length > 0 && (
+          <div className="border-t border-gray-800 p-4 max-h-[180px] overflow-y-auto">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Movimientos del turno</p>
+            <div className="space-y-1.5">
+              {shiftExpenses.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((e, i) => (
+                <div key={e.id || i} className="flex items-center justify-between text-xs py-1.5 px-3 bg-[#0c0d11] rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <span>{e.type === 'deposito' ? '⬇️' : '⬆️'}</span>
+                    <span className="font-bold text-gray-300 truncate max-w-[160px]">{e.reason}</span>
+                  </div>
+                  <span className={`font-black ${e.type === 'deposito' ? 'text-green-400' : 'text-red-400'}`}>
+                    {e.type === 'deposito' ? '+' : '-'}{formatMoney(e.amount)}
+                  </span>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-between mt-3 pt-2 border-t border-gray-800 text-xs font-black">
+              <span className="text-red-400">Retiros: -{formatMoney(totalRetiros)}</span>
+              <span className="text-green-400">Depósitos: +{formatMoney(totalDepositos)}</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

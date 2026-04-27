@@ -84,9 +84,12 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const totalSales    = cashSalesTotal + cardSalesTotal + transferSalesTotal;
   const totalDiscounts = sales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
-  const totalExpenses  = (expenses || []).reduce((acc, e) => acc + e.amount, 0);
+  const retiros  = (expenses || []).filter(e => e.type !== 'deposito');
+  const depositos = (expenses || []).filter(e => e.type === 'deposito');
+  const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
+  const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
 
-  const expectedCash = initial + cashSalesTotal - totalExpenses;
+  const expectedCash = initial + cashSalesTotal - totalExpenses + totalDeposits;
   const countedCash = shift.realAmount || 0;
   const difference = countedCash - expectedCash;
 
@@ -116,11 +119,11 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const expensesHtml = (tc.zShowExpensesDetail !== false && expenses && expenses.length > 0) ? `
     <div style="font-size: 12px; font-weight: bold; margin-top: 16px;">
-        <h3 style="text-align: center; background-color: #E5E7EB; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Detalle de Gastos</h3>
+        <h3 style="text-align: center; background-color: #E5E7EB; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Retiros y Depósitos</h3>
         ${expenses.map(e => `
             <div style="display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dashed #D1D5DB; padding-bottom: 4px;">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50mm;">${e.reason}</span>
-                <span>${formatMoney(e.amount)}</span>
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50mm;">${e.type === 'deposito' ? '⬇️' : '⬆️'} ${e.reason}</span>
+                <span style="color: ${e.type === 'deposito' ? '#16A34A' : '#DC2626'};">${e.type === 'deposito' ? '+' : '-'}${formatMoney(e.amount)}</span>
             </div>
         `).join('')}
     </div>
@@ -184,8 +187,13 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         </div>` : ''}
 
         ${tc.zShowExpensesLine !== false ? `<div style="display: flex; justify-content: space-between; margin-top: 8px; color: #DC2626;">
-          <span>Retiros/Gastos:</span>
+          <span>Retiros:</span>
           <span>-${formatMoney(totalExpenses)}</span>
+        </div>` : ''}
+
+        ${totalDeposits > 0 ? `<div style="display: flex; justify-content: space-between; margin-top: 4px; color: #16A34A;">
+          <span>Depósitos:</span>
+          <span>+${formatMoney(totalDeposits)}</span>
         </div>` : ''}
 
         ${discountsHtml}
