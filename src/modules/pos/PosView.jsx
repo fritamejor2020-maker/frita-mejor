@@ -341,17 +341,18 @@ export function PosView() {
     setShowSuspendedModal(false);
   };
 
-  const handleProcessPayment = (methodName, amountProvided) => {
+  const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
     // Find the method config
     const methods = posSettings?.paymentMethods || [
       { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: true }
     ];
-    const methodConfig = methods.find(m => m.name === methodName) || methods[0];
+    const methodConfig = isCredit
+      ? { name: 'CRÉDITO', openDrawer: false, printReceipt: true }
+      : (methods.find(m => m.name === methodName) || methods[0]);
 
     // Check if this is a contrata client
     const saleCustomer = customers?.find(c => c.id === selectedCustomer);
     const isContrata = saleCustomer && saleCustomer.typeId;
-    const contrataType = isContrata ? customerTypes?.find(t => t.id === saleCustomer.typeId) : null;
 
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
@@ -362,13 +363,13 @@ export function PosView() {
       discountAmount,
       total,
       status: 'PAID',
-      paymentMethod: methodConfig.name,
-      amountProvided: amountProvided,
-      change: amountProvided - total,
+      paymentMethod: isCredit ? 'CRÉDITO' : methodConfig.name,
+      amountProvided: isCredit ? 0 : amountProvided,
+      change: isCredit ? 0 : (amountProvided - total),
       timestamp: new Date().toISOString(),
       shiftId: activeShift?.id,
-      // Contrata fields
-      ...(isContrata && contrataType?.allowCredit ? {
+      // Contrata fields - only credit when explicitly requested
+      ...(isCredit && isContrata ? {
         contrataPaymentMethod: 'credit',
         creditAmount: total,
       } : isContrata ? {
@@ -491,6 +492,12 @@ export function PosView() {
                   onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}
                 >{pm.name}</button>
               ))}
+              {customer?.typeId && (
+                <button
+                  className="shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px] bg-red-700 active:bg-red-800 text-red-100"
+                  onClick={() => ticketItems.length > 0 && handleProcessPayment('CRÉDITO', 0, true)}
+                >⚠️ CRÉDITO</button>
+              )}
               <button
                 className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
                 onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}
