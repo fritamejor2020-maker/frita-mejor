@@ -69,6 +69,7 @@ export function PosView() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLogoutPromptModal, setShowLogoutPromptModal] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const [showZHistoryModal, setShowZHistoryModal] = useState(false);
   const [lastSale, setLastSale] = useState(null); // Used for printing the receipt
   const [lastClosedShift, setLastClosedShift] = useState(null); // Used for printing Z Report
 
@@ -215,6 +216,13 @@ export function PosView() {
     setTimeout(() => {
         setShowLogoutPromptModal(true);
     }, 500);
+  };
+
+  const handleReprintZReport = (shift) => {
+    const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
+    const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
+    const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig);
+    setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
 
   const handleAddExpense = (amount, reason) => {
@@ -575,6 +583,9 @@ export function PosView() {
               <div className="h-px bg-gray-800" />
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" onClick={() => { setShowContratasPanel(true); setShowHamburgerMenu(false); }}>
                 <span className="text-base">🤝</span> Contratas
+              </button>
+              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-teal-300 hover:bg-teal-950/40 transition-colors" onClick={() => { setShowZHistoryModal(true); setShowHamburgerMenu(false); }}>
+                <span className="text-base">📊</span> Historial Cierres Z
               </button>
 
               <div className="h-px bg-gray-800" />
@@ -1060,6 +1071,16 @@ export function PosView() {
           onClose={() => setShowContratasPanel(false)}
           formatMoney={formatMoney}
           updatePosSale={updatePosSale}
+        />
+      )}
+
+      {showZHistoryModal && (
+        <ZHistoryModal
+          shifts={(posShifts || []).filter(s => s.closedAt).sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))}
+          posSales={posSales}
+          onReprint={handleReprintZReport}
+          onClose={() => setShowZHistoryModal(false)}
+          formatMoney={formatMoney}
         />
       )}
 
@@ -2119,6 +2140,77 @@ function PinPromptModal({ message, expectedPin, onSuccess, onClose }) {
             <Button type="submit" className="flex-1 rounded-[20px] py-3 font-black bg-chunky-main text-chunky-dark hover:scale-[1.02] active:scale-95 transition-all" disabled={!pin}>Ingresar</Button>
           </div>
         </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Z-Report History Modal ───
+function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney }) {
+  return (
+    <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">📊 Historial de Cierres Z</h2>
+            <p className="text-gray-400 text-sm font-bold mt-1">{shifts.length} cierre{shifts.length !== 1 ? 's' : ''} registrado{shifts.length !== 1 ? 's' : ''}</p>
+          </div>
+          <button className="text-gray-400 hover:text-white bg-[#16171d] p-2 rounded-full hover:bg-gray-800 transition-colors" onClick={onClose}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {shifts.length === 0 ? (
+            <div className="text-center py-16 text-gray-500">
+              <p className="text-5xl mb-4">📋</p>
+              <p className="font-bold text-lg">Sin cierres registrados</p>
+              <p className="text-sm mt-1">Los cierres aparecerán aquí después de cerrar un turno.</p>
+            </div>
+          ) : (
+            shifts.map(shift => {
+              const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
+              const totalSales = shiftSales.reduce((acc, s) => acc + s.total, 0);
+              const salesCount = shiftSales.length;
+              const opened = new Date(shift.openedAt);
+              const closed = new Date(shift.closedAt);
+
+              return (
+                <div key={shift.id} className="bg-[#16171d] border border-gray-800 rounded-[20px] p-5 hover:border-gray-700 transition-colors">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-black text-white text-base">
+                          {closed.toLocaleDateString('es-CO', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        </span>
+                        {shift.registerName && (
+                          <span className="bg-purple-500/20 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-lg">{shift.registerName}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-4 mt-2 text-xs font-bold text-gray-400">
+                        <span>👤 {shift.userName || 'Sin cajero'}</span>
+                        <span>🕐 {opened.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} → {closed.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</span>
+                      </div>
+                      <div className="flex items-center gap-4 mt-2">
+                        <span className="text-green-400 font-black text-sm">{formatMoney(totalSales)}</span>
+                        <span className="text-gray-500 text-xs font-bold">{salesCount} venta{salesCount !== 1 ? 's' : ''}</span>
+                        {shift.realAmount > 0 && (
+                          <span className="text-gray-500 text-xs font-bold">Contado: {formatMoney(shift.realAmount)}</span>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      className="shrink-0 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all flex items-center gap-1.5"
+                      onClick={() => onReprint(shift)}
+                    >
+                      🖨️ Reimprimir
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
       </div>
     </div>
   );
