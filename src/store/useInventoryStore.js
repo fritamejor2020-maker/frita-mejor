@@ -683,15 +683,15 @@ export const useInventoryStore = create(
       })),
 
       // Clientes
-      addCustomer: (c) => set((s) => ({
+      addCustomer: (c) => { set((s) => ({
         customers: [...(s.customers || []), { ...c, id: `CUST-${Date.now()}`, active: true, typeId: c.typeId || null }],
-      })),
-      updateCustomer: (id, data) => set((s) => ({
+      })); syncKey('customers', useInventoryStore.getState().customers); },
+      updateCustomer: (id, data) => { set((s) => ({
         customers: (s.customers || []).map((c) => c.id === id ? { ...c, ...data } : c),
-      })),
-      deleteCustomer: (id) => set((s) => ({
+      })); syncKey('customers', useInventoryStore.getState().customers); },
+      deleteCustomer: (id) => { set((s) => ({
         customers: (s.customers || []).filter((c) => c.id !== id),
-      })),
+      })); syncKey('customers', useInventoryStore.getState().customers); },
 
       // Tipos de Clientes (Customer Types VIP)
       addCustomerType: (typeData) => set((state) => ({

@@ -419,7 +419,7 @@ export function PosView() {
   const handleReprintSale = (saleToPrint) => {
     if (!saleToPrint) return;
     const saleCustomer = customers?.find(c => c.id === saleToPrint.customerId);
-    const receiptHtml = generateReceiptHTML(saleToPrint, saleCustomer, posSettings?.ticketConfig);
+    const receiptHtml = generateReceiptHTML(saleToPrint, saleCustomer, posSettings?.ticketConfig, customerTypes);
     setTimeout(() => {
       printHTML(receiptHtml, 'Recibo de Venta (Copia)');
     }, 100);

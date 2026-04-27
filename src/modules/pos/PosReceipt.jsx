@@ -4,7 +4,7 @@ import { generateBarcodeSVG } from './barcodeUtils';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
+export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerTypes = []) => {
   if (!sale) return '';
 
   const tc = {
@@ -15,6 +15,19 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
     showLogo: true,
     showBarcode: true,
     showCashier: true,
+    showNit: true,
+    showPhone: true,
+    showAddress: true,
+    showTicketNumber: true,
+    showDate: true,
+    showCustomerName: true,
+    showCustomerDoc: true,
+    showCustomerAddress: true,
+    showCustomerPhone: true,
+    showContrataType: true,
+    showSubtotal: true,
+    showDiscount: true,
+    showPaymentInfo: true,
     saleFooterMsg: '¡GRACIAS POR SU COMPRA!',
     saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
     saleBottomLine: 'Sistema POS • fritamejor.com',
@@ -26,8 +39,20 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
   });
 
   const customerName = customer?.name || 'Cliente General';
-  const customerDoc = customer?.document ? `<p style="margin: 0;">NIT/CC: <span style="font-weight: normal;">${customer.document}</span></p>` : '';
-  const discountHtml = sale.discountAmount > 0 ? `
+  const customerDoc = (tc.showCustomerDoc && customer?.document) ? `<p style="margin: 0;">NIT/CC: <span style="font-weight: normal;">${customer.document}</span></p>` : '';
+  const customerAddr = (tc.showCustomerAddress && customer?.address) ? `<p style="margin: 0;">Dir: <span style="font-weight: normal;">${customer.address}</span></p>` : '';
+  const customerPhone = (tc.showCustomerPhone && customer?.phone) ? `<p style="margin: 0;">Tel: <span style="font-weight: normal;">${customer.phone}</span></p>` : '';
+
+  // Contrata type name
+  let contrataTypeHtml = '';
+  if (tc.showContrataType && customer?.typeId && customerTypes.length > 0) {
+    const cType = customerTypes.find(t => t.id === customer.typeId);
+    if (cType) {
+      contrataTypeHtml = `<p style="margin: 0; font-style: italic; font-size: 11px;">Tipo: ${cType.name}</p>`;
+    }
+  }
+
+  const discountHtml = (tc.showDiscount && sale.discountAmount > 0) ? `
     <div style="display: flex; justify-content: space-between;">
       <span>Descuento (${sale.discountPercent}%):</span>
       <span>-${formatMoney(sale.discountAmount)}</span>
@@ -59,17 +84,17 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
         ${tc.showLogo ? `<div style="display: flex; justify-content: center; margin-bottom: 6px;">
           <img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 120px; height: auto; display: block; margin: 0 auto;" />
         </div>` : ''}
-        ${tc.nit ? `<p style="font-weight: bold; margin: 0;">NIT: ${tc.nit}</p>` : ''}
-        ${tc.phone ? `<p style="margin: 0;">Tel: ${tc.phone}</p>` : ''}
-        ${tc.address ? `<p style="margin: 0;">${tc.address}</p>` : ''}
+        ${tc.showNit && tc.nit ? `<p style="font-weight: bold; margin: 0;">NIT: ${tc.nit}</p>` : ''}
+        ${tc.showPhone && tc.phone ? `<p style="margin: 0;">Tel: ${tc.phone}</p>` : ''}
+        ${tc.showAddress && tc.address ? `<p style="margin: 0;">${tc.address}</p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
 
       <!-- Transaction Info -->
       <div style="margin-bottom: 8px;">
-        <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${ticketNo}</span></p>
-        <p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>
+        ${tc.showTicketNumber ? `<p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${ticketNo}</span></p>` : ''}
+        ${tc.showDate ? `<p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>` : ''}
         ${tc.showCashier ? `<p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>` : ''}
       </div>
 
@@ -77,9 +102,11 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
 
       <!-- Customer Info -->
       <div style="margin-bottom: 8px;">
-        <p style="font-weight: bold; margin: 0;">Cliente: <span style="font-weight: normal;">${customerName}</span></p>
+        ${tc.showCustomerName ? `<p style="font-weight: bold; margin: 0;">Cliente: <span style="font-weight: normal;">${customerName}</span></p>` : ''}
         ${customerDoc}
-        ${customer?.address ? `<p style="margin: 0;">Dir: <span style="font-weight: normal;">${customer.address}</span></p>` : ''}
+        ${customerAddr}
+        ${customerPhone}
+        ${contrataTypeHtml}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
@@ -102,10 +129,10 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
 
       <!-- Totals -->
       <div style="text-align: right; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-        <div style="display: flex; justify-content: space-between;">
+        ${tc.showSubtotal ? `<div style="display: flex; justify-content: space-between;">
           <span>Subtotal:</span>
           <span>${formatMoney(sale.subtotal)}</span>
-        </div>
+        </div>` : ''}
         ${discountHtml}
         <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; margin-top: 4px; padding-top: 4px; border-top: 2px solid black;">
           <span>TOTAL:</span>
@@ -114,7 +141,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
       </div>
 
       <!-- Payments -->
-      <div style="margin-bottom: 12px; padding: 4px; border: 1px solid black; border-radius: 4px;">
+      ${tc.showPaymentInfo ? `<div style="margin-bottom: 12px; padding: 4px; border: 1px solid black; border-radius: 4px;">
         ${sale.contrataPaymentMethod === 'credit'
           ? `<p style="font-weight: 900; text-align: center; color: #DC2626; border-bottom: 1px solid black; margin: 0 0 4px 0; padding-bottom: 4px;">⚠ VENTA A CRÉDITO — POR COBRAR</p>
              <p style="text-align:center;font-size:11px;margin:0;">Monto pendiente: ${formatMoney(sale.creditAmount || sale.total)}</p>`
@@ -128,7 +155,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
                <span style="font-weight: bold;">${formatMoney(sale.change || 0)}</span>
              </div>`
         }
-      </div>
+      </div>` : ''}
 
       <div style="border-bottom: 2px dashed black; margin: 12px 0;"></div>
 
