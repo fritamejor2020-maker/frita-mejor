@@ -353,10 +353,46 @@ export function PosView() {
     : sellableItems.filter(i => !i.posCategoryId); // Items outside any folder
 
   return (
-    <div className="flex flex-col lg:flex-row h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans">
+
+      {/* ══════ HEADER GLOBAL 100% ancho ══════ */}
+      <div className="w-full shrink-0 bg-[#111318] border-b border-gray-800 flex items-center gap-2 px-3 h-14 shadow-lg shadow-black/40">
+        <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none">🍟 Caja FM</span>
+        <div className="relative w-48 shrink-0">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input ref={searchInputRef} className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2 pl-9 pr-3 text-sm font-bold text-white outline-none focus:border-chunky-main placeholder-gray-600 transition-all" placeholder="Escáner / Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleBarcodeSearch} />
+        </div>
+        <div className="w-px h-7 bg-gray-700 shrink-0" />
+        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1">
+          {!activeShift ? (
+            <button className="shrink-0 bg-red-600 text-white rounded-xl px-4 py-2.5 text-sm font-black border-none animate-pulse active:scale-95 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowShiftModal(true)}>⚠️ ABRIR CAJA</button>
+          ) : (
+            <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowClosingModal(true)}>🔴 Cierre Z</button>
+          )}
+          {activeShift && (<>
+            <button className="shrink-0 border border-green-600/50 text-green-300 bg-green-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-green-900/50 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setPinPromptConfig({ message: 'Contraseña de Ingresos', expectedPin: '7', onSuccess: () => setShowIncomesModal(true) })}>💰 Ingresos</button>
+            <button className="shrink-0 border border-red-600/50 text-red-300 bg-red-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-red-900/50 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setPinPromptConfig({ message: 'Contraseña de Gastos', expectedPin: '8', onSuccess: () => setShowExpensesModal(true) })}>💸 Gastos</button>
+          </>)}
+          <div className="w-px h-7 bg-gray-700 shrink-0" />
+          {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
+            <button key={pm.id || pm.name} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[40px] ${idx === 0 ? 'bg-[#1c6b3a] active:bg-[#155a30] text-green-100' : 'bg-[#0d6ebd] active:bg-[#0a5fa8] text-blue-100'}`} onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}>{pm.name}</button>
+          ))}
+          <button className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-4 py-2.5 text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[40px]" onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}>💳 Pago Modal</button>
+          <div className="w-px h-7 bg-gray-700 shrink-0" />
+          <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowSuspendedModal(true)}>🕑 Pendientes</button>
+          <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowHistoryModal(true)}>📜 Historial</button>
+          {lastSale && (<button className="shrink-0 border border-chunky-main/50 text-chunky-main bg-yellow-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-yellow-900/30 transition-all whitespace-nowrap min-h-[40px]" onClick={() => handleReprintSale(lastSale)}>🖨️ Reimprimir</button>)}
+        </div>
+        <button className="shrink-0 w-11 h-11 flex items-center justify-center border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all" title="Cerrar Sesión" onClick={signOut}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+        </button>
+      </div>
+
+      {/* ══════ CONTENIDO: Ticket + Productos ══════ */}
+      <div className="flex flex-1 overflow-hidden">
       
-      {/* ─── LEFT SIDEBAR: TICKET ────────────────────────────────────────── */}
-      <div className="w-full lg:w-[380px] xl:w-[420px] flex flex-col h-[50vh] lg:h-full border-b lg:border-b-0 lg:border-r border-gray-800 bg-[#16171d] order-2 lg:order-1 transition-all">
+      {/* ─── TICKET ─── */}
+      <div className="w-[300px] xl:w-[340px] shrink-0 flex flex-col border-r border-gray-800 bg-[#16171d]">
         
         {/* Ticket Header & Customer */}
         <div className="p-4 border-b border-gray-800 flex flex-col gap-3">
@@ -462,111 +498,27 @@ export function PosView() {
         </div>
       </div>
 
-      {/* ─── RIGHT SIDE: MAIN POS AREA ───────────────────────────────────── */}
-      <div className="flex-1 flex flex-col h-[50vh] lg:h-full order-1 lg:order-2">
-        
-        {/* Top Action Bar */}
-        <div className="min-h-[64px] border-b border-gray-800 bg-[#16171d] flex flex-wrap items-center justify-between p-2 lg:px-4 gap-2 lg:gap-4 overflow-visible">
-          <div className="flex items-center gap-2 lg:gap-4 flex-1 min-w-[300px]">
-            <span className="font-black text-sm lg:text-lg bg-yellow-400 text-chunky-dark px-3 py-1 rounded-xl shadow-sm whitespace-nowrap">Caja Frita Mejor</span>
-            
-            <div className="relative flex-1 max-w-[400px]">
-              <svg className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500" xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input 
-                ref={searchInputRef}
-                className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2.5 pl-11 pr-4 text-sm font-bold text-white outline-none focus:border-chunky-main focus:ring-2 focus:ring-chunky-main/20 placeholder-gray-600 shadow-inner transition-all w-full"
-                placeholder="Escáner Cód. Barras / Buscar Nombre"
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                onKeyDown={handleBarcodeSearch}
-              />
-            </div>
-          </div>
+      {/* ─── PANEL DERECHO ─── */}
+      <div className="flex-1 flex flex-col overflow-hidden">
 
-          <div className="flex flex-wrap gap-2 items-center lg:ml-auto">
-            {!activeShift ? (
-              <Button className="bg-red-600 text-white rounded-xl px-4 py-2 hover:bg-red-500 font-bold border-none shadow-lg shadow-red-500/30 animate-pulse hover:scale-105 transition-transform" onClick={() => setShowShiftModal(true)}>
-                ⚠️ ABRIR CAJA
-              </Button>
-            ) : (
-              <Button variant="outline" className="border-gray-700 text-gray-300 rounded-xl px-4 py-2 hover:bg-gray-800 font-bold hover:scale-105 transition-transform" onClick={() => setShowClosingModal(true)}>
-                🔴 CIERRE Z
-              </Button>
-            )}
-
-            {activeShift && (
-              <>
-                <Button variant="outline" className="border-green-500/50 text-green-400 rounded-xl px-4 py-2 hover:bg-green-500/10 font-bold hover:scale-105 transition-transform shadow-md" onClick={() => setPinPromptConfig({ message: 'Contraseña de Ingresos', expectedPin: '7', onSuccess: () => setShowIncomesModal(true) })}>
-                  💰 INGRESOS
-                </Button>
-                <Button variant="outline" className="border-red-500/50 text-red-500 rounded-xl px-4 py-2 hover:bg-red-500/10 font-bold hover:scale-105 transition-transform shadow-md" onClick={() => setPinPromptConfig({ message: 'Contraseña de Gastos', expectedPin: '8', onSuccess: () => setShowExpensesModal(true) })}>
-                  💸 GASTOS
-                </Button>
-              </>
-            )}
-
-            <div className="w-px h-8 bg-gray-700 mx-1 hidden lg:block"></div>
-
-            <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
-              {/* Dynamic Payment Buttons */}
-              {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
-                <Button 
-                  key={pm.id || pm.name}
-                  className={`rounded-xl px-5 py-2 h-auto text-sm border-none font-black shadow-md transition-all hover:-translate-y-0.5 whitespace-nowrap ${
-                    idx === 0 ? 'bg-[#1c4d32] hover:bg-[#235e3e] text-green-100 shadow-[0_4px_14px_0_rgba(28,77,50,0.39)] ring-1 ring-green-900/50' : 
-                    'bg-[#0b5c92] hover:bg-[#1070ae] text-blue-100 ring-1 ring-blue-900/50'
-                  }`}
-                  onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}
-                  title={`${pm.openDrawer ? 'Abre Cajón' : ''} ${pm.printReceipt ? 'Imprime Ticket' : ''}`}
-                >
-                  {pm.name}
-                </Button>
-              ))}
-            </div>
-
-            <Button className="bg-[#4a4e69] hover:bg-[#22223b] text-white rounded-xl px-4 py-2 h-auto text-sm font-bold border-none shadow-md transition-all hover:-translate-y-0.5 whitespace-nowrap" onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}>Pago Modal</Button>
-            
-            <Button variant="outline" className="border-gray-700 text-gray-300 rounded-xl px-4 py-2 hover:bg-gray-800 font-bold hover:scale-105 transition-transform" onClick={() => setShowSuspendedModal(true)}>
-              🕑 T. Pendientes
-            </Button>
-            
-            <Button variant="outline" className="border-gray-700 text-gray-300 rounded-xl px-4 py-2 hover:bg-gray-800 font-bold hover:scale-105 transition-transform" onClick={() => setShowHistoryModal(true)}>
-              📜 Historial
-            </Button>
-
-            {lastSale && (
-               <Button variant="outline" className="border-chunky-main/50 text-chunky-main rounded-xl px-4 py-2 hover:bg-chunky-main/10 font-bold hover:scale-105 transition-transform" onClick={() => handleReprintSale(lastSale)}>
-                 🖨️ Reimprimir
-               </Button>
-            )}
-
-            <div className="w-px h-8 bg-gray-700 mx-1 hidden lg:block"></div>
-            <Button variant="outline" className="border-gray-700 text-gray-400 rounded-xl p-2.5 hover:bg-gray-800 hover:text-white transition-colors" title="Cerrar Sesión" onClick={signOut}>
-              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-            </Button>
-          </div>
-        </div>
-
-        {/* Categories / Back Nav */}
-        <div className="bg-[#121318] px-4 py-4 border-b border-[#1c1d24] flex items-center gap-3 overflow-x-auto scrollbar-hide">
-          <Button 
-            className={`rounded-full py-2.5 px-5 border-none font-black text-sm whitespace-nowrap shadow-sm transition-transform active:scale-95 ${!currentFolder ? 'bg-chunky-main text-chunky-dark shadow-chunky-main/20' : 'bg-[#2a2d38] text-gray-400 hover:bg-[#343846]'}`}
+        {/* Categorías */}
+        <div className="bg-[#111318] px-3 py-2 border-b border-[#1c1d24] flex items-center gap-2 overflow-x-auto scrollbar-hide shrink-0">
+          <Button
+            className={`rounded-full py-2.5 px-5 border-none font-black text-sm whitespace-nowrap active:scale-95 transition-transform min-h-[40px] ${!currentFolder ? 'bg-chunky-main text-chunky-dark' : 'bg-[#2a2d38] text-gray-400 active:bg-[#343846]'}`}
             onClick={() => setCurrentFolder(null)}
           >
             🏠 Inicio (Todas)
           </Button>
-          <div className="w-px h-6 bg-gray-800 shrink-0 mx-1"></div>
-          <div className="flex gap-3 shrink-0">
-            {posCategories?.map(cat => (
-              <Button 
+          <div className="w-px h-6 bg-gray-800 shrink-0" />
+          {posCategories?.map(cat => (
+            <Button
                 key={cat.id}
-                className={`rounded-full py-2.5 px-5 font-black text-sm border-none whitespace-nowrap shadow-sm transition-transform hover:-translate-y-0.5 active:scale-95 ${currentFolder === cat.id ? `${cat.color} text-white ring-2 ring-white/50 shadow-lg` : 'bg-[#21242d] text-gray-300 hover:bg-[#3a3d48] hover:text-white ring-1 ring-gray-800'}`}
+                className={`rounded-full py-2.5 px-5 font-black text-sm border-none whitespace-nowrap active:scale-95 transition-transform min-h-[40px] ${currentFolder === cat.id ? `${cat.color} text-white ring-2 ring-white/50 shadow-lg` : 'bg-[#21242d] text-gray-300 active:bg-[#3a3d48] ring-1 ring-gray-800'}`}
                 onClick={() => setCurrentFolder(cat.id)}
               >
                 {cat.name}
               </Button>
-            ))}
-          </div>
+          ))}
         </div>
 
         {/* Grid Area */}
@@ -621,9 +573,11 @@ export function PosView() {
           )}
         </div>
         
-      </div>
+      </div>{/* fin panel derecho */}
+      </div>{/* fin flex-1 contenido */}
 
       {/* ─── MODALS ───────────────────────────────────────── */}
+
       {variablePriceProduct && (
         <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
