@@ -26,7 +26,7 @@ let _ignoreRemoteKeys = new Set();
 
 export function markLocalWrite(key) {
   _ignoreRemoteKeys.add(key);
-  setTimeout(() => _ignoreRemoteKeys.delete(key), 500);
+  setTimeout(() => _ignoreRemoteKeys.delete(key), 2000);
 }
 
 // Mapa de key → función que aplica el valor remoto al store correspondiente
