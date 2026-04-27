@@ -12,7 +12,7 @@
     <script>
       // Self-healing: force clear old service workers on version mismatch
       (function(){
-        var V = 'frita-sw-v3';
+        var V = 'frita-sw-v4';
         if (localStorage.getItem('frita-sw-version') !== V) {
           localStorage.setItem('frita-sw-version', V);
           if ('serviceWorker' in navigator) {

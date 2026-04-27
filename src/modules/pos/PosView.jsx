@@ -33,30 +33,14 @@ export function PosView() {
     addPosSale, updatePosSale, deletePosSale, addPosShift, updatePosShift, addPosExpense 
   } = useInventoryStore();
 
-  // Multi-register: selected register persisted in sessionStorage
-  const [selectedRegisterId, setSelectedRegisterId] = useState(() => {
-    return sessionStorage.getItem('frita-pos-register') || null;
-  });
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
+  // Multi-register: siempre elegir caja al entrar al POS
+  const [selectedRegisterId, setSelectedRegisterId] = useState(null);
+  const [showRegisterModal, setShowRegisterModal] = useState(true); // Siempre mostrar al inicio
   const activeRegisters = (posRegisters || []).filter(r => r.active !== false);
   const selectedRegister = activeRegisters.find(r => r.id === selectedRegisterId);
 
-  // Auto-show register selector if no register selected and there are multiple
-  useEffect(() => {
-    if (activeRegisters.length === 0) return;
-    if (activeRegisters.length === 1 && !selectedRegisterId) {
-      // Solo una caja: seleccionar automáticamente
-      const regId = activeRegisters[0].id;
-      setSelectedRegisterId(regId);
-      sessionStorage.setItem('frita-pos-register', regId);
-    } else if (!selectedRegisterId || !activeRegisters.find(r => r.id === selectedRegisterId)) {
-      setShowRegisterModal(true);
-    }
-  }, [activeRegisters.length]);
-
   const handleSelectRegister = (regId) => {
     setSelectedRegisterId(regId);
-    sessionStorage.setItem('frita-pos-register', regId);
     setShowRegisterModal(false);
   };
 
