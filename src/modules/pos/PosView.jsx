@@ -9,6 +9,8 @@ import { ExpensesModal }         from './components/ExpensesModal';
 import { formatMoney }           from '../../utils/formatUtils';
 
 export function PosView() {
+  const [showMobileTicket, setShowMobileTicket] = useState(false);
+  const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
   const { user, signOut } = useAuthStore();
   const { 
     inventory = [], 
@@ -355,44 +357,133 @@ export function PosView() {
   return (
     <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans">
 
-      {/* ══════ HEADER GLOBAL 100% ancho ══════ */}
+      {/* ══════ HEADER GLOBAL ══════ */}
+      {/* Overlay para cerrar hamburguesa al click fuera */}
+      {showHamburgerMenu && (
+        <div className="fixed inset-0 z-[45]" onClick={() => setShowHamburgerMenu(false)} />
+      )}
       <div className="w-full shrink-0 bg-[#111318] border-b border-gray-800 flex items-center gap-2 px-3 h-14 shadow-lg shadow-black/40">
+
+        {/* ── Logo ── */}
         <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none">🍟 Caja FM</span>
-        <div className="relative w-48 shrink-0">
+
+        {/* ── Buscador ── */}
+        <div className="relative shrink-0 w-36 sm:w-48">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input ref={searchInputRef} className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2 pl-9 pr-3 text-sm font-bold text-white outline-none focus:border-chunky-main placeholder-gray-600 transition-all" placeholder="Escáner / Buscar..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleBarcodeSearch} />
+          <input ref={searchInputRef} className="w-full bg-[#0c0d11] border border-gray-700 rounded-full py-2 pl-9 pr-3 text-sm font-bold text-white outline-none focus:border-chunky-main placeholder-gray-600 transition-all" placeholder="Escáner..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} onKeyDown={handleBarcodeSearch} />
         </div>
+
         <div className="w-px h-7 bg-gray-700 shrink-0" />
-        <div className="flex items-center gap-2 overflow-x-auto scrollbar-hide flex-1">
+
+        {/* ── Botones de pago — SIEMPRE VISIBLES ── */}
+        <div className="flex items-center gap-1.5 flex-1 flex-wrap">
           {!activeShift ? (
-            <button className="shrink-0 bg-red-600 text-white rounded-xl px-4 py-2.5 text-sm font-black border-none animate-pulse active:scale-95 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowShiftModal(true)}>⚠️ ABRIR CAJA</button>
+            <button
+              className="shrink-0 bg-red-600 text-white rounded-xl px-3 py-2 text-xs font-black border-none animate-pulse active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+              onClick={() => setShowShiftModal(true)}
+            >⚠️ ABRIR CAJA</button>
           ) : (
-            <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowClosingModal(true)}>🔴 Cierre Z</button>
+            <>
+              {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
+                <button
+                  key={pm.id || pm.name}
+                  className={`shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px] ${
+                    idx === 0
+                      ? 'bg-[#1c6b3a] active:bg-[#155a30] text-green-100'
+                      : 'bg-[#0d6ebd] active:bg-[#0a5fa8] text-blue-100'
+                  }`}
+                  onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}
+                >{pm.name}</button>
+              ))}
+              <button
+                className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+                onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}
+              >💳 Pago</button>
+            </>
           )}
-          {activeShift && (<>
-            <button className="shrink-0 border border-green-600/50 text-green-300 bg-green-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-green-900/50 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setPinPromptConfig({ message: 'Contraseña de Ingresos', expectedPin: '7', onSuccess: () => setShowIncomesModal(true) })}>💰 Ingresos</button>
-            <button className="shrink-0 border border-red-600/50 text-red-300 bg-red-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-red-900/50 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setPinPromptConfig({ message: 'Contraseña de Gastos', expectedPin: '8', onSuccess: () => setShowExpensesModal(true) })}>💸 Gastos</button>
-          </>)}
-          <div className="w-px h-7 bg-gray-700 shrink-0" />
-          {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
-            <button key={pm.id || pm.name} className={`shrink-0 rounded-xl px-4 py-2.5 text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[40px] ${idx === 0 ? 'bg-[#1c6b3a] active:bg-[#155a30] text-green-100' : 'bg-[#0d6ebd] active:bg-[#0a5fa8] text-blue-100'}`} onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}>{pm.name}</button>
-          ))}
-          <button className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-4 py-2.5 text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[40px]" onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}>💳 Pago Modal</button>
-          <div className="w-px h-7 bg-gray-700 shrink-0" />
-          <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowSuspendedModal(true)}>🕑 Pendientes</button>
-          <button className="shrink-0 border border-gray-600 text-gray-200 bg-gray-800/50 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-gray-700 transition-all whitespace-nowrap min-h-[40px]" onClick={() => setShowHistoryModal(true)}>📜 Historial</button>
-          {lastSale && (<button className="shrink-0 border border-chunky-main/50 text-chunky-main bg-yellow-950/30 rounded-xl px-4 py-2.5 text-sm font-bold active:scale-95 active:bg-yellow-900/30 transition-all whitespace-nowrap min-h-[40px]" onClick={() => handleReprintSale(lastSale)}>🖨️ Reimprimir</button>)}
         </div>
-        <button className="shrink-0 w-11 h-11 flex items-center justify-center border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all" title="Cerrar Sesión" onClick={signOut}>
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-        </button>
+
+        {/* ── Hamburguesa ── */}
+        <div className="relative shrink-0">
+          <button
+            className="w-11 h-11 flex flex-col items-center justify-center gap-[5px] border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all"
+            onClick={() => setShowHamburgerMenu(v => !v)}
+            title="Más opciones"
+          >
+            <span className="w-5 h-[2px] bg-current rounded-full" />
+            <span className="w-5 h-[2px] bg-current rounded-full" />
+            <span className="w-5 h-[2px] bg-current rounded-full" />
+          </button>
+
+          {/* Dropdown */}
+          {showHamburgerMenu && (
+            <div className="absolute right-0 top-[calc(100%+8px)] z-[46] bg-[#1e1f26] border border-gray-700 rounded-2xl shadow-2xl shadow-black/60 min-w-[200px] overflow-hidden animate-modal-in">
+              {/* Cierre Z / Abrir caja */}
+              {!activeShift ? (
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-red-400 hover:bg-red-950/40 transition-colors" onClick={() => { setShowShiftModal(true); setShowHamburgerMenu(false); }}>
+                  <span className="text-base">⚠️</span> Abrir Caja
+                </button>
+              ) : (
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowClosingModal(true); setShowHamburgerMenu(false); }}>
+                  <span className="text-base">🔴</span> Cierre Z
+                </button>
+              )}
+
+              {activeShift && (
+                <>
+                  <div className="h-px bg-gray-800" />
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-green-300 hover:bg-green-950/40 transition-colors" onClick={() => { setPinPromptConfig({ message: 'Contraseña de Ingresos', expectedPin: '7', onSuccess: () => setShowIncomesModal(true) }); setShowHamburgerMenu(false); }}>
+                    <span className="text-base">💰</span> Ingresos
+                  </button>
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-red-300 hover:bg-red-950/40 transition-colors" onClick={() => { setPinPromptConfig({ message: 'Contraseña de Gastos', expectedPin: '8', onSuccess: () => setShowExpensesModal(true) }); setShowHamburgerMenu(false); }}>
+                    <span className="text-base">💸</span> Gastos
+                  </button>
+                </>
+              )}
+
+              <div className="h-px bg-gray-800" />
+              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowSuspendedModal(true); setShowHamburgerMenu(false); }}>
+                <span className="text-base">🕑</span> Ventas en Espera
+              </button>
+              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowHistoryModal(true); setShowHamburgerMenu(false); }}>
+                <span className="text-base">📜</span> Historial
+              </button>
+              {lastSale && (
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-chunky-main hover:bg-yellow-950/40 transition-colors" onClick={() => { handleReprintSale(lastSale); setShowHamburgerMenu(false); }}>
+                  <span className="text-base">🖨️</span> Reimprimir último
+                </button>
+              )}
+
+              <div className="h-px bg-gray-800" />
+              <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-400 hover:bg-gray-800 transition-colors" onClick={() => { signOut(); setShowHamburgerMenu(false); }}>
+                <span className="text-base">↩️</span> Cerrar sesión
+              </button>
+            </div>
+          )}
+        </div>
+
       </div>
 
       {/* ══════ CONTENIDO: Ticket + Productos ══════ */}
-      <div className="flex flex-1 overflow-hidden">
-      
-      {/* ─── TICKET ─── */}
-      <div className="w-[300px] xl:w-[340px] shrink-0 flex flex-col border-r border-gray-800 bg-[#16171d]">
+      <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+
+      {/* ─── TICKET — drawer en móvil, columna en desktop ─── */}
+      {showMobileTicket && (
+        <div className="fixed inset-0 z-30 bg-black/60 md:hidden" onClick={() => setShowMobileTicket(false)} />
+      )}
+      <div className={`
+        md:w-[270px] lg:w-[300px] xl:w-[340px] md:relative md:translate-y-0 md:max-h-none md:border-r md:border-t-0
+        fixed bottom-0 left-0 right-0 z-40 border-t border-gray-800
+        flex flex-col bg-[#16171d]
+        transition-transform duration-300 ease-out
+        max-h-[88vh]
+        ${showMobileTicket ? 'translate-y-0' : 'translate-y-full md:translate-y-0'}
+      `}>
+        {/* Handle para cerrar en móvil */}
+        <div className="md:hidden flex items-center justify-between px-4 pt-3 pb-1 border-b border-gray-800">
+          <span className="font-black text-sm text-white">🧾 Ticket ({ticketItems.length})</span>
+          <button onClick={() => setShowMobileTicket(false)} className="text-gray-400 hover:text-white w-8 h-8 flex items-center justify-center">✕</button>
+        </div>
         
         {/* Ticket Header & Customer */}
         <div className="p-4 border-b border-gray-800 flex flex-col gap-3">
@@ -449,11 +540,11 @@ export function PosView() {
                       )}
                     </div>
                     <div className="flex items-center bg-[#16171d] rounded-lg overflow-hidden border border-gray-800">
-                      <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
+                      <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                       <span className="w-8 text-center font-black text-sm">{item.qty}</span>
-                      <button className="w-8 h-8 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
+                      <button className="w-10 h-10 flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-colors" onClick={() => handleQtyChange(item.id, 1)}>
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                       </button>
                     </div>
@@ -575,6 +666,18 @@ export function PosView() {
         
       </div>{/* fin panel derecho */}
       </div>{/* fin flex-1 contenido */}
+
+      {/* ─── FAB móvil: abre el ticket ─── */}
+      <button
+        className="fixed bottom-5 right-5 z-20 md:hidden flex items-center gap-2 bg-chunky-main text-gray-900 font-black text-sm px-5 py-3.5 rounded-full shadow-2xl shadow-black/50 active:scale-95 transition-all"
+        onClick={() => setShowMobileTicket(true)}
+      >
+        🛒
+        {ticketItems.length > 0 && (
+          <span className="bg-gray-900 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-black">{ticketItems.length}</span>
+        )}
+        <span>{ticketItems.length === 0 ? 'Ticket' : formatMoney(total)}</span>
+      </button>
 
       {/* ─── MODALS ───────────────────────────────────────── */}
 

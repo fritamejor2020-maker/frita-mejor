@@ -138,13 +138,13 @@ const INITIAL_POS_CATEGORIES = [
 ];
 
 const INITIAL_CUSTOMERS = [
-  { id: 'CUST-001', name: 'Cliente General', document: '', discountPercent: 0, active: true, typeId: null },
-  { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001' },
+  { id: 'CUST-001', name: 'Cliente General', document: '', discountPercent: 0, active: true, typeId: null, phone: '', creditLimit: 0, notes: '' },
+  { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001', phone: '', creditLimit: 500000, notes: '' },
 ];
 
 const INITIAL_CUSTOMER_TYPES = [
-  { id: 'CTYPE-001', name: 'Mayoristas', productDiscounts: [{ productId: 'PRD-001', discountValue: 1800 }] },
-  { id: 'CTYPE-002', name: 'Eventos Especiales', productDiscounts: [] }
+  { id: 'CTYPE-001', name: 'Mayoristas', productDiscounts: [{ productId: 'PRD-001', discountValue: 1800 }], allowCredit: true, globalDiscountPercent: 0, color: 'bg-blue-500' },
+  { id: 'CTYPE-002', name: 'Eventos Especiales', productDiscounts: [], allowCredit: false, globalDiscountPercent: 0, color: 'bg-purple-500' }
 ];
 
 const INITIAL_POS_SETTINGS = {
@@ -169,24 +169,27 @@ const INITIAL_LOAD_TEMPLATES = [];
 export const useInventoryStore = create(
   persist(
     (set, get) => ({
-      warehouses:       INITIAL_WAREHOUSES,
-      productionPoints: INITIAL_PRODUCTION_POINTS,
-      fryKitchens:      INITIAL_FRY_KITCHENS,
-      inventory:        INITIAL_INVENTORY,
-      products:         INITIAL_PRODUCTS,
-      recipes:          INITIAL_RECIPES,
-      posCategories:    INITIAL_POS_CATEGORIES,
-      customers:        INITIAL_CUSTOMERS,
-      customerTypes:    INITIAL_CUSTOMER_TYPES,
-      posSettings:      INITIAL_POS_SETTINGS,
-      fritadoRecipes:   INITIAL_FRITADO_RECIPES,
-      movements:        [],
-      posShifts:        [],
-      posSales:         [],
-      posExpenses:      [],
-      loadTemplates:    INITIAL_LOAD_TEMPLATES,
-      deletedShiftIds:  [],  // tombstone: IDs de cierres eliminados por el admin
-      vendorLocations:  {},  // { [vendorId]: { lat, lng, name, pointId, updatedAt } }
+      warehouses:         INITIAL_WAREHOUSES,
+      productionPoints:   INITIAL_PRODUCTION_POINTS,
+      fryKitchens:        INITIAL_FRY_KITCHENS,
+      inventory:          INITIAL_INVENTORY,
+      products:           INITIAL_PRODUCTS,
+      recipes:            INITIAL_RECIPES,
+      posCategories:      INITIAL_POS_CATEGORIES,
+      customers:          INITIAL_CUSTOMERS,
+      customerTypes:      INITIAL_CUSTOMER_TYPES,
+      posSettings:        INITIAL_POS_SETTINGS,
+      fritadoRecipes:     INITIAL_FRITADO_RECIPES,
+      movements:          [],
+      posShifts:          [],
+      posSales:           [],
+      posExpenses:        [],
+      loadTemplates:      INITIAL_LOAD_TEMPLATES,
+      deletedShiftIds:    [],  // tombstone: IDs de cierres eliminados por el admin
+      vendorLocations:    {},  // { [vendorId]: { lat, lng, name, pointId, updatedAt } }
+      // Pagos y abonos de clientes contrata
+      // { id, customerId, customerName, amount, method, note, shiftId, date }
+      contrataPayments:   [],
 
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
@@ -205,7 +208,7 @@ export const useInventoryStore = create(
             'warehouses', 'inventory', 'movements', 'products', 'recipes',
             'fritadoRecipes', 'posCategories', 'posSettings', 'posShifts',
             'posSales', 'posExpenses', 'customers', 'customerTypes', 'loadTemplates',
-            'vendorLocations',
+            'vendorLocations', 'contrataPayments',
           ];
           const updates = {};
           for (const key of SYNC_KEYS) {
@@ -744,6 +747,33 @@ export const useInventoryStore = create(
 
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
 
+      // ─── CONTRATAS: Pagos / Abonos ───────────────────────────────────────────
+      // El balance real de una contrata = sum(ventas crédito) - sum(pagos)
+      // Se calcula siempre en tiempo real para evitar inconsistencias de sync.
+      addContrataPayment: (payment) => {
+        const newPayment = {
+          ...payment,
+          id: `PAY-${Date.now()}`,
+          date: new Date().toISOString(),
+        };
+        set((s) => ({ contrataPayments: [newPayment, ...(s.contrataPayments || [])] }));
+        syncKey('contrataPayments', useInventoryStore.getState().contrataPayments);
+      },
+
+      // Calcula saldo pendiente de una contrata (cuánto debe actualmente)
+      // deuda > 0 significa que el cliente DEBE plata
+      getContrataBalance: (customerId) => {
+        const sales = (useInventoryStore.getState().posSales || []).filter(
+          s => s.customerId === customerId && s.status === 'PAID' && s.contrataPaymentMethod === 'credit'
+        );
+        const creditDebt = sales.reduce((acc, s) => acc + (s.creditAmount || s.total || 0), 0);
+        const payments = (useInventoryStore.getState().contrataPayments || []).filter(
+          p => p.customerId === customerId
+        );
+        const paid = payments.reduce((acc, p) => acc + (p.amount || 0), 0);
+        return Math.max(0, creditDebt - paid);
+      },
+
       /**
        * Guarda la última ubicación conocida del vendedor en app_state.
        * Esto permite mostrarla en el mapa aunque la app esté cerrada.
@@ -770,26 +800,27 @@ export const useInventoryStore = create(
     }),
     {
       name: 'frita-mejor-inventory',
-      version: 8,
+      version: 9, // v9: contrataPayments + allowCredit + color en customerTypes
       partialize: (state) => ({
-        warehouses:       state.warehouses,
-        productionPoints: state.productionPoints,
-        fryKitchens:      state.fryKitchens || [],
-        inventory:        state.inventory,
-        products:         state.products,
-        recipes:          state.recipes,
-        fritadoRecipes:   state.fritadoRecipes,
-        movements:        state.movements,
-        posCategories:    state.posCategories,
-        customers:        state.customers,
-        customerTypes:    state.customerTypes,
-        posSettings:      state.posSettings,
-        posShifts:        state.posShifts,
-        posSales:         state.posSales,
-        posExpenses:      state.posExpenses,
-        loadTemplates:    state.loadTemplates,
-        deletedShiftIds:  state.deletedShiftIds || [],  // persistir tombstones
-        vendorLocations:  state.vendorLocations  || {},
+        warehouses:         state.warehouses,
+        productionPoints:   state.productionPoints,
+        fryKitchens:        state.fryKitchens || [],
+        inventory:          state.inventory,
+        products:           state.products,
+        recipes:            state.recipes,
+        fritadoRecipes:     state.fritadoRecipes,
+        movements:          state.movements,
+        posCategories:      state.posCategories,
+        customers:          state.customers,
+        customerTypes:      state.customerTypes,
+        posSettings:        state.posSettings,
+        posShifts:          state.posShifts,
+        posSales:           state.posSales,
+        posExpenses:        state.posExpenses,
+        loadTemplates:      state.loadTemplates,
+        deletedShiftIds:    state.deletedShiftIds || [],
+        vendorLocations:    state.vendorLocations  || {},
+        contrataPayments:   state.contrataPayments || [],
       }),
       // Al rehidratar desde localStorage, filtrar posShifts borrados
       onRehydrateStorage: () => (state) => {

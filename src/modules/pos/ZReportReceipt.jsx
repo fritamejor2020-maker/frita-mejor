@@ -2,23 +2,52 @@ import React from 'react';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateZReportHTML = (shift, sales, expenses) => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes) => {
   if (!shift) return '';
 
   const dateStrOpened = new Date(shift.openedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
   const dateStrClosed = shift.closedAt ? new Date(shift.closedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : 'EN CURSO';
 
   const initial = shift.initialAmount || 0;
-  
-  // Calculate Totals By Method
-  const cashSalesTotal = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
-  const cardSalesTotal = sales.filter(s => s.paymentMethod === 'TARJETA').reduce((acc, s) => acc + s.total, 0);
-  const transferSalesTotal = sales.filter(s => s.paymentMethod === 'NEQUI' || s.paymentMethod === 'BANCOLOMBIA').reduce((acc, s) => acc + s.total, 0);
-  
-  const totalSales = cashSalesTotal + cardSalesTotal + transferSalesTotal;
+
+  // ── Contratas: agrupar ventas por cliente contrata ──────────────────────────
+  const contrataCustomers = (customers || []).filter(c => c.typeId);
+  const contrataIds = new Set(contrataCustomers.map(c => c.id));
+
+  // Ventas de contratas vs local
+  const contrataSales = sales.filter(s => s.customerId && contrataIds.has(s.customerId));
+  const localSales    = sales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
+
+  // Totales por cliente contrata
+  const contrataByClient = contrataCustomers
+    .map(c => {
+      const cs = contrataSales.filter(s => s.customerId === c.id);
+      if (cs.length === 0) return null;
+      const type = (customerTypes || []).find(t => t.id === c.typeId);
+      const cash     = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+      const transfer = cs.filter(s => s.paymentMethod !== 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+      const credit   = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total), 0);
+      return { name: c.name, typeName: type?.name || '', cash, transfer, credit, total: cash + transfer + credit };
+    })
+    .filter(Boolean);
+
+  const totalContrataCash     = contrataByClient.reduce((a, c) => a + c.cash, 0);
+  const totalContrataTransfer = contrataByClient.reduce((a, c) => a + c.transfer, 0);
+  const totalContrataCredit   = contrataByClient.reduce((a, c) => a + c.credit, 0);
+
+  // Calculate Totals By Method (full shift)
+  const cashSalesTotal     = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+  const cardSalesTotal     = sales.filter(s => s.paymentMethod === 'TARJETA').reduce((acc, s) => acc + s.total, 0);
+  const nequiSalesTotal    = sales.filter(s => s.paymentMethod === 'NEQUI').reduce((acc, s) => acc + s.total, 0);
+  const bancSalesTotal     = sales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((acc, s) => acc + s.total, 0);
+  const transferSalesTotal = nequiSalesTotal + bancSalesTotal;
+
+  // Local cash = total cash - contrata cash
+  const localCash = cashSalesTotal - totalContrataCash;
+
+  const totalSales    = cashSalesTotal + cardSalesTotal + transferSalesTotal;
   const totalDiscounts = sales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
-  
-  const totalExpenses = (expenses || []).reduce((acc, e) => acc + e.amount, 0);
+  const totalExpenses  = (expenses || []).reduce((acc, e) => acc + e.amount, 0);
 
   const expectedCash = initial + cashSalesTotal - totalExpenses;
   const countedCash = shift.realAmount || 0;
@@ -90,20 +119,21 @@ export const generateZReportHTML = (shift, sales, expenses) => {
           <span>Base Inicial:</span>
           <span>${formatMoney(initial)}</span>
         </div>
-        
         <div style="display: flex; justify-content: space-between;">
           <span>Ventas Efectivo:</span>
           <span>${formatMoney(cashSalesTotal)}</span>
         </div>
-        
         <div style="display: flex; justify-content: space-between;">
           <span>Ventas Tarjeta:</span>
           <span>${formatMoney(cardSalesTotal)}</span>
         </div>
-        
         <div style="display: flex; justify-content: space-between;">
-          <span>Ventas Transferencia:</span>
-          <span>${formatMoney(transferSalesTotal)}</span>
+          <span>Ventas NEQUI:</span>
+          <span>${formatMoney(nequiSalesTotal)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Ventas BANCOLOMBIA:</span>
+          <span>${formatMoney(bancSalesTotal)}</span>
         </div>
 
         <div style="border-top: 1px solid black; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
@@ -120,6 +150,39 @@ export const generateZReportHTML = (shift, sales, expenses) => {
       </div>
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+
+      ${contrataByClient.length > 0 ? `
+      <!-- Contratas Breakdown -->
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
+        <h3 style="text-align: center; background-color: #FEF3C7; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Desglose Contratas</h3>
+        ${contrataByClient.map(c => `
+          <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed #D1D5DB;">
+            <div style="font-weight: 900; margin-bottom: 3px;">${c.name} <span style="font-weight: normal; font-size: 11px;">(${c.typeName})</span></div>
+            ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
+            ${c.transfer > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  Transferencia:</span><span>${formatMoney(c.transfer)}</span></div>` : ''}
+            ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;color:#DC2626"><span>  A crédito (por cobrar):</span><span>${formatMoney(c.credit)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid #E5E7EB;margin-top:2px;padding-top:2px;"><span>  TOTAL:</span><span>${formatMoney(c.total)}</span></div>
+          </div>
+        `).join('')}
+        <div style="background:#FEF9C3;padding:6px 4px;border-radius:4px;margin-top:4px;">
+          <div style="display:flex;justify-content:space-between;"><span>Total Contratas Efectivo:</span><span>${formatMoney(totalContrataCash)}</span></div>
+          <div style="display:flex;justify-content:space-between;"><span>Total Contratas Transfer:</span><span>${formatMoney(totalContrataTransfer)}</span></div>
+          ${totalContrataCredit > 0 ? `<div style="display:flex;justify-content:space-between;color:#DC2626"><span>Total A Crédito:</span><span>${formatMoney(totalContrataCredit)}</span></div>` : ''}
+        </div>
+      </div>
+
+      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+
+      <!-- Cuadre Local vs Contratas -->
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; background:#F0FDF4; padding:8px; border-radius:4px;">
+        <h3 style="text-align: center; background-color: #BBF7D0; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Efectivo: Local vs Contratas</h3>
+        <div style="display:flex;justify-content:space-between;"><span>Efectivo Total Caja:</span><span>${formatMoney(cashSalesTotal)}</span></div>
+        <div style="display:flex;justify-content:space-between;color:#DC2626"><span>- Efectivo Contratas:</span><span>-${formatMoney(totalContrataCash)}</span></div>
+        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:14px;border-top:2px solid #16A34A;padding-top:4px;margin-top:4px;color:#16A34A"><span>= Efectivo LOCAL:</span><span>${formatMoney(localCash)}</span></div>
+      </div>
+
+      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      ` : ''}
 
       <!-- Cash Register Match -->
       <div style="font-size: 12px; font-weight: bold; margin-top: 8px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
@@ -169,3 +232,4 @@ export const generateZReportHTML = (shift, sales, expenses) => {
     </div>
   `;
 };
+

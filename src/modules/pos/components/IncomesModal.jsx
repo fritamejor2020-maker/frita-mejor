@@ -3,6 +3,7 @@ import { useFinanceStore } from '../../../store/useFinanceStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { useVehicleStore } from '../../../store/useVehicleStore';
 import { useIncomeConfigStore } from '../../../store/useIncomeConfigStore';
+import { useInventoryStore } from '../../../store/useInventoryStore';
 import { Button } from '../../../components/ui/Button';
 import { MoneyInput } from '../../../components/ui/MoneyInput';
 import { formatMoney } from '../../../utils/formatUtils';
@@ -27,6 +28,7 @@ export function IncomesModal({ onClose }) {
   const [salidas, setSalidas] = useState('');
   const [transferencias, setTransferencias] = useState('');
   const [observaciones, setObservaciones] = useState('');
+  const [zLoadedData, setZLoadedData] = useState(null); // Datos cargados del cierre Z
 
   // Foto del sobre — con rotación y confirmación
   const [photoBase64, setPhotoBase64] = useState(null);
@@ -466,7 +468,7 @@ export function IncomesModal({ onClose }) {
               <div className="bg-amber-950/30 border border-amber-800/50 rounded-2xl p-4">
                 <p className="text-amber-400 font-black text-sm mb-1">📦 Descargues activos para esta franja</p>
                 <p className="text-gray-400 text-xs">
-                  Hay {descarguesPrevios.filter(d => d.esDescargue).length} descargue(s) registrado(s) hoy en esta franja.
+                  Hay {descarguesPrevios.length} descargue(s) registrado(s) hoy en esta franja.
                 </p>
               </div>
               <div className="grid grid-cols-1 gap-3">
@@ -493,7 +495,111 @@ export function IncomesModal({ onClose }) {
           {step === 4 && selectedUbicacion !== 'Triciclo' && (
             <div className="space-y-4">
 
-              {/* Badge de subtipo */}
+              {/* ── Auto-fill desde Cierre Z (solo para Local) ── */}
+              {selectedUbicacion === 'Local' && !zLoadedData && (() => {
+                const { posShifts = [], posSales = [], posExpenses = [], customers = [], customerTypes = [] } = useInventoryStore.getState();
+                const lastClosed = [...posShifts].filter(s => s.closedAt).sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))[0];
+                if (!lastClosed) return null;
+                const shiftSales = posSales.filter(s => s.shiftId === lastClosed.id && s.status === 'PAID');
+                if (shiftSales.length === 0) return null;
+
+                // Contrata breakdown
+                const contrataCustomers = customers.filter(c => c.typeId);
+                const contrataIds = new Set(contrataCustomers.map(c => c.id));
+
+                const contrataSales = shiftSales.filter(s => s.customerId && contrataIds.has(s.customerId));
+                const localSalesOnly = shiftSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
+
+                const totalCashAll = shiftSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((a, s) => a + s.total, 0);
+                const contrataCash = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                const localCash = totalCashAll - contrataCash;
+
+                const nequi = shiftSales.filter(s => s.paymentMethod === 'NEQUI').reduce((a, s) => a + s.total, 0);
+                const banc  = shiftSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((a, s) => a + s.total, 0);
+                const totalTransfers = nequi + banc;
+
+                const totalPosExpenses = posExpenses.filter(e => e.shiftId === lastClosed.id).reduce((a, e) => a + e.amount, 0);
+
+                const contrataByClient = contrataCustomers.map(c => {
+                  const cs = contrataSales.filter(s => s.customerId === c.id);
+                  if (cs.length === 0) return null;
+                  const cash = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                  const transfer = cs.filter(s => s.paymentMethod !== 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                  const credit = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total), 0);
+                  return { name: c.name, cash, transfer, credit, total: cash + transfer + credit };
+                }).filter(Boolean);
+
+                const closedAt = new Date(lastClosed.closedAt);
+                const timeStr = closedAt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+
+                const handleLoadZ = () => {
+                  setEfectivo(String(localCash));
+                  setTransferencias(String(totalTransfers));
+                  setSalidas(String(totalPosExpenses));
+                  setVendedor(lastClosed.userName || '');
+                  setZLoadedData({ localCash, totalTransfers, totalPosExpenses, nequi, banc, contrataCash, contrataByClient, shiftId: lastClosed.id, time: timeStr });
+                };
+
+                return (
+                  <button
+                    onClick={handleLoadZ}
+                    className="w-full bg-blue-950/40 border-2 border-dashed border-blue-500/50 rounded-2xl p-4 hover:bg-blue-950/60 hover:border-blue-400 transition-all group active:scale-[0.98]"
+                  >
+                    <div className="flex items-center gap-3">
+                      <span className="text-3xl group-hover:scale-110 transition-transform">⚡</span>
+                      <div className="text-left">
+                        <p className="font-black text-blue-400 text-sm">Cargar desde Cierre Z</p>
+                        <p className="text-[11px] text-gray-500 font-bold">Último cierre: {timeStr} — Cajero: {lastClosed.userName || 'N/A'}</p>
+                      </div>
+                    </div>
+                  </button>
+                );
+              })()}
+
+              {/* Banner con datos cargados del Z */}
+              {zLoadedData && (
+                <div className="bg-blue-950/30 border border-blue-700/50 rounded-2xl p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-blue-400 font-black text-sm flex items-center gap-2">⚡ Datos cargados del Cierre Z ({zLoadedData.time})</p>
+                    <button onClick={() => { setZLoadedData(null); setEfectivo(''); setTransferencias(''); setSalidas(''); setVendedor(''); }}
+                      className="text-xs text-gray-500 hover:text-red-400 font-bold">✕ Limpiar</button>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div className="flex justify-between bg-[#0c0d11] rounded-lg px-3 py-2">
+                      <span className="text-gray-400 font-bold">Efectivo Local</span>
+                      <span className="text-green-400 font-black">{formatMoney(zLoadedData.localCash)}</span>
+                    </div>
+                    <div className="flex justify-between bg-[#0c0d11] rounded-lg px-3 py-2">
+                      <span className="text-gray-400 font-bold">Transferencias</span>
+                      <span className="text-blue-400 font-black">{formatMoney(zLoadedData.totalTransfers)}</span>
+                    </div>
+                    <div className="flex justify-between bg-[#0c0d11] rounded-lg px-3 py-2">
+                      <span className="text-gray-400 font-bold">Salidas (Gastos)</span>
+                      <span className="text-red-400 font-black">{formatMoney(zLoadedData.totalPosExpenses)}</span>
+                    </div>
+                    <div className="flex justify-between bg-[#0c0d11] rounded-lg px-3 py-2">
+                      <span className="text-gray-400 font-bold">Efect. Contratas</span>
+                      <span className="text-yellow-400 font-black">{formatMoney(zLoadedData.contrataCash)}</span>
+                    </div>
+                  </div>
+                  {zLoadedData.contrataByClient.length > 0 && (
+                    <div className="bg-yellow-950/30 border border-yellow-800/30 rounded-xl p-3 mt-1">
+                      <p className="text-xs font-black text-yellow-400 uppercase tracking-wider mb-1.5">Desglose Contratas</p>
+                      {zLoadedData.contrataByClient.map((c, i) => (
+                        <div key={i} className="flex justify-between text-xs py-0.5 border-b border-gray-800/30 last:border-0">
+                          <span className="text-yellow-300 font-bold">{c.name}</span>
+                          <span className="text-gray-400 font-bold">
+                            {c.cash > 0 ? `Ef:${formatMoney(c.cash)}` : ''}
+                            {c.transfer > 0 ? ` Tr:${formatMoney(c.transfer)}` : ''}
+                            {c.credit > 0 ? ` Cr:${formatMoney(c.credit)}` : ''}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <p className="text-[10px] text-gray-600 font-bold text-center">Los campos fueron pre-llenados. Puedes ajustarlos antes de guardar.</p>
+                </div>
+              )}
               {hasDescargues && selectedSubtipo && (
                 <div className={`rounded-2xl px-4 py-2.5 border flex items-center gap-2 ${
                   isDescargueMode ? 'bg-amber-950/30 border-amber-700/50' : 'bg-green-950/30 border-green-700/50'

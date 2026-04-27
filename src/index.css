@@ -25,6 +25,7 @@
 
 /* ─── Transiciones suaves globales en botones ────────────────── */
 button, a, [role="button"] {
+  touch-action: manipulation; /* elimina el 300ms delay en móvil */
   transition: transform 0.15s var(--ease-spring),
               opacity 0.15s ease,
               background-color 0.2s ease,
@@ -35,6 +36,13 @@ button, a, [role="button"] {
 /* Feedback táctil en todos los botones */
 button:active, [role="button"]:active {
   transform: scale(0.96);
+}
+
+/* ─── Touch targets mínimos (44px recomendado por Apple/Google) ─ */
+@media (pointer: coarse) {
+  button, [role="button"], select, input[type="checkbox"], input[type="radio"] {
+    min-height: 44px;
+  }
 }
 
 /* ─── Inputs: transición suave de foco ───────────────────────── */

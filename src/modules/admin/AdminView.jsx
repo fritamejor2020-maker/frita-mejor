@@ -16,6 +16,7 @@ import { AdminSuppliersTab } from '../../components/admin/AdminSuppliersTab';
 import { ResetGeneralPanel } from '../../components/admin/ResetGeneralPanel';
 import { AdminIncomeSourcesTab } from '../../components/admin/AdminIncomeSourcesTab';
 import { AdminCustomerDiscountsTab } from '../../components/admin/AdminCustomerDiscountsTab';
+import { AdminContratasTab } from '../../components/admin/AdminContratasTab';
 import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { formatMoney } from '../../utils/formatUtils';
 
@@ -2382,7 +2383,8 @@ export function AdminView() {
       { id: 'POS_CONFIG',   label: '⚙️ Config Caja'  },
       { id: 'POS_CARPETAS', label: '🗂️ Carpetas POS' },
       { id: 'POS_HISTORY',  label: '🧾 Historial POS'},
-      { id: 'CLIENTES',     label: '🤝 Clientes & Descuentos' },
+      { id: 'CLIENTES',     label: '🏷️ Grupos VIP & Precios' },
+      { id: 'CONTRATAS',    label: '🤝 Contratas' },
     ],
     FLOTA: [
       { id: 'INVENTARIO_FLOTA', label: '📊 Inventario en Ruta' },
@@ -2454,7 +2456,7 @@ export function AdminView() {
       </header>
 
       {/* Contenedor de Categorías */}
-      <div className="w-full max-w-[1400px] mb-3 sm:mb-4 flex flex-wrap gap-2 sm:gap-3">
+      <div className="w-full max-w-[1400px] mb-3 sm:mb-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-3">
         {CATEGORIES.map(cat => (
           <button
             key={cat.id}
@@ -2462,7 +2464,7 @@ export function AdminView() {
               setActiveCategory(cat.id);
               setActiveTab(TABS_BY_CATEGORY[cat.id][0].id); // Seleccionar el primer tab de la categoría
             }}
-            className={`flex-1 min-w-[140px] sm:min-w-[200px] py-3 sm:py-4 px-3 sm:px-6 rounded-[18px] sm:rounded-[24px] border-2 transition-all font-black text-sm sm:text-lg flex items-center justify-center gap-2 sm:gap-3
+            className={`py-3 sm:py-4 px-3 sm:px-6 rounded-[18px] sm:rounded-[24px] border-2 transition-all font-black text-xs sm:text-lg flex items-center justify-center gap-1 sm:gap-3
               ${activeCategory === cat.id 
                 ? 'bg-chunky-main border-chunky-main text-white shadow-md' 
                 : `${cat.color} border-transparent opacity-70`}`}
@@ -2524,6 +2526,7 @@ export function AdminView() {
         { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><PosCategoriesPanel /></div> }
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
         { activeTab === 'CLIENTES'  && <AdminCustomerDiscountsTab /> }
+        { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
 
