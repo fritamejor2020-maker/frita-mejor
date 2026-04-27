@@ -604,8 +604,8 @@ export function PosView() {
               value={selectedCustomer || ''}
               onChange={(e) => setSelectedCustomer(e.target.value)}
             >
-              <option value="">Consumidor Final</option>
-              {customers.map(c => {
+              <option value="">Cliente General</option>
+              {customers.filter(c => c.typeId).map(c => {
                 const typeName = c.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
                 return (
                   <option key={c.id} value={c.id}>
