@@ -13,6 +13,15 @@ const DEFAULTS = {
   saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
   saleBottomLine: 'Sistema POS • fritamejor.com',
   zReportFooterMsg: 'FIN DE INFORME Z',
+  // Z-Report sections
+  zShowFinancialSummary: true,
+  zShowContratasBreakdown: true,
+  zShowLocalVsContratas: true,
+  zShowCashRegisterMatch: true,
+  zShowProductsSold: true,
+  zShowExpensesDetail: true,
+  zShowSignatureLine: true,
+  zShowPaymentMethods: true,
 };
 
 export function AdminTicketConfigTab() {
@@ -167,14 +176,42 @@ export function AdminTicketConfigTab() {
         </div>
       </section>
 
-      {/* ── Mensajes del Cierre Z ── */}
-      <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-4">
+      {/* ── Configuración del Cierre Z ── */}
+      <section className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm space-y-5">
         <h3 className="font-black text-lg text-gray-700 border-b pb-2 flex items-center gap-2">
-          📊 Mensajes — Reporte Z (Cierre)
+          📊 Reporte Z — Secciones del Cierre
         </h3>
-        <p className="text-xs text-gray-400">Personaliza el texto final del ticket de cierre de caja.</p>
+        <p className="text-xs text-gray-400">Activa o desactiva cada sección que aparece en el ticket de cierre de caja.</p>
 
-        <div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {[
+            { key: 'zShowFinancialSummary', label: '💰 Resumen Financiero', desc: 'Base inicial, ventas por método de pago, total ventas, gastos' },
+            { key: 'zShowPaymentMethods', label: '💳 Desglose por Método', desc: 'Efectivo, Tarjeta, NEQUI, BANCOLOMBIA por separado' },
+            { key: 'zShowContratasBreakdown', label: '🤝 Desglose Contratas', desc: 'Detalle por cliente contrata: efectivo, transferencia, crédito' },
+            { key: 'zShowLocalVsContratas', label: '🏪 Local vs Contratas', desc: 'Separación de efectivo local vs efectivo de contratas' },
+            { key: 'zShowCashRegisterMatch', label: '🧮 Cuadre de Caja', desc: 'Efectivo esperado vs contado, sobrante o faltante' },
+            { key: 'zShowProductsSold', label: '📦 Productos Vendidos', desc: 'Lista de productos vendidos con cantidades' },
+            { key: 'zShowExpensesDetail', label: '💸 Detalle de Gastos', desc: 'Lista detallada de retiros y gastos del turno' },
+            { key: 'zShowSignatureLine', label: '✍️ Firma del Cajero', desc: 'Línea de firma al pie del reporte' },
+          ].map(opt => (
+            <label key={opt.key} className={`flex items-start gap-3 p-3.5 rounded-xl border-2 cursor-pointer transition-all ${
+              form[opt.key] !== false ? 'border-purple-400 bg-purple-50' : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+            }`}>
+              <input
+                type="checkbox"
+                className="mt-0.5 w-5 h-5 accent-purple-600 rounded"
+                checked={form[opt.key] !== false}
+                onChange={e => handleChange(opt.key, e.target.checked)}
+              />
+              <div>
+                <span className="font-bold text-sm text-gray-700 block">{opt.label}</span>
+                <span className="text-[11px] text-gray-400 leading-tight">{opt.desc}</span>
+              </div>
+            </label>
+          ))}
+        </div>
+
+        <div className="pt-2">
           <label className="block text-sm font-bold text-gray-600 mb-1">Mensaje Final del Reporte Z</label>
           <input
             className="w-full border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"

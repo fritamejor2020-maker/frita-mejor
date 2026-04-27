@@ -125,6 +125,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
 
       <!-- Financials -->
+      ${tc.zShowFinancialSummary !== false ? `
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
         <h3 style="text-align: center; background-color: #E5E7EB; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Resumen Financiero</h3>
         
@@ -132,6 +133,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <span>Base Inicial:</span>
           <span>${formatMoney(initial)}</span>
         </div>
+        ${tc.zShowPaymentMethods !== false ? `
         <div style="display: flex; justify-content: space-between;">
           <span>Ventas Efectivo:</span>
           <span>${formatMoney(cashSalesTotal)}</span>
@@ -148,6 +150,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <span>Ventas BANCOLOMBIA:</span>
           <span>${formatMoney(bancSalesTotal)}</span>
         </div>
+        ` : ''}
 
         <div style="border-top: 1px solid black; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
           <span>Total Ventas:</span>
@@ -163,8 +166,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       </div>
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      ` : ''}
 
-      ${contrataByClient.length > 0 ? `
+      ${contrataByClient.length > 0 && tc.zShowContratasBreakdown !== false ? `
       <!-- Contratas Breakdown -->
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
         <h3 style="text-align: center; background-color: #FEF3C7; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Desglose Contratas</h3>
@@ -186,6 +190,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
 
+      ${tc.zShowLocalVsContratas !== false ? `
       <!-- Cuadre Local vs Contratas -->
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; background:#F0FDF4; padding:8px; border-radius:4px;">
         <h3 style="text-align: center; background-color: #BBF7D0; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Efectivo: Local vs Contratas</h3>
@@ -196,8 +201,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
       ` : ''}
+      ` : ''}
 
       <!-- Cash Register Match -->
+      ${tc.zShowCashRegisterMatch !== false ? `
       <div style="font-size: 12px; font-weight: bold; margin-top: 8px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
         <h3 style="text-align: center; background-color: #E5E7EB; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Cuadre de Caja (Efectivo)</h3>
         
@@ -217,8 +224,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       </div>
 
       <div style="border-bottom: 3px solid black; margin: 12px 0;"></div>
+      ` : ''}
 
       <!-- Products Sold Summary -->
+      ${tc.zShowProductsSold !== false ? `
       <div style="font-size: 12px; font-weight: bold;">
         <h3 style="text-align: center; background-color: #E5E7EB; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Productos Vendidos</h3>
         <table style="width: 100%; text-align: left; table-layout: fixed; border-collapse: collapse;">
@@ -233,12 +242,13 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           </tbody>
         </table>
       </div>
+      ` : ''}
 
-      ${expensesHtml}
+      ${tc.zShowExpensesDetail !== false ? expensesHtml : ''}
 
       <!-- Footer -->
       <div style="text-align: center; font-size: 12px; margin-top: 24px;">
-        <p style="border-top: 1px solid black; padding-top: 4px; margin-bottom: 16px; width: 75%; margin-left: auto; margin-right: auto;">Firma Cajero</p>
+        ${tc.zShowSignatureLine !== false ? `<p style="border-top: 1px solid black; padding-top: 4px; margin-bottom: 16px; width: 75%; margin-left: auto; margin-right: auto;">Firma Cajero</p>` : ''}
         <p style="font-weight: bold; margin: 0;">${tc.zReportFooterMsg}</p>
       </div>
 
