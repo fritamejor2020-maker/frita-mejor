@@ -433,6 +433,8 @@ export function PosView() {
     ? sellableItems.filter(i => i.posCategoryId === currentFolder)
     : sellableItems.filter(i => !i.posCategoryId); // Items outside any folder
 
+  const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
+
   return (
     <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans">
 
@@ -467,7 +469,7 @@ export function PosView() {
             onClick={() => setShowSuspendedModal(true)}
           >
             🕐
-            {(() => { const count = (posSales || []).filter(s => s.status === 'SUSPENDED').length; return count > 0 ? <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{count}</span> : null; })()}
+            {suspendedCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{suspendedCount}</span>}
           </button>
         )}
 
