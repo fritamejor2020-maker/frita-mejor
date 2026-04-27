@@ -157,6 +157,19 @@ const INITIAL_POS_SETTINGS = {
     { id: 'PM-004', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: true },
   ],
   restockPresets: [5, 10, 15, 20],
+  ticketConfig: {
+    businessName: 'Frita Mejor',
+    nit: '900.000.000-1',
+    phone: '300 123 4567',
+    address: 'Cali, Colombia',
+    showLogo: true,
+    showBarcode: true,
+    showCashier: true,
+    saleFooterMsg: '¡GRACIAS POR SU COMPRA!',
+    saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
+    saleBottomLine: 'Sistema POS • fritamejor.com',
+    zReportFooterMsg: 'FIN DE INFORME Z',
+  },
 };
 
 // Templates vacíos — el usuario crea sus propias plantillas desde el Dejador

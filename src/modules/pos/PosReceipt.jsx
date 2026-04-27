@@ -3,8 +3,22 @@ import { LOGO_BASE64 } from './logoBase64';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateReceiptHTML = (sale, customer) => {
+export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
   if (!sale) return '';
+
+  const tc = {
+    businessName: 'Frita Mejor',
+    nit: '900.000.000-1',
+    phone: '300 123 4567',
+    address: 'Cali, Colombia',
+    showLogo: true,
+    showBarcode: true,
+    showCashier: true,
+    saleFooterMsg: '¡GRACIAS POR SU COMPRA!',
+    saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
+    saleBottomLine: 'Sistema POS • fritamejor.com',
+    ...ticketConfig,
+  };
 
   const dateStr = new Date(sale.timestamp).toLocaleString('es-CO', {
     dateStyle: 'short', timeStyle: 'short'
@@ -39,12 +53,12 @@ export const generateReceiptHTML = (sale, customer) => {
 
       <!-- Header & Logo -->
       <div style="text-align: center; margin-bottom: 12px;">
-        <div style="display: flex; justify-content: center; margin-bottom: 6px;">
-          <img src="${LOGO_BASE64}" alt="Frita Mejor" style="width: 120px; height: auto; display: block; margin: 0 auto;" />
-        </div>
-        <p style="font-weight: bold; margin: 0;">NIT: 900.000.000-1</p>
-        <p style="margin: 0;">Tel: 300 123 4567</p>
-        <p style="margin: 0;">Cali, Colombia</p>
+        ${tc.showLogo ? `<div style="display: flex; justify-content: center; margin-bottom: 6px;">
+          <img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 120px; height: auto; display: block; margin: 0 auto;" />
+        </div>` : ''}
+        ${tc.nit ? `<p style="font-weight: bold; margin: 0;">NIT: ${tc.nit}</p>` : ''}
+        ${tc.phone ? `<p style="margin: 0;">Tel: ${tc.phone}</p>` : ''}
+        ${tc.address ? `<p style="margin: 0;">${tc.address}</p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
@@ -53,7 +67,7 @@ export const generateReceiptHTML = (sale, customer) => {
       <div style="margin-bottom: 8px;">
         <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${(sale.id || 'N/A').replace('SALE-', '').slice(-6)}</span></p>
         <p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>
-        <p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>
+        ${tc.showCashier ? `<p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
@@ -116,11 +130,10 @@ export const generateReceiptHTML = (sale, customer) => {
 
       <!-- Footer -->
       <div style="text-align: center;">
-        <p style="font-weight: 900; font-size: 14px; margin: 0 0 4px 0;">¡GRACIAS POR SU COMPRA!</p>
-        <p style="font-size: 10px; margin: 0 0 8px 0;">Conserve este tiquete para reclamos.</p>
-        <!-- Placeholder para código de barras de la factura -->
-        <div style="width: 75%; height: 32px; background-color: black; margin: 0 auto 4px auto; opacity: 0.8; background-image: repeating-linear-gradient(90deg, transparent, transparent 2px, white 2px, white 4px); background-size: 4px 100%;"></div>
-        <p style="margin-top: 8px; font-size: 9px;">Sistema POS • fritamejor.com</p>
+        ${tc.saleFooterMsg ? `<p style="font-weight: 900; font-size: 14px; margin: 0 0 4px 0;">${tc.saleFooterMsg}</p>` : ''}
+        ${tc.saleSubFooterMsg ? `<p style="font-size: 10px; margin: 0 0 8px 0;">${tc.saleSubFooterMsg}</p>` : ''}
+        ${tc.showBarcode ? `<div style="width: 75%; height: 32px; background-color: black; margin: 0 auto 4px auto; opacity: 0.8; background-image: repeating-linear-gradient(90deg, transparent, transparent 2px, white 2px, white 4px); background-size: 4px 100%;"></div>` : ''}
+        ${tc.saleBottomLine ? `<p style="margin-top: 8px; font-size: 9px;">${tc.saleBottomLine}</p>` : ''}
       </div>
 
     </div>

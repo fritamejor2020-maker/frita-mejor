@@ -17,6 +17,7 @@ import { ResetGeneralPanel } from '../../components/admin/ResetGeneralPanel';
 import { AdminIncomeSourcesTab } from '../../components/admin/AdminIncomeSourcesTab';
 import { AdminCustomerDiscountsTab } from '../../components/admin/AdminCustomerDiscountsTab';
 import { AdminContratasTab } from '../../components/admin/AdminContratasTab';
+import { AdminTicketConfigTab } from '../../components/admin/AdminTicketConfigTab';
 import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { formatMoney } from '../../utils/formatUtils';
 
@@ -2385,6 +2386,7 @@ export function AdminView() {
       { id: 'POS_HISTORY',  label: '🧾 Historial POS'},
       { id: 'CLIENTES',     label: '🏷️ Grupos VIP & Precios' },
       { id: 'CONTRATAS',    label: '🤝 Contratas' },
+      { id: 'TICKET_CONFIG', label: '🧾 Diseño Tickets' },
     ],
     FLOTA: [
       { id: 'INVENTARIO_FLOTA', label: '📊 Inventario en Ruta' },
@@ -2527,6 +2529,7 @@ export function AdminView() {
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
         { activeTab === 'CLIENTES'  && <AdminCustomerDiscountsTab /> }
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
+        { activeTab === 'TICKET_CONFIG' && <AdminTicketConfigTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab /> }
 

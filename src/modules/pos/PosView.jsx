@@ -193,7 +193,7 @@ export function PosView() {
     const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
     const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
     
-    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes);
+    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
 
     // Show prompt for logout
@@ -417,7 +417,7 @@ export function PosView() {
   const handleReprintSale = (saleToPrint) => {
     if (!saleToPrint) return;
     const saleCustomer = customers?.find(c => c.id === saleToPrint.customerId);
-    const receiptHtml = generateReceiptHTML(saleToPrint, saleCustomer);
+    const receiptHtml = generateReceiptHTML(saleToPrint, saleCustomer, posSettings?.ticketConfig);
     setTimeout(() => {
       printHTML(receiptHtml, 'Recibo de Venta (Copia)');
     }, 100);

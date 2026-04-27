@@ -3,8 +3,19 @@ import { LOGO_BASE64 } from './logoBase64';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes) => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}) => {
   if (!shift) return '';
+
+  const tc = {
+    businessName: 'Frita Mejor',
+    nit: '900.000.000-1',
+    phone: '300 123 4567',
+    address: 'Cali, Colombia',
+    showLogo: true,
+    showCashier: true,
+    zReportFooterMsg: 'FIN DE INFORME Z',
+    ...ticketConfig,
+  };
 
   const dateStrOpened = new Date(shift.openedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' });
   const dateStrClosed = shift.closedAt ? new Date(shift.closedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' }) : 'EN CURSO';
@@ -101,11 +112,12 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 16px;">
-        <img src="${LOGO_BASE64}" alt="Frita Mejor" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto;" />
+        ${tc.showLogo ? `<img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto;" />` : ''}
         <h1 style="font-weight: 900; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">REPORTE Z — CIERRE DE TURNO</h1>
+        ${tc.nit ? `<p style="font-size: 11px; margin: 0;">NIT: ${tc.nit}</p>` : ''}
         <div style="border-bottom: 1px dashed black; margin: 8px 0;"></div>
         <p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Turno ID: ${shift.id.slice(-6)}</p>
-        <p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Cajero: ${shift.userName || 'PRINCIPAL'}</p>
+        ${tc.showCashier ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Cajero: ${shift.userName || 'PRINCIPAL'}</p>` : ''}
         <p style="font-size: 12px; margin: 4px 0 0 0;">Apertura: ${dateStrOpened}</p>
         <p style="font-size: 12px; margin: 0;">Cierre: ${dateStrClosed}</p>
       </div>
@@ -227,7 +239,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <!-- Footer -->
       <div style="text-align: center; font-size: 12px; margin-top: 24px;">
         <p style="border-top: 1px solid black; padding-top: 4px; margin-bottom: 16px; width: 75%; margin-left: auto; margin-right: auto;">Firma Cajero</p>
-        <p style="font-weight: bold; margin: 0;">FIN DE INFORME Z</p>
+        <p style="font-weight: bold; margin: 0;">${tc.zReportFooterMsg}</p>
       </div>
 
     </div>
