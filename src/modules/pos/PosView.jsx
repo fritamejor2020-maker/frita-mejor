@@ -349,6 +349,7 @@ export function PosView() {
     const methodConfig = methods.find(m => m.name === methodName) || methods[0];
 
     const saleData = {
+      id: activeSuspendedId || `SALE-${Date.now()}`,
       customerId: selectedCustomer,
       items: ticketItems,
       subtotal,

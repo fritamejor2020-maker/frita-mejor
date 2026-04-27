@@ -51,7 +51,7 @@ export const generateReceiptHTML = (sale, customer) => {
 
       <!-- Transaction Info -->
       <div style="margin-bottom: 8px;">
-        <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${sale.id.replace('SALE-', '').slice(-6)}</span></p>
+        <p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${(sale.id || 'N/A').replace('SALE-', '').slice(-6)}</span></p>
         <p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>
         <p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>
       </div>
