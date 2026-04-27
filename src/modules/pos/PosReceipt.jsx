@@ -76,6 +76,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}) => {
       <div style="margin-bottom: 8px;">
         <p style="font-weight: bold; margin: 0;">Cliente: <span style="font-weight: normal;">${customerName}</span></p>
         ${customerDoc}
+        ${customer?.address ? `<p style="margin: 0;">Dir: <span style="font-weight: normal;">${customer.address}</span></p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>

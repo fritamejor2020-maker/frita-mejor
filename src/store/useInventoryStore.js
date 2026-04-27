@@ -138,8 +138,8 @@ const INITIAL_POS_CATEGORIES = [
 ];
 
 const INITIAL_CUSTOMERS = [
-  { id: 'CUST-001', name: 'Cliente General', document: '', discountPercent: 0, active: true, typeId: null, phone: '', creditLimit: 0, notes: '' },
-  { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001', phone: '', creditLimit: 500000, notes: '' },
+  { id: 'CUST-001', name: 'Cliente General', document: '', discountPercent: 0, active: true, typeId: null, phone: '', creditLimit: 0, notes: '', address: '' },
+  { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001', phone: '', creditLimit: 500000, notes: '', address: '' },
 ];
 
 const INITIAL_CUSTOMER_TYPES = [

@@ -167,14 +167,15 @@ function ClientesTab() {
   const [nName, setNName] = useState('');
   const [nDoc, setNDoc]   = useState('');
   const [nPhone, setNPhone] = useState('');
+  const [nAddress, setNAddress] = useState('');
   const [nType, setNType] = useState('');
   const [nLimit, setNLimit] = useState('');
   const [nNotes, setNNotes] = useState('');
 
   const handleAddCustomer = () => {
     if (!nName.trim() || !nType) { alert('Nombre y nivel son obligatorios'); return; }
-    addCustomer({ name: nName.trim(), document: nDoc.trim(), phone: nPhone.trim(), typeId: nType, creditLimit: parseInt(nLimit) || 0, notes: nNotes.trim(), discountPercent: 0 });
-    setNName(''); setNDoc(''); setNPhone(''); setNType(''); setNLimit(''); setNNotes('');
+    addCustomer({ name: nName.trim(), document: nDoc.trim(), phone: nPhone.trim(), address: nAddress.trim(), typeId: nType, creditLimit: parseInt(nLimit) || 0, notes: nNotes.trim(), discountPercent: 0 });
+    setNName(''); setNDoc(''); setNPhone(''); setNAddress(''); setNType(''); setNLimit(''); setNNotes('');
     setTab('lista');
   };
 
@@ -212,9 +213,10 @@ function ClientesTab() {
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-3">
             <h3 className="font-black text-gray-800">Nuevo Cliente Contrata</h3>
             {[
-              { val: nName,  setVal: setNName,  placeholder: 'Nombre *', type: 'text' },
-              { val: nDoc,   setVal: setNDoc,   placeholder: 'NIT / CC', type: 'text' },
-              { val: nPhone, setVal: setNPhone, placeholder: 'Teléfono', type: 'tel' },
+              { val: nName,    setVal: setNName,    placeholder: 'Nombre *', type: 'text' },
+              { val: nDoc,     setVal: setNDoc,     placeholder: 'NIT / CC', type: 'text' },
+              { val: nPhone,   setVal: setNPhone,   placeholder: 'Teléfono', type: 'tel' },
+              { val: nAddress, setVal: setNAddress, placeholder: 'Dirección', type: 'text' },
             ].map((f, i) => (
               <input key={i} type={f.type} value={f.val} onChange={e => f.setVal(e.target.value)}
                 placeholder={f.placeholder}
