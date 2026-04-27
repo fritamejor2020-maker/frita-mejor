@@ -1327,11 +1327,11 @@ function PaymentModal({ total, paymentMethods, onClose, onConfirm }) {
         </div>
         
         <div className="p-6 space-y-6">
-          <div className="flex flex-wrap gap-3">
+          <div className={`grid gap-2 ${(paymentMethods || ['EFECTIVO']).length <= 3 ? 'grid-cols-3' : 'grid-cols-4'}`}>
             {(paymentMethods || ['EFECTIVO']).map(m => (
               <button 
                 key={m}
-                className={`flex-1 min-w-[100px] py-4 rounded-[20px] font-black text-sm uppercase tracking-wider transition-all border-2 ${method === m ? 'bg-chunky-main text-chunky-dark border-chunky-main shadow-lg shadow-chunky-main/20 scale-[1.02]' : 'bg-[#16171d] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-gray-300'}`}
+                className={`py-3 px-2 rounded-2xl font-black text-xs uppercase tracking-wide transition-all border-2 truncate ${method === m ? 'bg-chunky-main text-chunky-dark border-chunky-main shadow-lg shadow-chunky-main/20 scale-[1.02]' : 'bg-[#16171d] text-gray-400 border-gray-800 hover:border-gray-600 hover:text-gray-300'}`}
                 onClick={() => { setMethod(m); setAmount(total.toString()); }}
               >
                 {m}
