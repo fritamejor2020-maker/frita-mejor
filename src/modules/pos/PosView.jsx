@@ -453,19 +453,20 @@ export function PosView() {
 
         {/* ── Botón Abrir Cajón ── */}
         {activeShift && (
-          <button
-            className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
-            title="Abrir cajón"
-            onClick={() => {
-              const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
-              console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
-            }}
-          >🔓</button>
-
-          <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>
-            <span>🕐</span>
-            {suspendedCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{suspendedCount}</span>}
-          </button>
+          <>
+            <button
+              className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
+              title="Abrir cajón"
+              onClick={() => {
+                const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
+                console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
+              }}
+            ><span>🔓</span></button>
+            <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>
+              <span>🕐</span>
+              {suspendedCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{suspendedCount}</span>}
+            </button>
+          </>
         )}
 
         <div className="w-px h-7 bg-gray-700 shrink-0" />
