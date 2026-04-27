@@ -1838,7 +1838,7 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
 
         <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4">
           <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" disabled={realCount === ''} onClick={() => onConfirm(realCount)}>
+          <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" onClick={() => onConfirm(realCount)}>
             Cerrar Turno Definitivo
           </Button>
         </div>
