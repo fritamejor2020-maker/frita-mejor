@@ -941,37 +941,40 @@ function ClientAccountModal({ customer, customerTypes, posSales, contrataPayment
 
           {/* Register Payment */}
           {balance > 0 && (
-            <div className="bg-green-950/30 border border-green-800/50 rounded-2xl p-4">
-              <h3 className="font-black text-green-300 text-sm mb-3">💵 Registrar Abono</h3>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  placeholder="Monto"
-                  value={payAmt}
-                  onChange={e => setPayAmt(e.target.value)}
-                  className="flex-1 bg-[#0c0d11] border border-gray-700 focus:border-green-500 rounded-xl py-2.5 px-3 text-sm font-bold text-white outline-none"
-                  onKeyDown={e => { if (e.key === 'Enter') handlePay(); }}
-                />
+            <div className="bg-green-950/30 border border-green-800/50 rounded-2xl p-4 space-y-3">
+              <h3 className="font-black text-green-300 text-sm">💵 Registrar Abono</h3>
+              <div className="grid grid-cols-[1fr_auto] gap-2">
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">$</span>
+                  <input
+                    type="number"
+                    placeholder="0"
+                    value={payAmt}
+                    onChange={e => setPayAmt(e.target.value)}
+                    className="w-full bg-[#0c0d11] border border-gray-700 focus:border-green-500 rounded-xl py-3 pl-8 pr-3 text-lg font-black text-white outline-none transition-colors"
+                    onKeyDown={e => { if (e.key === 'Enter') handlePay(); }}
+                  />
+                </div>
                 <select
                   value={payMethod}
                   onChange={e => setPayMethod(e.target.value)}
-                  className="bg-[#0c0d11] border border-gray-700 rounded-xl py-2.5 px-3 text-sm font-bold text-white outline-none"
+                  className="bg-[#0c0d11] border border-gray-700 rounded-xl py-3 px-3 text-sm font-bold text-white outline-none min-w-[120px]"
                 >
-                  <option value="cash">Efectivo</option>
-                  <option value="transfer">Transferencia</option>
+                  <option value="cash">💵 Efectivo</option>
+                  <option value="transfer">📲 Transfer</option>
                 </select>
-                <button
-                  onClick={handlePay}
-                  className="shrink-0 bg-green-600 hover:bg-green-500 text-white rounded-xl px-4 py-2.5 font-black text-sm active:scale-95 transition-all"
-                >✓ Abonar</button>
               </div>
               <input
                 type="text"
                 placeholder="Nota (opcional)"
                 value={payNote}
                 onChange={e => setPayNote(e.target.value)}
-                className="w-full mt-2 bg-[#0c0d11] border border-gray-700 focus:border-green-500 rounded-xl py-2 px-3 text-sm font-bold text-white outline-none"
+                className="w-full bg-[#0c0d11] border border-gray-700 focus:border-green-500 rounded-xl py-2.5 px-3 text-sm font-bold text-white outline-none transition-colors"
               />
+              <button
+                onClick={handlePay}
+                className="w-full bg-green-600 hover:bg-green-500 text-white rounded-xl py-3.5 font-black text-base active:scale-[0.98] transition-all shadow-lg shadow-green-900/30"
+              >✓ Registrar Abono</button>
             </div>
           )}
 
