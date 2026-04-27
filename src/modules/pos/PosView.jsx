@@ -903,6 +903,7 @@ export function PosView() {
       {showSuspendedModal && (
         <SuspendedSalesModal
           sales={(posSales || []).filter(s => s.status === 'SUSPENDED')}
+          customers={customers}
           onClose={() => setShowSuspendedModal(false)}
           onLoad={handleLoadSuspended}
         />
@@ -1810,7 +1811,7 @@ function PaymentModal({ total, paymentMethods, onClose, onConfirm }) {
 }
 
 // ─── Suspended Sales Modal Component ───
-function SuspendedSalesModal({ sales, onClose, onLoad }) {
+function SuspendedSalesModal({ sales, customers, onClose, onLoad }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-bounce-in">
@@ -1827,18 +1828,28 @@ function SuspendedSalesModal({ sales, onClose, onLoad }) {
               <p className="text-center text-gray-400 font-bold">No hay ventas pendientes de cobro.</p>
             </div>
           ) : (
-            sales.map(s => (
-              <div key={s.id} className="bg-[#16171d] border border-gray-800 rounded-[24px] p-5 flex justify-between items-center hover:border-gray-600 transition-all hover:shadow-lg group">
-                <div>
-                  <h3 className="font-black text-white text-lg mb-1">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
-                  <p className="text-xs text-gray-400 font-bold">Fecha: {new Date(s.timestamp).toLocaleString('es-CO')}</p>
-                  <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items.length} ítem(s) guardados.</p>
+            sales.map(s => {
+              const cust = (customers || []).find(c => c.id === s.customerId);
+              const custName = cust?.name || 'Cliente General';
+              const isContrata = cust?.typeId;
+              return (
+                <div key={s.id} className="bg-[#16171d] border border-gray-800 rounded-[24px] p-5 flex justify-between items-center hover:border-gray-600 transition-all hover:shadow-lg group">
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${isContrata ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
+                        {isContrata ? '🤝' : '👤'} {custName}
+                      </span>
+                    </div>
+                    <h3 className="font-black text-white text-lg">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
+                    <p className="text-xs text-gray-400 font-bold">Fecha: {new Date(s.timestamp).toLocaleString('es-CO')}</p>
+                    <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items.length} ítem(s) guardados.</p>
+                  </div>
+                  <Button className="rounded-[16px] bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] group-hover:scale-105 active:scale-95 transition-all" onClick={() => onLoad(s)}>
+                    Recuperar
+                  </Button>
                 </div>
-                <Button className="rounded-[16px] bg-blue-600 hover:bg-blue-500 text-white font-bold px-6 py-3 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] group-hover:scale-105 active:scale-95 transition-all" onClick={() => onLoad(s)}>
-                  Recuperar
-                </Button>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       </div>
