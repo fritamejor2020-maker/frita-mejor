@@ -24,13 +24,18 @@ const DebtBadge = ({ amount }: { amount: number }) => {
 // SUB-TAB: NIVELES DE CONTRATA
 // ══════════════════════════════════════════════════════════════════════════════
 function NivelesTab() {
-  const { customerTypes, addCustomerType, updateCustomerType, deleteCustomerType } = useInventoryStore();
+  const { customerTypes, addCustomerType, updateCustomerType, deleteCustomerType, inventory } = useInventoryStore() as any;
   const contrataTypes = (customerTypes || []);
+  const sellableItems = (inventory || []).filter((i: any) => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
 
   const [newName, setNewName]   = useState('');
   const [newColor, setNewColor] = useState('bg-blue-500');
   const [editId, setEditId]     = useState<string | null>(null);
   const [editData, setEditData] = useState<any>({});
+  const [discountTypeId, setDiscountTypeId] = useState<string | null>(null);
+  const [newDiscItemId, setNewDiscItemId] = useState('');
+  const [newDiscType, setNewDiscType] = useState<'percent' | 'fixed'>('fixed');
+  const [newDiscValue, setNewDiscValue] = useState('');
 
   const handleAdd = () => {
     if (!newName.trim()) return;
@@ -41,32 +46,43 @@ function NivelesTab() {
   const startEdit = (t: any) => { setEditId(t.id); setEditData({ name: t.name, allowCredit: !!t.allowCredit, globalDiscountPercent: t.globalDiscountPercent || 0, color: t.color || 'bg-blue-500' }); };
   const saveEdit  = () => { if (!editId) return; updateCustomerType(editId, editData); setEditId(null); };
 
+  const addProductDiscount = (typeId: string) => {
+    if (!newDiscItemId || !parseFloat(newDiscValue)) return;
+    const item = sellableItems.find((i: any) => i.id === newDiscItemId);
+    if (!item) return;
+    const type = contrataTypes.find((t: any) => t.id === typeId);
+    if (!type) return;
+    const existing = (type.productDiscounts || []).filter((d: any) => d.itemId !== newDiscItemId);
+    updateCustomerType(typeId, { productDiscounts: [...existing, { itemId: newDiscItemId, itemName: item.name, type: newDiscType, value: parseFloat(newDiscValue) }] });
+    setNewDiscItemId(''); setNewDiscValue('');
+  };
+
+  const removeProductDiscount = (typeId: string, itemId: string) => {
+    const type = contrataTypes.find((t: any) => t.id === typeId);
+    if (!type) return;
+    updateCustomerType(typeId, { productDiscounts: (type.productDiscounts || []).filter((d: any) => d.itemId !== itemId) });
+  };
+
   return (
     <div className="space-y-6">
       {/* Crear nivel */}
       <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
         <h3 className="font-black text-gray-800 text-lg mb-4">Crear Nuevo Nivel</h3>
         <div className="flex gap-3 flex-wrap">
-          <input
-            value={newName} onChange={e => setNewName(e.target.value)}
-            placeholder="Ej: Nivel 1, Restaurantes..."
-            className="flex-1 min-w-[200px] border-2 border-gray-100 rounded-2xl px-4 py-3 font-bold text-gray-800 outline-none focus:border-yellow-400 bg-gray-50"
-          />
+          <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Ej: Nivel 1, Restaurantes..."
+            className="flex-1 min-w-[200px] border-2 border-gray-100 rounded-2xl px-4 py-3 font-bold text-gray-800 outline-none focus:border-yellow-400 bg-gray-50" />
           <select value={newColor} onChange={e => setNewColor(e.target.value)}
             className="border-2 border-gray-100 rounded-2xl px-4 py-3 font-bold text-gray-700 outline-none focus:border-yellow-400 bg-gray-50">
             {COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
           </select>
-          <button onClick={handleAdd} className="bg-yellow-400 text-gray-900 font-black px-6 py-3 rounded-2xl hover:bg-yellow-300 active:scale-95 transition-all shadow-sm">
-            + Crear
-          </button>
+          <button onClick={handleAdd} className="bg-yellow-400 text-gray-900 font-black px-6 py-3 rounded-2xl hover:bg-yellow-300 active:scale-95 transition-all shadow-sm">+ Crear</button>
         </div>
       </div>
 
       {/* Lista de niveles */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {contrataTypes.map((t: any) => (
           <div key={t.id} className="bg-white rounded-3xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* Header del nivel */}
             <div className={`${t.color || 'bg-blue-500'} p-4`}>
               <div className="flex items-center justify-between">
                 <span className="font-black text-white text-lg">{t.name}</span>
@@ -76,27 +92,20 @@ function NivelesTab() {
               </div>
             </div>
 
-            {/* Cuerpo */}
             {editId === t.id ? (
               <div className="p-4 space-y-3">
                 <input value={editData.name} onChange={e => setEditData((d: any) => ({ ...d, name: e.target.value }))}
                   className="w-full border-2 border-yellow-300 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none text-sm" />
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" checked={editData.allowCredit}
-                      onChange={e => setEditData((d: any) => ({ ...d, allowCredit: e.target.checked }))}
-                      className="w-4 h-4 accent-yellow-400" />
-                    <span className="font-bold text-sm text-gray-700">Permite Crédito</span>
-                  </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" checked={editData.allowCredit} onChange={e => setEditData((d: any) => ({ ...d, allowCredit: e.target.checked }))} className="w-4 h-4 accent-yellow-400" />
+                  <span className="font-bold text-sm text-gray-700">Permite Crédito</span>
+                </label>
+                <div>
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Descuento Global (%)</label>
+                  <input type="number" min="0" max="100" value={editData.globalDiscountPercent}
+                    onChange={e => setEditData((d: any) => ({ ...d, globalDiscountPercent: parseFloat(e.target.value) || 0 }))}
+                    className="w-full border-2 border-gray-100 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none text-sm" />
                 </div>
-                {editData.allowCredit && (
-                  <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-widest block mb-1">Descuento Global (%)</label>
-                    <input type="number" min="0" max="100" value={editData.globalDiscountPercent}
-                      onChange={e => setEditData((d: any) => ({ ...d, globalDiscountPercent: parseFloat(e.target.value) || 0 }))}
-                      className="w-full border-2 border-gray-100 rounded-xl px-3 py-2 font-bold text-gray-800 outline-none text-sm" />
-                  </div>
-                )}
                 <select value={editData.color} onChange={e => setEditData((d: any) => ({ ...d, color: e.target.value }))}
                   className="w-full border-2 border-gray-100 rounded-xl px-3 py-2 font-bold text-gray-700 outline-none text-sm">
                   {COLORS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
@@ -121,14 +130,69 @@ function NivelesTab() {
                   </div>
                 )}
                 <div className="flex gap-2 pt-2">
-                  <button onClick={() => startEdit(t)} className="flex-1 text-sm font-bold py-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 active:scale-95 transition-all">
-                    ✏️ Editar
+                  <button onClick={() => startEdit(t)} className="flex-1 text-sm font-bold py-2 rounded-xl bg-gray-50 text-gray-600 hover:bg-gray-100 active:scale-95 transition-all">✏️ Editar</button>
+                  <button onClick={() => setDiscountTypeId(discountTypeId === t.id ? null : t.id)}
+                    className={`flex-1 text-sm font-bold py-2 rounded-xl active:scale-95 transition-all ${discountTypeId === t.id ? 'bg-yellow-400 text-gray-900' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'}`}>
+                    🏷️ Precios
                   </button>
                   <button onClick={() => { if (confirm(`¿Eliminar "${t.name}"?`)) deleteCustomerType(t.id); }}
-                    className="text-sm font-bold py-2 px-3 rounded-xl text-red-400 hover:bg-red-50 active:scale-95 transition-all">
-                    🗑️
-                  </button>
+                    className="text-sm font-bold py-2 px-3 rounded-xl text-red-400 hover:bg-red-50 active:scale-95 transition-all">🗑️</button>
                 </div>
+              </div>
+            )}
+
+            {/* Product Discounts Panel */}
+            {discountTypeId === t.id && (
+              <div className="border-t border-gray-100 p-4 bg-yellow-50/50 space-y-3">
+                <h4 className="font-black text-sm text-gray-700">🏷️ Precios Especiales — {t.name}</h4>
+                <p className="text-xs text-gray-400">Precio fijo ($) o descuento (%) por producto.</p>
+                <div className="flex gap-2 flex-wrap">
+                  <select value={newDiscItemId} onChange={e => setNewDiscItemId(e.target.value)}
+                    className="flex-1 min-w-[140px] border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 text-sm outline-none focus:border-yellow-400 bg-white">
+                    <option value="">Producto...</option>
+                    {sellableItems.filter((i: any) => !(t.productDiscounts || []).find((d: any) => d.itemId === i.id)).map((i: any) => (
+                      <option key={i.id} value={i.id}>{i.name} (${(i.price || 0).toLocaleString()})</option>
+                    ))}
+                  </select>
+                  <select value={newDiscType} onChange={e => setNewDiscType(e.target.value as any)}
+                    className="border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-700 text-sm outline-none focus:border-yellow-400 bg-white">
+                    <option value="fixed">$ Precio fijo</option>
+                    <option value="percent">% Descuento</option>
+                  </select>
+                  <input type="number" placeholder={newDiscType === 'fixed' ? 'Precio $' : '% Dto.'} value={newDiscValue}
+                    onChange={e => setNewDiscValue(e.target.value)}
+                    className="w-24 border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-gray-800 text-sm outline-none focus:border-yellow-400 bg-white" />
+                  <button onClick={() => addProductDiscount(t.id)}
+                    className="bg-yellow-400 text-gray-900 font-black px-4 py-2 rounded-xl hover:bg-yellow-300 active:scale-95 transition-all text-sm">+ Agregar</button>
+                </div>
+                {(t.productDiscounts || []).length > 0 ? (
+                  <div className="space-y-1.5">
+                    {(t.productDiscounts || []).map((d: any) => {
+                      const item = sellableItems.find((i: any) => i.id === d.itemId);
+                      const orig = item?.price || 0;
+                      const final_ = d.type === 'fixed' ? d.value : orig * (1 - d.value / 100);
+                      return (
+                        <div key={d.itemId} className="flex items-center justify-between bg-white rounded-xl px-3 py-2 border border-gray-100">
+                          <div className="flex-1 min-w-0">
+                            <span className="font-bold text-sm text-gray-800 truncate block">{d.itemName || item?.name || d.itemId}</span>
+                            <span className="text-xs text-gray-400">
+                              Original: ${orig.toLocaleString()}{d.type === 'percent' ? ` → -${d.value}%` : ''}{' → '}
+                              <span className="font-black text-green-600">${Math.round(final_).toLocaleString()}</span>
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0">
+                            <span className={`text-xs font-black px-2 py-0.5 rounded-full ${d.type === 'fixed' ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'}`}>
+                              {d.type === 'fixed' ? `$${d.value.toLocaleString()}` : `${d.value}%`}
+                            </span>
+                            <button onClick={() => removeProductDiscount(t.id, d.itemId)} className="text-red-400 hover:text-red-600 text-sm active:scale-90 transition-all p-1">✕</button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 text-center py-3">Sin precios especiales aún.</p>
+                )}
               </div>
             )}
           </div>
