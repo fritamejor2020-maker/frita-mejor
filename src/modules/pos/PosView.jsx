@@ -8,6 +8,7 @@ import { IncomesModal }          from './components/IncomesModal';
 import { ExpensesModal }         from './components/ExpensesModal';
 import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
+import { useSupplierStore }      from '../../store/useSupplierStore';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -1908,14 +1909,9 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
   const provRef = useRef(null);
   const descRef = useRef(null);
 
-  // Get suppliers & past expenses for autocomplete
-  const suppliersState = useInventoryStore.getState();
-  const finState = useFinanceStore.getState();
-  const suppliers = finState.expenses || [];
-  const pastExpenses = finState.expenses || [];
-
-  let supplierList = [];
-  try { supplierList = require('../../store/useSupplierStore').useSupplierStore.getState().suppliers || []; } catch (_) {}
+  // Get suppliers & past expenses for autocomplete (via Zustand hooks)
+  const supplierList = useSupplierStore((s) => s.suppliers) || [];
+  const pastExpenses = useFinanceStore((s) => s.expenses) || [];
 
   const norm = (s = '') => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
 
@@ -1929,7 +1925,7 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
       .filter(p => norm(p).includes(q))
       .sort((a, b) => (norm(a).startsWith(q) ? 0 : 1) - (norm(b).startsWith(q) ? 0 : 1))
       .slice(0, 6);
-  }, [reason]);
+  }, [reason, pastExpenses, supplierList]);
 
   // Supplier suggestions
   const provSuggestions = React.useMemo(() => {
@@ -1937,7 +1933,7 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
     const active = supplierList.filter(s => s.active !== false);
     if (!pq) return active.slice(0, 8);
     return active.filter(s => norm(s.name).includes(pq)).slice(0, 8);
-  }, [proveedor]);
+  }, [proveedor, supplierList]);
 
   // Close dropdowns on outside click
   useEffect(() => {
