@@ -431,7 +431,7 @@ export function IncomesModal({ onClose }) {
           {/* Step 1: Ubicación */}
           {step === 1 && (
             <div className="grid grid-cols-2 gap-4">
-              {Object.keys(incomeHierarchy).map(ub => (
+              {Object.keys(incomeHierarchy).filter(ub => ub !== 'Contratas').map(ub => (
                 <Button key={ub} className="py-6 rounded-[20px] text-lg font-black bg-[#2a2d38] hover:bg-[#343846] text-white border-2 border-transparent hover:border-green-500 shadow-chunky hover:scale-[1.02] active:scale-95 transition-all" onClick={() => handleNextStep('ubicacion', ub)}>
                   {ub}
                 </Button>
