@@ -22,13 +22,20 @@ export function IncomesModal({ onClose }) {
   const [selectedSubtipo, setSelectedSubtipo]     = useState(''); // 'Descargue N' o 'Cierre Final'
   const [descarguesPrevios, setDescarguesPrevios] = useState([]);
 
-  // Single form state
+  // Single form state (non-Local locations)
   const [vendedor, setVendedor] = useState('');
   const [efectivo, setEfectivo] = useState('');
   const [salidas, setSalidas] = useState('');
   const [transferencias, setTransferencias] = useState('');
   const [observaciones, setObservaciones] = useState('');
-  const [zLoadedData, setZLoadedData] = useState(null); // Datos cargados del cierre Z
+  const [zLoadedData, setZLoadedData] = useState(null);
+
+  // ── Unified Local + Contratas state ─────────────────────────────────────────
+  const [efectivoReal, setEfectivoReal] = useState('');           // total physical cash counted
+  const [contraEfectivoZ, setContraEfectivoZ] = useState('');     // contrata cash from Z (editable)
+  const [salidasLocal, setSalidasLocal] = useState('');
+  const [transferenciasLocal, setTransferenciasLocal] = useState('');
+  const [transferenciasContratas, setTransferenciasContratas] = useState('');
 
   // Foto del sobre — con rotación y confirmación
   const [photoBase64, setPhotoBase64] = useState(null);
@@ -92,12 +99,26 @@ export function IncomesModal({ onClose }) {
     setGridData(prev => ({ ...prev, [tipo]: { ...prev[tipo], [field]: value } }));
   };
 
-  // ── Calculations Single ────────────────────────────────────────────────────
+  // ── Calculations Single (non-Local) ────────────────────────────────────────
   const numEfectivo      = parseFloat(efectivo)      || 0;
   const numTransferencias = parseFloat(transferencias) || 0;
   const numSalidas       = parseFloat(salidas)       || 0;
-  // TOTAL = Efectivo + Transferencias + Salidas (los tres suman al ingreso)
   const totalSingle = numEfectivo + numTransferencias + numSalidas;
+
+  // ── Calculations Unified Local + Contratas ─────────────────────────────────
+  const numEfectivoReal = parseFloat(efectivoReal) || 0;
+  const numContraEfectivoZ = parseFloat(contraEfectivoZ) || 0;
+  const numSalidasLocal = parseFloat(salidasLocal) || 0;
+  const numTransferenciasLocal = parseFloat(transferenciasLocal) || 0;
+  const numTransferenciasContratas = parseFloat(transferenciasContratas) || 0;
+
+  const efectivoLocalCalc = Math.max(0, numEfectivoReal - numContraEfectivoZ);
+  const efectivoContratasCalc = Math.min(numEfectivoReal, numContraEfectivoZ);
+  const salidasContratasAuto = Math.max(0, numContraEfectivoZ - numEfectivoReal);
+
+  const totalLocalCalc = efectivoLocalCalc + numSalidasLocal + numTransferenciasLocal;
+  const totalContratasCalc = efectivoContratasCalc + salidasContratasAuto + numTransferenciasContratas;
+  const totalGeneralCalc = totalLocalCalc + totalContratasCalc;
 
 
   // Calculations Grid
@@ -131,9 +152,15 @@ export function IncomesModal({ onClose }) {
   ).length + 1;
 
   // Validaciones adaptadas al subtipo
-  const isSingleFormValid = isDescargueMode
-    ? numEfectivo > 0 && !!photoBase64 && photoConfirmed          // descargue: solo efectivo + foto
-    : (numEfectivo > 0 || numTransferencias > 0 || numSalidas > 0) && !!photoBase64 && photoConfirmed;
+  const isLocalFormValid = isDescargueMode
+    ? numEfectivoReal > 0 && !!photoBase64 && photoConfirmed
+    : (numEfectivoReal > 0 || numTransferenciasLocal > 0 || numTransferenciasContratas > 0) && !!photoBase64 && photoConfirmed;
+
+  const isSingleFormValid = selectedUbicacion === 'Local'
+    ? isLocalFormValid
+    : isDescargueMode
+      ? numEfectivo > 0 && !!photoBase64 && photoConfirmed
+      : (numEfectivo > 0 || numTransferencias > 0 || numSalidas > 0) && !!photoBase64 && photoConfirmed;
 
   const handleNextStep = (type, value) => {
     if (type === 'ubicacion') {
@@ -204,15 +231,55 @@ export function IncomesModal({ onClose }) {
         };
       }).filter(Boolean);
       if (incomesArray.length > 0) addMultipleIncomes(incomesArray);
+    } else if (selectedUbicacion === 'Local') {
+      // ── Unified Local + Contratas: guardar 2 registros ──────────────────────
+      const base = {
+        ubicacion: 'Local',
+        jornada: selectedJornada,
+        tipo: hasDescargues ? selectedTipo : selectedTipo,
+        esDescargue: esDescargue || undefined,
+        esCierre: esCierre || undefined,
+        vendedor,
+        creado_por: user?.name || 'Desconocido',
+        observaciones: observaciones.trim() || null,
+        fecha: new Date().toISOString(),
+        photoBase64: bakedPhoto || null,
+        photoRotation: 0,
+      };
+      const arr = [];
+      const subPrefix = hasDescargues ? `${selectedSubtipo} - ` : '';
+      // LOCAL record
+      if (efectivoLocalCalc > 0 || numSalidasLocal > 0 || numTransferenciasLocal > 0) {
+        arr.push({
+          ...base,
+          subtipo: `${subPrefix}Local`,
+          efectivo: efectivoLocalCalc,
+          salidas: esDescargue ? 0 : numSalidasLocal,
+          transferencias: esDescargue ? 0 : numTransferenciasLocal,
+          total: esDescargue ? efectivoLocalCalc : totalLocalCalc,
+        });
+      }
+      // CONTRATAS record
+      if (efectivoContratasCalc > 0 || salidasContratasAuto > 0 || numTransferenciasContratas > 0) {
+        arr.push({
+          ...base,
+          subtipo: `${subPrefix}Contratas`,
+          efectivo: efectivoContratasCalc,
+          salidas: esDescargue ? 0 : salidasContratasAuto,
+          transferencias: esDescargue ? 0 : numTransferenciasContratas,
+          total: esDescargue
+            ? efectivoContratasCalc
+            : totalContratasCalc,
+        });
+      }
+      if (arr.length > 0) addMultipleIncomes(arr);
     } else {
-      // Determinar subtipo real: para franja sin descargues, selectedSubtipo está vacío
-      // El tipo guardado es la franja si es ingreso normal, o selectedSubtipo si hay descargues
-      const tipoFinal = hasDescargues ? selectedSubtipo : selectedTipo;
+      // ── Non-Local single record (Contratas standalone, etc.) ────────────────
       addIncome({
         ubicacion: selectedUbicacion,
         jornada: selectedJornada,
-        tipo: hasDescargues ? selectedTipo : selectedTipo,   // franja horaria siempre
-        subtipo: hasDescargues ? selectedSubtipo : null,     // 'Descargue 1', 'Cierre Final', null
+        tipo: hasDescargues ? selectedTipo : selectedTipo,
+        subtipo: hasDescargues ? selectedSubtipo : null,
         esDescargue: esDescargue || undefined,
         esCierre: esCierre || undefined,
         vendedor,
