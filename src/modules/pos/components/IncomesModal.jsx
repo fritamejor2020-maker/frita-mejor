@@ -265,10 +265,10 @@ export function IncomesModal({ onClose }) {
           ...base,
           subtipo: `${subPrefix}Contratas`,
           efectivo: efectivoContratasCalc,
-          salidas: esDescargue ? 0 : salidasContratasAuto,
+          salidas: salidasContratasAuto,
           transferencias: esDescargue ? 0 : numTransferenciasContratas,
           total: esDescargue
-            ? efectivoContratasCalc
+            ? efectivoContratasCalc + salidasContratasAuto
             : totalContratasCalc,
         });
       }
