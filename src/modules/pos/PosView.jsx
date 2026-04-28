@@ -226,12 +226,14 @@ export function PosView() {
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
 
-  const handleAddExpense = (amount, reason, shareToGastos = false) => {
+  const handleAddExpense = (amount, reason, shareToGastos = false, extras = {}) => {
     addPosExpense({
       shiftId: activeShift?.id || null,
       registerId: selectedRegisterId,
       amount: parseFloat(amount),
       reason,
+      proveedor: extras.proveedor || '',
+      observacion: extras.observacion || '',
       timestamp: new Date().toISOString(),
       userId: user?.id,
       userName: user?.name,
@@ -243,9 +245,10 @@ export function PosView() {
         useFinanceStore.getState().addExpense({
           descripcion: reason,
           monto: parseFloat(amount),
-          proveedor: 'Caja POS',
+          proveedor: extras.proveedor || 'Caja POS',
           creado_por: user?.name || 'Cajero',
           fecha: new Date().toISOString(),
+          observacion: extras.observacion || null,
         });
       } catch (e) { console.warn('No se pudo compartir al módulo Gastos:', e); }
     }
@@ -1894,13 +1897,59 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
 
 // ─── Retiros y Depósitos Modal ───
 function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], formatMoney }) {
-  const [tab, setTab] = useState('retiro'); // 'retiro' | 'deposito'
+  const [tab, setTab] = useState('retiro');
   const [amount, setAmount] = useState('');
   const [reason, setReason] = useState('');
+  const [proveedor, setProveedor] = useState('');
+  const [observacion, setObservacion] = useState('');
   const [shareToGastos, setShareToGastos] = useState(false);
+  const [showProvSugg, setShowProvSugg] = useState(false);
+  const [showDescSugg, setShowDescSugg] = useState(false);
+  const provRef = useRef(null);
+  const descRef = useRef(null);
+
+  // Get suppliers & past expenses for autocomplete
+  const suppliersState = useInventoryStore.getState();
+  const finState = useFinanceStore.getState();
+  const suppliers = finState.expenses || [];
+  const pastExpenses = finState.expenses || [];
+
+  let supplierList = [];
+  try { supplierList = require('../../store/useSupplierStore').useSupplierStore.getState().suppliers || []; } catch (_) {}
+
+  const norm = (s = '') => s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+
+  // Description suggestions
+  const descSuggestions = React.useMemo(() => {
+    if (!reason || norm(reason).length < 2) return [];
+    const q = norm(reason);
+    const pastDescs = [...new Set(pastExpenses.map(e => e.descripcion).filter(Boolean))];
+    const provProds = [...new Set(supplierList.flatMap(s => s.commonProducts || []))];
+    return [...new Set([...pastDescs, ...provProds])]
+      .filter(p => norm(p).includes(q))
+      .sort((a, b) => (norm(a).startsWith(q) ? 0 : 1) - (norm(b).startsWith(q) ? 0 : 1))
+      .slice(0, 6);
+  }, [reason]);
+
+  // Supplier suggestions
+  const provSuggestions = React.useMemo(() => {
+    const pq = norm(proveedor);
+    const active = supplierList.filter(s => s.active !== false);
+    if (!pq) return active.slice(0, 8);
+    return active.filter(s => norm(s.name).includes(pq)).slice(0, 8);
+  }, [proveedor]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const h = (e) => {
+      if (descRef.current && !descRef.current.contains(e.target)) setShowDescSugg(false);
+      if (provRef.current && !provRef.current.contains(e.target)) setShowProvSugg(false);
+    };
+    document.addEventListener('mousedown', h);
+    return () => document.removeEventListener('mousedown', h);
+  }, []);
 
   const isValid = parseFloat(amount) > 0 && reason.trim() !== '';
-
   const retiros = shiftExpenses.filter(e => e.type !== 'deposito');
   const depositos = shiftExpenses.filter(e => e.type === 'deposito');
   const totalRetiros = retiros.reduce((s, e) => s + (e.amount || 0), 0);
@@ -1909,7 +1958,7 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
   const handleSubmit = () => {
     if (!isValid) return;
     if (tab === 'retiro') {
-      onConfirm(amount, reason, shareToGastos);
+      onConfirm(amount, reason, shareToGastos, { proveedor: proveedor.trim(), observacion: observacion.trim() });
     } else {
       onDeposit(amount, reason);
     }
@@ -1919,7 +1968,7 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-md overflow-hidden shadow-2xl flex flex-col animate-bounce-in max-h-[90vh]">
         {/* Header with tabs */}
-        <div className="p-5 border-b border-gray-800">
+        <div className="p-5 border-b border-gray-800 shrink-0">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-xl font-black text-white">🔄 Retiros y Depósitos</h2>
             <button className="text-gray-400 hover:text-white p-1" onClick={onClose}>
@@ -1927,47 +1976,88 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
             </button>
           </div>
           <div className="flex gap-2">
-            <button
-              className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'retiro' ? 'bg-red-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`}
-              onClick={() => setTab('retiro')}
-            >
+            <button className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'retiro' ? 'bg-red-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`} onClick={() => setTab('retiro')}>
               ⬆️ Retiro (Salida)
             </button>
-            <button
-              className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'deposito' ? 'bg-green-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`}
-              onClick={() => setTab('deposito')}
-            >
+            <button className={`flex-1 py-2.5 rounded-xl font-black text-sm transition-all ${tab === 'deposito' ? 'bg-green-600 text-white shadow-lg' : 'bg-[#16171d] text-gray-400 hover:text-gray-200'}`} onClick={() => setTab('deposito')}>
               ⬇️ Depósito (Entrada)
             </button>
           </div>
         </div>
         
-        {/* Form */}
-        <div className="p-5 space-y-4">
+        {/* Form - scrollable */}
+        <div className="p-5 space-y-3 overflow-y-auto flex-1">
+          {/* Monto */}
           <div>
-            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Monto</label>
+            <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-widest">Monto</label>
             <div className="relative">
               <span className="absolute left-5 top-1/2 -translate-y-1/2 text-xl font-black text-gray-500">$</span>
-              <input 
-                 autoFocus type="number" 
-                 className={`w-full bg-[#0c0d11] border focus:border-orange-500 rounded-[18px] py-3.5 pl-12 pr-4 text-2xl font-black text-white outline-none transition-colors shadow-inner ${tab === 'retiro' ? 'border-red-800' : 'border-green-800'}`}
-                 value={amount}
-                 onChange={(e) => setAmount(e.target.value)}
-                 placeholder="0"
+              <input autoFocus type="number" 
+                className={`w-full bg-[#0c0d11] border focus:border-orange-500 rounded-[18px] py-3 pl-12 pr-4 text-2xl font-black text-white outline-none transition-colors shadow-inner ${tab === 'retiro' ? 'border-red-800' : 'border-green-800'}`}
+                value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="0"
               />
             </div>
           </div>
-          <div>
-            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Motivo / Descripción</label>
-            <input 
-               type="text" 
-               className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[18px] py-3.5 px-4 text-sm font-bold text-white outline-none transition-colors shadow-inner"
-               value={reason}
-               onChange={(e) => setReason(e.target.value)}
-               placeholder={tab === 'retiro' ? 'Ej: Pago hielo, proveedor...' : 'Ej: Cambio, base adicional...'}
-               onKeyDown={(e) => e.key === 'Enter' && isValid && handleSubmit()}
+
+          {/* Motivo / Descripción con autocomplete */}
+          <div className="relative" ref={descRef}>
+            <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-widest">Motivo / Descripción</label>
+            <input type="text" 
+              className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[18px] py-3 px-4 text-sm font-bold text-white outline-none transition-colors shadow-inner"
+              value={reason} onChange={(e) => { setReason(e.target.value); setShowDescSugg(true); }}
+              onFocus={() => setShowDescSugg(true)}
+              placeholder={tab === 'retiro' ? 'Ej: Compra de hielo, papas...' : 'Ej: Cambio, base adicional...'}
+              onKeyDown={(e) => e.key === 'Enter' && isValid && handleSubmit()}
             />
+            {showDescSugg && descSuggestions.length > 0 && (
+              <div className="absolute left-0 right-0 mt-1 bg-[#1a1b23] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[150px] overflow-y-auto">
+                <div className="px-3 py-1 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">📦 Sugerencias</div>
+                {descSuggestions.map((prod) => (
+                  <button key={prod} className="w-full text-left px-4 py-2 hover:bg-red-900/30 transition-colors border-b border-gray-800/50 last:border-0"
+                    onMouseDown={() => { setReason(prod); setShowDescSugg(false); }}>
+                    <span className="font-bold text-white text-sm capitalize">{prod}</span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
+
+          {/* Proveedor con autocomplete (solo retiros) */}
+          {tab === 'retiro' && (
+            <div className="relative" ref={provRef}>
+              <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-widest">Proveedor / Tercero</label>
+              <input type="text"
+                className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[18px] py-3 px-4 text-sm font-bold text-white outline-none transition-colors shadow-inner"
+                placeholder="Nombre del proveedor o tienda..."
+                value={proveedor} onChange={e => { setProveedor(e.target.value); setShowProvSugg(true); }}
+                onFocus={() => setShowProvSugg(true)}
+              />
+              {showProvSugg && provSuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 mt-1 bg-[#1a1b23] border border-gray-700 rounded-2xl shadow-2xl overflow-hidden z-50 max-h-[150px] overflow-y-auto">
+                  <div className="px-3 py-1 text-[10px] font-black text-gray-500 uppercase tracking-widest border-b border-gray-800">🏪 Proveedores</div>
+                  {provSuggestions.map((sup) => (
+                    <button key={sup.id} className="w-full text-left px-4 py-2 hover:bg-red-900/30 transition-colors border-b border-gray-800/50 last:border-0"
+                      onMouseDown={() => { setProveedor(sup.name); setShowProvSugg(false); }}>
+                      <span className="font-black text-white text-sm">{sup.name}</span>
+                      {sup.commonProducts?.length > 0 && (
+                        <span className="text-[10px] font-bold text-gray-500 block truncate">Vende: {sup.commonProducts.slice(0, 3).join(', ')}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Observación (solo retiros) */}
+          {tab === 'retiro' && (
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1 uppercase tracking-widest">Observación (Opcional)</label>
+              <input type="text" className="w-full bg-[#0c0d11] border border-gray-700 focus:border-orange-500 rounded-[18px] py-3 px-4 text-sm font-bold text-white outline-none transition-colors shadow-inner"
+                value={observacion} onChange={(e) => setObservacion(e.target.value)} placeholder="Notas adicionales..."
+              />
+            </div>
+          )}
 
           {/* Share to Gastos toggle (only for retiros) */}
           {tab === 'retiro' && (
@@ -1975,7 +2065,7 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-[18px] border transition-all text-left ${shareToGastos ? 'bg-red-900/30 border-red-700 text-red-300' : 'bg-[#0c0d11] border-gray-800 text-gray-500'}`}
               onClick={() => setShareToGastos(!shareToGastos)}
             >
-              <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${shareToGastos ? 'bg-red-600 border-red-600 text-white' : 'border-gray-600'}`}>
+              <span className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all shrink-0 ${shareToGastos ? 'bg-red-600 border-red-600 text-white' : 'border-gray-600'}`}>
                 {shareToGastos && '✓'}
               </span>
               <div>
@@ -1987,11 +2077,10 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
         </div>
 
         {/* Action button */}
-        <div className="px-5 pb-4">
+        <div className="px-5 pb-4 shrink-0">
           <Button
             className={`w-full rounded-[18px] py-4 font-black text-lg shadow-lg hover:scale-[1.02] active:scale-95 transition-all ${tab === 'retiro' ? 'bg-red-600 text-white' : 'bg-green-600 text-white'}`}
-            disabled={!isValid}
-            onClick={handleSubmit}
+            disabled={!isValid} onClick={handleSubmit}
           >
             {tab === 'retiro' ? '⬆️ Registrar Retiro' : '⬇️ Registrar Depósito'}
           </Button>
@@ -1999,16 +2088,17 @@ function ShiftExpenseModal({ onClose, onConfirm, onDeposit, shiftExpenses = [], 
 
         {/* Mini history */}
         {shiftExpenses.length > 0 && (
-          <div className="border-t border-gray-800 p-4 max-h-[180px] overflow-y-auto">
+          <div className="border-t border-gray-800 p-4 max-h-[150px] overflow-y-auto shrink-0">
             <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Movimientos del turno</p>
             <div className="space-y-1.5">
-              {shiftExpenses.sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((e, i) => (
+              {[...shiftExpenses].sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp)).map((e, i) => (
                 <div key={e.id || i} className="flex items-center justify-between text-xs py-1.5 px-3 bg-[#0c0d11] rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <span>{e.type === 'deposito' ? '⬇️' : '⬆️'}</span>
-                    <span className="font-bold text-gray-300 truncate max-w-[160px]">{e.reason}</span>
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="shrink-0">{e.type === 'deposito' ? '⬇️' : '⬆️'}</span>
+                    <span className="font-bold text-gray-300 truncate">{e.reason}</span>
+                    {e.proveedor && <span className="text-gray-500 text-[10px] shrink-0">({e.proveedor})</span>}
                   </div>
-                  <span className={`font-black ${e.type === 'deposito' ? 'text-green-400' : 'text-red-400'}`}>
+                  <span className={`font-black shrink-0 ml-2 ${e.type === 'deposito' ? 'text-green-400' : 'text-red-400'}`}>
                     {e.type === 'deposito' ? '+' : '-'}{formatMoney(e.amount)}
                   </span>
                 </div>
