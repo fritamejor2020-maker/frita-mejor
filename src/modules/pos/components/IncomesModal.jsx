@@ -584,6 +584,8 @@ export function IncomesModal({ onClose }) {
                 const nequi = shiftSales.filter(s => s.paymentMethod === 'NEQUI').reduce((a, s) => a + s.total, 0);
                 const banc  = shiftSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((a, s) => a + s.total, 0);
                 const totalTransfers = nequi + banc;
+                const contrataTransfers = contrataSales.filter(s => (s.paymentMethod === 'NEQUI' || s.paymentMethod === 'BANCOLOMBIA') && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                const localTransfers = totalTransfers - contrataTransfers;
 
                 const totalPosExpenses = posExpenses.filter(e => e.shiftId === lastClosed.id).reduce((a, e) => a + e.amount, 0);
 
@@ -600,11 +602,18 @@ export function IncomesModal({ onClose }) {
                 const timeStr = closedAt.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
 
                 const handleLoadZ = () => {
+                  // Unified Local+Contratas fields
+                  setEfectivoReal('');  // user must count and enter
+                  setContraEfectivoZ(String(contrataCash));
+                  setSalidasLocal(String(totalPosExpenses));
+                  setTransferenciasLocal(String(localTransfers));
+                  setTransferenciasContratas(String(contrataTransfers));
+                  // Legacy fields (for banner display)
                   setEfectivo(String(localCash));
                   setTransferencias(String(totalTransfers));
                   setSalidas(String(totalPosExpenses));
                   setVendedor(lastClosed.userName || '');
-                  setZLoadedData({ localCash, totalTransfers, totalPosExpenses, nequi, banc, contrataCash, contrataByClient, shiftId: lastClosed.id, time: timeStr });
+                  setZLoadedData({ localCash, totalTransfers, localTransfers, contrataTransfers, totalPosExpenses, nequi, banc, contrataCash, contrataByClient, shiftId: lastClosed.id, time: timeStr });
                 };
 
                 return (
@@ -628,7 +637,7 @@ export function IncomesModal({ onClose }) {
                 <div className="bg-blue-950/30 border border-blue-700/50 rounded-2xl p-4 space-y-2">
                   <div className="flex items-center justify-between">
                     <p className="text-blue-400 font-black text-sm flex items-center gap-2">⚡ Datos cargados del Cierre Z ({zLoadedData.time})</p>
-                    <button onClick={() => { setZLoadedData(null); setEfectivo(''); setTransferencias(''); setSalidas(''); setVendedor(''); }}
+                    <button onClick={() => { setZLoadedData(null); setEfectivo(''); setTransferencias(''); setSalidas(''); setVendedor(''); setEfectivoReal(''); setContraEfectivoZ(''); setSalidasLocal(''); setTransferenciasLocal(''); setTransferenciasContratas(''); }}
                       className="text-xs text-gray-500 hover:text-red-400 font-bold">✕ Limpiar</button>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
@@ -712,49 +721,77 @@ export function IncomesModal({ onClose }) {
                 <input type="text" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-lg font-bold text-white outline-none" placeholder="Nombre completo" value={vendedor} onChange={e => setVendedor(e.target.value)} />
               </div>
 
-              {/* Efectivo (siempre) */}
-              <div>
-                <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Efectivo ($)</label>
-                <MoneyInput value={efectivo} onChange={setEfectivo} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
-              </div>
-
-              {/* Transferencias y Salidas solo en Cierre Final o cuando no hay descargues */}
-              {(!hasDescargues || isCierreMode) && (
+              {/* ── Formulario unificado Local + Contratas ── */}
+              {selectedUbicacion === 'Local' ? (
                 <>
+                  {/* Efectivo Real Contado */}
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
-                    <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
+                    <label className="text-xs font-bold text-yellow-400 uppercase block mb-1">💰 Efectivo Real Contado (Total Caja)</label>
+                    <MoneyInput value={efectivoReal} onChange={setEfectivoReal} placeholder="Ingresa el total físico" className="w-full bg-[#0c0d11] border-2 border-yellow-700 focus:border-yellow-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
                   </div>
+                  {/* Efectivo Contratas del Z */}
                   <div>
-                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
-                    <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-green-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                    <label className="text-xs font-bold text-orange-400 uppercase block mb-1">🤝 Efectivo Contratas (del Cierre Z)</label>
+                    <MoneyInput value={contraEfectivoZ} onChange={setContraEfectivoZ} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-orange-700 focus:border-orange-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
                   </div>
-                </>
-              )}
 
-              {/* Total */}
-              <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-2 shadow-inner">
-                {isDescargueMode ? (
-                  /* Descargue: solo muestra el monto del retiro */
-                  <>
-                    <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
-                      <span>Solo Efectivo — retiro de caja</span>
+                  {/* ── Sección LOCAL ── */}
+                  <div className="bg-[#0f1018] rounded-2xl border border-blue-900/50 p-4 space-y-3">
+                    <p className="text-sm font-black text-blue-400 uppercase tracking-wider">🏪 Local</p>
+                    <div className="flex justify-between items-center bg-[#16171d] rounded-xl px-4 py-2">
+                      <span className="text-xs font-bold text-gray-400">Efectivo Local</span>
+                      <span className="text-lg font-black text-green-400">{formatMoney(efectivoLocalCalc)}</span>
                     </div>
+                    {(!hasDescargues || isCierreMode) && (
+                      <>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas Local ($)</label>
+                          <MoneyInput value={salidasLocal} onChange={setSalidasLocal} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-blue-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias Local ($)</label>
+                          <MoneyInput value={transferenciasLocal} onChange={setTransferenciasLocal} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-blue-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                        </div>
+                      </>
+                    )}
+                    <div className="flex justify-between items-center border-t border-blue-900/30 pt-2">
+                      <span className="text-xs font-black text-blue-300 uppercase">Total Local</span>
+                      <span className="text-xl font-black text-blue-400">{formatMoney(totalLocalCalc)}</span>
+                    </div>
+                  </div>
+
+                  {/* ── Sección CONTRATAS ── */}
+                  <div className="bg-[#0f1018] rounded-2xl border border-orange-900/50 p-4 space-y-3">
+                    <p className="text-sm font-black text-orange-400 uppercase tracking-wider">🤝 Contratas</p>
+                    <div className="flex justify-between items-center bg-[#16171d] rounded-xl px-4 py-2">
+                      <span className="text-xs font-bold text-gray-400">Efectivo Contratas</span>
+                      <span className="text-lg font-black text-orange-400">{formatMoney(efectivoContratasCalc)}</span>
+                    </div>
+                    {salidasContratasAuto > 0 && (
+                      <div className="flex justify-between items-center bg-red-950/30 rounded-xl px-4 py-2 border border-red-900/30">
+                        <span className="text-xs font-bold text-red-400">Salidas (faltante)</span>
+                        <span className="text-lg font-black text-red-400">{formatMoney(salidasContratasAuto)}</span>
+                      </div>
+                    )}
+                    {(!hasDescargues || isCierreMode) && (
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias Contratas ($)</label>
+                        <MoneyInput value={transferenciasContratas} onChange={setTransferenciasContratas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-orange-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                      </div>
+                    )}
+                    <div className="flex justify-between items-center border-t border-orange-900/30 pt-2">
+                      <span className="text-xs font-black text-orange-300 uppercase">Total Contratas</span>
+                      <span className="text-xl font-black text-orange-400">{formatMoney(totalContratasCalc)}</span>
+                    </div>
+                  </div>
+
+                  {/* ── Total General ── */}
+                  <div className="bg-[#16171d] p-4 rounded-2xl border-2 border-green-700/50 space-y-2 shadow-inner">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-amber-400 uppercase">{selectedSubtipo}</span>
-                      <span className="text-3xl font-black text-amber-400">{formatMoney(numEfectivo)}</span>
+                      <span className="text-sm font-black text-green-300 uppercase">Total General</span>
+                      <span className="text-3xl font-black text-green-400">{formatMoney(totalGeneralCalc)}</span>
                     </div>
-                  </>
-                ) : isCierreMode ? (
-                  /* Cierre Final: Total Ingreso + Descargues + Total del Cierre */
-                  <>
-                    {/* Total del formulario actual */}
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
-                      <span className="text-2xl font-black text-green-400">{formatMoney(totalSingle)}</span>
-                    </div>
-                    {/* Descargues previos */}
-                    {descarguesPrevios.length > 0 && (
+                    {isCierreMode && descarguesPrevios.length > 0 && (
                       <>
                         <div className="border-t border-gray-800 pt-2 space-y-1">
                           {descarguesPrevios.map((d, i) => (
@@ -764,35 +801,43 @@ export function IncomesModal({ onClose }) {
                             </div>
                           ))}
                         </div>
-                        {/* Total del Cierre = ingreso + todos los descargues */}
-                        <div className="flex justify-between items-center border-t-2 border-green-700/50 pt-2 mt-1">
-                          <span className="text-sm font-black text-green-300 uppercase">Total del Cierre</span>
+                        <div className="flex justify-between items-center border-t-2 border-green-600/50 pt-2">
+                          <span className="text-sm font-black text-green-200 uppercase">Total del Cierre</span>
                           <span className="text-3xl font-black text-green-400">
-                            {formatMoney(totalSingle + descarguesPrevios.reduce((s, d) => s + (d.efectivo || 0), 0))}
+                            {formatMoney(totalGeneralCalc + descarguesPrevios.reduce((s, d) => s + (d.efectivo || 0), 0))}
                           </span>
                         </div>
                       </>
                     )}
-                    {descarguesPrevios.length === 0 && (
-                      <div className="flex justify-between items-center border-t border-gray-800 pt-2">
-                        <span className="text-sm font-black text-green-300 uppercase">Total del Cierre</span>
-                        <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
+                  </div>
+                </>
+              ) : (
+                /* ── Formulario para ubicaciones no-Local (Venta, etc.) ── */
+                <>
+                  <div>
+                    <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Efectivo ($)</label>
+                    <MoneyInput value={efectivo} onChange={setEfectivo} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
+                  </div>
+                  {(!hasDescargues || isCierreMode) && (
+                    <>
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Transferencias ($)</label>
+                        <MoneyInput value={transferencias} onChange={setTransferencias} placeholder="0" className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-green-500 rounded-xl py-3 px-4 text-xl font-black text-white outline-none" />
                       </div>
-                    )}
-                  </>
-                ) : (
-                  /* Ingreso normal sin descargues */
-                  <>
-                    <div className="flex justify-between text-xs font-bold text-gray-500 px-1">
-                      <span>Efectivo + Transferencias + Salidas</span>
-                    </div>
+                      <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase block mb-1">Salidas ($) <span className="text-gray-600 normal-case font-normal">— Opcional</span></label>
+                        <MoneyInput value={salidas} onChange={setSalidas} placeholder="0" className="w-full bg-[#0c0d11] border border-gray-800 focus:border-green-500 rounded-xl py-2 px-4 text-lg font-bold text-white outline-none" />
+                      </div>
+                    </>
+                  )}
+                  <div className="bg-[#16171d] p-4 rounded-2xl border border-green-900/50 space-y-2 shadow-inner">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-bold text-gray-400 uppercase">Total Ingreso</span>
                       <span className="text-3xl font-black text-green-400">{formatMoney(totalSingle)}</span>
                     </div>
-                  </>
-                )}
-              </div>
+                  </div>
+                </>
+              )}
 
               {/* Foto del sobre */}
               <PhotoSection />
