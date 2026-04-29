@@ -1047,6 +1047,7 @@ export function PosView() {
           selectedId={selectedRegisterId}
           onSelect={handleSelectRegister}
           onClose={() => selectedRegisterId && setShowRegisterModal(false)}
+          onLogout={signOut}
         />
       )}
 
@@ -1741,7 +1742,7 @@ function NewClientModal({ customerTypes, onClose, onSave }) {
 }
 
 // ─── Register Select Modal ───
-function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose }) {
+function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose, onLogout }) {
   return (
     <div className="fixed inset-0 z-[65] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[85vh]">
@@ -1787,6 +1788,16 @@ function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose 
               </button>
             );
           })}
+        </div>
+        {/* Volver al Login */}
+        <div className="p-4 border-t border-gray-800">
+          <button
+            className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl bg-gray-800/80 text-gray-400 font-bold text-sm hover:bg-red-900/40 hover:text-red-300 active:scale-95 transition-all"
+            onClick={onLogout}
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            Volver al Login
+          </button>
         </div>
       </div>
     </div>
