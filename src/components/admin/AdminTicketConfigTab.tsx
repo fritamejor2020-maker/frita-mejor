@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
+import { useBranchStore } from '../../store/useBranchStore';
 
 const DEFAULTS = {
   businessName: 'Frita Mejor',
@@ -87,8 +88,11 @@ const TextInput = ({ label, value, onChange, placeholder, hint, color = 'blue' }
 
 export function AdminTicketConfigTab() {
   const { posSettings, updatePosSettings, posRegisters = [], addPosRegister, updatePosRegister, deletePosRegister } = useInventoryStore();
+  const { branches } = useBranchStore();
+  const activeBranches = branches.filter(b => b.active !== false);
   const tc = posSettings?.ticketConfig || DEFAULTS;
   const [newRegName, setNewRegName] = useState('');
+  const [newRegBranch, setNewRegBranch] = useState(activeBranches[0]?.id || '');
 
   const [form, setForm] = useState({ ...DEFAULTS, ...tc });
   const [saved, setSaved] = useState(false);
@@ -124,11 +128,18 @@ export function AdminTicketConfigTab() {
           {posRegisters.map(reg => (
             <div key={reg.id} className="flex items-center gap-3 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3">
               <span className="text-lg">{reg.active !== false ? '🟢' : '🔴'}</span>
-              <input
-                className="flex-1 bg-transparent border-none outline-none font-bold text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-lg px-2 py-1 transition-all"
-                value={reg.name}
-                onChange={e => updatePosRegister(reg.id, { name: e.target.value })}
-              />
+              <div className="flex-1 min-w-0">
+                <input
+                  className="w-full bg-transparent border-none outline-none font-bold text-sm text-gray-700 focus:bg-white focus:ring-2 focus:ring-blue-400 rounded-lg px-2 py-1 transition-all"
+                  value={reg.name}
+                  onChange={e => updatePosRegister(reg.id, { name: e.target.value })}
+                />
+                {reg.branchId && (
+                  <p className="text-[10px] text-gray-400 font-medium px-2">
+                    📍 {activeBranches.find(b => b.id === reg.branchId)?.name || reg.branchId}
+                  </p>
+                )}
+              </div>
               <button
                 className={`text-xs font-bold px-3 py-1.5 rounded-lg transition-all ${reg.active !== false ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
                 onClick={() => updatePosRegister(reg.id, { active: reg.active === false ? true : false })}
@@ -147,21 +158,36 @@ export function AdminTicketConfigTab() {
           ))}
         </div>
 
-        <div className="flex gap-2">
-          <input
-            className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold focus:ring-blue-500 focus:border-blue-500 outline-none"
-            value={newRegName}
-            onChange={e => setNewRegName(e.target.value)}
-            placeholder="Nombre de la nueva caja..."
-            onKeyDown={e => { if (e.key === 'Enter' && newRegName.trim()) { addPosRegister({ name: newRegName.trim() }); setNewRegName(''); } }}
-          />
-          <button
-            className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            disabled={!newRegName.trim()}
-            onClick={() => { addPosRegister({ name: newRegName.trim() }); setNewRegName(''); }}
-          >
-            + Agregar
-          </button>
+        <div className="space-y-2">
+          <div className="flex gap-2">
+            <input
+              className="flex-1 border border-gray-300 rounded-xl px-4 py-3 text-sm font-bold focus:ring-blue-500 focus:border-blue-500 outline-none"
+              value={newRegName}
+              onChange={e => setNewRegName(e.target.value)}
+              placeholder="Nombre de la nueva caja..."
+              onKeyDown={e => { if (e.key === 'Enter' && newRegName.trim()) { addPosRegister({ name: newRegName.trim(), branchId: newRegBranch }); setNewRegName(''); } }}
+            />
+            <button
+              className="bg-blue-600 text-white font-bold px-5 py-3 rounded-xl hover:bg-blue-700 active:scale-95 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              disabled={!newRegName.trim()}
+              onClick={() => { addPosRegister({ name: newRegName.trim(), branchId: newRegBranch }); setNewRegName(''); }}
+            >
+              + Agregar
+            </button>
+          </div>
+          {/* Selector de sede para la nueva caja */}
+          {activeBranches.length > 1 && (
+            <select
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-blue-400"
+              value={newRegBranch}
+              onChange={e => setNewRegBranch(e.target.value)}
+            >
+              <option value="">— Sin sede asignada (global) —</option>
+              {activeBranches.map(b => (
+                <option key={b.id} value={b.id}>{b.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </section>
 

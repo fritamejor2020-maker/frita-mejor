@@ -177,7 +177,7 @@ const INITIAL_POS_SETTINGS = {
 };
 
 const INITIAL_POS_REGISTERS = [
-  { id: 'REG-001', name: 'Caja Principal', active: true },
+  { id: 'REG-001', name: 'Caja Principal', active: true, branchId: 'BRANCH-001' },
 ];
 
 // Templates vacíos — el usuario crea sus propias plantillas desde el Dejador
