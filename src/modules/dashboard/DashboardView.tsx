@@ -194,7 +194,7 @@ function CustomTooltip({ active, payload, label }: any) {
 export function DashboardView() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { period, getRange } = useDashboardFilters();
+  const { period, getRange, branchId, selectedMonth, selectedYear } = useDashboardFilters();
   const [showGoals, setShowGoals] = useState(false);
 
   // Cargar finanzas al montar
@@ -203,7 +203,6 @@ export function DashboardView() {
   }, []);
 
   const data = useDashboardData();
-  const { branchId, selectedMonth, selectedYear } = useDashboardFilters();
   const incomes = (useFinanceStore as any)((s: any) => s.incomes) || [];
   const {
     totalSales, totalGastos,
@@ -247,10 +246,10 @@ export function DashboardView() {
               🎯 <span className="hidden sm:inline">Metas</span>
             </button>
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/selector')}
               className="flex items-center gap-1.5 bg-white/80 hover:bg-white text-gray-700 font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-full shadow-sm transition-all active:scale-95"
             >
-              ← <span className="hidden sm:inline">Admin</span>
+              ← <span className="hidden sm:inline">Salir</span>
             </button>
           </div>
         </div>

@@ -3,7 +3,6 @@ import { useDashboardFilters } from './useDashboardFilters';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useInventoryStore } from '../store/useInventoryStore';
-import { useSupplierStore } from '../store/useSupplierStore';
 
 function inRange(dateStr: string, start: Date, end: Date) {
   if (!dateStr) return false;
@@ -13,15 +12,14 @@ function inRange(dateStr: string, start: Date, end: Date) {
 
 export function useDashboardData() {
   const { getRange, branchId } = useDashboardFilters();
-  const { start, end } = getRange();
 
   const incomes  = (useFinanceStore as any)((s: any) => s.incomes)  || [];
   const expenses = (useFinanceStore as any)((s: any) => s.expenses) || [];
   const payrollRecords = (usePayrollStore as any)((s: any) => s.payrollRecords) || [];
   const movements = (useInventoryStore as any)((s: any) => s.movements) || [];
-  const inventory = (useInventoryStore as any)((s: any) => s.inventory) || [];
 
   return useMemo(() => {
+    const { start, end } = getRange();
     // ── Filtros de período ────────────────────────────────────────────────────
     const filterIncome = (i: any) => {
       const dateOk = inRange(i.fecha || i.created_at, start, end);
@@ -189,5 +187,5 @@ export function useDashboardData() {
       expenseCount: filteredExpenses.length,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [start.getTime(), end.getTime(), branchId, incomes, expenses, payrollRecords, movements]);
+  }, [branchId, incomes, expenses, payrollRecords, movements, getRange]);
 }
