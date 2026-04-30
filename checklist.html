@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Checklist — Cajas POS por Sede</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      padding: 32px 16px;
+      color: #fff;
+    }
+    h1 {
+      text-align: center;
+      font-size: 1.6rem;
+      font-weight: 900;
+      margin-bottom: 6px;
+      color: #fff;
+    }
+    .subtitle {
+      text-align: center;
+      font-size: 0.85rem;
+      color: #94a3b8;
+      margin-bottom: 32px;
+    }
+    .progress-bar-wrap {
+      background: #ffffff18;
+      border-radius: 99px;
+      height: 10px;
+      max-width: 500px;
+      margin: 0 auto 10px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #f97316, #ef4444);
+      border-radius: 99px;
+      transition: width 0.4s ease;
+    }
+    .progress-label {
+      text-align: center;
+      font-size: 0.8rem;
+      color: #94a3b8;
+      margin-bottom: 32px;
+    }
+    .section {
+      max-width: 600px;
+      margin: 0 auto 24px;
+      background: #ffffff0d;
+      border: 1px solid #ffffff18;
+      border-radius: 20px;
+      overflow: hidden;
+    }
+    .section-header {
+      background: #ffffff12;
+      padding: 14px 20px;
+      font-weight: 900;
+      font-size: 0.95rem;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #ffffff10;
+    }
+    .section-header .emoji { font-size: 1.2rem; }
+    .item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 14px 20px;
+      border-bottom: 1px solid #ffffff08;
+      cursor: pointer;
+      transition: background 0.2s;
+      user-select: none;
+    }
+    .item:last-child { border-bottom: none; }
+    .item:hover { background: #ffffff08; }
+    .circle {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      border: 2.5px solid #475569;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      transition: all 0.25s ease;
+      margin-top: 1px;
+    }
+    .item.done .circle {
+      background: linear-gradient(135deg, #f97316, #ef4444);
+      border-color: transparent;
+      transform: scale(1.1);
+    }
+    .item.done .circle::after { content: '✓'; color: #fff; font-weight: 900; }
+    .item-text {
+      flex: 1;
+      font-size: 0.9rem;
+      color: #cbd5e1;
+      line-height: 1.5;
+      transition: color 0.25s;
+    }
+    .item.done .item-text {
+      color: #64748b;
+      text-decoration: line-through;
+      text-decoration-color: #475569;
+    }
+    .item-text code {
+      background: #ffffff15;
+      border-radius: 6px;
+      padding: 1px 7px;
+      font-family: monospace;
+      font-size: 0.85em;
+      color: #fbbf24;
+    }
+    .item-text .note {
+      display: block;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 3px;
+    }
+    .item-text .expected {
+      display: block;
+      font-size: 0.78rem;
+      color: #34d399;
+      margin-top: 3px;
+    }
+    .item-text .warn {
+      display: block;
+      font-size: 0.78rem;
+      color: #f87171;
+      margin-top: 3px;
+    }
+    .code-block {
+      max-width: 600px;
+      margin: -12px auto 24px;
+      background: #0f172a;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 16px 20px;
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: #7dd3fc;
+      line-height: 1.6;
+      white-space: pre;
+      overflow-x: auto;
+    }
+    .done-banner {
+      display: none;
+      max-width: 600px;
+      margin: 0 auto 24px;
+      background: linear-gradient(135deg, #065f46, #064e3b);
+      border: 1px solid #34d399;
+      border-radius: 20px;
+      padding: 24px;
+      text-align: center;
+    }
+    .done-banner.visible { display: block; }
+    .done-banner h2 { font-size: 1.4rem; font-weight: 900; color: #34d399; margin-bottom: 6px; }
+    .done-banner p { color: #6ee7b7; font-size: 0.9rem; }
+    .reset-btn {
+      display: block;
+      max-width: 600px;
+      margin: 0 auto;
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #64748b;
+      font-size: 0.8rem;
+      padding: 10px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .reset-btn:hover { color: #94a3b8; border-color: #475569; }
+  </style>
+</head>
+<body>
+
+<h1>🧪 Checklist — Cajas POS por Sede</h1>
+<p class="subtitle">Haz clic en cada círculo para marcarlo como completado</p>
+
+<div class="progress-bar-wrap">
+  <div class="progress-bar" id="progressBar" style="width:0%"></div>
+</div>
+<div class="progress-label" id="progressLabel">0 de 14 completados</div>
+
+<!-- SECTION 1 -->
+<div class="section">
+  <div class="section-header"><span class="emoji">🧹</span> Paso 1 — Limpiar datos de prueba</div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Abre <code>http://localhost:5174</code> en el browser
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Abre DevTools con <code>F12</code> → pestaña <strong>Console</strong>
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Pega y ejecuta el script de limpieza (ver abajo) en la consola
+      <span class="expected">✓ Debe imprimir: [{id: 'REG-001', name: 'Caja Principal', branchId: 'BRANCH-001'}]</span>
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Presiona <code>Ctrl+Shift+R</code> para recargar la página
+    </div>
+  </div>
+</div>
+
+<div class="code-block">const raw = JSON.parse(localStorage.getItem('frita-mejor-inventory') || '{}');
+raw.state.posRegisters = [{ id: 'REG-001', name: 'Caja Principal', active: true, branchId: 'BRANCH-001' }];
+raw.version = 10;
+localStorage.setItem('frita-mejor-inventory', JSON.stringify(raw));
+console.log('✅ OK:', raw.state.posRegisters);</div>
+
+<!-- SECTION 2 -->
+<div class="section">
+  <div class="section-header"><span class="emoji">🔧</span> Paso 2 — Crear caja para Sede Norte (Admin)</div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Login: dropdown <code>Acceso Global</code> → contraseña <code>1</code> → ENTRAR
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Ir a <strong>Administración → ⚙️ Sistema → Punto de Venta → Diseño Tickets</strong>
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Verificar que <strong>Caja Principal</strong> muestra el badge <code>📍 Sede Principal</code>
+      <span class="expected">✓ Esperado: sí aparece el badge de sede</span>
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Escribir <code>Caja Norte</code> en el campo → seleccionar <strong>Sede Norte</strong> en el dropdown → <strong>+ Agregar</strong>
+      <span class="expected">✓ Aparecen 2 cajas: Caja Principal (Sede Principal) y Caja Norte (Sede Norte)</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 3 -->
+<div class="section">
+  <div class="section-header"><span class="emoji">🏪</span> Paso 3 — Cajero Sede Principal solo ve su caja</div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Cerrar sesión → Login: dropdown <code>Sede Principal</code> → contraseña <code>4</code> → ENTRAR
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Ir a <strong>Punto de Venta</strong>
+      <span class="expected">✓ Modal muestra SOLO "Caja Principal"</span>
+      <span class="warn">✗ "Caja Norte" NO debe aparecer</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 4 -->
+<div class="section">
+  <div class="section-header"><span class="emoji">🏪</span> Paso 4 — Cajero Sede Norte solo ve su caja</div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Cerrar sesión → Login: dropdown <code>Sede Norte</code> → contraseña <code>4</code> → ENTRAR
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Ir a <strong>Punto de Venta</strong>
+      <span class="expected">✓ Modal muestra SOLO "Caja Norte"</span>
+      <span class="warn">✗ "Caja Principal" NO debe aparecer</span>
+    </div>
+  </div>
+</div>
+
+<!-- SECTION 5 -->
+<div class="section">
+  <div class="section-header"><span class="emoji">👑</span> Paso 5 — Admin ve todas las cajas</div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Cerrar sesión → Login: <code>Acceso Global</code> → contraseña <code>1</code> → ENTRAR
+    </div>
+  </div>
+
+  <div class="item" onclick="toggle(this)">
+    <div class="circle"></div>
+    <div class="item-text">
+      Ir a <strong>Punto de Venta</strong>
+      <span class="expected">✓ Modal muestra AMBAS: Caja Principal + Caja Norte</span>
+    </div>
+  </div>
+</div>
+
+<!-- Done banner -->
+<div class="done-banner" id="doneBanner">
+  <h2>🎉 ¡Todo verificado!</h2>
+  <p>Las cajas POS por sede funcionan correctamente.</p>
+</div>
+
+<button class="reset-btn" onclick="resetAll()">↺ Reiniciar checklist</button>
+
+<script>
+  const TOTAL = document.querySelectorAll('.item').length;
+
+  function toggle(el) {
+    el.classList.toggle('done');
+    updateProgress();
+    saveSate();
+  }
+
+  function updateProgress() {
+    const done = document.querySelectorAll('.item.done').length;
+    const pct = Math.round((done / TOTAL) * 100);
+    document.getElementById('progressBar').style.width = pct + '%';
+    document.getElementById('progressLabel').textContent = done + ' de ' + TOTAL + ' completados';
+    document.getElementById('doneBanner').classList.toggle('visible', done === TOTAL);
+  }
+
+  function saveSate() {
+    const states = [...document.querySelectorAll('.item')].map(el => el.classList.contains('done'));
+    localStorage.setItem('checklist-pos-registers', JSON.stringify(states));
+  }
+
+  function resetAll() {
+    document.querySelectorAll('.item').forEach(el => el.classList.remove('done'));
+    updateProgress();
+    saveSate();
+  }
+
+  // Restore state
+  try {
+    const saved = JSON.parse(localStorage.getItem('checklist-pos-registers') || '[]');
+    const items = document.querySelectorAll('.item');
+    saved.forEach((done, i) => { if (done && items[i]) items[i].classList.add('done'); });
+    updateProgress();
+  } catch(e) {}
+</script>
+</body>
+</html>

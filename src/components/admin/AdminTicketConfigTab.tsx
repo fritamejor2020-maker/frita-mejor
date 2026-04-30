@@ -93,6 +93,7 @@ export function AdminTicketConfigTab() {
   const tc = posSettings?.ticketConfig || DEFAULTS;
   const [newRegName, setNewRegName] = useState('');
   const [newRegBranch, setNewRegBranch] = useState(activeBranches[0]?.id || '');
+  const [confirmDeleteReg, setConfirmDeleteReg] = useState<{id:string;name:string}|null>(null);
 
   const [form, setForm] = useState({ ...DEFAULTS, ...tc });
   const [saved, setSaved] = useState(false);
@@ -149,7 +150,7 @@ export function AdminTicketConfigTab() {
               {posRegisters.length > 1 && (
                 <button
                   className="text-xs font-bold px-3 py-1.5 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all"
-                  onClick={() => { if (confirm(`¿Eliminar "${reg.name}"? Las ventas existentes se mantendrán.`)) deletePosRegister(reg.id); }}
+                  onClick={() => setConfirmDeleteReg({ id: reg.id, name: reg.name })}
                 >
                   🗑️
                 </button>
@@ -397,6 +398,27 @@ export function AdminTicketConfigTab() {
           </div>
         </div>
       </section>
+      {/* Modal confirmar eliminar caja */}
+      {confirmDeleteReg && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[24px] p-6 w-full max-w-sm shadow-2xl text-center">
+            <div className="text-4xl mb-3">🗑️</div>
+            <h2 className="text-lg font-black text-gray-900 mb-1">¿Eliminar caja?</h2>
+            <p className="text-sm text-gray-500 mb-1 font-medium">"{confirmDeleteReg.name}"</p>
+            <p className="text-xs text-gray-400 mb-5">Las ventas existentes se mantendrán en el historial.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDeleteReg(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-2.5 rounded-full hover:bg-gray-50"
+              >Cancelar</button>
+              <button
+                onClick={() => { deletePosRegister(confirmDeleteReg.id); setConfirmDeleteReg(null); }}
+                className="flex-1 bg-red-500 text-white font-black py-2.5 rounded-full hover:bg-red-600"
+              >Eliminar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

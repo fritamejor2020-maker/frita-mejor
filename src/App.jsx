@@ -26,6 +26,7 @@ import { MapTrackingView }     from './views/MapTrackingView';
 import { FinanceDashboard }    from './modules/pos/FinanceDashboard';
 import { ModuleSelectorView }  from './views/ModuleSelectorView';
 import { CierresView }         from './modules/cierres/CierresView';
+import { DashboardView }       from './modules/dashboard/DashboardView';
 
 import { Link } from 'react-router-dom';
 
@@ -159,6 +160,12 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+// Reactive wrapper so MapTrackingView always gets live posShifts (BUG-08 fix)
+function TrackingWrapper() {
+  const posShifts = useInventoryStore((s) => s.posShifts) || [];
+  return <MapTrackingView activeShifts={posShifts} />;
+}
+
 function App() {
   // Suscripción a cambios remotos en tiempo real (Supabase)
   useRealtimeSync();
@@ -242,6 +249,7 @@ function App() {
 
               <Route element={<ProtectedRoute allowedModules={['admin']} />}>
                 <Route path="/admin" element={<AdminView />} />
+                <Route path="/dashboard" element={<DashboardView />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['pos']} />}>
@@ -263,7 +271,7 @@ function App() {
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
-                <Route path="/tracking" element={<MapTrackingView activeShifts={useInventoryStore.getState().posShifts || []} />} />
+                <Route path="/tracking" element={<TrackingWrapper />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>

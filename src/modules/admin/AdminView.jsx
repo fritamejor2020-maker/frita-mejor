@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
@@ -2366,6 +2367,7 @@ function NominaAdminPanel({ fmtMoney }) {
 
 export function AdminView() {
   const signOut = useAuthStore((s) => s.signOut);
+  const navigate = useNavigate();
   const { inventory } = useInventoryStore();
   const [activeTab, setActiveTab] = useState('BODEGAS');
   const dbInfo = useDbSize();
@@ -2456,9 +2458,18 @@ export function AdminView() {
             </div>
           )}
         </div>
-        <Button variant="outline" className="w-10 h-10 sm:w-12 sm:h-12 !min-w-0 !p-0 rounded-full flex items-center justify-center text-gray-400 border-gray-100 hover:bg-red-50" onClick={signOut} title="Cerrar sesión">
-          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
-        </Button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-gray-900 font-black text-sm px-4 py-2.5 rounded-full shadow-sm transition-all active:scale-95"
+            title="Ir al Dashboard"
+          >
+            📊 Dashboard
+          </button>
+          <Button variant="outline" className="w-10 h-10 sm:w-12 sm:h-12 !min-w-0 !p-0 rounded-full flex items-center justify-center text-gray-400 border-gray-100 hover:bg-red-50" onClick={signOut} title="Cerrar sesión">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></svg>
+          </Button>
+        </div>
       </header>
 
       {/* Contenedor de Categorías */}

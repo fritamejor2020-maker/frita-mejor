@@ -260,35 +260,70 @@ export const useInventoryStore = create(
             }
           }
 
-          // Procesar llaves de sede — intentar primero la llave con sufijo, luego legacy
-          const effectiveBranch = branchId || 'BRANCH-001';
-          for (const key of BRANCH_STORE_KEYS) {
-            const branchKeyName = `${key}_${effectiveBranch}`;
-            // Preferencia: llave con sufijo > llave legacy > nada
-            const val = remote[branchKeyName] ?? remote[key];
-            if (val !== undefined && val !== null) {
-              const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
-              if (isNonEmpty) {
-                let finalVal = val;
-                if (key === 'posShifts') {
-                  const deleted = get().deletedShiftIds || [];
-                  finalVal = val.filter(s => !deleted.includes(s.id));
+          // Procesar llaves de sede
+          if (branchId) {
+            // Usuario de sede: cargar solo su sede
+            const effectiveBranch = branchId;
+            for (const key of BRANCH_STORE_KEYS) {
+              const branchKeyName = `${key}_${effectiveBranch}`;
+              const val = remote[branchKeyName] ?? remote[key];
+              if (val !== undefined && val !== null) {
+                const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
+                if (isNonEmpty) {
+                  let finalVal = val;
+                  if (key === 'posShifts') {
+                    const deleted = get().deletedShiftIds || [];
+                    finalVal = val.filter(s => !deleted.includes(s.id));
+                  }
+                  updates[key] = finalVal;
                 }
-                updates[key] = finalVal;
               }
             }
+            console.log('[Store] Cargado desde Supabase (sede:', effectiveBranch, '):', Object.keys(updates));
+          } else {
+            // BUG-04 FIX: Admin carga y fusiona datos de TODAS las sedes
+            const deleted = get().deletedShiftIds || [];
+            for (const key of BRANCH_STORE_KEYS) {
+              const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds'];
+              let merged = remote[key] ? [...(Array.isArray(remote[key]) ? remote[key] : [])] : [];
+              for (const bId of allBranchIds) {
+                const branchKeyName = `${key}_${bId}`;
+                const val = remote[branchKeyName];
+                if (Array.isArray(val) && val.length > 0) {
+                  // Merge arrays, avoiding duplicate IDs
+                  const existingIds = new Set(merged.map(x => x?.id).filter(Boolean));
+                  val.forEach(item => {
+                    if (item?.id && !existingIds.has(item.id)) {
+                      merged.push(item);
+                      existingIds.add(item.id);
+                    }
+                  });
+                } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+                  // For objects like posSettings: last branch wins (or use BRANCH-001)
+                  if (bId === 'BRANCH-001' || !updates[key]) {
+                    updates[key] = val;
+                  }
+                }
+              }
+              if (mergedArrayKeys.includes(key) && merged.length > 0) {
+                if (key === 'posShifts') merged = merged.filter(s => !deleted.includes(s.id));
+                updates[key] = merged;
+              } else if (merged.length > 0 && !updates[key]) {
+                updates[key] = merged;
+              }
+            }
+            console.log('[Store] Admin: cargado desde Supabase (todas las sedes):', Object.keys(updates));
           }
 
+          // Smart merge para inventario: local siempre gana en items ya existentes
+          if (updates.inventory) {
+            const localInventory = get().inventory;
+            const localIds = new Set(localInventory.map(i => i.id));
+            const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id));
+            updates.inventory = [...localInventory, ...remoteOnlyItems];
+          }
           if (Object.keys(updates).length > 0) {
-            // Smart merge para inventario: local siempre gana en items ya existentes
-            if (updates.inventory) {
-              const localInventory = get().inventory;
-              const localIds = new Set(localInventory.map(i => i.id));
-              const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id));
-              updates.inventory = [...localInventory, ...remoteOnlyItems];
-            }
             set(updates);
-            console.log('[Store] Estado cargado desde Supabase (sede:', effectiveBranch, '):', Object.keys(updates));
           }
         } catch (err) {
           console.warn('[Store] No se pudo cargar estado remoto:', err.message);
@@ -679,9 +714,13 @@ export const useInventoryStore = create(
       })),
 
       // Cocinas de Fritado
-      addFryKitchen: (fk) => set((s) => ({
-        fryKitchens: [...(s.fryKitchens || []), { ...fk, id: `FK-${Date.now()}`, active: true }],
-      })),
+      addFryKitchen: (fk) => {
+        const user = useAuthStore.getState().user;
+        const branchId = fk.branchId || user?.branchId || 'BRANCH-001';
+        set((s) => ({
+          fryKitchens: [...(s.fryKitchens || []), { ...fk, id: `FK-${Date.now()}`, active: true, branchId }],
+        }));
+      },
       updateFryKitchen: (id, data) => set((s) => ({
         fryKitchens: (s.fryKitchens || []).map((k) => k.id === id ? { ...k, ...data } : k),
       })),
@@ -856,7 +895,23 @@ export const useInventoryStore = create(
     }),
     {
       name: 'frita-mejor-inventory',
-      version: 9, // v9: contrataPayments + allowCredit + color en customerTypes
+      version: 11, // v11: branchId en fryKitchens
+      migrate: (persisted, fromVersion) => {
+        // v9 → v10: agregar branchId a cajas POS que no lo tienen
+        if (fromVersion < 10) {
+          const registers = persisted.posRegisters || [];
+          persisted.posRegisters = registers.map(r =>
+            r.branchId ? r : { ...r, branchId: 'BRANCH-001' }
+          );
+        }
+        // v10 → v11: agregar branchId a líneas de fritado que no lo tienen
+        if (fromVersion < 11) {
+          persisted.fryKitchens = (persisted.fryKitchens || []).map(k =>
+            k.branchId ? k : { ...k, branchId: 'BRANCH-001' }
+          );
+        }
+        return persisted;
+      },
       partialize: (state) => ({
         warehouses:         state.warehouses,
         productionPoints:   state.productionPoints,

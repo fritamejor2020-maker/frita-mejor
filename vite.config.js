@@ -9,14 +9,15 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       workbox: {
-        skipWaiting: true,       // Nuevo SW toma el control inmediatamente
-        clientsClaim: true,      // Reclamar todos los clientes abiertos
-        cleanupOutdatedCaches: true, // Borrar caches viejas automáticamente
+        maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB (recharts añade ~400KB)
+        skipWaiting: true,
+        clientsClaim: true,
+        cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/.*supabase.*$/i,
-            handler: 'NetworkOnly',  // Nunca cachear llamadas a Supabase
+            handler: 'NetworkOnly',
           },
         ],
       },

@@ -38,11 +38,13 @@ export function PosView() {
   // Multi-register: siempre elegir caja al entrar al POS
   const [selectedRegisterId, setSelectedRegisterId] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(true); // Siempre mostrar al inicio
-  // Filtrar cajas por sede: Admin ve todas, usuarios de sede solo ven las de su sede
+  // Filtrar cajas por sede:
+  // - Admin (branchId=null): ve TODAS las cajas
+  // - Usuario de sede: ve solo cajas asignadas a su sede (branchId coincide)
   const userBranchId = user?.branchId ?? null;
   const activeRegisters = (posRegisters || []).filter(r =>
     r.active !== false &&
-    (userBranchId === null || !r.branchId || r.branchId === userBranchId)
+    (userBranchId === null || r.branchId === userBranchId)
   );
   const selectedRegister = activeRegisters.find(r => r.id === selectedRegisterId);
 

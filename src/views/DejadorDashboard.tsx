@@ -163,6 +163,7 @@ export const DejadorDashboard = () => {
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, posShifts, addPosShift } = useInventoryStore();
   const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
+  const userBranchId = (user as any)?.branchId ?? null;
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const { playOnce, startLoop, stopAll, isLooping } = useDeliveryAlert();
   const { unsubscribe: pushUnsubscribe } = usePushSubscription();
@@ -176,8 +177,15 @@ export const DejadorDashboard = () => {
   const loopAlreadyFiredRef = useRef(false);
   const INACTIVITY_MS = 2 * 60 * 1000; // 2 minutos
 
-  const getAllActivePoints = useVehicleStore((state) => state.getAllActivePoints);
-  const vehicles = getAllActivePoints ? getAllActivePoints() : useVehicleStore.getState().vehicles.filter((v: any) => v.active).map((v: any) => v.abbreviation || v.name);
+  // Vehículos filtrados por sede (Admin ve todos)
+  const allVehicles = useVehicleStore((state: any) => state.vehicles);
+  const vehicles = React.useMemo(() => {
+    const active = allVehicles.filter((v: any) => v.active);
+    const branchFiltered = userBranchId
+      ? active.filter((v: any) => !v.branchId || v.branchId === userBranchId)
+      : active;
+    return branchFiltered.map((v: any) => v.abbreviation || v.name);
+  }, [allVehicles, userBranchId]);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
   // Mapa: tricicloId → nombre del vendedor con turno abierto
@@ -197,7 +205,11 @@ export const DejadorDashboard = () => {
     ...(completedRequests || []).map((r: any) => r.id),
     ...(rejectedRequests  || []).map((r: any) => r.id),
   ]);
-  const truePendingRequests = (pendingRequests || []).filter((r: any) => !processedIds.has(r.id));
+  // Filtrar por sede: Admin (branchId=null) ve todos, Dejador de sede ve solo los suyos
+  const truePendingRequests = (pendingRequests || []).filter((r: any) =>
+    !processedIds.has(r.id) &&
+    (userBranchId === null || !r.branchId || r.branchId === userBranchId)
+  );
 
   // Conteo de pedidos genuinos del vendedor (sin los reencolados por el dejador)
   const genuinePendingCount = truePendingRequests.filter((r: any) => !r.isPostponed).length;

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
+import { useAuthStore } from '../store/useAuthStore';
 
 export const SellerSetupView = () => {
   const startShift = useSellerSessionStore((state) => state.startShift);
@@ -24,9 +25,16 @@ export const SellerSetupView = () => {
   const pointTypes = allPointTypes.filter(pt => enabledPointTypes[pt.vehicleType] !== false);
 
   const vehicles = useVehicleStore((state: any) => state.vehicles);
+  const { user } = useAuthStore();
+  const userBranchId = (user as any)?.branchId ?? null;
   const selectedTypeObj = pointTypes.find(pt => pt.id === pointType) ?? pointTypes[0];
   const allPointIds = vehicles
-    .filter((v: any) => v.active && v.type === selectedTypeObj?.vehicleType)
+    .filter((v: any) =>
+      v.active &&
+      v.type === selectedTypeObj?.vehicleType &&
+      // Admin ve todos; vendedor ve solo los de su sede (o sin sede)
+      (userBranchId === null || !v.branchId || v.branchId === userBranchId)
+    )
     .map((v: any) => v.abbreviation || v.name);
 
   const navigate = useNavigate();

@@ -17,15 +17,14 @@ const SYNC_LISTENERS = new Set();
 
 /**
  * Llaves GLOBALES — compartidas entre todas las sedes.
- * Se almacenan en Supabase con el nombre exacto (sin sufijo).
+ * Solo catálogos y configuración maestros que son idénticos en todas las sedes.
  */
 export const GLOBAL_KEYS = [
+  // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories',
-  'customers', 'customerTypes', 'users', 'branches',
-  'loadTemplates', 'vehicles', 'suppliers',
-  'payrollEmployees', 'payrollRecords',
-  'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
-  'vendorLocations',
+  // Administración global del sistema
+  'users', 'branches', 'suppliers',
+  // Traslados (son cross-sede por diseño)
   'transfers',
 ];
 
@@ -34,9 +33,23 @@ export const GLOBAL_KEYS = [
  * Se almacenan en Supabase como `<key>_<branchId>` (ej: `posSales_BRANCH-001`).
  */
 export const BRANCH_KEYS = [
+  // Inventario y bodega
   'inventory', 'movements', 'warehouses',
+  // POS
   'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
   'contrataPayments', 'deletedShiftIds',
+  // Logística (Dejador / Vendedor) — por sede
+  'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
+  // Vehículos / Triciclos — por sede
+  'vehicles',
+  // Plantillas de carga — por sede
+  'loadTemplates',
+  // Clientes — por sede
+  'customers', 'customerTypes',
+  // Nómina — por sede
+  'payrollEmployees', 'payrollRecords',
+  // GPS vendedores — por sede
+  'vendorLocations',
 ];
 
 /**

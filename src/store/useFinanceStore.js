@@ -1,6 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
+import { useAuthStore } from './useAuthStore';
+
+// Helper: retorna el branchId del usuario activo (null = Admin global)
+function getActiveBranchId() {
+  return useAuthStore.getState().user?.branchId ?? null;
+}
 
 // ── Sube una foto base64 a Supabase Storage y devuelve la URL pública ──────────
 async function uploadPhoto(base64) {
@@ -37,20 +43,24 @@ export const useFinanceStore = create(
       isLoading: false,
       error: null,
 
-      // ── Fetch inicial desde Supabase (datos compartidos de todos los usuarios) ──
+      // ── Fetch inicial desde Supabase filtrado por sede ─────────────────────
       fetchFinances: async () => {
         set({ isLoading: true });
+        const branchId = getActiveBranchId();
         try {
-          const [incomesRes, expensesRes] = await Promise.all([
-            supabase.from('incomes').select('*').order('created_at', { ascending: false }),
-            supabase.from('expenses').select('*').order('created_at', { ascending: false }),
-          ]);
+          // Admin (branchId=null) ve todos; usuario de sede ve solo los suyos
+          const incomesQuery = branchId
+            ? supabase.from('incomes').select('*').eq('branch_id', branchId).order('created_at', { ascending: false })
+            : supabase.from('incomes').select('*').order('created_at', { ascending: false });
+          const expensesQuery = branchId
+            ? supabase.from('expenses').select('*').eq('branch_id', branchId).order('created_at', { ascending: false })
+            : supabase.from('expenses').select('*').order('created_at', { ascending: false });
 
-          // Actualizar siempre que no haya error (aunque el array esté vacío)
+          const [incomesRes, expensesRes] = await Promise.all([incomesQuery, expensesQuery]);
+
           if (!incomesRes.error) {
             set({ incomes: incomesRes.data || [] });
           }
-          // Normalizar facturaUrl (puede venir como factura_url desde Supabase)
           const normalizeExpense = (e) => ({
             ...e,
             facturaUrl: e.facturaUrl || e.factura_url || null,
@@ -113,24 +123,29 @@ export const useFinanceStore = create(
       },
 
       addIncome: async (incomeData) => {
+        const branchId = getActiveBranchId();
         const newIncome = {
           id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
+          branch_id: branchId || 'BRANCH-001',
           ...incomeData,
         };
-        // Actualización optimista local (incluye todos los campos para el chat)
+        // Actualización optimista local
         set((state) => ({ incomes: [newIncome, ...state.incomes] }));
 
         try {
           const photoUrl = await uploadPhoto(incomeData.photoBase64);
-          // Quitar campos que no existen en la tabla de Supabase
           const {
             photoBase64: _pb,
             esDescargue: _ed,
             esCierre: _ec,
             ...incomeForDB
           } = incomeData;
-          const incomeWithPhoto = { ...incomeForDB, ...(photoUrl ? { photoUrl } : {}) };
+          const incomeWithPhoto = {
+            ...incomeForDB,
+            branch_id: branchId || 'BRANCH-001',
+            ...(photoUrl ? { photoUrl } : {}),
+          };
 
           const { data, error } = await supabase.from('incomes').insert([incomeWithPhoto]).select();
           if (error) {
@@ -215,18 +230,20 @@ export const useFinanceStore = create(
       },
 
       addExpense: async (expenseData) => {
+        const branchId = getActiveBranchId();
         const newExpense = {
           id: `local-${Date.now()}`,
           created_at: new Date().toISOString(),
+          branch_id: branchId || 'BRANCH-001',
           ...expenseData,
         };
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
-          // Excluir campos que Supabase auto-genera o que no existen en la tabla
           const { valor, created_at: _ca, id: _id, ...rest } = expenseData;
           const expenseForDB = {
             ...rest,
+            branch_id: branchId || 'BRANCH-001',
             monto: valor ?? expenseData.monto ?? 0,
           };
           console.log('[FinanceStore] addExpense payload:', expenseForDB);

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useVehicleStore } from '../../store/useVehicleStore';
+import { useInventoryStore } from '../../store/useInventoryStore';
 import { Edit2, Trash2, Check, X, Truck, ShoppingCart, Store, Eye, EyeOff } from 'lucide-react';
 
 // ── Icono + color por tipo de punto ───────────────────────────────────────────
@@ -63,9 +64,16 @@ function VehicleSection({ type, vehicles, onEdit, onToggleActive, onRemove }: an
                   <span className={`font-black block text-base ${!v.active ? 'line-through text-gray-400' : 'text-gray-800'}`}>
                     {v.name}
                   </span>
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${cfg.badge}`}>
-                    CÓDIGO: {v.abbreviation}
-                  </span>
+                  <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider border ${cfg.badge}`}>
+                      CÓDIGO: {v.abbreviation}
+                    </span>
+                    {v.branchId && (
+                      <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-600 border border-indigo-200 uppercase tracking-wider">
+                        🏢 {v.branchId}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -145,10 +153,14 @@ export function AdminVehiclesTab() {
     togglePointType,
   } = useVehicleStore() as any;
 
+  const branches = (useInventoryStore.getState() as any).branches ||
+    [{ id: 'BRANCH-001', name: 'Sede Principal' }];
+
   const [isEditing, setIsEditing] = useState<string | null>(null);
   const [name, setName]               = useState('');
   const [abbreviation, setAbbreviation] = useState('');
   const [vehicleType, setVehicleType]   = useState('Triciclo');
+  const [branchId, setBranchId]         = useState('BRANCH-001');
 
   const cfg = typeConfig[vehicleType];
 
@@ -157,6 +169,7 @@ export function AdminVehiclesTab() {
     setName(vehicle.name);
     setAbbreviation(vehicle.abbreviation || '');
     setVehicleType(vehicle.type || 'Triciclo');
+    setBranchId(vehicle.branchId || 'BRANCH-001');
   };
 
   const cancelEdit = () => {
@@ -164,18 +177,20 @@ export function AdminVehiclesTab() {
     setName('');
     setAbbreviation('');
     setVehicleType('Triciclo');
+    setBranchId('BRANCH-001');
   };
 
   const handleSave = () => {
     if (!name || !abbreviation) return;
     if (isEditing) {
-      updateVehicle(isEditing, { name, abbreviation, type: vehicleType });
+      updateVehicle(isEditing, { name, abbreviation, type: vehicleType, branchId });
       setIsEditing(null);
     } else {
-      addVehicle({ name, abbreviation, type: vehicleType });
+      addVehicle({ name, abbreviation, type: vehicleType, branchId });
     }
     setName('');
     setAbbreviation('');
+    setBranchId('BRANCH-001');
   };
 
   const toggleActive = (id: string, currentStatus: boolean) => {
@@ -288,6 +303,18 @@ export function AdminVehiclesTab() {
                 placeholder={cfg.placeholder}
                 className="w-full bg-white border-2 border-white hover:border-[#FFB700] rounded-xl py-3 px-4 text-gray-800 font-bold focus:border-[#FFB700] outline-none transition-colors shadow-sm"
               />
+            </div>
+            <div className="flex-1 w-full">
+              <label className="text-xs font-bold text-gray-600 uppercase block mb-1">🏢 Sede</label>
+              <select
+                value={branchId}
+                onChange={(e) => setBranchId(e.target.value)}
+                className="w-full bg-white border-2 border-white hover:border-[#FFB700] rounded-xl py-3 px-4 text-gray-800 font-bold focus:border-[#FFB700] outline-none transition-colors shadow-sm"
+              >
+                {branches.map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.name || b.id}</option>
+                ))}
+              </select>
             </div>
             <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
               {isEditing && (

@@ -4,10 +4,13 @@ import { supabase } from '../lib/supabase';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
+import { useAuthStore } from './useAuthStore';
 
 function syncKey(key, value) {
-  markLocalWrite(key);
-  push(key, value).catch(err => console.warn('[Sync]', key, err.message));
+  const user = useAuthStore.getState().user;
+  const branchId = user?.branchId ?? null;
+  markLocalWrite(key, branchId);
+  push(key, value, branchId).catch(err => console.warn('[Sync]', key, err.message));
 }
 
 /**
@@ -64,6 +67,9 @@ export const useLogisticsStore = create(
     if (!pointId) throw new Error("Acceso denegado: pointId vacío.");
     if (restockCart.length === 0) throw new Error("Carrito de surtido vacío.");
 
+    // Capturar branchId del vendedor para filtrado por sede
+    const senderBranchId = useAuthStore.getState().user?.branchId ?? null;
+
     // Intentar capturar ubicación GPS del vendedor al momento del pedido
     let location = null;
     try {
@@ -91,6 +97,7 @@ export const useLogisticsStore = create(
       items_payload: restockCart.filter(item => item.qty > 0),
       observacion: observacion?.trim() || null,
       location,
+      branchId: senderBranchId,  // ← sede del vendedor
       status: 'pending',
       created_at: new Date().toISOString()
     };

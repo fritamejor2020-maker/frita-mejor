@@ -2,10 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { useAuthStore } from './useAuthStore';
 
 function syncKey(key, value) {
-  markLocalWrite(key);
-  push(key, value).catch(err => console.warn('[Payroll Sync]', key, err.message));
+  const user = useAuthStore.getState().user;
+  const branchId = user?.branchId ?? null;
+  markLocalWrite(key, branchId);
+  push(key, value, branchId).catch(err => console.warn('[Payroll Sync]', key, err.message));
 }
 
 /**
@@ -33,9 +36,10 @@ export const usePayrollStore = create(
           e => e.name.toLowerCase() === trimmed.toLowerCase()
         );
         if (already) return;
+        const branchId = useAuthStore.getState().user?.branchId ?? null;
         const updated = [
           ...get().payrollEmployees,
-          { id: `EMP-${Date.now()}`, name: trimmed },
+          { id: `EMP-${Date.now()}`, name: trimmed, branchId },
         ];
         set({ payrollEmployees: updated });
         syncKey('payrollEmployees', updated);
@@ -80,10 +84,13 @@ export const usePayrollStore = create(
        * Si ya existe un registro para ese período, lo sobreescribe.
        */
       savePayroll: (periodo, filas, creadoPor = '') => {
-        const existing = get().payrollRecords.find(r => r.periodo === periodo);
+        const branchId = useAuthStore.getState().user?.branchId ?? null;
+        const existing = get().payrollRecords.find(r => r.periodo === periodo
+          && (!r.branchId || !branchId || r.branchId === branchId));
         const newRecord = {
           id: existing?.id || `PAY-${Date.now()}`,
           periodo,
+          branchId,  // BUG-03 FIX: associate record with branch
           savedAt: new Date().toISOString(),
           creadoPor,
           filas: filas.map((f, idx) => ({
@@ -96,7 +103,7 @@ export const usePayrollStore = create(
           })),
         };
         const updated = existing
-          ? get().payrollRecords.map(r => r.periodo === periodo ? newRecord : r)
+          ? get().payrollRecords.map(r => r.id === existing.id ? newRecord : r)
           : [newRecord, ...get().payrollRecords];
         set({ payrollRecords: updated });
         syncKey('payrollRecords', updated);
@@ -156,6 +163,11 @@ export const usePayrollStore = create(
     }),
     {
       name: 'frita-mejor-payroll',
+      version: 2, // v2: separación por sede
+      migrate: (persisted) => {
+        // Los datos migrados se re-sincronizarán a la llave de sede en el próximo push
+        return persisted;
+      },
       partialize: (state) => ({
         payrollEmployees: state.payrollEmployees,
         payrollRecords:   state.payrollRecords,

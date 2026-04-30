@@ -2,10 +2,13 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { useAuthStore } from './useAuthStore';
 
 function syncVehicles(vehicles) {
-  markLocalWrite('vehicles');
-  push('vehicles', vehicles).catch(err => console.warn('[Sync] vehicles:', err.message));
+  const user = useAuthStore.getState().user;
+  const branchId = user?.branchId ?? null;
+  markLocalWrite('vehicles', branchId);
+  push('vehicles', vehicles, branchId).catch(err => console.warn('[Sync] vehicles:', err.message));
 }
 
 /**
@@ -16,18 +19,18 @@ export const useVehicleStore = create(
   persist(
     (set, get) => ({
       vehicles: [
-        { id: '1',  type: 'Triciclo', name: 'Triciclo 1', abbreviation: 'T1', active: true },
-        { id: '2',  type: 'Triciclo', name: 'Triciclo 2', abbreviation: 'T2', active: true },
-        { id: '3',  type: 'Triciclo', name: 'Triciclo 3', abbreviation: 'T3', active: true },
-        { id: '4',  type: 'Triciclo', name: 'Triciclo 4', abbreviation: 'T4', active: true },
-        { id: '5',  type: 'Triciclo', name: 'Triciclo 5', abbreviation: 'T5', active: true },
-        { id: '6',  type: 'Triciclo', name: 'Triciclo 6', abbreviation: 'T6', active: true },
-        { id: '7',  type: 'Local',    name: 'Local 1',    abbreviation: 'L1', active: true },
-        { id: '8',  type: 'Local',    name: 'Local 2',    abbreviation: 'L2', active: true },
-        { id: '9',  type: 'Local',    name: 'Local 3',    abbreviation: 'L3', active: true },
-        { id: '10', type: 'Carrito',  name: 'Carrito 1',  abbreviation: 'C1', active: true },
-        { id: '11', type: 'Carrito',  name: 'Carrito 2',  abbreviation: 'C2', active: true },
-        { id: '12', type: 'Carrito',  name: 'Carrito 3',  abbreviation: 'C3', active: true },
+        { id: '1',  type: 'Triciclo', name: 'Triciclo 1', abbreviation: 'T1', active: true, branchId: 'BRANCH-001' },
+        { id: '2',  type: 'Triciclo', name: 'Triciclo 2', abbreviation: 'T2', active: true, branchId: 'BRANCH-001' },
+        { id: '3',  type: 'Triciclo', name: 'Triciclo 3', abbreviation: 'T3', active: true, branchId: 'BRANCH-001' },
+        { id: '4',  type: 'Triciclo', name: 'Triciclo 4', abbreviation: 'T4', active: true, branchId: 'BRANCH-001' },
+        { id: '5',  type: 'Triciclo', name: 'Triciclo 5', abbreviation: 'T5', active: true, branchId: 'BRANCH-001' },
+        { id: '6',  type: 'Triciclo', name: 'Triciclo 6', abbreviation: 'T6', active: true, branchId: 'BRANCH-001' },
+        { id: '7',  type: 'Local',    name: 'Local 1',    abbreviation: 'L1', active: true, branchId: 'BRANCH-001' },
+        { id: '8',  type: 'Local',    name: 'Local 2',    abbreviation: 'L2', active: true, branchId: 'BRANCH-001' },
+        { id: '9',  type: 'Local',    name: 'Local 3',    abbreviation: 'L3', active: true, branchId: 'BRANCH-001' },
+        { id: '10', type: 'Carrito',  name: 'Carrito 1',  abbreviation: 'C1', active: true, branchId: 'BRANCH-001' },
+        { id: '11', type: 'Carrito',  name: 'Carrito 2',  abbreviation: 'C2', active: true, branchId: 'BRANCH-001' },
+        { id: '12', type: 'Carrito',  name: 'Carrito 3',  abbreviation: 'C3', active: true, branchId: 'BRANCH-001' },
       ],
 
       // Controla si la vista del Vendedor y del Dejador están habilitadas
@@ -57,10 +60,12 @@ export const useVehicleStore = create(
       },
 
       addVehicle: (vehicleData) => {
+        const user = useAuthStore.getState().user;
         const newVehicle = {
           id: Date.now().toString(),
           active: true,
           type: 'Triciclo',
+          branchId: vehicleData.branchId || user?.branchId || 'BRANCH-001',
           ...vehicleData
         };
         set((state) => ({ vehicles: [...state.vehicles, newVehicle] }));
@@ -97,7 +102,7 @@ export const useVehicleStore = create(
     }),
     {
       name: 'frita-mejor-vehicles',
-      version: 2,
+      version: 3, // v3: branchId en cada vehículo
       migrate: (persisted, version) => {
         if (version < 2) {
           const existing = persisted.vehicles || [];
@@ -118,6 +123,12 @@ export const useVehicleStore = create(
             );
           }
           persisted.vehicles = existing;
+        }
+        if (version < 3) {
+          // Asignar BRANCH-001 a todos los vehículos sin sede
+          persisted.vehicles = (persisted.vehicles || []).map(v =>
+            v.branchId ? v : { ...v, branchId: 'BRANCH-001' }
+          );
         }
         return persisted;
       }
