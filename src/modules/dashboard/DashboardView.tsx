@@ -49,7 +49,8 @@ function FilterBar() {
     selectedMonth, setSelectedMonth,
     selectedYear, setSelectedYear,
   } = useDashboardFilters();
-  const branches = useBranchStore(s => s.branches.filter(b => b.active !== false));
+  const allBranches = useBranchStore(s => s.branches);
+  const branches = allBranches.filter((b: any) => b.active !== false);
 
   const PERIODS: { key: Period; label: string }[] = [
     { key: 'day',    label: 'Hoy'    },
