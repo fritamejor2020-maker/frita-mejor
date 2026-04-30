@@ -10,10 +10,11 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'pos':              { label: 'Caja POS',         icon: '🛒', route: '/pos',           color: 'from-green-500 to-green-600',  bg: 'bg-green-50' },
   'finanzas-ingresos':{ label: 'Ingresos',         icon: '💵', route: '/finanzas',      color: 'from-emerald-500 to-teal-500', bg: 'bg-emerald-50' },
   'finanzas-gastos':  { label: 'Gastos',           icon: '💸', route: '/finanzas',      color: 'from-red-500 to-rose-600',     bg: 'bg-red-50' },
-  'finanzas-nomina':  { label: 'Nómina',            icon: '👥', route: '/finanzas',      color: 'from-violet-500 to-purple-600',bg: 'bg-violet-50' },
+  'finanzas-nomina':  { label: 'Nómina',           icon: '👥', route: '/finanzas',      color: 'from-violet-500 to-purple-600',bg: 'bg-violet-50' },
   'vendedor-setup':   { label: 'Vendedor Móvil',  icon: '🛵', route: '/vendedor-setup',color: 'from-red-500 to-rose-600',    bg: 'bg-red-50' },
   'dejador':          { label: 'Dejador',          icon: '🚚', route: '/dejador-setup', color: 'from-orange-500 to-amber-500', bg: 'bg-orange-50' },
   'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
+  'dashboard':        { label: 'Dashboard',        icon: '📊', route: '/dashboard',     color: 'from-amber-400 to-orange-500', bg: 'bg-amber-50' },
   'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
   'cierres':          { label: 'Auditor Cierres',  icon: '🧐', route: '/cierres',       color: 'from-teal-500 to-teal-700',    bg: 'bg-teal-50' },
   'traslados':        { label: 'Traslados',        icon: '🚛', route: '/traslados',     color: 'from-orange-500 to-red-500',   bg: 'bg-orange-50' },
@@ -35,8 +36,9 @@ export const ModuleSelectorView = () => {
   const effectiveAccess = user.role === 'ADMIN'
     ? [...new Set([
         ...storedAccess,
-        ...(!storedAccess.includes('tracking')  ? ['tracking']  : []),
-        ...(!storedAccess.includes('traslados') ? ['traslados'] : []),
+        ...(!storedAccess.includes('tracking')   ? ['tracking']   : []),
+        ...(!storedAccess.includes('traslados')  ? ['traslados']  : []),
+        ...(!storedAccess.includes('dashboard')  ? ['dashboard']  : []),
       ])]
     : storedAccess;
 

@@ -88,7 +88,7 @@ function RoleRedirect() {
       pos: '/pos', finanzas: '/finanzas',
       'finanzas-ingresos': '/finanzas', 'finanzas-gastos': '/finanzas', 'finanzas-nomina': '/finanzas',
       admin: '/admin', tracking: '/tracking', cierres: '/cierres',
-      traslados: '/traslados',
+      traslados: '/traslados', dashboard: '/dashboard',
     };
     return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }
@@ -247,7 +247,7 @@ function App() {
                 <Route path="/bodega" element={<WarehouseView />} />
               </Route>
 
-              <Route element={<ProtectedRoute allowedModules={['admin']} />}>
+              <Route element={<ProtectedRoute allowedModules={['admin', 'dashboard']} />}>
                 <Route path="/admin" element={<AdminView />} />
                 <Route path="/dashboard" element={<DashboardView />} />
               </Route>

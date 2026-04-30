@@ -19,7 +19,7 @@ const DEFAULT_USERS = [
     active: true,
     branchId: null,        // null = acceso global a todas las sedes
     permissions: [],       // ADMIN tiene todos los permisos implícitamente
-    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres', 'traslados'],
+    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres', 'traslados', 'dashboard'],
   },
   {
     id: 'USR-002',
@@ -113,7 +113,7 @@ const DEFAULT_USERS = [
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados', 'dashboard'],
   // MANAGER: acceso configurable por el Admin. Por defecto solo admin y reportes.
   MANAGER:   ['admin', 'pos', 'cierres', 'finanzas-ingresos', 'finanzas-gastos'],
   OPERARIO:  ['produccion'],
@@ -283,7 +283,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 15, // v15: 'traslados' para ADMIN
+      version: 16, // v16: 'dashboard' como módulo asignable
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
@@ -365,6 +365,19 @@ export const useAuthStore = create(
           });
           if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('traslados')) {
             state.user = { ...state.user, access: [...(state.user.access || []), 'traslados'] };
+          }
+        }
+
+        // v16: 'dashboard' para ADMIN
+        if (fromVersion < 16 && state.users) {
+          state.users = state.users.map((u) => {
+            if (u.role === 'ADMIN' && !u.access?.includes('dashboard')) {
+              return { ...u, access: [...(u.access || []), 'dashboard'] };
+            }
+            return u;
+          });
+          if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('dashboard')) {
+            state.user = { ...state.user, access: [...(state.user.access || []), 'dashboard'] };
           }
         }
 
