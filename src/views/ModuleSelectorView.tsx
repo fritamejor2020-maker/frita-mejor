@@ -16,6 +16,7 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'admin':            { label: 'Administración',   icon: '🔧', route: '/admin',         color: 'from-purple-500 to-purple-700',bg: 'bg-purple-50' },
   'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
   'cierres':          { label: 'Auditor Cierres',  icon: '🧐', route: '/cierres',       color: 'from-teal-500 to-teal-700',    bg: 'bg-teal-50' },
+  'traslados':        { label: 'Traslados',        icon: '🚛', route: '/traslados',     color: 'from-orange-500 to-red-500',   bg: 'bg-orange-50' },
 };
 
 export const ModuleSelectorView = () => {
@@ -31,8 +32,12 @@ export const ModuleSelectorView = () => {
   // Acceso efectivo: respetar el access[] del usuario (permisos granulares).
   // Solo excepción: si el rol es ADMIN, siempre incluir 'tracking' aunque el caché esté desactualizado.
   const storedAccess: string[] = user.access || [];
-  const effectiveAccess = user.role === 'ADMIN' && !storedAccess.includes('tracking')
-    ? [...storedAccess, 'tracking']
+  const effectiveAccess = user.role === 'ADMIN'
+    ? [...new Set([
+        ...storedAccess,
+        ...(!storedAccess.includes('tracking')  ? ['tracking']  : []),
+        ...(!storedAccess.includes('traslados') ? ['traslados'] : []),
+      ])]
     : storedAccess;
 
   const userModules = effectiveAccess

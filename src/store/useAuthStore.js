@@ -17,7 +17,9 @@ const DEFAULT_USERS = [
     password: '1',
     role: 'ADMIN',
     active: true,
-    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres'],
+    branchId: null,        // null = acceso global a todas las sedes
+    permissions: [],       // ADMIN tiene todos los permisos implícitamente
+    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres', 'traslados'],
   },
   {
     id: 'USR-002',
@@ -26,6 +28,8 @@ const DEFAULT_USERS = [
     password: '2',
     role: 'OPERARIO',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['produccion'],
   },
   {
@@ -35,6 +39,8 @@ const DEFAULT_USERS = [
     password: '3',
     role: 'BODEGUERO',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['bodega'],
   },
   {
@@ -44,6 +50,8 @@ const DEFAULT_USERS = [
     password: '4',
     role: 'CAJERO',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['pos'],
   },
   {
@@ -53,6 +61,8 @@ const DEFAULT_USERS = [
     password: '5',
     role: 'VENDEDOR',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['vendedor-setup', 'vendedor'],
   },
   {
@@ -62,6 +72,8 @@ const DEFAULT_USERS = [
     password: '6',
     role: 'DEJADOR',
     active: true,
+    branchId: null,        // Los dejadores son globales (mueven entre sedes)
+    permissions: [],
     access: ['dejador', 'tracking'],
   },
   {
@@ -71,6 +83,8 @@ const DEFAULT_USERS = [
     password: '7',
     role: 'FINANZAS',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['finanzas-ingresos'],
   },
   {
@@ -80,6 +94,8 @@ const DEFAULT_USERS = [
     password: '8',
     role: 'FINANZAS',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['finanzas-gastos'],
   },
   {
@@ -89,13 +105,17 @@ const DEFAULT_USERS = [
     password: '9',
     role: 'FRITADOR',
     active: true,
+    branchId: 'BRANCH-001',
+    permissions: [],
     access: ['fritado'],
   },
 ];
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados'],
+  // MANAGER: acceso configurable por el Admin. Por defecto solo admin y reportes.
+  MANAGER:   ['admin', 'pos', 'cierres', 'finanzas-ingresos', 'finanzas-gastos'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
@@ -105,6 +125,17 @@ export const ROLE_ACCESS = {
   // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los tres
   FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina'],
 };
+
+// Permisos granulares disponibles para delegar a MANAGER
+export const MANAGER_PERMISSIONS = [
+  { id: 'edit_prices',      label: 'Editar precios de productos' },
+  { id: 'manage_users',     label: 'Crear y editar empleados' },
+  { id: 'view_all_finance', label: 'Ver finanzas de todas las sedes' },
+  { id: 'close_shifts',     label: 'Cerrar turnos de otros usuarios' },
+  { id: 'edit_inventory',   label: 'Ajustar inventario manualmente' },
+  { id: 'manage_customers', label: 'Gestionar clientes y contratas' },
+  { id: 'edit_settings',    label: 'Editar configuración de la sede' },
+];
 
 // =============================================================================
 // ZUSTAND STORE CON PERSISTENCIA (localStorage)
@@ -252,7 +283,7 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 13, // v13: finanzas-nomina agregado a ADMIN y FINANZAS
+      version: 15, // v15: 'traslados' para ADMIN
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
@@ -300,6 +331,40 @@ export const useAuthStore = create(
           });
           if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('finanzas-nomina')) {
             state.user = { ...state.user, access: [...(state.user.access || []), 'finanzas-nomina'] };
+          }
+        }
+
+        // v14: branchId y permissions para todos los usuarios existentes
+        if (fromVersion < 14 && state.users) {
+          state.users = state.users.map((u) => {
+            const isGlobal = u.role === 'ADMIN' || u.role === 'DEJADOR';
+            return {
+              ...u,
+              branchId: u.branchId !== undefined ? u.branchId : (isGlobal ? null : 'BRANCH-001'),
+              permissions: u.permissions || [],
+            };
+          });
+          // Migrar también el usuario activo en sesión
+          if (state.user) {
+            const isGlobal = state.user.role === 'ADMIN' || state.user.role === 'DEJADOR';
+            state.user = {
+              ...state.user,
+              branchId: state.user.branchId !== undefined ? state.user.branchId : (isGlobal ? null : 'BRANCH-001'),
+              permissions: state.user.permissions || [],
+            };
+          }
+        }
+
+        // v15: 'traslados' para ADMIN
+        if (fromVersion < 15 && state.users) {
+          state.users = state.users.map((u) => {
+            if (u.role === 'ADMIN' && !u.access?.includes('traslados')) {
+              return { ...u, access: [...(u.access || []), 'traslados'] };
+            }
+            return u;
+          });
+          if (state.user?.role === 'ADMIN' && !state.user?.access?.includes('traslados')) {
+            state.user = { ...state.user, access: [...(state.user.access || []), 'traslados'] };
           }
         }
 

@@ -1,13 +1,18 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
-import { push, pullAll } from '../lib/syncManager';
+import { useBranchStore } from './useBranchStore';
+import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 
-// Helper: sincroniza una sección del store con Supabase
+// Helper: sincroniza una sección del store con Supabase.
+// Resuelve automáticamente el branchId del usuario activo para las llaves locales.
 function syncKey(key, value) {
-  markLocalWrite(key);
-  push(key, value).catch(err => console.warn('[Sync]', key, err.message));
+  const user = useAuthStore.getState().user;
+  const branchId = user?.branchId ?? null;
+  const resolvedKey = getBranchKey(key, branchId);
+  markLocalWrite(key, branchId);
+  push(key, value, branchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 }
 
 // =============================================================================
@@ -210,9 +215,9 @@ export const useInventoryStore = create(
 
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
-      // Si Supabase tiene datos más recientes, los usa; si está vacío, queda el local.
-      // GUARD: si justo se ejecutó un Reset General, no cargar datos remotos
-      //        (los datos en Supabase deberían estar vacíos, pero por si acaso).
+      // Multisede: descarga solo las llaves de la sede del usuario activo
+      // (o todas las sedes si es Admin). Incluye soporte legacy para migrar
+      // datos de la versión anterior (llaves sin sufijo).
       loadFromRemote: async () => {
         if (sessionStorage.getItem('__reset_done__') === '1') {
           sessionStorage.removeItem('__reset_done__');
@@ -220,34 +225,62 @@ export const useInventoryStore = create(
           return;
         }
         try {
-          const remote = await pullAll();
-          const SYNC_KEYS = [
-            'warehouses', 'inventory', 'movements', 'products', 'recipes',
-            'fritadoRecipes', 'posCategories', 'posSettings', 'posRegisters', 'posShifts',
-            'posSales', 'posExpenses', 'customers', 'customerTypes', 'loadTemplates',
-            'vendorLocations', 'contrataPayments',
+          const user = useAuthStore.getState().user;
+          const branchId = user?.branchId ?? null;
+
+          // Obtener IDs de todas las sedes para el Admin
+          let allBranchIds = ['BRANCH-001'];
+          try {
+            allBranchIds = useBranchStore.getState().branches.map(b => b.id);
+          } catch { /* useBranchStore puede no estar listo aún */ }
+
+          const remote = await pullAll(branchId, allBranchIds);
+
+          // Llaves globales — se aplican directamente al store
+          const GLOBAL_STORE_KEYS = [
+            'products', 'recipes', 'fritadoRecipes', 'posCategories',
+            'customers', 'customerTypes', 'loadTemplates', 'vendorLocations',
           ];
+
+          // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
+          const BRANCH_STORE_KEYS = [
+            'warehouses', 'inventory', 'movements',
+            'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
+            'contrataPayments', 'deletedShiftIds',
+          ];
+
           const updates = {};
-          for (const key of SYNC_KEYS) {
-            if (remote[key] !== undefined && remote[key] !== null) {
-              const isNonEmpty = Array.isArray(remote[key])
-                ? remote[key].length > 0
-                : Object.keys(remote[key]).length > 0;
+
+          // Procesar llaves globales
+          for (const key of GLOBAL_STORE_KEYS) {
+            const val = remote[key];
+            if (val !== undefined && val !== null) {
+              const isNonEmpty = Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0;
+              if (isNonEmpty) updates[key] = val;
+            }
+          }
+
+          // Procesar llaves de sede — intentar primero la llave con sufijo, luego legacy
+          const effectiveBranch = branchId || 'BRANCH-001';
+          for (const key of BRANCH_STORE_KEYS) {
+            const branchKeyName = `${key}_${effectiveBranch}`;
+            // Preferencia: llave con sufijo > llave legacy > nada
+            const val = remote[branchKeyName] ?? remote[key];
+            if (val !== undefined && val !== null) {
+              const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
               if (isNonEmpty) {
-                let val = remote[key];
-                // Filtrar tombstones de posShifts remotos
+                let finalVal = val;
                 if (key === 'posShifts') {
                   const deleted = get().deletedShiftIds || [];
-                  val = val.filter(s => !deleted.includes(s.id));
+                  finalVal = val.filter(s => !deleted.includes(s.id));
                 }
-                updates[key] = val;
+                updates[key] = finalVal;
               }
             }
           }
+
           if (Object.keys(updates).length > 0) {
-            // Smart merge for inventory: local ALWAYS wins over remote.
-            // - For items that exist locally: keep local version entirely (preserves price:null for deleted items)
-            // - For items that only exist in remote: append them (synced from other devices)
+            // Smart merge para inventario: local siempre gana en items ya existentes
             if (updates.inventory) {
               const localInventory = get().inventory;
               const localIds = new Set(localInventory.map(i => i.id));
@@ -255,7 +288,7 @@ export const useInventoryStore = create(
               updates.inventory = [...localInventory, ...remoteOnlyItems];
             }
             set(updates);
-            console.log('[Store] Estado cargado desde Supabase:', Object.keys(updates));
+            console.log('[Store] Estado cargado desde Supabase (sede:', effectiveBranch, '):', Object.keys(updates));
           }
         } catch (err) {
           console.warn('[Store] No se pudo cargar estado remoto:', err.message);

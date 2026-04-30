@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
+import { useBranchStore } from '../../store/useBranchStore';
 import { User, Edit2, Trash2, Check, X, UserMinus, UserCheck, Shield, RefreshCw } from 'lucide-react';
 import { push } from '../../lib/syncManager';
 
@@ -20,10 +21,11 @@ const ALL_MODULES = [
   { key: 'cierres',           label: 'Auditor Cierres', icon: '🧐', color: 'bg-teal-100 text-teal-700 border-teal-200' },
 ];
 
-const ALL_ROLES = ['ADMIN', 'OPERARIO', 'FRITADOR', 'BODEGUERO', 'CAJERO', 'VENDEDOR', 'DEJADOR', 'FINANZAS'];
+const ALL_ROLES = ['ADMIN', 'MANAGER', 'OPERARIO', 'FRITADOR', 'BODEGUERO', 'CAJERO', 'VENDEDOR', 'DEJADOR', 'FINANZAS'];
 
 const ROLE_COLORS: Record<string, string> = {
   ADMIN:     'bg-purple-500 text-white',
+  MANAGER:   'bg-violet-500 text-white',
   VENDEDOR:  'bg-red-500 text-white',
   DEJADOR:   'bg-orange-500 text-white',
   OPERARIO:  'bg-blue-500 text-white',
@@ -33,7 +35,7 @@ const ROLE_COLORS: Record<string, string> = {
   FINANZAS:  'bg-emerald-500 text-white',
 };
 
-const EMPTY_FORM = { name: '', role: 'VENDEDOR', password: '', access: ROLE_ACCESS['VENDEDOR'] || [] };
+const EMPTY_FORM = { name: '', role: 'CAJERO', password: '', access: ROLE_ACCESS['CAJERO'] || [], branchId: 'BRANCH-001' };
 
 // ── Toggle de un módulo en la lista de access ─────────────────────────────────
 function toggleModule(access: string[], key: string): string[] {
@@ -95,10 +97,14 @@ function UserForm({
   isEdit?: boolean;
 }) {
   const [showPass, setShowPass] = useState(false);
+  const branches = useBranchStore(s => s.branches).filter((b: any) => b.active !== false);
+
+  // Roles que son GLOBALES (sin sede fija)
+  const isGlobalRole = ['ADMIN', 'DEJADOR'].includes(form.role);
 
   return (
     <div className="bg-white rounded-2xl border-2 border-frita-red p-5 flex flex-col gap-4 animate-fade-in shadow-sm">
-      {/* Fila 1: nombre, correo (opcional), contraseña, rol */}
+      {/* Fila 1: nombre, contraseña, rol */}
       <div className="flex flex-wrap gap-3">
         <div className="flex-1 min-w-[140px]">
           <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1">Nombre</label>
@@ -138,8 +144,8 @@ function UserForm({
             value={form.role}
             onChange={(e) => {
               const role = e.target.value;
-              // Al cambiar rol, pre-seleccionar los módulos del nuevo rol
-              setForm({ ...form, role, access: ROLE_ACCESS[role] || [] });
+              const isGlobal = ['ADMIN', 'DEJADOR'].includes(role);
+              setForm({ ...form, role, access: ROLE_ACCESS[role] || [], branchId: isGlobal ? null : (form.branchId || 'BRANCH-001') });
             }}
           >
             {ALL_ROLES.map((r) => (
@@ -147,6 +153,38 @@ function UserForm({
             ))}
           </select>
         </div>
+      </div>
+
+      {/* Fila 2: Sede asignada */}
+      <div>
+        <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-1.5">
+          🏢 Sede asignada
+          {isGlobalRole && <span className="normal-case text-blue-400 ml-2">— Acceso Global (no requiere sede)</span>}
+        </label>
+        {isGlobalRole ? (
+          <div className="px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-100 text-blue-600 font-bold text-sm">
+            🌐 Este rol tiene acceso a todas las sedes automáticamente
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {branches.map((b: any) => (
+              <button
+                key={b.id}
+                type="button"
+                onClick={() => setForm({ ...form, branchId: b.id })}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border-2 text-left font-bold text-sm transition-all ${
+                  form.branchId === b.id
+                    ? 'border-frita-red bg-red-50 text-frita-red'
+                    : 'border-gray-100 text-gray-500 hover:border-gray-200'
+                }`}
+              >
+                <span className="text-base">{b.type === 'pos' ? '🏪' : b.type === 'fabricacion' ? '🏭' : '📦'}</span>
+                <span className="truncate">{b.name}</span>
+                {form.branchId === b.id && <span className="ml-auto text-frita-red">✓</span>}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Fila 2: módulos (chips clickeables) */}
@@ -216,7 +254,8 @@ export const AdminUsersTab = () => {
 
   const handleSaveAdd = () => {
     if (!form.name || !form.password) { alert('Nombre y contraseña son obligatorios'); return; }
-    const res = addUser({ ...form });
+    const isGlobalRole = ['ADMIN', 'DEJADOR'].includes(form.role);
+    const res = addUser({ ...form, branchId: isGlobalRole ? null : (form.branchId || 'BRANCH-001'), permissions: [] });
     if (!res.ok) { alert(res.error); return; }
     setShowAdd(false);
     setForm(EMPTY_FORM);
@@ -224,7 +263,13 @@ export const AdminUsersTab = () => {
 
   const handleSaveEdit = (id: string) => {
     if (!form.name) { alert('El nombre es obligatorio'); return; }
-    const updates: any = { name: form.name, role: form.role, access: form.access };
+    const isGlobalRole = ['ADMIN', 'DEJADOR'].includes(form.role);
+    const updates: any = {
+      name: form.name,
+      role: form.role,
+      access: form.access,
+      branchId: isGlobalRole ? null : (form.branchId || 'BRANCH-001'),
+    };
     if (form.password) updates.password = form.password;
     const res = updateUser(id, updates);
     if (res?.ok === false && res?.error) { alert(res.error); return; }
@@ -312,8 +357,15 @@ export const AdminUsersTab = () => {
                         {u.active ? 'Activo' : 'Inactivo'}
                       </span>
                     </div>
-                    {/* Módulos */}
-                    <div className="mt-2">
+                    {/* Módulos y sede */}
+                    <div className="mt-2 flex flex-col gap-1.5">
+                      {u.branchId ? (
+                        <span className="text-[10px] font-bold text-gray-500 bg-gray-50 px-2 py-0.5 rounded-full w-fit">
+                          🏢 {useBranchStore.getState().getBranchById(u.branchId)?.name || u.branchId}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-blue-400 bg-blue-50 px-2 py-0.5 rounded-full w-fit">🌐 Global</span>
+                      )}
                       <ModuleChips access={u.access || []} />
                     </div>
                   </div>
@@ -325,8 +377,7 @@ export const AdminUsersTab = () => {
                       title="Editar"
                       onClick={() => {
                         setEditingId(u.id);
-                        // Usar u.access exactamente como está (null/undefined = sin acceso asignado aún, no rellenar)
-                        setForm({ name: u.name, role: u.role, password: '', access: u.access ?? [] });
+                        setForm({ name: u.name, role: u.role, password: '', access: u.access ?? [], branchId: u.branchId ?? 'BRANCH-001' });
                         setShowAdd(false);
                       }}
                     >

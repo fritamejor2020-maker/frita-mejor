@@ -1,23 +1,71 @@
 import { supabase } from './supabase';
 
 // ==============================================================================
-// SYNC MANAGER — Motor de sincronización Offline-First
+// SYNC MANAGER — Motor de sincronización Offline-First (Multisede)
 // Responsabilidades:
 //   1. Escribir cambios en Supabase cuando hay internet
 //   2. Encolar cambios localmente cuando no hay internet
 //   3. Vaciar la cola cuando el internet regresa
-//   4. Notificar al resto de la app sobre el estado de conexión
+//   4. Particionar llaves por sede (branchId) para aislar datos entre sucursales
 // ==============================================================================
 
 const QUEUE_KEY = 'frita-sync-queue';
 const MAX_RETRIES = 3;
 const SYNC_LISTENERS = new Set();
 
+// ─── Clasificación de llaves ───────────────────────────────────────────────────
+
+/**
+ * Llaves GLOBALES — compartidas entre todas las sedes.
+ * Se almacenan en Supabase con el nombre exacto (sin sufijo).
+ */
+export const GLOBAL_KEYS = [
+  'products', 'recipes', 'fritadoRecipes', 'posCategories',
+  'customers', 'customerTypes', 'users', 'branches',
+  'loadTemplates', 'vehicles', 'suppliers',
+  'payrollEmployees', 'payrollRecords',
+  'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
+  'vendorLocations',
+  'transfers',
+];
+
+/**
+ * Llaves LOCALES — específicas de cada sede.
+ * Se almacenan en Supabase como `<key>_<branchId>` (ej: `posSales_BRANCH-001`).
+ */
+export const BRANCH_KEYS = [
+  'inventory', 'movements', 'warehouses',
+  'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
+  'contrataPayments', 'deletedShiftIds',
+];
+
+/**
+ * Resuelve el nombre real de la llave en Supabase.
+ * - Si es global: retorna la llave tal cual (ej: 'products').
+ * - Si es local:  retorna 'llave_branchId' (ej: 'posSales_BRANCH-001').
+ * - Si branchId es null (Admin global): retorna la llave sin sufijo para globales,
+ *   o usa 'BRANCH-001' como fallback para llaves locales.
+ */
+export function getBranchKey(key, branchId) {
+  if (GLOBAL_KEYS.includes(key)) return key;
+  const effectiveBranch = branchId || 'BRANCH-001';
+  return `${key}_${effectiveBranch}`;
+}
+
+/**
+ * Dado un nombre de llave completo de Supabase (ej: 'posSales_BRANCH-001'),
+ * retorna el nombre base del store (ej: 'posSales').
+ */
+export function getBaseKey(fullKey) {
+  for (const k of BRANCH_KEYS) {
+    if (fullKey === k || fullKey.startsWith(`${k}_`)) return k;
+  }
+  return fullKey; // es una llave global
+}
+
 // ─── Estado interno ────────────────────────────────────────────────────────────
 
 let isSyncing = false;
-// Asumimos online=true al inicio. navigator.onLine es poco confiable en móviles
-// (puede reportar false aunque haya conexión). Lo validamos con un probe real.
 let isOnline = true;
 
 // ─── Listeners de estado ──────────────────────────────────────────────────────
@@ -45,14 +93,13 @@ function saveQueue(queue) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
 }
 
-function enqueue(key, value) {
+function enqueue(supabaseKey, value) {
   const queue = getQueue();
-  // Si ya hay un item pendiente para esta key, reemplazarlo (solo el último importa)
-  const existingIndex = queue.findIndex(item => item.key === key);
+  const existingIndex = queue.findIndex(item => item.key === supabaseKey);
   if (existingIndex !== -1) {
-    queue[existingIndex] = { key, value, timestamp: Date.now(), retries: 0 };
+    queue[existingIndex] = { key: supabaseKey, value, timestamp: Date.now(), retries: 0 };
   } else {
-    queue.push({ key, value, timestamp: Date.now(), retries: 0 });
+    queue.push({ key: supabaseKey, value, timestamp: Date.now(), retries: 0 });
   }
   saveQueue(queue);
   notifyListeners({ online: isOnline, pendingCount: queue.length, syncing: false });
@@ -65,13 +112,13 @@ function isSupabaseConfigured() {
   return url.length > 0 && !url.includes('placeholder');
 }
 
-async function writeToSupabase(key, value) {
+async function writeToSupabase(supabaseKey, value) {
   if (!isSupabaseConfigured()) {
     throw new Error('Supabase no configurado: faltan variables de entorno VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY');
   }
   const { error } = await supabase
     .from('app_state')
-    .upsert({ key, value }, { onConflict: 'key' });
+    .upsert({ key: supabaseKey, value }, { onConflict: 'key' });
   if (error) throw error;
 }
 
@@ -97,7 +144,6 @@ export async function flushQueue() {
         const retries = (item.retries || 0) + 1;
         if (retries >= MAX_RETRIES) {
           console.warn(`[SyncManager] "${item.key}" descartado tras ${MAX_RETRIES} intentos fallidos:`, err.message);
-          // No lo agregamos a remaining → se descarta
         } else {
           console.warn(`[SyncManager] Error syncing "${item.key}" (intento ${retries}/${MAX_RETRIES}):`, err.message);
           remaining.push({ ...item, retries });
@@ -105,7 +151,6 @@ export async function flushQueue() {
       }
     }
   } finally {
-    // SIEMPRE reseteamos isSyncing, aunque ocurra un error inesperado
     saveQueue(remaining);
     isSyncing = false;
     notifyListeners({ online: isOnline, pendingCount: remaining.length, syncing: false });
@@ -116,22 +161,23 @@ export async function flushQueue() {
 
 /**
  * Escribe un valor al store de Supabase.
- * Si no hay internet, lo encola para cuando vuelva la conexión.
- * @param {string} key — clave en app_state
+ * @param {string} key — nombre BASE de la llave (ej: 'posSales', no 'posSales_BRANCH-001')
  * @param {any} value — valor (array u objeto)
+ * @param {string|null} branchId — ID de la sede. null = llave global o Admin.
  */
-export async function push(key, value) {
+export async function push(key, value, branchId = null) {
+  const supabaseKey = getBranchKey(key, branchId);
+
   if (!isOnline) {
-    enqueue(key, value);
+    enqueue(supabaseKey, value);
     return;
   }
 
   try {
-    await writeToSupabase(key, value);
+    await writeToSupabase(supabaseKey, value);
     notifyListeners({ online: true, pendingCount: getQueue().length, syncing: false });
   } catch (err) {
-    console.warn(`[SyncManager] Falló sync de "${key}", encolando:`, err.message);
-    // Solo marcamos offline si es un error de red real, no un error de Supabase (RLS, etc.)
+    console.warn(`[SyncManager] Falló sync de "${supabaseKey}", encolando:`, err.message);
     const isNetworkError = err.message?.includes('fetch') ||
       err.message?.includes('network') ||
       err.message?.includes('Failed to fetch') ||
@@ -140,33 +186,66 @@ export async function push(key, value) {
       isOnline = false;
       notifyListeners({ online: false, pendingCount: getQueue().length + 1, syncing: false });
     }
-    enqueue(key, value);
+    enqueue(supabaseKey, value);
   }
 }
 
 /**
  * Lee una clave del estado remoto en Supabase.
- * @param {string} key
- * @returns {any} value o null si no existe
+ * @param {string} key — nombre base de la llave
+ * @param {string|null} branchId
  */
-export async function pull(key) {
+export async function pull(key, branchId = null) {
+  const supabaseKey = getBranchKey(key, branchId);
   const { data, error } = await supabase
     .from('app_state')
     .select('value')
-    .eq('key', key)
+    .eq('key', supabaseKey)
     .single();
   if (error || !data) return null;
   return data.value;
 }
 
 /**
- * Lee todas las claves de app_state de una vez (bulk pull al inicio).
- * @returns {Object} mapa key → value
+ * Lee todas las claves relevantes de app_state para una sede específica.
+ * - Admin (branchId=null): descarga globales + llaves de TODAS las sedes activas.
+ * - Operativo (branchId='BRANCH-XXX'): descarga globales + llaves de su sede.
+ * @param {string|null} branchId
+ * @param {string[]} allBranchIds — lista de todos los IDs de sedes (necesario para Admin)
+ * @returns {Object} mapa { supabaseKey → value }
  */
-export async function pullAll() {
+export async function pullAll(branchId = null, allBranchIds = ['BRANCH-001']) {
+  // Construir lista de llaves a descargar
+  const keysToFetch = [...GLOBAL_KEYS];
+
+  if (branchId === null) {
+    // Admin: descarga llaves de todas las sedes conocidas
+    const effectiveBranches = allBranchIds.length > 0 ? allBranchIds : ['BRANCH-001'];
+    for (const bid of effectiveBranches) {
+      for (const bk of BRANCH_KEYS) {
+        keysToFetch.push(`${bk}_${bid}`);
+      }
+    }
+    // También incluir las llaves legacy (sin sufijo) para la migración inicial
+    for (const bk of BRANCH_KEYS) {
+      if (!keysToFetch.includes(bk)) keysToFetch.push(bk);
+    }
+  } else {
+    // Operativo: solo su sede
+    for (const bk of BRANCH_KEYS) {
+      keysToFetch.push(`${bk}_${branchId}`);
+    }
+    // También incluir llaves legacy para migración inicial (primer arranque)
+    for (const bk of BRANCH_KEYS) {
+      if (!keysToFetch.includes(bk)) keysToFetch.push(bk);
+    }
+  }
+
   const { data, error } = await supabase
     .from('app_state')
-    .select('key, value');
+    .select('key, value')
+    .in('key', keysToFetch);
+
   if (error || !data) return {};
   return Object.fromEntries(data.map(row => [row.key, row.value]));
 }
@@ -176,7 +255,6 @@ export async function pullAll() {
 window.addEventListener('online', () => {
   isOnline = true;
   console.log('[SyncManager] Conexión restaurada. Sincronizando cola...');
-  // Pequeño delay para que la red realmente esté disponible antes de intentar sync
   setTimeout(() => flushQueue(), 1000);
 });
 
@@ -187,8 +265,6 @@ window.addEventListener('offline', () => {
   console.log('[SyncManager] Sin conexión. Los cambios se guardarán localmente.');
 });
 
-// Probe de conectividad: verifica la conexión real con Supabase al arrancar.
-// Resuelve el problema de navigator.onLine = false en móviles aunque haya internet.
 async function probeConnectivity() {
   try {
     const { error } = await supabase.from('app_state').select('key').limit(1);
@@ -197,19 +273,14 @@ async function probeConnectivity() {
         isOnline = true;
         notifyListeners({ online: true, pendingCount: getQueue().length, syncing: false });
       }
-      // Si hay cola pendiente, vaciarla
       flushQueue();
     }
   } catch {
-    // Si el probe falla, confiamos en navigator.onLine
     isOnline = navigator.onLine;
   }
 }
 
-// Ejecutar probe al cargar
 probeConnectivity();
-
-// Re-probar cada 30 segundos para recuperarse de falsos negativos
 setInterval(probeConnectivity, 30_000);
 
 export function getSyncStatus() {

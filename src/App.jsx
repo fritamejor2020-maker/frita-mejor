@@ -16,6 +16,7 @@ import { WarehouseView }  from './modules/warehouse/WarehouseView';
 import { AdminView }      from './modules/admin/AdminView';
 import { PosView }        from './modules/pos/PosView';
 import { FritadoView }    from './modules/fritado/FritadoView';
+import { TransfersView }  from './modules/transfers/TransfersView';
 
 import { SellerSetupView }     from './views/SellerSetupView';
 import { DejadorSetupView }    from './views/DejadorSetupView';
@@ -86,6 +87,7 @@ function RoleRedirect() {
       pos: '/pos', finanzas: '/finanzas',
       'finanzas-ingresos': '/finanzas', 'finanzas-gastos': '/finanzas', 'finanzas-nomina': '/finanzas',
       admin: '/admin', tracking: '/tracking', cierres: '/cierres',
+      traslados: '/traslados',
     };
     return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }
@@ -266,6 +268,10 @@ function App() {
 
               <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
                 <Route path="/cierres" element={<CierresView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['traslados', 'admin']} />}>
+                <Route path="/traslados" element={<TransfersView />} />
               </Route>
 
               {/* Sin acceso al módulo */}

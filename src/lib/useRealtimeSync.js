@@ -1,79 +1,108 @@
 import { useEffect, useRef } from 'react';
-import { flushSync } from 'react-dom';
 import { unstable_batchedUpdates } from 'react-dom';
 import { supabase } from './supabase';
-import { pullAll } from './syncManager';
+import { pullAll, GLOBAL_KEYS, BRANCH_KEYS, getBranchKey, getBaseKey } from './syncManager';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useSupplierStore } from '../store/useSupplierStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePayrollStore } from '../store/usePayrollStore';
+import { useBranchStore } from '../store/useBranchStore';
+import { useTransferStore } from '../store/useTransferStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
-// Cuando otro dispositivo hace un cambio, este hook lo recibe y actualiza el
-// store local automáticamente, sin recargar la página.
+// Soporte Multisede: los applicators se generan dinámicamente según el branchId
+// del usuario activo, de modo que cada dispositivo solo aplica cambios de su sede.
 // ==============================================================================
 
-// Flag para evitar que los updates de Supabase Realtime disparen re-broadcasts al crossTabSync.
 let _isApplyingRealtimeState = false;
 export function isApplyingRealtimeState() { return _isApplyingRealtimeState; }
 
-// Flag para evitar loops: cuando nosotros mismos hacemos un push, Supabase nos
-// devuelve el evento. Este flag lo ignora durante 500ms.
 let _ignoreRemoteKeys = new Set();
 
-export function markLocalWrite(key) {
-  _ignoreRemoteKeys.add(key);
-  setTimeout(() => _ignoreRemoteKeys.delete(key), 2000);
+export function markLocalWrite(key, branchId = null) {
+  const supabaseKey = getBranchKey(key, branchId);
+  _ignoreRemoteKeys.add(supabaseKey);
+  setTimeout(() => _ignoreRemoteKeys.delete(supabaseKey), 2000);
 }
 
-// Mapa de key → función que aplica el valor remoto al store correspondiente
-function getApplicators() {
-  return {
-    warehouses:        (v) => useInventoryStore.setState({ warehouses: v }),
-    inventory:         (v) => useInventoryStore.setState({ inventory: v }),
-    movements:         (v) => useInventoryStore.setState({ movements: v }),
-    products:          (v) => useInventoryStore.setState({ products: v }),
-    recipes:           (v) => useInventoryStore.setState({ recipes: v }),
-    fritadoRecipes:    (v) => useInventoryStore.setState({ fritadoRecipes: v }),
-    posCategories:     (v) => useInventoryStore.setState({ posCategories: v }),
-    posSettings:       (v) => useInventoryStore.setState({ posSettings: v }),
-    posRegisters:      (v) => useInventoryStore.setState({ posRegisters: v }),
-    posShifts:         (v) => useInventoryStore.setState({ posShifts: v }),
-    posSales:          (v) => useInventoryStore.setState({ posSales: v }),
-    posExpenses:       (v) => useInventoryStore.setState({ posExpenses: v }),
-    customers:         (v) => useInventoryStore.setState({ customers: v }),
-    customerTypes:     (v) => useInventoryStore.setState({ customerTypes: v }),
-    loadTemplates:     (v) => useInventoryStore.setState({ loadTemplates: v }),
-    vehicles:          (v) => useVehicleStore.setState({ vehicles: v }),
-    suppliers:         (v) => useSupplierStore.setState({ suppliers: v }),
-    pendingRequests:   (v) => useLogisticsStore.setState({ pendingRequests: v }),
-    completedRequests: (v) => useLogisticsStore.setState({ completedRequests: v }),
-    rejectedRequests:  (v) => useLogisticsStore.setState({ rejectedRequests: v }),
-    loadHistory:       (v) => useLogisticsStore.setState({ loadHistory: v }),
-    users:             (v) => useAuthStore.setState({ users: v }),
-    payrollEmployees:  (v) => usePayrollStore.setState({ payrollEmployees: v }),
-    payrollRecords:    (v) => usePayrollStore.setState({ payrollRecords: v }),
-  };
-}
+// ─── Applicators dinámicos ────────────────────────────────────────────────────
 
 /**
- * Aplica un mapa { key: value } agrupando TODOS los setState en un único
- * render de React usando unstable_batchedUpdates.
- * Esto evita el crash "insertBefore" que ocurría cuando múltiples setState
- * en secuencia disparaban renders de React solapados.
+ * Genera el mapa { supabaseKey → función aplicadora } para un branchId dado.
+ * - Las llaves globales siempre se incluyen.
+ * - Las llaves locales se incluyen con el sufijo del branchId del usuario.
+ * - Si branchId es null (Admin), se incluyen llaves de TODAS las sedes activas.
  */
-function applyRemoteSnapshot(snapshot) {
-  const applicators = getApplicators();
+function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
+  const applicators = {};
+
+  // ── Globales (sin sufijo) ──
+  applicators['warehouses']        = (v) => useInventoryStore.setState({ warehouses: v });
+  applicators['products']          = (v) => useInventoryStore.setState({ products: v });
+  applicators['movements']         = (v) => useInventoryStore.setState({ movements: v });
+  applicators['recipes']           = (v) => useInventoryStore.setState({ recipes: v });
+  applicators['fritadoRecipes']    = (v) => useInventoryStore.setState({ fritadoRecipes: v });
+  applicators['posCategories']     = (v) => useInventoryStore.setState({ posCategories: v });
+  applicators['customers']         = (v) => useInventoryStore.setState({ customers: v });
+  applicators['customerTypes']     = (v) => useInventoryStore.setState({ customerTypes: v });
+  applicators['loadTemplates']     = (v) => useInventoryStore.setState({ loadTemplates: v });
+  applicators['vehicles']          = (v) => useVehicleStore.setState({ vehicles: v });
+  applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
+  applicators['pendingRequests']   = (v) => useLogisticsStore.setState({ pendingRequests: v });
+  applicators['completedRequests'] = (v) => useLogisticsStore.setState({ completedRequests: v });
+  applicators['rejectedRequests']  = (v) => useLogisticsStore.setState({ rejectedRequests: v });
+  applicators['loadHistory']       = (v) => useLogisticsStore.setState({ loadHistory: v });
+  applicators['users']             = (v) => useAuthStore.setState({ users: v });
+  applicators['payrollEmployees']  = (v) => usePayrollStore.setState({ payrollEmployees: v });
+  applicators['payrollRecords']    = (v) => usePayrollStore.setState({ payrollRecords: v });
+  applicators['branches']          = (v) => useBranchStore.getState().loadFromRemote(v);
+  applicators['vendorLocations']   = (v) => useInventoryStore.setState({ vendorLocations: v });
+  applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
+
+  // ── Locales por sede ──
+  // Si es Admin (branchId=null), suscribe a TODAS las sedes.
+  // Si es operativo, solo a su sede.
+  const effectiveBranches = branchId === null
+    ? (allBranchIds.length > 0 ? allBranchIds : ['BRANCH-001'])
+    : [branchId];
+
+  for (const bid of effectiveBranches) {
+    applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: { ...useInventoryStore.getState().posSettings, [bid]: v } });
+    applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
+    applicators[`posShifts_${bid}`]        = (v) => useInventoryStore.setState({ posShifts: v });
+    applicators[`posSales_${bid}`]         = (v) => useInventoryStore.setState({ posSales: v });
+    applicators[`posExpenses_${bid}`]      = (v) => useInventoryStore.setState({ posExpenses: v });
+    applicators[`inventory_${bid}`]        = (v) => useInventoryStore.setState({ inventory: v });
+    applicators[`contrataPayments_${bid}`] = (v) => useInventoryStore.setState({ contrataPayments: v });
+    applicators[`deletedShiftIds_${bid}`]  = (v) => useInventoryStore.setState({ deletedShiftIds: v });
+
+    // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
+    if (!applicators['posShifts'])    applicators['posShifts']    = (v) => useInventoryStore.setState({ posShifts: v });
+    if (!applicators['posSales'])     applicators['posSales']     = (v) => useInventoryStore.setState({ posSales: v });
+    if (!applicators['posExpenses'])  applicators['posExpenses']  = (v) => useInventoryStore.setState({ posExpenses: v });
+    if (!applicators['posRegisters']) applicators['posRegisters'] = (v) => useInventoryStore.setState({ posRegisters: v });
+    if (!applicators['posSettings'])  applicators['posSettings']  = (v) => useInventoryStore.setState({ posSettings: v });
+    if (!applicators['inventory'])    applicators['inventory']    = (v) => useInventoryStore.setState({ inventory: v });
+    if (!applicators['contrataPayments']) applicators['contrataPayments'] = (v) => useInventoryStore.setState({ contrataPayments: v });
+  }
+
+  return applicators;
+}
+
+// ─── Aplicación de snapshot remoto ────────────────────────────────────────────
+
+function applyRemoteSnapshot(snapshot, branchId, allBranchIds) {
+  const applicators = getApplicators(branchId, allBranchIds);
   _isApplyingRealtimeState = true;
   try {
     unstable_batchedUpdates(() => {
       Object.entries(snapshot).forEach(([key, value]) => {
         const apply = applicators[key];
         if (apply) {
-          console.log(`[Realtime] Aplicando estado remoto (pull): "${key}"`);
+          console.log(`[Realtime] Aplicando estado remoto: "${key}"`);
           apply(value);
         }
       });
@@ -83,14 +112,13 @@ function applyRemoteSnapshot(snapshot) {
   }
 }
 
-/**
- * Fuerza una re-lectura de todo el estado desde Supabase y lo aplica localmente.
- */
-export async function refreshAllFromSupabase() {
+// ─── Refresh forzado desde Supabase ───────────────────────────────────────────
+
+export async function refreshAllFromSupabase(branchId, allBranchIds) {
   try {
-    const snapshot = await pullAll();
+    const snapshot = await pullAll(branchId, allBranchIds);
     if (snapshot && Object.keys(snapshot).length > 0) {
-      applyRemoteSnapshot(snapshot);
+      applyRemoteSnapshot(snapshot, branchId, allBranchIds);
       console.log('[Realtime] Estado fresco obtenido desde Supabase ✅');
     }
   } catch (err) {
@@ -98,29 +126,34 @@ export async function refreshAllFromSupabase() {
   }
 }
 
-// ── Batching de eventos individuales de Realtime ──────────────────────────────
-// Supabase puede disparar varios eventos en ráfaga (uno por key).
-// Los acumulamos en un objeto y los aplicamos todos juntos con un setTimeout(0),
-// garantizando un único render de React por ráfaga de cambios remotos.
+// ─── Batching de eventos individuales de Realtime ────────────────────────────
+
 let _pendingBatch = {};
 let _batchTimer = null;
 
-function scheduleBatch(key, value) {
+function scheduleBatch(key, value, branchId, allBranchIds) {
   _pendingBatch[key] = value;
-  if (_batchTimer) return; // ya hay un flush programado
+  if (_batchTimer) return;
   _batchTimer = setTimeout(() => {
     const batch = _pendingBatch;
     _pendingBatch = {};
     _batchTimer = null;
-    applyRemoteSnapshot(batch);
-  }, 0); // flush en el siguiente macrotask (fuera del render actual)
+    applyRemoteSnapshot(batch, branchId, allBranchIds);
+  }, 0);
 }
+
+// ─── Hook principal ───────────────────────────────────────────────────────────
 
 export function useRealtimeSync() {
   const channelRef = useRef(null);
   const pullDebounceRef = useRef(null);
 
   useEffect(() => {
+    // Obtener el branchId del usuario activo en el momento de montar
+    const user = useAuthStore.getState().user;
+    const branchId = user?.branchId ?? null;
+    const allBranchIds = useBranchStore.getState().branches.map(b => b.id);
+
     const channel = supabase
       .channel('app-state-realtime')
       .on(
@@ -132,14 +165,13 @@ export function useRealtimeSync() {
 
           const { key, value } = newRow;
 
-          // Ignorar si fuimos nosotros quienes escribimos (evita parpadeo)
           if (_ignoreRemoteKeys.has(key)) return;
 
-          const applicators = getApplicators();
-          if (applicators[key]) {
+          // Solo procesar llaves que le corresponden a este dispositivo
+          const currentApplicators = getApplicators(branchId, allBranchIds);
+          if (currentApplicators[key]) {
             console.log(`[Realtime] Actualización remota recibida: "${key}"`);
-            // Acumular y aplicar en batch para evitar renders concurrentes
-            scheduleBatch(key, value);
+            scheduleBatch(key, value, branchId, allBranchIds);
           }
         }
       )
@@ -148,7 +180,7 @@ export function useRealtimeSync() {
         if (status === 'SUBSCRIBED') {
           clearTimeout(pullDebounceRef.current);
           pullDebounceRef.current = setTimeout(() => {
-            refreshAllFromSupabase();
+            refreshAllFromSupabase(branchId, allBranchIds);
           }, 800);
         }
       });

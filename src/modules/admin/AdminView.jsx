@@ -15,6 +15,8 @@ import { AdminVehiclesTab } from '../../components/admin/AdminVehiclesTab';
 import { AdminSuppliersTab } from '../../components/admin/AdminSuppliersTab';
 import { ResetGeneralPanel } from '../../components/admin/ResetGeneralPanel';
 import { AdminIncomeSourcesTab } from '../../components/admin/AdminIncomeSourcesTab';
+import { GlobalSettingsPanel } from '../../components/admin/GlobalSettingsPanel';
+import { PermissionsPanel } from '../../components/admin/PermissionsPanel';
 
 import { AdminContratasTab } from '../../components/admin/AdminContratasTab';
 import { AdminTicketConfigTab } from '../../components/admin/AdminTicketConfigTab';
@@ -2402,8 +2404,10 @@ export function AdminView() {
       { id: 'NOMINA',     label: '👥 Nómina' },
     ],
     SISTEMA: [
-      { id: 'USUARIOS',      label: '👥 Usuarios del Sistema' },
-      { id: 'RESET_GENERAL', label: '🗑️ Reset General' },
+      { id: 'SEDES',            label: '🏢 Sedes y Sucursales' },
+      { id: 'PERMISOS_MANAGER', label: '🔑 Permisos Gerentes' },
+      { id: 'USUARIOS',         label: '👥 Usuarios del Sistema' },
+      { id: 'RESET_GENERAL',    label: '🗑️ Reset General' },
     ]
   };
 
@@ -2542,6 +2546,10 @@ export function AdminView() {
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
         { activeTab === 'NOMINA' && <NominaAdminPanel /> }
+
+        {/* Nuevas pestañas multisede */}
+        { activeTab === 'SEDES' && <GlobalSettingsPanel /> }
+        { activeTab === 'PERMISOS_MANAGER' && <PermissionsPanel /> }
       </div>
     </div>
   );
