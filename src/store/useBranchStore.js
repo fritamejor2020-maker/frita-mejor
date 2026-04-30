@@ -130,6 +130,16 @@ export const useBranchStore = create(
         syncBranches(useBranchStore.getState().branches);
       },
 
+      deleteBranch: (id) => {
+        if (id === 'BRANCH-001') {
+          console.warn('[BranchStore] No se puede eliminar la Sede Principal.');
+          return { ok: false, error: 'No puedes eliminar la Sede Principal.' };
+        }
+        set(s => ({ branches: s.branches.filter(b => b.id !== id) }));
+        syncBranches(useBranchStore.getState().branches);
+        return { ok: true };
+      },
+
       // ─── Carga remota ──────────────────────────────────────────────────────
       loadFromRemote: (remoteBranches) => {
         if (Array.isArray(remoteBranches) && remoteBranches.length > 0) {

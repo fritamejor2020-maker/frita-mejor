@@ -13,8 +13,9 @@ const TRANSFER_TYPES = [
 // Solo visible para el Administrador Principal (role === 'ADMIN')
 // =============================================================================
 
-function BranchCard({ branch, onEdit, onToggle }) {
+function BranchCard({ branch, onEdit, onToggle, onDelete }) {
   const typeInfo = BRANCH_TYPES[branch.type] || { label: branch.type, icon: '🏢' };
+  const isPrincipal = branch.id === 'BRANCH-001';
   return (
     <div className={`border-2 rounded-2xl p-5 transition-all ${branch.active !== false ? 'border-gray-100 bg-white' : 'border-dashed border-gray-200 bg-gray-50 opacity-60'}`}>
       <div className="flex items-start justify-between gap-4">
@@ -37,6 +38,7 @@ function BranchCard({ branch, onEdit, onToggle }) {
           <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${branch.active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
             {branch.active !== false ? 'ACTIVA' : 'INACTIVA'}
           </span>
+          {isPrincipal && <span className="text-[10px] font-black px-2.5 py-1 rounded-full bg-amber-100 text-amber-700">PRINCIPAL</span>}
         </div>
       </div>
 
@@ -91,7 +93,7 @@ function BranchCard({ branch, onEdit, onToggle }) {
         >
           ✏️ Editar
         </button>
-        {branch.id !== 'BRANCH-001' && (
+        {!isPrincipal && (
           <button
             onClick={() => onToggle(branch)}
             className={`flex-1 font-bold text-xs py-2 rounded-xl transition-colors ${branch.active !== false
@@ -100,6 +102,15 @@ function BranchCard({ branch, onEdit, onToggle }) {
             }`}
           >
             {branch.active !== false ? '⏸ Desactivar' : '▶ Reactivar'}
+          </button>
+        )}
+        {!isPrincipal && (
+          <button
+            onClick={() => onDelete(branch)}
+            className="border border-red-100 text-red-400 font-bold text-xs py-2 px-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
+            title="Eliminar sede"
+          >
+            🗑️
           </button>
         )}
       </div>
@@ -223,12 +234,13 @@ function BranchModal({ branch, onSave, onClose }) {
 }
 
 export function GlobalSettingsPanel() {
-  const { branches, addBranch, updateBranch, updateBranchSettings, deactivateBranch, reactivateBranch } = useBranchStore();
+  const { branches, addBranch, updateBranch, updateBranchSettings, deactivateBranch, reactivateBranch, deleteBranch } = useBranchStore();
   const user = useAuthStore(s => s.user);
 
-  const [showModal,    setShowModal]    = useState(false);
+  const [showModal,     setShowModal]    = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
-  const [confirmBranch, setConfirmBranch] = useState(null); // sede a desactivar
+  const [confirmBranch, setConfirmBranch] = useState(null);  // sede a desactivar
+  const [deletingBranch, setDeletingBranch] = useState(null); // sede a eliminar
 
   // Solo ADMIN puede ver esto
   if (user?.role !== 'ADMIN') {
@@ -290,6 +302,7 @@ export function GlobalSettingsPanel() {
             branch={branch}
             onEdit={(b) => { setEditingBranch(b); setShowModal(true); }}
             onToggle={handleToggle}
+            onDelete={(b) => setDeletingBranch(b)}
           />
         ))}
       </div>
@@ -305,6 +318,7 @@ export function GlobalSettingsPanel() {
                 branch={branch}
                 onEdit={(b) => { setEditingBranch(b); setShowModal(true); }}
                 onToggle={handleToggle}
+                onDelete={(b) => setDeletingBranch(b)}
               />
             ))}
           </div>
@@ -356,6 +370,35 @@ export function GlobalSettingsPanel() {
                 className="flex-1 bg-orange-500 text-white font-black py-3 rounded-full hover:bg-orange-600 transition-colors"
               >
                 Sí, desactivar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Modal de confirmación de eliminar */}
+      {deletingBranch && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center text-3xl mx-auto mb-4">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">¿Eliminar sede permanentemente?</h2>
+            <p className="text-sm text-gray-500 font-medium mb-1">
+              <span className="font-black text-gray-800">"{deletingBranch.name}"</span>
+            </p>
+            <p className="text-xs text-red-400 font-medium mb-6">
+              ⚠️ Esta acción no se puede deshacer. Los registros históricos en Supabase se conservan, pero la sede desaparece de la lista.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingBranch(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deleteBranch(deletingBranch.id); setDeletingBranch(null); }}
+                className="flex-1 bg-red-500 text-white font-black py-3 rounded-full hover:bg-red-600 transition-colors"
+              >
+                Sí, eliminar
               </button>
             </div>
           </div>

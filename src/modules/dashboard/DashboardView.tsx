@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDashboardFilters, Period } from '../../hooks/useDashboardFilters';
 import { useDashboardData } from '../../hooks/useDashboardData';
 import { useFinanceStore } from '../../store/useFinanceStore';
-import { useInventoryStore } from '../../store/useInventoryStore';
+import { useBranchStore } from '../../store/useBranchStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { MonthlyCalendarSection } from '../../components/dashboard/MonthlyCalendarSection';
 import { IncomeSourceSection } from '../../components/dashboard/IncomeSourceSection';
@@ -49,7 +49,7 @@ function FilterBar() {
     selectedMonth, setSelectedMonth,
     selectedYear, setSelectedYear,
   } = useDashboardFilters();
-  const branches = (useInventoryStore as any).getState().branches || [];
+  const branches = useBranchStore(s => s.branches.filter(b => b.active !== false));
 
   const PERIODS: { key: Period; label: string }[] = [
     { key: 'day',    label: 'Hoy'    },
