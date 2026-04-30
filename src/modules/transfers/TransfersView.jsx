@@ -445,19 +445,29 @@ export function TransfersView() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 font-sans">
+    <div className="min-h-screen font-sans" style={{ background: 'linear-gradient(160deg, #FFF8EE 0%, #FFF3E0 100%)' }}>
+
       {/* Header */}
-      <div className="bg-white border-b border-gray-100 px-4 py-4 flex items-center justify-between sticky top-0 z-10">
-        <div>
-          <h1 className="text-xl font-black text-gray-900">🚛 Traslados</h1>
-          <p className="text-xs text-gray-400 font-medium">Inter-sede · {transfers.length} registros</p>
+      <div className="bg-white border-b border-orange-100 px-5 py-4 flex items-center justify-between sticky top-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center text-xl shadow-sm">
+            🚛
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-gray-900 leading-tight">Traslados</h1>
+            <p className="text-xs text-gray-400 font-medium">Inter-sede · {transfers.length} registros</p>
+          </div>
         </div>
         {(userBranchId || isAdmin) && (
           <button
             onClick={() => setShowForm(v => !v)}
-            className="bg-orange-500 text-white font-black px-4 py-2.5 rounded-xl text-sm hover:bg-orange-600 transition-colors shadow-sm"
+            className={`font-black px-5 py-2.5 rounded-xl text-sm transition-all shadow-sm ${
+              showForm
+                ? 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                : 'bg-gradient-to-r from-orange-500 to-red-500 text-white hover:opacity-90'
+            }`}
           >
-            + Solicitar
+            {showForm ? '✕ Cancelar' : '+ Solicitar'}
           </button>
         )}
       </div>
@@ -475,42 +485,50 @@ export function TransfersView() {
           />
         )}
 
-        {/* Tabs */}
-        <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
-          {TABS.map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl font-black text-sm transition-all ${
-                tab === t.key
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-white text-gray-600 border border-gray-100 hover:border-orange-300'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-
-          {/* Filtro de estado */}
-          <select
-            className="ml-auto flex-shrink-0 px-3 py-2 rounded-xl border border-gray-100 text-sm font-bold text-gray-600 outline-none bg-white"
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-          >
-            <option value="">Todos los estados</option>
-            {Object.entries(TRANSFER_STATUS).map(([key, val]) => (
-              <option key={key} value={key}>{val.icon} {val.label}</option>
+        {/* Tabs + Filtro — separados en dos filas */}
+        <div className="space-y-2">
+          {/* Fila 1: tabs de vista */}
+          <div className="flex gap-2 overflow-x-auto pb-0.5 hide-scrollbar">
+            {TABS.map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`flex-shrink-0 px-4 py-2 rounded-xl font-black text-sm transition-all ${
+                  tab === t.key
+                    ? 'bg-orange-500 text-white shadow-sm shadow-orange-200'
+                    : 'bg-white text-gray-600 border border-gray-200 hover:border-orange-300 hover:text-orange-600'
+                }`}
+              >
+                {t.label}
+              </button>
             ))}
-          </select>
+          </div>
+
+          {/* Fila 2: filtro de estado — siempre visible */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-gray-400 flex-shrink-0">Estado:</span>
+            <select
+              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-700 outline-none bg-white focus:border-orange-400 transition-colors"
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+            >
+              <option value="">Todos los estados</option>
+              {Object.entries(TRANSFER_STATUS).map(([key, val]) => (
+                <option key={key} value={key}>{val.icon} {val.label}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {/* Lista */}
         {filtered.length === 0 ? (
-          <div className="text-center py-16 text-gray-400">
-            <div className="text-5xl mb-3">🚛</div>
-            <p className="font-black text-lg">Sin traslados</p>
-            <p className="text-sm mt-1">
-              {userBranchId ? 'Haz clic en "+ Solicitar" para crear uno.' : 'Aún no hay traslados registrados.'}
+          <div className="text-center py-20">
+            <div className="w-20 h-20 rounded-3xl bg-orange-100 flex items-center justify-center text-4xl mx-auto mb-4 shadow-sm">
+              🚛
+            </div>
+            <p className="font-black text-gray-700 text-lg">Sin traslados</p>
+            <p className="text-sm text-gray-400 font-medium mt-1">
+              {(userBranchId || isAdmin) ? 'Usa "+ Solicitar" para crear el primero.' : 'Aún no hay traslados registrados.'}
             </p>
           </div>
         ) : (
@@ -530,3 +548,4 @@ export function TransfersView() {
     </div>
   );
 }
+

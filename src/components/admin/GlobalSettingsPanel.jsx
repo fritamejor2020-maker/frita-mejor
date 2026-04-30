@@ -226,8 +226,9 @@ export function GlobalSettingsPanel() {
   const { branches, addBranch, updateBranch, updateBranchSettings, deactivateBranch, reactivateBranch } = useBranchStore();
   const user = useAuthStore(s => s.user);
 
-  const [showModal, setShowModal] = useState(false);
+  const [showModal,    setShowModal]    = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
+  const [confirmBranch, setConfirmBranch] = useState(null); // sede a desactivar
 
   // Solo ADMIN puede ver esto
   if (user?.role !== 'ADMIN') {
@@ -252,9 +253,7 @@ export function GlobalSettingsPanel() {
 
   const handleToggle = (branch) => {
     if (branch.active !== false) {
-      if (window.confirm(`¿Desactivar la sede "${branch.name}"? Los usuarios asignados a esta sede no podrán operar hasta que la reactives.`)) {
-        deactivateBranch(branch.id);
-      }
+      setConfirmBranch(branch); // abrir modal de confirmación
     } else {
       reactivateBranch(branch.id);
     }
@@ -324,13 +323,43 @@ export function GlobalSettingsPanel() {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal de edición */}
       {showModal && editingBranch !== null && (
         <BranchModal
           branch={editingBranch}
           onSave={handleSave}
           onClose={() => { setShowModal(false); setEditingBranch(null); }}
         />
+      )}
+
+      {/* Modal de confirmación de desactivación */}
+      {confirmBranch && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center">
+            <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-3xl mx-auto mb-4">⏸</div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">¿Desactivar sede?</h2>
+            <p className="text-sm text-gray-500 font-medium mb-1">
+              <span className="font-black text-gray-800">"{confirmBranch.name}"</span>
+            </p>
+            <p className="text-xs text-gray-400 font-medium mb-6">
+              Los usuarios asignados a esta sede no podrán operar hasta que la reactives.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmBranch(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deactivateBranch(confirmBranch.id); setConfirmBranch(null); }}
+                className="flex-1 bg-orange-500 text-white font-black py-3 rounded-full hover:bg-orange-600 transition-colors"
+              >
+                Sí, desactivar
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
