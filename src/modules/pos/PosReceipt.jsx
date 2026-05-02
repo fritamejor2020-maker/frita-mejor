@@ -74,15 +74,17 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
       <style>
         @page { size: 80mm auto; margin: 0; }
         @media print {
-          body { -webkit-print-color-adjust: exact; margin: 0; padding: 0; background: white; }
+          body { margin: 0; padding: 0; background: white; }
           html { background: transparent; }
+          * { color: black !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          img { filter: grayscale(100%) contrast(1000%) !important; }
         }
       </style>
 
       <!-- Header & Logo -->
       <div style="text-align: center; margin-bottom: 12px;">
         ${tc.showLogo ? `<div style="display: flex; justify-content: center; margin-bottom: 6px;">
-          <img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 120px; height: auto; display: block; margin: 0 auto;" />
+          <img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 120px; height: auto; display: block; margin: 0 auto; filter: grayscale(100%) contrast(1000%);" />
         </div>` : ''}
         ${tc.showNit && tc.nit ? `<p style="font-weight: bold; margin: 0;">NIT: ${tc.nit}</p>` : ''}
         ${tc.showPhone && tc.phone ? `<p style="margin: 0;">Tel: ${tc.phone}</p>` : ''}

@@ -134,13 +134,15 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <style>
         @page { size: auto; margin: 0; }
         @media print {
-          body { -webkit-print-color-adjust: exact; margin: 0; }
+          body { margin: 0; }
+          * { color: black !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          img { filter: grayscale(100%) contrast(1000%) !important; }
         }
       </style>
 
       <!-- Header -->
       <div style="text-align: center; margin-bottom: 16px;">
-        ${tc.showLogo ? `<img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto;" />` : ''}
+        ${tc.showLogo ? `<img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto; filter: grayscale(100%) contrast(1000%);" />` : ''}
         <h1 style="font-weight: 900; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">${tc.zCustomTitle || 'REPORTE Z — CIERRE DE TURNO'}</h1>
         ${tc.showNit !== false && tc.nit ? `<p style="font-size: 11px; margin: 0;">NIT: ${tc.nit}</p>` : ''}
         ${tc.showPhone !== false && tc.phone ? `<p style="font-size: 11px; margin: 0;">Tel: ${tc.phone}</p>` : ''}

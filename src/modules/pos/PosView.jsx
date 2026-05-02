@@ -370,26 +370,26 @@ export function PosView() {
     const typeName = c?.typeId ? (customerTypes.find(t => t.id === c.typeId)?.name || '') : '';
     const orderHtml = `
       <div style="width:80mm;color:black;font-family:sans-serif;font-size:14px;padding:16px;margin:0 auto;">
-        <style>@page{size:auto;margin:0;}@media print{body{margin:0;}}</style>
+        <style>@page{size:auto;margin:0;}@media print{body{margin:0;}* { color: black !important; background: white !important; }}</style>
         <div style="text-align:center;margin-bottom:12px;border-bottom:2px dashed black;padding-bottom:8px;">
-          <h1 style="font-weight:900;font-size:20px;margin:0;">📋 PEDIDO</h1>
+          <h1 style="font-weight:900;font-size:20px;margin:0;">PEDIDO</h1>
           <p style="font-size:12px;margin:4px 0 0;">${new Date().toLocaleString('es-CO',{dateStyle:'short',timeStyle:'short'})}</p>
         </div>
-        ${c ? `<div style="background:#f3f4f6;padding:8px;border-radius:8px;margin-bottom:12px;">
+        ${c ? `<div style="border: 2px solid black; padding:8px; margin-bottom:12px;">
           <p style="font-weight:900;margin:0;font-size:14px;">${c.name}</p>
-          ${typeName ? `<p style="margin:2px 0 0;font-size:12px;color:#666;">${typeName}</p>` : ''}
+          ${typeName ? `<p style="margin:2px 0 0;font-size:12px;">${typeName}</p>` : ''}
           ${c.phone ? `<p style="margin:2px 0 0;font-size:12px;">Tel: ${c.phone}</p>` : ''}
         </div>` : ''}
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="border-bottom:2px solid black;"><th style="text-align:left;padding:4px 0;">Producto</th><th style="text-align:center;width:40px;">Cant</th><th style="text-align:right;padding:4px 0;">Total</th></tr></thead>
           <tbody>
-            ${ticketItems.map(i => `<tr style="border-bottom:1px dashed #ccc;"><td style="padding:4px 0;">${i.name}</td><td style="text-align:center;">${i.qty}</td><td style="text-align:right;font-weight:bold;">$${(i.price * i.qty).toLocaleString('es-CO')}</td></tr>`).join('')}
+            ${ticketItems.map(i => `<tr style="border-bottom:1px dashed black;"><td style="padding:4px 0;">${i.name}</td><td style="text-align:center;">${i.qty}</td><td style="text-align:right;font-weight:bold;">$${(i.price * i.qty).toLocaleString('es-CO')}</td></tr>`).join('')}
           </tbody>
         </table>
         <div style="border-top:2px solid black;margin-top:8px;padding-top:8px;display:flex;justify-content:space-between;font-weight:900;font-size:18px;">
           <span>TOTAL</span><span>$${total.toLocaleString('es-CO')}</span>
         </div>
-        <p style="text-align:center;margin-top:16px;font-size:12px;font-weight:bold;color:#666;">⏳ PENDIENTE DE PAGO</p>
+        <p style="text-align:center;margin-top:16px;font-size:12px;font-weight:bold;">*** PENDIENTE DE PAGO ***</p>
       </div>
     `;
     printHTML(orderHtml, 'Pedido');
