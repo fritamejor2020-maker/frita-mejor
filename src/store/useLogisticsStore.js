@@ -25,6 +25,48 @@ function syncKeyWithBranch(key, value, branchId) {
 }
 
 /**
+ * Sincroniza las particiones de logística de una sede específica.
+ * El Dejador tiene branchId:null y maneja pedidos de TODAS las sedes.
+ * Para no contaminar la partición global ni otras sedes, este helper
+ * filtra el array completo y escribe solo el slice de la sede afectada.
+ *
+ * @param {string}  affectedBranchId - Sede del pedido que fue procesado
+ * @param {Array}   pendingReqs      - Array completo de pendingRequests
+ * @param {Array}   [completedReqs]  - Array completo de completedRequests
+ * @param {Array}   [rejectedReqs]   - Array completo de rejectedRequests
+ * @param {object}  opts             - { syncCompleted, syncRejected }
+ */
+function syncLogisticsPartition(
+  affectedBranchId,
+  pendingReqs,
+  completedReqs,
+  rejectedReqs,
+  { syncCompleted = false, syncRejected = false } = {}
+) {
+  const bid = affectedBranchId || 'BRANCH-001';
+  const pendingSlice = (pendingReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
+  syncKeyWithBranch('pendingRequests', pendingSlice, bid);
+  if (syncCompleted) {
+    const completedSlice = (completedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
+    syncKeyWithBranch('completedRequests', completedSlice, bid);
+  }
+  if (syncRejected) {
+    const rejectedSlice = (rejectedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
+    syncKeyWithBranch('rejectedRequests', rejectedSlice, bid);
+  }
+}
+
+/**
+ * Resuelve el branchId de un vehículo por su ID/abreviación.
+ * Usado por Dejador para saber a qué partición escribir loadHistory.
+ */
+function getVehicleBranchId(vehicleId) {
+  const vehicle = useVehicleStore.getState().vehicles
+    .find(v => (v.abbreviation || v.name) === vehicleId);
+  return vehicle?.branchId || 'BRANCH-001';
+}
+
+/**
  * Store global para administrar flujos Logísticos y de Surtido
  */
 export const useLogisticsStore = create(
@@ -160,6 +202,7 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const affectedBranchId = req.branchId || 'BRANCH-001';
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const newPending = pendingRequests.filter(req => req.id !== requestId);
     const newCompleted = [{
@@ -170,8 +213,7 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...completedRequests];
     set({ pendingRequests: newPending, completedRequests: newCompleted });
-    syncKey('pendingRequests', newPending);
-    syncKey('completedRequests', newCompleted);
+    syncLogisticsPartition(affectedBranchId, newPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
   },
 
   /**
@@ -184,6 +226,7 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const affectedBranchId = req.branchId || 'BRANCH-001';
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
 
     // Quitar el request original de pendientes
@@ -199,7 +242,7 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...completedRequests];
 
-    // Reencolar los ítems pospuestos como nuevo pedido pendiente
+    // Reencolar los ítems pospuestos como nuevo pedido pendiente (heredan el branchId del original)
     let finalPending = newPending;
     if (postponedItems.length > 0) {
       const postponedRequest = {
@@ -209,6 +252,7 @@ export const useLogisticsStore = create(
         items_payload: postponedItems,
         location: req.location || null,
         observacion: req.observacion || null,
+        branchId: affectedBranchId,  // ← propagar branchId al pedido reencolado
         status: 'pending',
         isPostponed: true,
         created_at: new Date().toISOString(),
@@ -218,8 +262,7 @@ export const useLogisticsStore = create(
     }
 
     set({ pendingRequests: finalPending, completedRequests: newCompleted });
-    syncKey('pendingRequests', finalPending);
-    syncKey('completedRequests', newCompleted);
+    syncLogisticsPartition(affectedBranchId, finalPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
   },
 
   rejectRequest: (requestId) => {
@@ -227,6 +270,7 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const affectedBranchId = req.branchId || 'BRANCH-001';
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const newPending = pendingRequests.filter(r => r.id !== requestId);
     const newRejected = [{
@@ -237,8 +281,7 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...rejectedRequests];
     set({ pendingRequests: newPending, rejectedRequests: newRejected });
-    syncKey('pendingRequests', newPending);
-    syncKey('rejectedRequests', newRejected);
+    syncLogisticsPartition(affectedBranchId, newPending, get().completedRequests, newRejected, { syncRejected: true });
   },
 
   /**
@@ -251,6 +294,7 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req || req.readAt) return; // Ya estaba leído
 
+    const affectedBranchId = req.branchId || 'BRANCH-001';
     const { dejadorName } = useDejadorSessionStore.getState();
     const updated = pendingRequests.map(r =>
       r.id === requestId
@@ -258,7 +302,7 @@ export const useLogisticsStore = create(
         : r
     );
     set({ pendingRequests: updated });
-    syncKey('pendingRequests', updated);
+    syncLogisticsPartition(affectedBranchId, updated, get().completedRequests, get().rejectedRequests);
   },
 
   /**
@@ -270,42 +314,52 @@ export const useLogisticsStore = create(
     const req = pendingRequests.find(r => r.id === requestId);
     if (!req) return;
 
+    const affectedBranchId = req.branchId || 'BRANCH-001';
     const newPending = pendingRequests.filter(r => r.id !== requestId);
     const postponedRequest = {
       ...req,
       id: `REQ-POST-${Date.now()}`,
+      branchId: affectedBranchId,  // ← propagar branchId al pedido pospuesto
       isPostponed: true,
       created_at: new Date().toISOString(),
       original_request_id: requestId,
     };
     const finalPending = [...newPending, postponedRequest];
     set({ pendingRequests: finalPending });
-    syncKey('pendingRequests', finalPending);
+    syncLogisticsPartition(affectedBranchId, finalPending, get().completedRequests, get().rejectedRequests);
   },
 
   updatePendingRequest: (requestId, newPayload) => {
     const { pendingRequests } = get();
-    const updated = pendingRequests.map(req => 
-      req.id === requestId ? { ...req, items_payload: newPayload } : req
+    const req = pendingRequests.find(r => r.id === requestId);
+    const affectedBranchId = req?.branchId || 'BRANCH-001';
+    const updated = pendingRequests.map(r =>
+      r.id === requestId ? { ...r, items_payload: newPayload } : r
     );
     set({ pendingRequests: updated });
-    syncKey('pendingRequests', updated);
+    syncLogisticsPartition(affectedBranchId, updated, get().completedRequests, get().rejectedRequests);
   },
 
   // Editar items de una entrada del historial de cargas/recepciones
   updateLoadEntry: (id, items) => {
     const { loadHistory } = get();
+    const entry = loadHistory.find(e => e.id === id);
+    const affectedBranchId = entry?.branchId || getVehicleBranchId(entry?.vehicleId) || 'BRANCH-001';
     const updated = loadHistory.map(e => e.id === id ? { ...e, items } : e);
     set({ loadHistory: updated });
-    syncKey('loadHistory', updated);
+    const loadSlice = updated.filter(e => (e.branchId || getVehicleBranchId(e.vehicleId) || 'BRANCH-001') === affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
   },
 
   // Editar items de un surtido completado
   updateCompletedRequestItems: (id, items_payload) => {
     const { completedRequests } = get();
+    const req = completedRequests.find(r => r.id === id);
+    const affectedBranchId = req?.branchId || 'BRANCH-001';
     const updated = completedRequests.map(r => r.id === id ? { ...r, items_payload } : r);
     set({ completedRequests: updated });
-    syncKey('completedRequests', updated);
+    const completedSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === affectedBranchId);
+    syncKeyWithBranch('completedRequests', completedSlice, affectedBranchId);
   },
 
   // ===============================
@@ -325,11 +379,13 @@ export const useLogisticsStore = create(
       });
     if (items.length === 0) return false;
 
+    const affectedBranchId = getVehicleBranchId(vehicleId);
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const entry = {
       id: `LOAD-${Date.now()}`,
       type: 'carga',
       vehicleId,
+      branchId: affectedBranchId,  // ← guardar sede para poder filtrar después
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
@@ -337,7 +393,8 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
-    syncKey('loadHistory', newHistory);
+    const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
     return true;
   },
 
@@ -353,11 +410,13 @@ export const useLogisticsStore = create(
       });
     if (items.length === 0) return false;
 
+    const affectedBranchId = getVehicleBranchId(vehicleId);
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
     const entry = {
       id: `RECV-${Date.now()}`,
       type: 'recepcion',
       vehicleId,
+      branchId: affectedBranchId,  // ← guardar sede para poder filtrar después
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
@@ -365,7 +424,8 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
-    syncKey('loadHistory', newHistory);
+    const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
     return true;
   },
 

@@ -6,13 +6,16 @@ import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS } from '../lib/sy
 import { markLocalWrite } from '../lib/useRealtimeSync';
 
 // Helper: sincroniza una sección del store con Supabase.
-// Resuelve automáticamente el branchId del usuario activo para las llaves locales.
+// Para BRANCH_KEYS: si el usuario no tiene sede (Admin, branchId=null),
+// usa BRANCH-001 como fallback en lugar de escribir en la llave global.
+// Esto previene que el Admin contamine la partición global con datos de sede.
 function syncKey(key, value) {
   const user = useAuthStore.getState().user;
-  const branchId = user?.branchId ?? null;
-  const resolvedKey = getBranchKey(key, branchId);
-  markLocalWrite(key, branchId);
-  push(key, value, branchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
+  const userBranchId = user?.branchId ?? null;
+  const effectiveBranchId = BRANCH_KEYS.includes(key) ? (userBranchId || 'BRANCH-001') : null;
+  const resolvedKey = getBranchKey(key, effectiveBranchId);
+  markLocalWrite(key, effectiveBranchId);
+  push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 }
 
 // =============================================================================
