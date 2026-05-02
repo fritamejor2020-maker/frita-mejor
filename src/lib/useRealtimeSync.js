@@ -70,6 +70,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     : [branchId];
 
   for (const bid of effectiveBranches) {
+    // ── POS ──
     applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: { ...useInventoryStore.getState().posSettings, [bid]: v } });
     applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
     applicators[`posShifts_${bid}`]        = (v) => useInventoryStore.setState({ posShifts: v });
@@ -79,13 +80,33 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`contrataPayments_${bid}`] = (v) => useInventoryStore.setState({ contrataPayments: v });
     applicators[`deletedShiftIds_${bid}`]  = (v) => useInventoryStore.setState({ deletedShiftIds: v });
 
+    // ── Logística (Dejador / Vendedor) ──
+    // CRÍTICO: estas llaves se escriben con sufijo de sede en syncManager (BRANCH_KEYS),
+    // pero antes solo existía el applicator sin sufijo. Eso hacía que los updates de
+    // Realtime y los pullAll fueran ignorados silenciosamente por el Dejador.
+    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState({ pendingRequests: v });
+    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState({ completedRequests: v });
+    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState({ rejectedRequests: v });
+    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState({ loadHistory: v });
+
+    // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
+    applicators[`vehicles_${bid}`]          = (v) => useVehicleStore.setState({ vehicles: v });
+    applicators[`loadTemplates_${bid}`]     = (v) => useInventoryStore.setState({ loadTemplates: v });
+    applicators[`vendorLocations_${bid}`]   = (v) => useInventoryStore.setState({ vendorLocations: v });
+    applicators[`customers_${bid}`]         = (v) => useInventoryStore.setState({ customers: v });
+    applicators[`customerTypes_${bid}`]     = (v) => useInventoryStore.setState({ customerTypes: v });
+    applicators[`payrollEmployees_${bid}`]  = (v) => usePayrollStore.setState({ payrollEmployees: v });
+    applicators[`payrollRecords_${bid}`]    = (v) => usePayrollStore.setState({ payrollRecords: v });
+    applicators[`movements_${bid}`]         = (v) => useInventoryStore.setState({ movements: v });
+    applicators[`warehouses_${bid}`]        = (v) => useInventoryStore.setState({ warehouses: v });
+
     // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
-    if (!applicators['posShifts'])    applicators['posShifts']    = (v) => useInventoryStore.setState({ posShifts: v });
-    if (!applicators['posSales'])     applicators['posSales']     = (v) => useInventoryStore.setState({ posSales: v });
-    if (!applicators['posExpenses'])  applicators['posExpenses']  = (v) => useInventoryStore.setState({ posExpenses: v });
-    if (!applicators['posRegisters']) applicators['posRegisters'] = (v) => useInventoryStore.setState({ posRegisters: v });
-    if (!applicators['posSettings'])  applicators['posSettings']  = (v) => useInventoryStore.setState({ posSettings: v });
-    if (!applicators['inventory'])    applicators['inventory']    = (v) => useInventoryStore.setState({ inventory: v });
+    if (!applicators['posShifts'])        applicators['posShifts']        = (v) => useInventoryStore.setState({ posShifts: v });
+    if (!applicators['posSales'])         applicators['posSales']         = (v) => useInventoryStore.setState({ posSales: v });
+    if (!applicators['posExpenses'])      applicators['posExpenses']      = (v) => useInventoryStore.setState({ posExpenses: v });
+    if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => useInventoryStore.setState({ posRegisters: v });
+    if (!applicators['posSettings'])      applicators['posSettings']      = (v) => useInventoryStore.setState({ posSettings: v });
+    if (!applicators['inventory'])        applicators['inventory']        = (v) => useInventoryStore.setState({ inventory: v });
     if (!applicators['contrataPayments']) applicators['contrataPayments'] = (v) => useInventoryStore.setState({ contrataPayments: v });
   }
 

@@ -1,0 +1,16 @@
+fix: Dejador no recibe pedidos del Vendedor - applicators faltantes en Realtime
+
+BUG RAIZ: useRealtimeSync.js tenia applicators para pendingRequests,
+completedRequests, etc. sin sufijo de sede, pero syncManager.js los
+escribe en Supabase CON sufijo (pendingRequests_BRANCH-001).
+
+Cuando llegaba un update de Realtime con clave pendingRequests_BRANCH-001,
+el sistema no encontraba ningun handler y lo ignoraba silenciosamente.
+Lo mismo al hacer pullAll en el arranque del Dejador.
+
+Cambios en useRealtimeSync.js -> getApplicators():
+- Agrega applicators con sufijo de sede para todas las BRANCH_KEYS
+  de logistica: pendingRequests, completedRequests, rejectedRequests,
+  loadHistory, vehicles, loadTemplates, vendorLocations, customers,
+  customerTypes, payrollEmployees, payrollRecords, movements, warehouses
+- Se mantienen los applicators sin sufijo como legacy fallback
