@@ -73,6 +73,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
     <div style="width: 78mm; color: black; font-family: 'Courier New', Courier, monospace; font-size: 12px; padding: 8px; margin: 0 auto;">
       <style>
         @page { size: 80mm auto; margin: 0; }
+        * { color: black !important; }
         @media print {
           body { margin: 0; padding: 0; background: white; }
           html { background: transparent; }
