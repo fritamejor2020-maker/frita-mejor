@@ -143,7 +143,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
       <!-- Payments -->
       ${tc.showPaymentInfo ? `<div style="margin-bottom: 12px; padding: 4px; border: 1px solid black; border-radius: 4px;">
         ${sale.contrataPaymentMethod === 'credit'
-          ? `<p style="font-weight: 900; text-align: center; color: #DC2626; border-bottom: 1px solid black; margin: 0 0 4px 0; padding-bottom: 4px;">⚠ VENTA A CRÉDITO — POR COBRAR</p>
+          ? `<p style="font-weight: 900; text-align: center; border-bottom: 1px solid black; margin: 0 0 4px 0; padding-bottom: 4px;">*** VENTA A CREDITO — POR COBRAR ***</p>
              <p style="text-align:center;font-size:11px;margin:0;">Monto pendiente: ${formatMoney(sale.creditAmount || sale.total)}</p>`
           : `<p style="font-weight: bold; text-align: center; border-bottom: 1px solid black; margin: 0 0 4px 0; padding-bottom: 4px;">PAGO EN ${sale.paymentMethod || 'EFECTIVO'}</p>
              <div style="display: flex; justify-content: space-between;">
