@@ -5,10 +5,21 @@ import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useAuthStore } from './useAuthStore';
+import { useVehicleStore } from './useVehicleStore';
 
 function syncKey(key, value) {
   const user = useAuthStore.getState().user;
   const branchId = user?.branchId ?? null;
+  markLocalWrite(key, branchId);
+  push(key, value, branchId).catch(err => console.warn('[Sync]', key, err.message));
+}
+
+/**
+ * Variante de syncKey con branchId explícito.
+ * Necesario cuando el usuario activo (AuthStore) no tiene branchId pero el
+ * dato pertenece a una sede específica (ej: Vendedor haciendo un pedido).
+ */
+function syncKeyWithBranch(key, value, branchId) {
   markLocalWrite(key, branchId);
   push(key, value, branchId).catch(err => console.warn('[Sync]', key, err.message));
 }
@@ -67,8 +78,13 @@ export const useLogisticsStore = create(
     if (!pointId) throw new Error("Acceso denegado: pointId vacío.");
     if (restockCart.length === 0) throw new Error("Carrito de surtido vacío.");
 
-    // Capturar branchId del vendedor para filtrado por sede
-    const senderBranchId = useAuthStore.getState().user?.branchId ?? null;
+    // Capturar branchId del vendedor para filtrado por sede.
+    // Primero intenta desde AuthStore (el Vendedor hizo login).
+    // Fallback: busca el branchId del vehículo con ese pointId.
+    const userBranchId = useAuthStore.getState().user?.branchId ?? null;
+    const vehicleBranchId = useVehicleStore.getState().vehicles
+      .find((v) => (v.abbreviation || v.name) === pointId)?.branchId ?? null;
+    const senderBranchId = userBranchId ?? vehicleBranchId;
 
     // Intentar capturar ubicación GPS del vendedor al momento del pedido
     let location = null;
@@ -105,7 +121,10 @@ export const useLogisticsStore = create(
     const updated = [...pendingRequests, newRequest];
     set({ pendingRequests: updated });
     get().clearRestockCart();
-    syncKey('pendingRequests', updated);
+    // IMPORTANTE: usar syncKeyWithBranch con el branchId del vendedor (senderBranchId),
+    // NO syncKey(), que leería el branchId del AuthStore (null para el Vendedor)
+    // y guardaría el pedido en la llave global sin sede, invisible para el Dejador.
+    syncKeyWithBranch('pendingRequests', updated, senderBranchId);
 
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
     try {
