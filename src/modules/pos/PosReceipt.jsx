@@ -39,9 +39,9 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
   });
 
   const customerName = customer?.name || 'Cliente General';
-  const customerDoc = (tc.showCustomerDoc && customer?.document) ? `<p style="margin: 0;">NIT/CC: <span style="font-weight: normal;">${customer.document}</span></p>` : '';
-  const customerAddr = (tc.showCustomerAddress && customer?.address) ? `<p style="margin: 0;">Dir: <span style="font-weight: normal;">${customer.address}</span></p>` : '';
-  const customerPhone = (tc.showCustomerPhone && customer?.phone) ? `<p style="margin: 0;">Tel: <span style="font-weight: normal;">${customer.phone}</span></p>` : '';
+  const customerDoc = (tc.showCustomerDoc && customer?.document) ? `<p style="margin: 0;">NIT/CC: ${customer.document}</p>` : '';
+  const customerAddr = (tc.showCustomerAddress && customer?.address) ? `<p style="margin: 0;">Dir: ${customer.address}</p>` : '';
+  const customerPhone = (tc.showCustomerPhone && customer?.phone) ? `<p style="margin: 0;">Tel: ${customer.phone}</p>` : '';
 
   // Contrata type name
   let contrataTypeHtml = '';
@@ -73,11 +73,11 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
     <div style="width: 78mm; color: black; font-family: 'Courier New', Courier, monospace; font-size: 12px; padding: 8px; margin: 0 auto;">
       <style>
         @page { size: 80mm auto; margin: 0; }
-        * { color: black !important; }
+        * { color: black !important; font-weight: bold !important; }
         @media print {
           body { margin: 0; padding: 0; background: white; }
           html { background: transparent; }
-          * { color: black !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          * { color: black !important; background: transparent !important; font-weight: bold !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           img { filter: grayscale(100%) contrast(1000%) !important; }
         }
       </style>
@@ -96,16 +96,16 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
 
       <!-- Transaction Info -->
       <div style="margin-bottom: 8px;">
-        ${tc.showTicketNumber ? `<p style="font-weight: bold; margin: 0; font-size: 14px;">Ticket No: <span style="font-weight: normal;">${ticketNo}</span></p>` : ''}
-        ${tc.showDate ? `<p style="font-weight: bold; margin: 0;">Fecha: <span style="font-weight: normal;">${dateStr}</span></p>` : ''}
-        ${tc.showCashier ? `<p style="font-weight: bold; margin: 0;">Cajero: <span style="font-weight: normal;">PRINCIPAL</span></p>` : ''}
+        ${tc.showTicketNumber ? `<p style="margin: 0; font-size: 14px;">Ticket No: ${ticketNo}</p>` : ''}
+        ${tc.showDate ? `<p style="margin: 0;">Fecha: ${dateStr}</p>` : ''}
+        ${tc.showCashier ? `<p style="margin: 0;">Cajero: PRINCIPAL</p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
 
       <!-- Customer Info -->
       <div style="margin-bottom: 8px;">
-        ${tc.showCustomerName ? `<p style="font-weight: bold; margin: 0;">Cliente: <span style="font-weight: normal;">${customerName}</span></p>` : ''}
+        ${tc.showCustomerName ? `<p style="margin: 0;">Cliente: ${customerName}</p>` : ''}
         ${customerDoc}
         ${customerAddr}
         ${customerPhone}
@@ -133,8 +133,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
       <!-- Totals -->
       <div style="text-align: right; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
         ${tc.showSubtotal ? `<div style="display: flex; justify-content: space-between;">
-          <span>Subtotal:</span>
-          <span>${formatMoney(sale.subtotal)}</span>
+          <span>Subtotal:</span><span>${formatMoney(sale.subtotal)}</span>
         </div>` : ''}
         ${discountHtml}
         <div style="display: flex; justify-content: space-between; font-size: 18px; font-weight: 900; margin-top: 4px; padding-top: 4px; border-top: 2px solid black;">

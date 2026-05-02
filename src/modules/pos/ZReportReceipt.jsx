@@ -133,10 +133,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
     <div style="width: 80mm; color: black; font-family: sans-serif; font-size: 14px; padding: 16px; margin: 0 auto;">
       <style>
         @page { size: auto; margin: 0; }
-        * { color: black !important; }
+        * { color: black !important; font-weight: bold !important; }
         @media print {
           body { margin: 0; }
-          * { color: black !important; background: transparent !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          * { color: black !important; background: transparent !important; font-weight: bold !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           img { filter: grayscale(100%) contrast(1000%) !important; }
         }
       </style>
