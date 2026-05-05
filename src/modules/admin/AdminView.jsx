@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
+import { uploadProductImage } from '../../lib/storageUtils';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
@@ -25,11 +26,119 @@ import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInv
 import { formatMoney } from '../../utils/formatUtils';
 
 // ─── Componente de fila editable genérica ─────────────────────────────────────
+// ─── Componente para subida de imagen inline ──────────────────────────────────
+function ImageUploadField({ value, onChange, label }) {
+  const fileRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+  const [preview, setPreview] = useState(value || '');
+  const [dragOver, setDragOver] = useState(false);
+
+  useEffect(() => { setPreview(value || ''); }, [value]);
+
+  const handleFile = async (file) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    // Show local preview immediately
+    const localUrl = URL.createObjectURL(file);
+    setPreview(localUrl);
+    setUploading(true);
+    try {
+      const publicUrl = await uploadProductImage(file);
+      if (publicUrl) {
+        onChange(publicUrl);
+        setPreview(publicUrl);
+      } else {
+        // Fallback: keep local preview + use data URL for offline support
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          onChange(e.target.result);
+          setPreview(e.target.result);
+        };
+        reader.readAsDataURL(file);
+      }
+    } catch {
+      // fallback to dataURL
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        onChange(e.target.result);
+        setPreview(e.target.result);
+      };
+      reader.readAsDataURL(file);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setDragOver(false);
+    if (e.dataTransfer.files?.[0]) handleFile(e.dataTransfer.files[0]);
+  };
+
+  const removeImage = () => {
+    onChange('');
+    setPreview('');
+    if (fileRef.current) fileRef.current.value = '';
+  };
+
+  return (
+    <div className="shrink-0">
+      <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">{label}</label>
+      {preview ? (
+        <div className="relative group w-16 h-16">
+          <div className="w-16 h-16 rounded-xl overflow-hidden border-2 border-green-200 bg-gray-50">
+            <img src={preview} alt="Preview" className="w-full h-full object-cover" onError={() => setPreview('')} />
+          </div>
+          {uploading && (
+            <div className="absolute inset-0 bg-black/40 rounded-xl flex items-center justify-center">
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            </div>
+          )}
+          <button type="button" onClick={removeImage}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full text-[10px] font-black flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+          >✕</button>
+          <button type="button" onClick={() => fileRef.current?.click()}
+            className="absolute inset-0 bg-black/0 hover:bg-black/30 rounded-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+        </div>
+      ) : (
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={`w-16 h-16 border-2 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all ${
+            dragOver ? 'border-chunky-main bg-yellow-50 scale-105' : 'border-gray-200 bg-white hover:border-chunky-main hover:bg-yellow-50/30'
+          }`}
+        >
+          {uploading ? (
+            <div className="w-5 h-5 border-2 border-chunky-main border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <>
+              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-300">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                <circle cx="8.5" cy="8.5" r="1.5"/>
+                <polyline points="21 15 16 10 5 21"/>
+              </svg>
+              <span className="text-[8px] font-bold text-gray-400 mt-0.5">Foto</span>
+            </>
+          )}
+        </div>
+      )}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={(e) => { if (e.target.files?.[0]) handleFile(e.target.files[0]); }} />
+    </div>
+  );
+}
+
 function EditableRow({ fields, values, onChange, onSave, onCancel }) {
+  const regularFields = fields.filter((f) => f.type !== 'image');
+  const imageFields = fields.filter((f) => f.type === 'image');
+
   return (
     <div className="border-2 border-chunky-main rounded-2xl p-4 bg-yellow-50/30 space-y-3">
       <div className="flex flex-wrap items-end gap-3">
-        {fields.map((f) => (
+        {regularFields.map((f) => (
           <div key={f.key} className={`${f.wide ? 'flex-1 min-w-[180px]' : 'w-28'}`}>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">{f.label}</label>
             {f.options ? (
@@ -42,9 +151,14 @@ function EditableRow({ fields, values, onChange, onSave, onCancel }) {
           </div>
         ))}
       </div>
-      <div className="flex gap-2">
-        <Button variant="secondary" className="rounded-full text-sm py-2 px-6" onClick={onSave}>Guardar</Button>
-        <Button variant="outline" className="rounded-full text-sm py-2 px-4 border-gray-200 text-gray-500" onClick={onCancel}>Cancelar</Button>
+      <div className="flex items-end gap-3">
+        {imageFields.map((f) => (
+          <ImageUploadField key={f.key} value={values[f.key] ?? ''} onChange={(v) => onChange(f.key, v)} label={f.label} />
+        ))}
+        <div className="flex gap-2 ml-auto">
+          <Button variant="secondary" className="rounded-full text-sm py-2 px-6" onClick={onSave}>Guardar</Button>
+          <Button variant="outline" className="rounded-full text-sm py-2 px-4 border-gray-200 text-gray-500" onClick={onCancel}>Cancelar</Button>
+        </div>
       </div>
     </div>
   );
@@ -366,7 +480,7 @@ function InventoryPanel() {
     { key: 'alert',       label: 'Alerta en',type: 'number' },
     { key: 'price',       label: 'Precio ($)',type: 'number' },
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
-    { key: 'imageUrl',    label: 'URL de Imagen (POS)', wide: true },
+    { key: 'imageUrl',    label: 'Imagen (POS)', type: 'image' },
   ];
 
   // Convierte los dos campos vizuales en el campo 'type' real del item
@@ -447,7 +561,7 @@ function InventoryPanel() {
                 {item.qty}<span className="text-gray-400 font-bold text-xs ml-1">{item.unit}</span>
               </span>
               <div className="flex gap-2 ml-auto">
-                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '' }); setShowAdd(false); }}>
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '' }); setShowAdd(false); }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
                 <button className="text-gray-300 hover:text-red-400" onClick={() => deleteInventoryItem(item.id)}>
