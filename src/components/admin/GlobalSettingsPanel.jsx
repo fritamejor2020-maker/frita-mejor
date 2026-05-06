@@ -10,6 +10,32 @@ const TRANSFER_TYPES = [
   { key: 'productos',label: 'Productos',icon: '📦' },
 ];
 
+// Ciudades colombianas con coordenadas GPS para centrar el mapa
+const COLOMBIAN_CITIES = [
+  { name: 'Pitalito, Huila',        lat: 1.8485,   lng: -76.0522 },
+  { name: 'Neiva, Huila',           lat: 2.9273,   lng: -75.2819 },
+  { name: 'Garzón, Huila',          lat: 2.1964,   lng: -75.6258 },
+  { name: 'Cali, Valle',            lat: 3.4516,   lng: -76.5320 },
+  { name: 'Bogotá, Cundinamarca',   lat: 4.7110,   lng: -74.0721 },
+  { name: 'Medellín, Antioquia',    lat: 6.2476,   lng: -75.5658 },
+  { name: 'Barranquilla, Atlántico',lat: 10.9685,  lng: -74.7813 },
+  { name: 'Cartagena, Bolívar',     lat: 10.3910,  lng: -75.5144 },
+  { name: 'Bucaramanga, Santander', lat: 7.1193,   lng: -73.1227 },
+  { name: 'Pereira, Risaralda',     lat: 4.8133,   lng: -75.6961 },
+  { name: 'Manizales, Caldas',      lat: 5.0689,   lng: -75.5174 },
+  { name: 'Ibagué, Tolima',         lat: 4.4389,   lng: -75.2322 },
+  { name: 'Cúcuta, N. Santander',   lat: 7.8939,   lng: -72.5078 },
+  { name: 'Villavicencio, Meta',    lat: 4.1420,   lng: -73.6266 },
+  { name: 'Popayán, Cauca',         lat: 2.4419,   lng: -76.6061 },
+  { name: 'Pasto, Nariño',          lat: 1.2136,   lng: -77.2811 },
+  { name: 'Armenia, Quindío',       lat: 4.5339,   lng: -75.6811 },
+  { name: 'Mocoa, Putumayo',        lat: 1.1492,   lng: -76.6466 },
+  { name: 'Florencia, Caquetá',     lat: 1.6144,   lng: -75.6062 },
+  { name: 'San Agustín, Huila',     lat: 1.8836,   lng: -76.2689 },
+  { name: 'La Plata, Huila',        lat: 2.3833,   lng: -75.8922 },
+  { name: 'Personalizado',          lat: null,     lng: null },
+];
+
 // Solo visible para el Administrador Principal (role === 'ADMIN')
 // =============================================================================
 
@@ -130,8 +156,16 @@ function BranchModal({ branch, onSave, onClose }) {
       address: branch.settings?.address || '',
       printerName: branch.settings?.printerName || 'POS-58',
       allowedTransferTypes: branch.settings?.allowedTransferTypes ?? ['fritos', 'crudos', 'insumos', 'productos'],
+      lat: branch.settings?.lat ?? null,
+      lng: branch.settings?.lng ?? null,
     },
   });
+
+  const [customCoords, setCustomCoords] = useState(
+    // Si las coordenadas actuales no coinciden con ninguna ciudad predefinida, es custom
+    !COLOMBIAN_CITIES.slice(0, -1).some(c => c.lat === (branch.settings?.lat) && c.lng === (branch.settings?.lng))
+    && branch.settings?.lat != null
+  );
 
   const ch  = (k, v) => setForm(f => ({ ...f, [k]: v }));
   const chS = (k, v) => setForm(f => ({ ...f, settings: { ...f.settings, [k]: v } }));
@@ -142,6 +176,21 @@ function BranchModal({ branch, onSave, onClose }) {
       ? current.filter(k => k !== key)
       : [...current, key];
     chS('allowedTransferTypes', next);
+  };
+
+  const selectCity = (cityName) => {
+    if (cityName === 'Personalizado') {
+      setCustomCoords(true);
+      return;
+    }
+    setCustomCoords(false);
+    const city = COLOMBIAN_CITIES.find(c => c.name === cityName);
+    if (city) {
+      setForm(f => ({
+        ...f,
+        settings: { ...f.settings, lat: city.lat, lng: city.lng }
+      }));
+    }
   };
 
   return (
@@ -185,6 +234,55 @@ function BranchModal({ branch, onSave, onClose }) {
               <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:border-amber-400" placeholder="Dirección" value={form.settings.address} onChange={e => chS('address', e.target.value)} />
               <input className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:border-amber-400" placeholder="Nombre impresora (ej: POS-58)" value={form.settings.printerName} onChange={e => chS('printerName', e.target.value)} />
             </div>
+          </div>
+
+          {/* Ubicación de la Sede (para el mapa) */}
+          <div className="border-t border-gray-100 pt-4">
+            <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-1">🗺️ Ubicación en el Mapa</p>
+            <p className="text-[11px] text-gray-400 font-medium mb-3">Selecciona la ciudad donde opera esta sede. El mapa se centrará ahí.</p>
+            <select
+              value={
+                customCoords
+                  ? 'Personalizado'
+                  : (COLOMBIAN_CITIES.find(c => c.lat === form.settings.lat && c.lng === form.settings.lng)?.name || '')
+              }
+              onChange={e => selectCity(e.target.value)}
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-800 outline-none focus:border-cyan-400 cursor-pointer"
+            >
+              <option value="">Seleccionar ciudad...</option>
+              {COLOMBIAN_CITIES.map(c => (
+                <option key={c.name} value={c.name}>{c.name === 'Personalizado' ? '📍 Coordenadas personalizadas' : `🏙️ ${c.name}`}</option>
+              ))}
+            </select>
+            {customCoords && (
+              <div className="grid grid-cols-2 gap-2 mt-2">
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Latitud</label>
+                  <input
+                    type="number" step="0.0001"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:border-cyan-400"
+                    placeholder="Ej: 1.8485"
+                    value={form.settings.lat || ''}
+                    onChange={e => chS('lat', parseFloat(e.target.value) || null)}
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-gray-400 block mb-0.5">Longitud</label>
+                  <input
+                    type="number" step="0.0001"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-800 outline-none focus:border-cyan-400"
+                    placeholder="Ej: -76.0522"
+                    value={form.settings.lng || ''}
+                    onChange={e => chS('lng', parseFloat(e.target.value) || null)}
+                  />
+                </div>
+              </div>
+            )}
+            {form.settings.lat && form.settings.lng && (
+              <p className="text-[10px] font-bold text-cyan-600 mt-1.5 flex items-center gap-1">
+                ✅ Coordenadas: {form.settings.lat.toFixed(4)}, {form.settings.lng.toFixed(4)}
+              </p>
+            )}
           </div>
 
           {/* Toggles de traslados */}

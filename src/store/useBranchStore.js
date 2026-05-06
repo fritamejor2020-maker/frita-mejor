@@ -28,11 +28,14 @@ const DEFAULT_BRANCHES = [
       businessName: 'Frita Mejor',
       nit: '900.000.000-1',
       phone: '300 123 4567',
-      address: 'Cali, Colombia',
+      address: 'Pitalito, Huila',
       printerName: 'POS-58',
       paymentMethods: ['EFECTIVO', 'TARJETA', 'NEQUI', 'BANCOLOMBIA'],
       // Tipos de traslado habilitados para esta sede
       allowedTransferTypes: ['fritos', 'crudos', 'insumos', 'productos'],
+      // Coordenadas de la sede (centro del mapa)
+      lat: 1.8485,
+      lng: -76.0522,
     },
   },
 ];
@@ -80,6 +83,8 @@ export const useBranchStore = create(
             printerName: 'POS-58',
             paymentMethods: ['EFECTIVO', 'NEQUI'],
             allowedTransferTypes: ['fritos', 'crudos', 'insumos', 'productos'],
+            lat: null,
+            lng: null,
             ...branchData.settings,
           },
         };

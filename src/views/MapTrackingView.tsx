@@ -16,6 +16,7 @@ import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
+import { useBranchStore } from '../store/useBranchStore';
 import { useNavigate } from 'react-router-dom';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 
@@ -76,8 +77,8 @@ interface VendorLocation {
   source?: 'presence' | 'db' | 'offline';
 }
 
-// ── Componente auxiliar: centra el mapa si no hay ubicaciones aún ────────────
-function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
+// ── Componente auxiliar: centra el mapa según la sede o los vendedores ────────
+function AutoCenter({ vendors, mapCenter }: { vendors: VendorLocation[]; mapCenter: [number, number] }) {
   const map = useMap();
   useEffect(() => {
     if (vendors.length === 1) {
@@ -85,8 +86,11 @@ function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
     } else if (vendors.length > 1) {
       const bounds = L.latLngBounds(vendors.map(v => [v.lat, v.lng]));
       map.fitBounds(bounds, { padding: [50, 50] });
+    } else {
+      // Sin vendedores: centrar en la sede
+      map.setView(mapCenter, DEFAULT_ZOOM);
     }
-  }, [vendors.length]);
+  }, [vendors.length, mapCenter[0], mapCenter[1]]);
   return null;
 }
 
@@ -99,6 +103,16 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 }) => {
   const { user, signOut } = useAuthStore();
   const navigate = useNavigate();
+
+  // Resolver centro del mapa según la sede
+  const branchData = useBranchStore((s: any) =>
+    branchId ? s.branches?.find((b: any) => b.id === branchId) : null
+  );
+  const mapCenter: [number, number] = (
+    branchData?.settings?.lat && branchData?.settings?.lng
+      ? [branchData.settings.lat, branchData.settings.lng]
+      : DEFAULT_CENTER
+  );
   const [vendors, setVendors] = useState<VendorLocation[]>([]);
   const [connected, setConnected] = useState(false);
   const [selectedVehicleId, setSelectedVehicleId] = useState<string | null>(null);
@@ -263,7 +277,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
         {/* Mapa */}
         <MapContainer
-          center={DEFAULT_CENTER}
+          center={mapCenter}
           zoom={DEFAULT_ZOOM}
           style={{ flex: 1, height: '100%', zIndex: 1 }}
           zoomControl={true}
@@ -272,7 +286,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <AutoCenter vendors={vendors} />
+          <AutoCenter vendors={vendors} mapCenter={mapCenter} />
           {vendors.map((v) => {
             const stale   = isStale(v.updatedAt);
             const offline = v.source === 'offline';
