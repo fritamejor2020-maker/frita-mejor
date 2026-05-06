@@ -212,7 +212,7 @@ export function PosView() {
     setShowClosingModal(false);
     
     // Auto print Z report & Open Drawer
-    const drawerCode = posSettings?.cashDrawerCode || '27,112,0,25,250';
+    const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
     
     const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
     const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
@@ -469,7 +469,7 @@ export function PosView() {
     
     if (printReceipt) {
       // Si openDrawer es true, incluir comando de cajón en el ticket impreso
-      const drawerCode = openDrawer ? (posSettings?.cashDrawerCode || '27,112,0,25,250') : '';
+      const drawerCode = openDrawer ? (posSettings?.cashDrawerCode || '27,112,48,55,121') : '';
       const saleCustomer = customers?.find(c => c.id === sale.customerId);
       const receiptHtml = generateReceiptHTML(sale, saleCustomer, posSettings?.ticketConfig, customerTypes, drawerCode);
       setTimeout(() => {

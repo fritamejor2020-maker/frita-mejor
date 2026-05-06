@@ -156,7 +156,7 @@ const INITIAL_CUSTOMER_TYPES = [
 
 const INITIAL_POS_SETTINGS = {
   printerName: 'POS-58',
-  cashDrawerCode: '\\x1B\\x70\\x00\\x19\\xFA',
+  cashDrawerCode: '27,112,48,55,121',
   paymentMethods: [
     { id: 'PM-001', name: 'EFECTIVO', openDrawer: true, printReceipt: true },
     { id: 'PM-002', name: 'TARJETA', openDrawer: false, printReceipt: true },
@@ -363,6 +363,16 @@ export const useInventoryStore = create(
             const localIds = new Set(localInventory.map(i => i.id));
             const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id) && !deletedInvIds.includes(i.id));
             updates.inventory = [...localInventory, ...remoteOnlyItems];
+          }
+          // Sanitizar posSettings: convertir cashDrawerCode viejo si viene de Supabase
+          if (updates.posSettings && updates.posSettings.cashDrawerCode) {
+            const code = updates.posSettings.cashDrawerCode;
+            if (!code.match(/^\d+(,\s*\d+)*$/)) {
+              updates.posSettings = {
+                ...updates.posSettings,
+                cashDrawerCode: '27,112,48,55,121',
+              };
+            }
           }
           if (Object.keys(updates).length > 0) {
             set(updates);
@@ -944,7 +954,7 @@ export const useInventoryStore = create(
     }),
     {
       name: 'frita-mejor-inventory',
-      version: 12, // v12: tombstone para inventario eliminado
+      version: 13, // v13: fix cashDrawerCode format + proteger posSettings
       migrate: (persisted, fromVersion) => {
         // v9 → v10: agregar branchId a cajas POS que no lo tienen
         if (fromVersion < 10) {
@@ -962,6 +972,19 @@ export const useInventoryStore = create(
         // v11 → v12: inicializar tombstone de inventario
         if (fromVersion < 12) {
           persisted.deletedInventoryIds = persisted.deletedInventoryIds || [];
+        }
+        // v12 → v13: corregir formato de cashDrawerCode y proteger posSettings
+        if (fromVersion < 13) {
+          if (persisted.posSettings) {
+            const code = persisted.posSettings.cashDrawerCode || '';
+            // Si no tiene formato decimal separado por comas (ej: 27,112,48,55,121), resetear
+            if (!code.match(/^\d+(,\s*\d+)*$/)) {
+              persisted.posSettings = {
+                ...persisted.posSettings,
+                cashDrawerCode: '27,112,48,55,121',
+              };
+            }
+          }
         }
         return persisted;
       },
