@@ -44,19 +44,32 @@ export const SellerSetupView = () => {
       alert("Faltan datos");
       return;
     }
-    const openedAt = new Date().toISOString();
-    startShift({ pointId, shift, pointType, responsibleName, openedAt });
 
-    // Crear el posShift aquí — el store ya está 100% hidratado en este punto.
-    // Nunca en un useEffect del Dashboard (race condition con rehidratación de Zustand).
     const { posShifts, addPosShift } = useInventoryStore.getState();
-    const alreadyExists = (posShifts || []).some(
-      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
+
+    // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) ──
+    // Si ya existe un turno abierto para este punto+jornada, reanudarlo
+    const existingShift = (posShifts || []).find(
+      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.shift === shift && !s.closedAt
     );
-    if (!alreadyExists) {
-      addPosShift({ openedAt, pointId, shift, responsibleName, type: 'VENDEDOR', closedAt: null });
+
+    if (existingShift) {
+      // Reanudar turno existente — no crear duplicado
+      startShift({
+        pointId,
+        shift,
+        pointType,
+        responsibleName,
+        openedAt: existingShift.openedAt,
+      });
+      navigate('/vendedor');
+      return;
     }
 
+    // Crear nuevo turno (no existe uno abierto para este punto+jornada)
+    const openedAt = new Date().toISOString();
+    startShift({ pointId, shift, pointType, responsibleName, openedAt });
+    addPosShift({ openedAt, pointId, shift, responsibleName, type: 'VENDEDOR', closedAt: null });
     navigate('/vendedor');
   };
 

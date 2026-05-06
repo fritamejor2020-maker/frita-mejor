@@ -898,9 +898,21 @@ export const useInventoryStore = create(
       deletePosSale: (id) => { set((s) => ({ posSales: (s.posSales || []).filter((sale) => sale.id !== id) })); syncKey('posSales', useInventoryStore.getState().posSales); },
 
       addPosShift: (shift) => {
+        // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) ──
+        const current = useInventoryStore.getState().posShifts || [];
+        const duplicate = current.find(
+          s => s.type === shift.type &&
+               s.pointId === shift.pointId &&
+               s.shift === shift.shift &&
+               !s.closedAt
+        );
+        if (duplicate) {
+          console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — omitiendo duplicado`);
+          return duplicate;
+        }
+
         const deleted = useInventoryStore.getState().deletedShiftIds || [];
         const newShift = { ...shift, id: `SHIFT-${Date.now()}` };
-        // Solo agregar si no está en la lista de eliminados (por IDs previos)
         set((s) => ({
           posShifts: [
             newShift,
@@ -908,6 +920,7 @@ export const useInventoryStore = create(
           ]
         }));
         syncKey('posShifts', useInventoryStore.getState().posShifts);
+        return newShift;
       },
       updatePosShift: (id, data) => { set((s) => ({ posShifts: (s.posShifts || []).map((shift) => shift.id === id ? { ...shift, ...data } : shift) })); syncKey('posShifts', useInventoryStore.getState().posShifts); },
       deletePosShift: (id) => {
