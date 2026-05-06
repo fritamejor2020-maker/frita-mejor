@@ -20,7 +20,7 @@ export const VendedorDashboard = () => {
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
-  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, updatePosShift, posShifts } = useInventoryStore();
+  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { transfers: allVendorTransfers, addTransfer: addVendorTransfer, deleteTransfer: deleteVendorTransfer, updateTransfer: updateVendorTransfer, getShiftTransfers, getShiftTransferTotal } = useVendorTransferStore();
   
