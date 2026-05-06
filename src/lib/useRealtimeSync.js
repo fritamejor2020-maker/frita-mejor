@@ -71,7 +71,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
 
   for (const bid of effectiveBranches) {
     // ── POS ──
-    applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: { ...useInventoryStore.getState().posSettings, [bid]: v } });
+    applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: v });
     applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
     applicators[`posShifts_${bid}`]        = (v) => useInventoryStore.setState({ posShifts: v });
     applicators[`posSales_${bid}`]         = (v) => useInventoryStore.setState({ posSales: v });

@@ -242,7 +242,6 @@ export const useInventoryStore = create(
           // Llaves globales — se aplican directamente al store
           const GLOBAL_STORE_KEYS = [
             'products', 'recipes', 'fritadoRecipes', 'posCategories',
-            'customers', 'customerTypes', 'loadTemplates', 'vendorLocations',
           ];
 
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
@@ -250,6 +249,7 @@ export const useInventoryStore = create(
             'warehouses', 'inventory', 'movements',
             'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
             'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds',
+            'customers', 'customerTypes', 'loadTemplates', 'vendorLocations',
           ];
 
           const updates = {};
