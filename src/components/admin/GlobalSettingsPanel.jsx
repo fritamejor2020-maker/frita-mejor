@@ -145,8 +145,8 @@ function BranchModal({ branch, onSave, onClose }) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-white rounded-[28px] p-7 w-full max-w-md shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-[28px] p-7 w-full max-w-md shadow-2xl max-h-[90vh] overflow-y-auto my-4" onClick={e => e.stopPropagation()}>
         <h2 className="text-2xl font-black text-gray-900 mb-1">{isNew ? '🏪 Nueva Sede' : '✏️ Editar Sede'}</h2>
         <p className="text-sm text-gray-400 font-medium mb-6">Configura los datos de esta sucursal.</p>
 
