@@ -1633,6 +1633,7 @@ function NewClientModal({ customerTypes, onClose, onSave }) {
   const [phone, setPhone] = useState('');
   const [typeId, setTypeId] = useState('');
   const [document, setDocument] = useState('');
+  const [address, setAddress] = useState('');
 
   const selectedType = customerTypes.find(t => t.id === typeId);
 
@@ -1642,6 +1643,7 @@ function NewClientModal({ customerTypes, onClose, onSave }) {
       name: name.trim(),
       phone: phone.trim(),
       document: document.trim(),
+      address: address.trim(),
       typeId: typeId || null,
       creditLimit: 0,
       discountPercent: selectedType?.globalDiscountPercent || 0,
@@ -1693,6 +1695,18 @@ function NewClientModal({ customerTypes, onClose, onSave }) {
               value={document}
               onChange={e => setDocument(e.target.value)}
               placeholder="Opcional"
+            />
+          </div>
+
+          {/* Dirección */}
+          <div>
+            <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-widest">Dirección</label>
+            <input
+              type="text"
+              className="w-full bg-[#0c0d11] border border-gray-700 focus:border-chunky-main rounded-2xl py-3 px-4 text-base font-bold text-white outline-none transition-colors"
+              value={address}
+              onChange={e => setAddress(e.target.value)}
+              placeholder="Dirección de entrega"
             />
           </div>
 
@@ -2259,6 +2273,7 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
   const [filterPayment, setFilterPayment] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [expandedId, setExpandedId] = useState(null);
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = más reciente primero, 'asc' = más antiguo primero
 
   // Unique payment methods and customers for filter dropdowns
   const paymentMethods = [...new Set(sales.map(s => s.paymentMethod).filter(Boolean))];
@@ -2283,6 +2298,13 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
     if (filterPayment && s.paymentMethod !== filterPayment) return false;
     if (filterCustomer && customerName !== filterCustomer) return false;
     return true;
+  });
+
+  // Sort by time
+  const sorted = [...filtered].sort((a, b) => {
+    const ta = new Date(a.timestamp).getTime();
+    const tb = new Date(b.timestamp).getTime();
+    return sortOrder === 'desc' ? tb - ta : ta - tb;
   });
 
   const totalFiltered = filtered.reduce((s, sale) => s + sale.total, 0);
@@ -2384,7 +2406,20 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
               <tr className="bg-[#1a1b23] border-b border-gray-800">
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left w-8"></th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left"># Ticket</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Hora</th>
+                <th
+                  className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left cursor-pointer select-none hover:text-gray-300 transition-colors group"
+                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
+                  title={sortOrder === 'desc' ? 'Más reciente primero — clic para invertir' : 'Más antiguo primero — clic para invertir'}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Hora
+                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
+                      className={`transition-transform duration-200 text-chunky-main ${sortOrder === 'asc' ? 'rotate-180' : ''}`}
+                    >
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </span>
+                </th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Método Pago</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Cliente</th>
                 <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Items</th>
@@ -2394,7 +2429,7 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
               </tr>
             </thead>
             <tbody>
-              {filtered.map(sale => {
+              {sorted.map(sale => {
                 const customerName = customers?.find(c => c.id === sale.customerId)?.name || 'Consumidor Final';
                 const isExpanded = expandedId === sale.id;
                 const totalItems = sale.items.reduce((sum, item) => sum + item.qty, 0);
