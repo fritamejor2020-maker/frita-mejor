@@ -788,7 +788,7 @@ export const VendedorDashboard = () => {
         {activeTab === 'close' && (() => {
           const { soldItems: logSoldItems, theoretical: logTheoretical } = getLogisticsCalc();
           const cashVal = parseInt(cash) || 0;
-          const transferVal = parseInt(transfer) || 0;
+          const transferVal = shiftTransferTotal;
           const expensesVal = parseInt(expenses) || 0;
           const realTotal = cashVal + transferVal + expensesVal;
           const diff = realTotal - logTheoretical;
