@@ -163,10 +163,10 @@ export const useLogisticsStore = create(
     const updated = [...pendingRequests, newRequest];
     set({ pendingRequests: updated });
     get().clearRestockCart();
-    // IMPORTANTE: usar syncKeyWithBranch con el branchId del vendedor (senderBranchId),
-    // NO syncKey(), que leería el branchId del AuthStore (null para el Vendedor)
-    // y guardaría el pedido en la llave global sin sede, invisible para el Dejador.
-    syncKeyWithBranch('pendingRequests', updated, senderBranchId);
+    // IMPORTANTE: sincronizar solo el slice de la sede del vendedor.
+    // Enviar el array completo causaba sobreescritura de pedidos de otras sedes.
+    const branchSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === (senderBranchId || 'BRANCH-001'));
+    syncKeyWithBranch('pendingRequests', branchSlice, senderBranchId);
 
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
     try {

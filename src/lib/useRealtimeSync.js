@@ -82,13 +82,29 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`deletedShiftIds_${bid}`]  = (v) => useInventoryStore.setState({ deletedShiftIds: v });
 
     // ── Logística (Dejador / Vendedor) ──
-    // CRÍTICO: estas llaves se escriben con sufijo de sede en syncManager (BRANCH_KEYS),
-    // pero antes solo existía el applicator sin sufijo. Eso hacía que los updates de
-    // Realtime y los pullAll fueran ignorados silenciosamente por el Dejador.
-    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState({ pendingRequests: v });
-    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState({ completedRequests: v });
-    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState({ rejectedRequests: v });
-    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState({ loadHistory: v });
+    // MERGE por sede: al recibir datos de una sede, conservar pedidos de otras sedes
+    // y reemplazar solo los de la sede que se actualizó. Esto evita que un update
+    // de BRANCH-001 borre los pedidos de BRANCH-002 en el estado local del Dejador.
+    applicators[`pendingRequests_${bid}`]   = (v) => {
+      const current = useLogisticsStore.getState().pendingRequests || [];
+      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
+      useLogisticsStore.setState({ pendingRequests: [...otherBranch, ...(v || [])] });
+    };
+    applicators[`completedRequests_${bid}`] = (v) => {
+      const current = useLogisticsStore.getState().completedRequests || [];
+      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
+      useLogisticsStore.setState({ completedRequests: [...otherBranch, ...(v || [])] });
+    };
+    applicators[`rejectedRequests_${bid}`]  = (v) => {
+      const current = useLogisticsStore.getState().rejectedRequests || [];
+      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
+      useLogisticsStore.setState({ rejectedRequests: [...otherBranch, ...(v || [])] });
+    };
+    applicators[`loadHistory_${bid}`]       = (v) => {
+      const current = useLogisticsStore.getState().loadHistory || [];
+      const otherBranch = current.filter(e => (e.branchId || 'BRANCH-001') !== bid);
+      useLogisticsStore.setState({ loadHistory: [...otherBranch, ...(v || [])] });
+    };
 
     // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
     applicators[`vehicles_${bid}`]          = (v) => useVehicleStore.setState({ vehicles: v });
