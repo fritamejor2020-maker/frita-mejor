@@ -9,6 +9,7 @@ import { ExpensesModal }         from './components/ExpensesModal';
 import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
 import { useSupplierStore }      from '../../store/useSupplierStore';
+import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printerAgent';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -17,6 +18,7 @@ export function PosView() {
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
   const [showContratasPanel, setShowContratasPanel] = useState(false);
   const [numPadTarget, setNumPadTarget] = useState(null); // { itemId, itemName, currentQty }
+  const [printerAgentOk, setPrinterAgentOk] = useState(false);
   const { user, signOut } = useAuthStore();
   const { 
     inventory = [], 
@@ -91,6 +93,14 @@ export function PosView() {
       setShowShiftModal(true);
     }
   }, [activeShift]);
+
+  // Detectar si el agente de impresión está corriendo
+  useEffect(() => {
+    checkAgent().then(r => setPrinterAgentOk(r.ok));
+    // Re-check cada 30 segundos
+    const interval = setInterval(() => checkAgent().then(r => setPrinterAgentOk(r.ok)), 30000);
+    return () => clearInterval(interval);
+  }, []);
   
   // Enforce customer selection via a mock hook that sets the default
   useEffect(() => {
@@ -467,9 +477,14 @@ export function PosView() {
   const handlePrintReceipt = (sale, openDrawer = true, printReceipt = true) => {
     setLastSale(sale);
     
+    // Si hay agente, abrir cajón vía agente (silencioso)
+    if (openDrawer && printerAgentOk) {
+      agentOpenDrawer(posSettings?.cashDrawerCode || '27,112,48,55,121');
+    }
+    
     if (printReceipt) {
-      // Si openDrawer es true, incluir comando de cajón en el ticket impreso
-      const drawerCode = openDrawer ? (posSettings?.cashDrawerCode || '27,112,48,55,121') : '';
+      // Si NO hay agente y openDrawer, incluir comando en el ticket
+      const drawerCode = (openDrawer && !printerAgentOk) ? (posSettings?.cashDrawerCode || '27,112,48,55,121') : '';
       const saleCustomer = customers?.find(c => c.id === sale.customerId);
       const receiptHtml = generateReceiptHTML(sale, saleCustomer, posSettings?.ticketConfig, customerTypes, drawerCode);
       setTimeout(() => {
@@ -519,14 +534,20 @@ export function PosView() {
         {activeShift && (
           <>
             <button
-              className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
-              title="Abrir cajón"
-              onClick={() => {
-                // El cajón se abre automáticamente al imprimir tickets.
-                // No es posible abrirlo sin diálogo de impresión desde el navegador.
-                alert('💡 El cajón se abre automáticamente al imprimir un ticket de venta.\n\nPara abrir manualmente, usa el botón "Probar Cajón" desde Admin > Config Caja.');
+              className={`shrink-0 w-11 h-11 flex items-center justify-center rounded-xl border active:scale-95 transition-all relative ${printerAgentOk ? 'bg-green-900/40 text-green-300 border-green-700 hover:bg-green-800/50' : 'bg-gray-800 text-gray-300 border-gray-700'}`}
+              title={printerAgentOk ? 'Abrir cajón (Agente conectado)' : 'Agente no conectado — cajón se abre con tickets'}
+              onClick={async () => {
+                if (printerAgentOk) {
+                  const ok = await agentOpenDrawer(posSettings?.cashDrawerCode || '27,112,48,55,121');
+                  if (!ok) alert('❌ Error al abrir el cajón. Verifique que la impresora esté encendida.');
+                } else {
+                  alert('💡 Agente no detectado.\n\nEl cajón se abre automáticamente al imprimir tickets.\n\nPara abrir manualmente, instale frita-printer-agent.exe en este PC.');
+                }
               }}
-            ><span>🔓</span></button>
+            >
+              <span>🔓</span>
+              <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-gray-900 ${printerAgentOk ? 'bg-green-400' : 'bg-red-400'}`} />
+            </button>
             <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>
               <span>🕐</span>
               {suspendedCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{suspendedCount}</span>}
