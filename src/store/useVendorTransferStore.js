@@ -74,6 +74,17 @@ export const useVendorTransferStore = create(
       },
 
       /**
+       * Edita una transferencia existente (monto, nota, foto).
+       */
+      updateTransfer: (id, updates) => {
+        const updated = get().transfers.map(t =>
+          t.id === id ? { ...t, ...updates, editedAt: new Date().toISOString() } : t
+        );
+        set({ transfers: updated });
+        syncTransfers(updated);
+      },
+
+      /**
        * Retorna las transferencias del turno actual de un punto.
        */
       getShiftTransfers: (pointId, shiftOpenedAt) => {

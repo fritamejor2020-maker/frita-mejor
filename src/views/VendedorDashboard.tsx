@@ -22,7 +22,7 @@ export const VendedorDashboard = () => {
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
   const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
-  const { transfers: allVendorTransfers, addTransfer: addVendorTransfer, deleteTransfer: deleteVendorTransfer, getShiftTransfers, getShiftTransferTotal } = useVendorTransferStore();
+  const { transfers: allVendorTransfers, addTransfer: addVendorTransfer, deleteTransfer: deleteVendorTransfer, updateTransfer: updateVendorTransfer, getShiftTransfers, getShiftTransferTotal } = useVendorTransferStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) =>
@@ -71,7 +71,12 @@ export const VendedorDashboard = () => {
   const [transferPhoto, setTransferPhoto] = useState<string | null>(null);
   const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
   const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
+  const [editingTransferId, setEditingTransferId] = useState<string | null>(null);
+  const [editAmount, setEditAmount] = useState('');
+  const [editNote, setEditNote] = useState('');
+  const [editPhoto, setEditPhoto] = useState<string | null>(null);
   const transferFileRef = useRef<HTMLInputElement>(null);
+  const editFileRef = useRef<HTMLInputElement>(null);
 
   // Transferencias del turno actual
   const shiftTransfers = getShiftTransfers(pointId, openedAt);
@@ -717,6 +722,91 @@ export const VendedorDashboard = () => {
                 <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Historial del Turno</h4>
                 {shiftTransfers.map((t: any) => {
                   const time = new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                  const isEditing = editingTransferId === t.id;
+
+                  // Modo edición inline
+                  if (isEditing) {
+                    return (
+                      <div key={t.id} className="bg-amber-50 rounded-2xl shadow-sm border-2 border-amber-300 overflow-hidden p-4 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-black text-amber-600 uppercase tracking-widest">✏️ Editando Transferencia</span>
+                          <span className="text-xs font-bold text-gray-300">{time}</span>
+                        </div>
+                        {/* Monto */}
+                        <MoneyInput value={editAmount} onChange={setEditAmount} placeholder="$ 0"
+                          className="w-full bg-white border-2 border-amber-200 rounded-2xl py-3 px-4 font-black text-xl text-gray-800 outline-none focus:border-amber-400 transition-colors" />
+                        {/* Nota */}
+                        <input
+                          type="text"
+                          value={editNote}
+                          onChange={(e) => setEditNote(e.target.value)}
+                          placeholder="Nota (opcional)"
+                          className="w-full bg-white rounded-xl py-2.5 px-4 font-bold text-gray-500 text-sm outline-none border-2 border-gray-100 focus:border-amber-300"
+                        />
+                        {/* Foto */}
+                        <input
+                          ref={editFileRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setEditPhoto(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                            e.target.value = '';
+                          }}
+                        />
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => editFileRef.current?.click()}
+                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 ${
+                              editPhoto ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-gray-50 border border-dashed border-gray-200 text-gray-400'
+                            }`}
+                          >
+                            {editPhoto ? <><CheckCircle size={14} /> Foto lista</> : <><Camera size={14} /> Cambiar Foto</>}
+                          </button>
+                          {editPhoto && (
+                            <button onClick={() => setEditPhoto(null)}
+                              className="w-10 flex items-center justify-center rounded-xl bg-red-50 border border-red-100 text-red-400 active:scale-95">
+                              <X size={14} />
+                            </button>
+                          )}
+                        </div>
+                        {editPhoto && (
+                          <img src={editPhoto} alt="Preview" className="w-full h-24 object-cover rounded-xl border border-gray-100" />
+                        )}
+                        {/* Acciones */}
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            onClick={() => {
+                              const newAmount = parseInt(editAmount) || 0;
+                              if (newAmount <= 0) { toast.error('Ingresa un valor válido'); return; }
+                              updateVendorTransfer(t.id, {
+                                amount: newAmount,
+                                note: editNote.trim(),
+                                ...(editPhoto !== t.photoBase64 ? { photoBase64: editPhoto } : {}),
+                              });
+                              toast.success('✔ Transferencia actualizada');
+                              setEditingTransferId(null);
+                            }}
+                            className="flex-1 bg-amber-500 text-white font-black py-2.5 rounded-xl active:scale-95 flex items-center justify-center gap-1.5"
+                          >
+                            <Save size={14} /> Guardar
+                          </button>
+                          <button
+                            onClick={() => setEditingTransferId(null)}
+                            className="flex-1 bg-gray-100 text-gray-500 font-bold py-2.5 rounded-xl active:scale-95"
+                          >
+                            Cancelar
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
                       <div className="flex items-center justify-between px-4 py-3">
@@ -727,6 +817,7 @@ export const VendedorDashboard = () => {
                           <div>
                             <span className="font-black text-gray-900 text-lg">{formatMoney(t.amount)}</span>
                             {t.note && <p className="text-xs font-bold text-gray-400 leading-tight">{t.note}</p>}
+                            {t.editedAt && <p className="text-[10px] font-bold text-amber-400">✏️ editada</p>}
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5">
@@ -741,6 +832,19 @@ export const VendedorDashboard = () => {
                               <Image size={14} />
                             </button>
                           )}
+                          {/* Editar */}
+                          <button
+                            onClick={() => {
+                              setEditingTransferId(t.id);
+                              setEditAmount(String(t.amount));
+                              setEditNote(t.note || '');
+                              setEditPhoto(t.photoBase64 || null);
+                            }}
+                            className="w-8 h-8 rounded-lg bg-amber-50 text-amber-500 flex items-center justify-center active:scale-90"
+                            title="Editar"
+                          >
+                            <Pencil size={14} />
+                          </button>
                           {/* Compartir WhatsApp */}
                           <button
                             onClick={() => {
