@@ -254,12 +254,43 @@ export const useInventoryStore = create(
 
           const updates = {};
 
-          // Procesar llaves globales
+          // Procesar llaves globales — smart merge: local gana
           for (const key of GLOBAL_STORE_KEYS) {
             const val = remote[key];
             if (val !== undefined && val !== null) {
               const isNonEmpty = Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0;
-              if (isNonEmpty) updates[key] = val;
+              if (isNonEmpty) {
+                let finalVal = val;
+                // Arrays: smart merge por ID, local gana
+                if (Array.isArray(finalVal)) {
+                  const localArr = get()[key] || [];
+                  if (localArr.length > 0) {
+                    const merged = [...localArr];
+                    const mergedIds = new Set(localArr.map(x => x?.id).filter(Boolean));
+                    finalVal.forEach(item => {
+                      if (item?.id && !mergedIds.has(item.id)) {
+                        merged.push(item);
+                        mergedIds.add(item.id);
+                      }
+                    });
+                    finalVal = merged;
+                  }
+                }
+                // Objetos: el más reciente gana
+                if (finalVal && typeof finalVal === 'object' && !Array.isArray(finalVal)) {
+                  const localVal = get()[key];
+                  if (localVal && typeof localVal === 'object' && !Array.isArray(localVal) && Object.keys(localVal).length > 0) {
+                    const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
+                    const remoteTime = finalVal._updatedAt ? new Date(finalVal._updatedAt).getTime() : 0;
+                    if (localTime > remoteTime) {
+                      finalVal = { ...finalVal, ...localVal };
+                    } else {
+                      finalVal = { ...localVal, ...finalVal };
+                    }
+                  }
+                }
+                updates[key] = finalVal;
+              }
             }
           }
 
@@ -300,11 +331,20 @@ export const useInventoryStore = create(
                     if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
                   }
 
-                  // Para objetos (posSettings, etc.): deep merge, local gana
+                  // Para objetos (posSettings, etc.): el más reciente gana
                   if (finalVal && typeof finalVal === 'object' && !Array.isArray(finalVal)) {
                     const localVal = get()[key];
                     if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
-                      finalVal = { ...finalVal, ...localVal };
+                      const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
+                      const remoteTime = finalVal._updatedAt ? new Date(finalVal._updatedAt).getTime() : 0;
+                      // Si local fue modificado por el usuario más recientemente, local gana
+                      // Si remote es más reciente (correcciones), remote gana
+                      // Si ninguno tiene timestamp, remote gana (para que fixes se propaguen)
+                      if (localTime > remoteTime) {
+                        finalVal = { ...finalVal, ...localVal };
+                      } else {
+                        finalVal = { ...localVal, ...finalVal };
+                      }
                     }
                   }
                   updates[key] = finalVal;
@@ -842,7 +882,7 @@ export const useInventoryStore = create(
       })),
 
       // Configuración POS y Global settings
-      updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
+      updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data, _updatedAt: new Date().toISOString() } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
 
       // Registros de Caja (Multi-Caja)
       addPosRegister: (reg) => { set((s) => ({ posRegisters: [...(s.posRegisters || INITIAL_POS_REGISTERS), { ...reg, id: `REG-${Date.now()}`, active: true }] })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
