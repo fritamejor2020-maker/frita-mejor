@@ -131,20 +131,33 @@ function FilterBar() {
         </div>
       )}
 
-      {/* Sede filter */}
-      <div className="flex items-center gap-2 ml-auto">
-        <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Sede:</span>
-        <select
-          value={branchId || ''}
-          onChange={e => setBranchId(e.target.value || null)}
-          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer"
-        >
-          <option value="">🏢 Todas</option>
-          {branches.map((b: any) => (
-            <option key={b.id} value={b.id}>{b.name || b.id}</option>
-          ))}
-        </select>
-      </div>
+      {/* Sede filter — Gerentes solo ven sus sedes asignadas */}
+      {(() => {
+        const user = useAuthStore.getState()?.user;
+        const isManager = user?.role === 'MANAGER';
+        const allowedBranches: string[] = isManager
+          ? (user?.allowedBranches?.length > 0 ? user.allowedBranches : user?.branchId ? [user.branchId] : [])
+          : [];
+        const filteredBranches = isManager
+          ? branches.filter((b: any) => allowedBranches.includes(b.id))
+          : branches;
+
+        return (
+          <div className="flex items-center gap-2 ml-auto">
+            <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Sede:</span>
+            <select
+              value={branchId || ''}
+              onChange={e => setBranchId(e.target.value || null)}
+              className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-gray-700 outline-none shadow-sm cursor-pointer"
+            >
+              {!isManager && <option value="">🏢 Todas</option>}
+              {filteredBranches.map((b: any) => (
+                <option key={b.id} value={b.id}>{b.name || b.id}</option>
+              ))}
+            </select>
+          </div>
+        );
+      })()}
     </div>
   );
 }

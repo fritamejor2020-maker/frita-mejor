@@ -29,6 +29,7 @@ import { FinanceDashboard }    from './modules/pos/FinanceDashboard';
 import { ModuleSelectorView }  from './views/ModuleSelectorView';
 import { CierresView }         from './modules/cierres/CierresView';
 import { DashboardView }       from './modules/dashboard/DashboardView';
+import { ManagerDashboard }    from './views/ManagerDashboard';
 
 import { Link } from 'react-router-dom';
 
@@ -90,7 +91,7 @@ function RoleRedirect() {
       pos: '/pos', finanzas: '/finanzas',
       'finanzas-ingresos': '/finanzas', 'finanzas-gastos': '/finanzas', 'finanzas-nomina': '/finanzas',
       admin: '/admin', tracking: '/tracking', cierres: '/cierres',
-      traslados: '/traslados', dashboard: '/dashboard',
+      traslados: '/traslados', dashboard: '/dashboard', gerente: '/gerente',
     };
     return <Navigate to={singleRoutes[key] ?? '/selector'} replace />;
   }
@@ -287,6 +288,10 @@ function App() {
 
               <Route element={<ProtectedRoute allowedModules={['traslados', 'admin']} />}>
                 <Route path="/traslados" element={<TransfersView />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['gerente']} />}>
+                <Route path="/gerente" element={<ManagerDashboard />} />
               </Route>
 
               {/* Sin acceso al módulo */}

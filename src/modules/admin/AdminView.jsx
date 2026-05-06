@@ -1425,9 +1425,10 @@ const USER_ROLES = [
   { value: 'CAJERO',    label: '💵 Cajero',        color: 'bg-green-50 text-green-600' },
   { value: 'VENDEDOR',  label: '🚲 Vendedor',      color: 'bg-red-50 text-frita-red'   },
   { value: 'DEJADOR',   label: '🛵 Dejador',       color: 'bg-yellow-50 text-frita-orange' },
+  { value: 'MANAGER',   label: '👔 Gerente',       color: 'bg-violet-50 text-violet-600' },
   { value: 'ADMIN',     label: '⚙️ Administrador', color: 'bg-purple-50 text-purple-600' },
 ];
-const USER_MODULE_LABELS = { produccion: '🏭 Producción', bodega: '📦 Bodega', pos: '💵 Caja', admin: '⚙️ Admin', 'vendedor-setup': '🔧 Conf. Vendedor', vendedor: '🚲 Vendedor', dejador: '🛵 Dejador', tracking: '🗺️ Rutas' };
+const USER_MODULE_LABELS = { produccion: '🏭 Producción', bodega: '📦 Bodega', pos: '💵 Caja', admin: '⚙️ Admin', 'vendedor-setup': '🔧 Conf. Vendedor', vendedor: '🚲 Vendedor', dejador: '🛵 Dejador', tracking: '🗺️ Rutas', gerente: '👔 Mi Sede' };
 const USER_FIELDS = [
   { key: 'name',     label: 'Nombre',      placeholder: 'Nombre Apellido',              type: 'text'     },
   { key: 'email',    label: 'Correo',      placeholder: 'usuario@fritamejor.com',       type: 'email'    },

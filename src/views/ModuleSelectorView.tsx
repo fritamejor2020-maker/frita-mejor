@@ -18,6 +18,7 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'tracking':         { label: 'Rutas y Mapa',     icon: '🗺️', route: '/tracking',      color: 'from-cyan-500 to-sky-600',    bg: 'bg-cyan-50' },
   'cierres':          { label: 'Auditor Cierres',  icon: '🧐', route: '/cierres',       color: 'from-teal-500 to-teal-700',    bg: 'bg-teal-50' },
   'traslados':        { label: 'Traslados',        icon: '🚛', route: '/traslados',     color: 'from-orange-500 to-red-500',   bg: 'bg-orange-50' },
+  'gerente':          { label: 'Mi Sede',          icon: '👔', route: '/gerente',       color: 'from-violet-500 to-purple-600',bg: 'bg-violet-50' },
 };
 
 export const ModuleSelectorView = () => {

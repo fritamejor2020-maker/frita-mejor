@@ -114,8 +114,8 @@ const DEFAULT_USERS = [
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
   ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados', 'dashboard'],
-  // MANAGER: acceso configurable por el Admin. Por defecto solo admin y reportes.
-  MANAGER:   ['admin', 'pos', 'cierres', 'finanzas-ingresos', 'finanzas-gastos'],
+  // MANAGER: módulo dedicado con Dashboard, Mapa, Finanzas y Config (filtrado por sede).
+  MANAGER:   ['gerente'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
