@@ -249,10 +249,25 @@ export const VendedorDashboard = () => {
           soldItems,
           details,
       };
+      // Buscar el turno abierto de este vehículo/jornada hoy.
+      // Búsqueda amplia: mismo pointId + tipo VENDEDOR + sin cerrar + mismo día.
+      // Esto evita duplicados cuando el vendedor reabre la app y openedAt cambia.
+      const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
+      const shiftKey = shiftData.shift; // "AM" o "PM"
 
-      const activeShiftRecord = (posShifts || []).find(
-        (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt && !s.closedAt
+      // 1. Buscar turno abierto (sin closedAt) para este triciclo hoy
+      let activeShiftRecord = (posShifts || []).find(
+        (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && !s.closedAt
+          && s.openedAt?.startsWith(today)
       );
+
+      // 2. Si no hay abierto, buscar por openedAt exacto (el del session store)
+      if (!activeShiftRecord) {
+        activeShiftRecord = (posShifts || []).find(
+          (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt
+        );
+      }
+
       if (activeShiftRecord) {
         updatePosShift(activeShiftRecord.id, finalShift);
       } else {
