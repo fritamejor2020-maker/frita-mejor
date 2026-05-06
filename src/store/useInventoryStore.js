@@ -848,15 +848,9 @@ export const useInventoryStore = create(
       deleteRecipe: (id) => { set((s) => ({ recipes: s.recipes.filter((r) => r.id !== id) })); syncKey('recipes', useInventoryStore.getState().recipes); },
 
       // POS Categorías
-      addPosCategory: (c) => set((s) => ({
-        posCategories: [...(s.posCategories || []), { ...c, id: `CAT-${Date.now()}` }],
-      })),
-      updatePosCategory: (id, data) => set((s) => ({
-        posCategories: (s.posCategories || []).map((c) => c.id === id ? { ...c, ...data } : c),
-      })),
-      deletePosCategory: (id) => set((s) => ({
-        posCategories: (s.posCategories || []).filter((c) => c.id !== id),
-      })),
+      addPosCategory: (c) => { set((s) => ({ posCategories: [...(s.posCategories || []), { ...c, id: `CAT-${Date.now()}` }] })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
+      updatePosCategory: (id, data) => { set((s) => ({ posCategories: (s.posCategories || []).map((c) => c.id === id ? { ...c, ...data } : c) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
+      deletePosCategory: (id) => { set((s) => ({ posCategories: (s.posCategories || []).filter((c) => c.id !== id) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
 
       // Clientes
       addCustomer: (c) => { set((s) => ({
@@ -870,16 +864,9 @@ export const useInventoryStore = create(
       })); syncKey('customers', useInventoryStore.getState().customers); },
 
       // Tipos de Clientes (Customer Types VIP)
-      addCustomerType: (typeData) => set((state) => ({
-        customerTypes: [...(state.customerTypes || []), { ...typeData, id: `CTYPE-${Date.now()}` }]
-      })),
-      updateCustomerType: (id, updates) => set((state) => ({
-        customerTypes: (state.customerTypes || []).map(c => c.id === id ? { ...c, ...updates } : c)
-      })),
-      deleteCustomerType: (id) => set((state) => ({
-        customerTypes: (state.customerTypes || []).filter(c => c.id !== id),
-        customers: (state.customers || []).map(c => c.typeId === id ? { ...c, typeId: null } : c)
-      })),
+      addCustomerType: (typeData) => { set((state) => ({ customerTypes: [...(state.customerTypes || []), { ...typeData, id: `CTYPE-${Date.now()}` }] })); syncKey('customerTypes', useInventoryStore.getState().customerTypes); },
+      updateCustomerType: (id, updates) => { set((state) => ({ customerTypes: (state.customerTypes || []).map(c => c.id === id ? { ...c, ...updates } : c) })); syncKey('customerTypes', useInventoryStore.getState().customerTypes); },
+      deleteCustomerType: (id) => { set((state) => ({ customerTypes: (state.customerTypes || []).filter(c => c.id !== id), customers: (state.customers || []).map(c => c.typeId === id ? { ...c, typeId: null } : c) })); syncKey('customerTypes', useInventoryStore.getState().customerTypes); },
 
       // Configuración POS y Global settings
       updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data, _updatedAt: new Date().toISOString() } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
@@ -901,15 +888,9 @@ export const useInventoryStore = create(
       })),
 
       // Plantillas de Carga / Surtido
-      addLoadTemplate: (template) => set((s) => ({
-        loadTemplates: [...(s.loadTemplates || []), { ...template, id: `TPL-${Date.now()}` }]
-      })),
-      updateLoadTemplate: (id, updates) => set((s) => ({
-        loadTemplates: (s.loadTemplates || []).map(t => t.id === id ? { ...t, ...updates } : t)
-      })),
-      deleteLoadTemplate: (id) => set((s) => ({
-        loadTemplates: (s.loadTemplates || []).filter(t => t.id !== id)
-      })),
+      addLoadTemplate: (template) => { set((s) => ({ loadTemplates: [...(s.loadTemplates || []), { ...template, id: `TPL-${Date.now()}` }] })); syncKey('loadTemplates', useInventoryStore.getState().loadTemplates); },
+      updateLoadTemplate: (id, updates) => { set((s) => ({ loadTemplates: (s.loadTemplates || []).map(t => t.id === id ? { ...t, ...updates } : t) })); syncKey('loadTemplates', useInventoryStore.getState().loadTemplates); },
+      deleteLoadTemplate: (id) => { set((s) => ({ loadTemplates: (s.loadTemplates || []).filter(t => t.id !== id) })); syncKey('loadTemplates', useInventoryStore.getState().loadTemplates); },
 
       // Ventas / Caja
       addPosSale: (sale) => { set((s) => ({ posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])] })); syncKey('posSales', useInventoryStore.getState().posSales); },

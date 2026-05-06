@@ -169,11 +169,14 @@ export function useRealtimeSync() {
   const channelRef = useRef(null);
   const pullDebounceRef = useRef(null);
 
+  // Reactivo: re-suscribir cuando se agregan/eliminan sedes
+  const branchIdsKey = useBranchStore(s => s.branches.map(b => b.id).join(','));
+
   useEffect(() => {
-    // Obtener el branchId del usuario activo en el momento de montar
+    // Obtener el branchId del usuario activo
     const user = useAuthStore.getState().user;
     const branchId = user?.branchId ?? null;
-    const allBranchIds = useBranchStore.getState().branches.map(b => b.id);
+    const allBranchIds = branchIdsKey ? branchIdsKey.split(',') : ['BRANCH-001'];
 
     const channel = supabase
       .channel('app-state-realtime')
@@ -213,5 +216,5 @@ export function useRealtimeSync() {
       if (_batchTimer) { clearTimeout(_batchTimer); _batchTimer = null; }
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [branchIdsKey]);
 }

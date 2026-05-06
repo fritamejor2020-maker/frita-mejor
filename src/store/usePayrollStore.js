@@ -156,9 +156,11 @@ export const usePayrollStore = create(
         syncKey('payrollRecords', updated);
       },
 
-      /** Devuelve el registro del período dado, o null si no existe. */
+      /** Devuelve el registro del período dado, filtrado por sede. */
       getPayrollByPeriod: (periodo) => {
-        return get().payrollRecords.find(r => r.periodo === periodo) || null;
+        const branchId = useAuthStore.getState().user?.branchId ?? null;
+        return get().payrollRecords.find(r => r.periodo === periodo
+          && (!r.branchId || !branchId || r.branchId === branchId)) || null;
       },
     }),
     {
