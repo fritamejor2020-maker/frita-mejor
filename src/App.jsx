@@ -7,7 +7,9 @@ import { useInventoryStore } from './store/useInventoryStore';
 import { useLogisticsStore } from './store/useLogisticsStore';
 import { flushQueue } from './lib/syncManager';
 import { initCrossTabSync, registerStore, broadcastState, isApplyingRemoteState } from './lib/crossTabSync';
+import { trackError, installGlobalErrorHandlers } from './lib/errorTracker';
 import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
+import VersionBadge from './components/ui/VersionBadge';
 
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -107,6 +109,7 @@ class ErrorBoundary extends React.Component {
   }
   componentDidCatch(error, errorInfo) {
     console.error("ErrorBoundary caught:", error, errorInfo);
+    trackError('crash', error, { componentStack: errorInfo?.componentStack });
   }
   render() {
     if (this.state.hasError) {
@@ -171,6 +174,9 @@ function App() {
   useRealtimeSync();
 
   useEffect(() => {
+    // 0. Instalar handlers globales de errores (una sola vez)
+    installGlobalErrorHandlers();
+
     // 1. Cargar estado remoto DESPUÉS de que Zustand persist hidrate
     // El persist de Zustand carga síncronamente desde localStorage,
     // pero lo hace en el mismo tick. Usamos un microtask (Promise.resolve)
@@ -218,6 +224,7 @@ function App() {
   return (
     <>
       <SyncStatusIndicator />
+      <VersionBadge />
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
         <ErrorBoundary>
