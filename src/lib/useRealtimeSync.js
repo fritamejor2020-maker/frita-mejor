@@ -74,12 +74,26 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     // ── POS ──
     applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: v });
     applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
-    applicators[`posShifts_${bid}`]        = (v) => useInventoryStore.setState({ posShifts: v });
+    applicators[`posShifts_${bid}`]        = (v) => {
+      // Filtrar tombstones: no re-introducir turnos que el Admin ya borró
+      const deleted = new Set(useInventoryStore.getState().deletedShiftIds || []);
+      const filtered = (v || []).filter(s => !deleted.has(s.id));
+      useInventoryStore.setState({ posShifts: filtered });
+    };
     applicators[`posSales_${bid}`]         = (v) => useInventoryStore.setState({ posSales: v });
     applicators[`posExpenses_${bid}`]      = (v) => useInventoryStore.setState({ posExpenses: v });
-    applicators[`inventory_${bid}`]        = (v) => useInventoryStore.setState({ inventory: v });
+    applicators[`inventory_${bid}`]        = (v) => {
+      // Filtrar tombstones de inventario
+      const deletedInv = new Set(useInventoryStore.getState().deletedInventoryIds || []);
+      const filtered = (v || []).filter(i => !deletedInv.has(i.id));
+      useInventoryStore.setState({ inventory: filtered });
+    };
     applicators[`contrataPayments_${bid}`] = (v) => useInventoryStore.setState({ contrataPayments: v });
-    applicators[`deletedShiftIds_${bid}`]  = (v) => useInventoryStore.setState({ deletedShiftIds: v });
+    applicators[`deletedShiftIds_${bid}`]  = (v) => {
+      // MERGE: no perder tombstones locales al recibir los de otra sede
+      const local = useInventoryStore.getState().deletedShiftIds || [];
+      useInventoryStore.setState({ deletedShiftIds: [...new Set([...local, ...(v || [])])] });
+    };
 
     // ── Logística (Dejador / Vendedor) ──
     // MERGE por sede: al recibir datos de una sede, conservar pedidos de otras sedes
@@ -119,7 +133,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`vendorTransfers_${bid}`]   = (v) => useVendorTransferStore.getState().loadFromRemote(v);
 
     // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
-    if (!applicators['posShifts'])        applicators['posShifts']        = (v) => useInventoryStore.setState({ posShifts: v });
+    if (!applicators['posShifts'])        applicators['posShifts']        = (v) => {
+      const deleted = new Set(useInventoryStore.getState().deletedShiftIds || []);
+      useInventoryStore.setState({ posShifts: (v || []).filter(s => !deleted.has(s.id)) });
+    };
     if (!applicators['posSales'])         applicators['posSales']         = (v) => useInventoryStore.setState({ posSales: v });
     if (!applicators['posExpenses'])      applicators['posExpenses']      = (v) => useInventoryStore.setState({ posExpenses: v });
     if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => useInventoryStore.setState({ posRegisters: v });
