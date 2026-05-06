@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -13,6 +13,7 @@ import { BottomNav } from '../components/ui/BottomNav';
 import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useVendorTracking } from '../lib/useVendorTracking';
+import { useVendorTransferStore } from '../store/useVendorTransferStore';
 
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
@@ -21,6 +22,7 @@ export const VendedorDashboard = () => {
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
   const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, updatePosShift, posShifts } = useInventoryStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
+  const { transfers: allVendorTransfers, addTransfer: addVendorTransfer, deleteTransfer: deleteVendorTransfer, getShiftTransfers, getShiftTransferTotal } = useVendorTransferStore();
   
   const presets: number[] = (user as any)?.restockPresets || [5, 10, 15, 20];
   const vendedorTemplates = loadTemplates?.filter((t: any) =>
@@ -60,9 +62,20 @@ export const VendedorDashboard = () => {
 
   // Cierre state
   const [cash, setCash] = useState('');
-  const [transfer, setTransfer] = useState('');
   const [expenses, setExpenses] = useState('');
   const [expensesDesc, setExpensesDesc] = useState('');
+
+  // Transferencias state
+  const [transferAmount, setTransferAmount] = useState('');
+  const [transferNote, setTransferNote] = useState('');
+  const [transferPhoto, setTransferPhoto] = useState<string | null>(null);
+  const [viewingPhoto, setViewingPhoto] = useState<string | null>(null);
+  const [deletingTransferId, setDeletingTransferId] = useState<string | null>(null);
+  const transferFileRef = useRef<HTMLInputElement>(null);
+
+  // Transferencias del turno actual
+  const shiftTransfers = getShiftTransfers(pointId, openedAt);
+  const shiftTransferTotal = getShiftTransferTotal(pointId, openedAt);
 
 
   // Build product price map for calcSoldByVehicle
@@ -198,7 +211,7 @@ export const VendedorDashboard = () => {
 
   const handleCloseShift = async () => {
     const cashVal = parseInt(cash) || 0;
-    const transferVal = parseInt(transfer) || 0;
+    const transferVal = shiftTransferTotal;
     const expensesVal = parseInt(expenses) || 0;
     const realTotal = cashVal + transferVal + expensesVal;
 
@@ -253,12 +266,14 @@ export const VendedorDashboard = () => {
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },
     { id: 'restock', label: 'Pedir', icon: <Package size={24} /> },
+    { id: 'transfers', label: 'Transf.', icon: <ArrowRightLeft size={24} /> },
     { id: 'close', label: 'Cierre', icon: <DollarSign size={24} /> }
   ];
 
   const getHeaderTitle = () => {
     if (activeTab === 'pos') return 'Venta Rápida';
     if (activeTab === 'restock') return 'Pedir Surtido';
+    if (activeTab === 'transfers') return 'Transferencias';
     if (activeTab === 'close') return 'Cierre Caja';
     return 'Dashboard';
   };
@@ -586,6 +601,189 @@ export const VendedorDashboard = () => {
           </div>
         )}
 
+        {/* SUBVISTA: TRANSFERENCIAS BANCARIAS */}
+        {activeTab === 'transfers' && (
+          <div className="max-w-3xl mx-auto space-y-4">
+
+            {/* Formulario nueva transferencia */}
+            <div className="bg-white rounded-3xl p-5 shadow-sm border border-white">
+              <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Nueva Transferencia</h4>
+
+              {/* Monto */}
+              <div className="relative pt-6 mb-4">
+                <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest flex items-center gap-1">
+                  <DollarSign size={12} strokeWidth={3} /> VALOR
+                </div>
+                <MoneyInput value={transferAmount} onChange={setTransferAmount} placeholder="$ 0"
+                  className="w-full bg-white border-2 border-gray-100 rounded-2xl py-4 px-5 font-black text-2xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors" />
+              </div>
+
+              {/* Nota opcional */}
+              <input
+                type="text"
+                value={transferNote}
+                onChange={(e) => setTransferNote(e.target.value)}
+                placeholder="Nota (opcional) — ej: Nequi de Juan"
+                className="w-full bg-gray-50 rounded-2xl py-3 px-5 font-bold text-gray-500 text-sm outline-none shadow-sm border-none focus:ring-2 ring-[#FFB700] mb-4"
+              />
+
+              {/* Foto del comprobante */}
+              <input
+                ref={transferFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => setTransferPhoto(ev.target?.result as string);
+                  reader.readAsDataURL(file);
+                  e.target.value = '';
+                }}
+              />
+
+              <div className="flex gap-3 mb-4">
+                <button
+                  onClick={() => transferFileRef.current?.click()}
+                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 ${
+                    transferPhoto
+                      ? 'bg-green-50 border-2 border-green-200 text-green-700'
+                      : 'bg-gray-50 border-2 border-dashed border-gray-200 text-gray-400 hover:border-gray-300'
+                  }`}
+                >
+                  {transferPhoto ? (
+                    <><CheckCircle size={16} /> Foto lista ✔</>
+                  ) : (
+                    <><Camera size={16} /> Tomar / Subir Foto</>
+                  )}
+                </button>
+                {transferPhoto && (
+                  <button
+                    onClick={() => setTransferPhoto(null)}
+                    className="w-12 flex items-center justify-center rounded-2xl bg-red-50 border-2 border-red-100 text-red-400 active:scale-95"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Preview de la foto */}
+              {transferPhoto && (
+                <div className="mb-4 rounded-2xl overflow-hidden border-2 border-gray-100">
+                  <img src={transferPhoto} alt="Comprobante" className="w-full max-h-48 object-cover" />
+                </div>
+              )}
+
+              {/* Botón registrar */}
+              <button
+                onClick={() => {
+                  const amount = parseInt(transferAmount) || 0;
+                  if (amount <= 0) { toast.error('Ingresa un valor válido'); return; }
+                  addVendorTransfer({
+                    pointId,
+                    shiftOpenedAt: openedAt,
+                    amount,
+                    photoBase64: transferPhoto,
+                    note: transferNote,
+                  });
+                  toast.success(`✔ Transferencia de ${formatMoney(amount)} registrada`);
+                  setTransferAmount('');
+                  setTransferNote('');
+                  setTransferPhoto(null);
+                }}
+                disabled={!(parseInt(transferAmount) > 0)}
+                className="w-full flex items-center justify-center gap-2 bg-[#FF4040] text-white font-black text-lg py-4 rounded-[28px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95 disabled:opacity-40 disabled:active:scale-100"
+              >
+                <Send size={20} /> Registrar Transferencia
+              </button>
+            </div>
+
+            {/* Total del turno */}
+            {shiftTransfers.length > 0 && (
+              <div className="bg-gray-50 rounded-3xl px-6 py-5 flex items-center justify-between border border-gray-100">
+                <div>
+                  <span className="block text-xs font-black text-gray-400 uppercase tracking-widest mb-0.5">Total Transferencias</span>
+                  <span className="text-xs font-bold text-gray-300">{shiftTransfers.length} transferencia{shiftTransfers.length !== 1 ? 's' : ''} hoy</span>
+                </div>
+                <span className="text-3xl font-black text-gray-900">{formatMoney(shiftTransferTotal)}</span>
+              </div>
+            )}
+
+            {/* Lista de transferencias del turno */}
+            {shiftTransfers.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest">Historial del Turno</h4>
+                {shiftTransfers.map((t: any) => {
+                  const time = new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div key={t.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+                      <div className="flex items-center justify-between px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white shadow-sm">
+                            <ArrowRightLeft size={18} />
+                          </div>
+                          <div>
+                            <span className="font-black text-gray-900 text-lg">{formatMoney(t.amount)}</span>
+                            {t.note && <p className="text-xs font-bold text-gray-400 leading-tight">{t.note}</p>}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-xs font-bold text-gray-300">{time}</span>
+                          {/* Ver foto */}
+                          {t.photoBase64 && (
+                            <button
+                              onClick={() => setViewingPhoto(t.photoBase64)}
+                              className="w-8 h-8 rounded-lg bg-blue-50 text-blue-500 flex items-center justify-center active:scale-90"
+                              title="Ver comprobante"
+                            >
+                              <Image size={14} />
+                            </button>
+                          )}
+                          {/* Compartir WhatsApp */}
+                          <button
+                            onClick={() => {
+                              const msg = `*Transferencia ${pointId}*%0A💰 ${formatMoney(t.amount)}%0A📝 ${t.note || 'Sin nota'}%0A🕐 ${time}%0A👤 ${t.vendorName}`;
+                              window.open(`https://wa.me/?text=${msg}`, '_blank');
+                            }}
+                            className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center active:scale-90"
+                            title="Compartir por WhatsApp"
+                          >
+                            <Share2 size={14} />
+                          </button>
+                          {/* Eliminar */}
+                          <button
+                            onClick={() => setDeletingTransferId(t.id)}
+                            className="w-8 h-8 rounded-lg bg-red-50 text-red-400 flex items-center justify-center active:scale-90"
+                            title="Eliminar"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                      {/* Miniatura de la foto */}
+                      {t.photoBase64 && (
+                        <button onClick={() => setViewingPhoto(t.photoBase64)} className="w-full">
+                          <img src={t.photoBase64} alt="Comprobante" className="w-full h-24 object-cover border-t border-gray-100 hover:opacity-80 transition-opacity" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {shiftTransfers.length === 0 && (
+              <div className="text-center py-12">
+                <div className="text-5xl mb-3">💸</div>
+                <p className="text-gray-400 font-bold text-sm">No hay transferencias en este turno</p>
+                <p className="text-gray-300 font-bold text-xs mt-1">Registra las transferencias que recibas</p>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* SUBVISTA: CIERRE CAJA */}
         {activeTab === 'close' && (() => {
           const { soldItems: logSoldItems, theoretical: logTheoretical } = getLogisticsCalc();
@@ -623,8 +821,10 @@ export const VendedorDashboard = () => {
                     <div className="absolute top-0 left-4 bg-[#FF4040] text-white font-black text-[10px] px-3 py-1 rounded-t-lg tracking-widest flex items-center gap-1">
                        <Zap size={12} strokeWidth={3} fill="currentColor" /> TRANSFERENCIAS
                     </div>
-                    <MoneyInput value={transfer} onChange={setTransfer} placeholder="$ 0"
-                      className="w-full bg-white border-2 border-gray-100 rounded-2xl py-4 px-5 font-black text-xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors" />
+                    <div className="w-full bg-blue-50 border-2 border-blue-100 rounded-2xl py-4 px-5 font-black text-xl text-blue-700 cursor-default flex items-center justify-between">
+                      <span>{formatMoney(shiftTransferTotal)}</span>
+                      <span className="text-xs font-bold text-blue-400">{shiftTransfers.length} transf.</span>
+                    </div>
                  </div>
                </div>
 
@@ -886,6 +1086,36 @@ export const VendedorDashboard = () => {
             <div className="flex gap-3">
               <button onClick={() => setDeletingTemplate(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95">Cancelar</button>
               <button onClick={() => { deleteLoadTemplate(deletingTemplate.id); setDeletingTemplate(null); }} className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95">Sí, borrar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal ver foto transferencia */}
+      {viewingPhoto && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm px-4" onClick={() => setViewingPhoto(null)}>
+          <div className="relative max-w-lg w-full" onClick={(e) => e.stopPropagation()}>
+            <button
+              onClick={() => setViewingPhoto(null)}
+              className="absolute -top-3 -right-3 w-10 h-10 bg-white rounded-full shadow-lg flex items-center justify-center text-gray-500 active:scale-90 z-10"
+            >
+              <X size={20} />
+            </button>
+            <img src={viewingPhoto} alt="Comprobante" className="w-full rounded-2xl shadow-2xl" />
+          </div>
+        </div>
+      )}
+
+      {/* Modal confirmar eliminar transferencia */}
+      {deletingTransferId && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 backdrop-blur-sm px-6">
+          <div className="bg-white rounded-3xl shadow-2xl p-6 max-w-xs w-full text-center">
+            <div className="text-4xl mb-3">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-1">¿Eliminar transferencia?</h2>
+            <p className="text-sm text-gray-500 mb-6">Esta acción no se puede deshacer.</p>
+            <div className="flex gap-3">
+              <button onClick={() => setDeletingTransferId(null)} className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-700 font-bold text-sm active:scale-95">Cancelar</button>
+              <button onClick={() => { deleteVendorTransfer(deletingTransferId); setDeletingTransferId(null); toast.success('Transferencia eliminada'); }} className="flex-1 py-3 rounded-2xl bg-red-500 text-white font-black text-sm active:scale-95">Sí, borrar</button>
             </div>
           </div>
         </div>

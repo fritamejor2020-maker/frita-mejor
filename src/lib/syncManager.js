@@ -50,6 +50,8 @@ export const BRANCH_KEYS = [
   'payrollEmployees', 'payrollRecords',
   // GPS vendedores — por sede
   'vendorLocations',
+  // Transferencias bancarias del vendedor — por sede
+  'vendorTransfers',
 ];
 
 /**

@@ -10,6 +10,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useBranchStore } from '../store/useBranchStore';
 import { useTransferStore } from '../store/useTransferStore';
+import { useVendorTransferStore } from '../store/useVendorTransferStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -99,6 +100,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`payrollRecords_${bid}`]    = (v) => usePayrollStore.setState({ payrollRecords: v });
     applicators[`movements_${bid}`]         = (v) => useInventoryStore.setState({ movements: v });
     applicators[`warehouses_${bid}`]        = (v) => useInventoryStore.setState({ warehouses: v });
+    applicators[`vendorTransfers_${bid}`]   = (v) => useVendorTransferStore.getState().loadFromRemote(v);
 
     // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
     if (!applicators['posShifts'])        applicators['posShifts']        = (v) => useInventoryStore.setState({ posShifts: v });
