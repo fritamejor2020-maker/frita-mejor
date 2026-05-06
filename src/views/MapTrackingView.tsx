@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useInventoryStore } from '../store/useInventoryStore';
+import { useVehicleStore } from '../store/useVehicleStore';
 import { useNavigate } from 'react-router-dom';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 
@@ -90,10 +91,11 @@ function AutoCenter({ vendors }: { vendors: VendorLocation[] }) {
 }
 
 // ── Componente principal ──────────────────────────────────────────────────────
-export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShifts = [] }: {
+export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShifts = [], branchId = null }: {
   embedded?: boolean;
   onVehicleSelect?: (vehicleId: string) => void;
   activeShifts?: any[];   // posShifts con turno activo para cruzar con la última ubicación
+  branchId?: string | null; // Filtrar por sede (para Gerentes)
 }) => {
   const { user, signOut } = useAuthStore();
   const navigate = useNavigate();
@@ -110,6 +112,12 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   const isStale = (updatedAt: string) =>
     Date.now() - new Date(updatedAt).getTime() > 2 * 60 * 1000;
 
+  // ── Vehículos filtrados por sede (para restricción de Gerentes) ────────────
+  const allVehicles = useVehicleStore((s: any) => s.vehicles) || [];
+  const branchVehicleIds = branchId
+    ? new Set(allVehicles.filter((v: any) => v.active && v.branchId === branchId).map((v: any) => v.abbreviation || v.name))
+    : null; // null = no filtrar (Admin/Dejador ven todo)
+
   // ── Fusionar Presence (en vivo) + BD (persistida) ──────────────────────────
   const mergeVendors = () => {
     const merged = new Map<string, VendorLocation>();
@@ -120,7 +128,13 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     // Luego sobrescribir con los de Presence (estos son más recientes)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
-    setVendors(Array.from(merged.values()));
+    // Filtrar por sede si hay branchId
+    let result = Array.from(merged.values());
+    if (branchVehicleIds) {
+      result = result.filter(v => v.pointId && branchVehicleIds.has(v.pointId));
+    }
+
+    setVendors(result);
   };
 
   // ── Leer ubicaciones desde el store (sincronizado vía app_state) ──────────

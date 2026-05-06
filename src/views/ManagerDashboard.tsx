@@ -164,7 +164,7 @@ export const ManagerDashboard = () => {
         {/* TAB: Mapa GPS */}
         {activeTab === 'map' && (
           <div className="flex-1 h-[calc(100vh-200px)]">
-            <MapTrackingView activeShifts={posShifts} />
+            <MapTrackingView activeShifts={posShifts} branchId={selectedBranch} />
           </div>
         )}
 
