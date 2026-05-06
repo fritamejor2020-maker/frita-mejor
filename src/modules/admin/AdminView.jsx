@@ -2016,12 +2016,35 @@ function PosConfigPanel() {
 
         <div>
           <label className="text-sm font-bold text-gray-400 block mb-2">Código ESC/POS de Apertura de Cajón</label>
-          <input 
-            type="text" 
-            className="w-full max-w-sm bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark font-mono outline-none focus:border-chunky-main"
-            value={cashDrawerCode}
-            onChange={(e) => setCashDrawerCode(e.target.value)}
-          />
+          <div className="flex items-center gap-3">
+            <input 
+              type="text" 
+              className="w-full max-w-sm bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark font-mono outline-none focus:border-chunky-main"
+              value={cashDrawerCode}
+              onChange={(e) => setCashDrawerCode(e.target.value)}
+            />
+            <button
+              className="whitespace-nowrap px-5 py-3 rounded-xl bg-chunky-dark text-white font-bold text-sm hover:opacity-90 active:scale-95 transition-all flex items-center gap-2 shadow-md"
+              onClick={() => {
+                const code = cashDrawerCode || '27,112,48,55,121';
+                console.log(`--- PROBANDO APERTURA DE CAJÓN: ${code} ---`);
+                const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+                const escChars = bytes.map(b => String.fromCharCode(b)).join('');
+                const testHtml = `<!DOCTYPE html><html><head><title>Test Cajón</title></head><body style="margin:0;padding:0;font-size:1px;color:white;">
+                  <pre style="font-size:0;line-height:0;color:transparent;">${escChars}</pre>
+                  <script>window.onload=function(){window.print();setTimeout(function(){window.close()},1000);}<\/script>
+                </body></html>`;
+                const win = window.open('', '_blank', 'width=1,height=1');
+                if (win) {
+                  win.document.open();
+                  win.document.write(testHtml);
+                  win.document.close();
+                }
+              }}
+            >
+              🔓 Probar Cajón
+            </button>
+          </div>
         </div>
 
         <div>
