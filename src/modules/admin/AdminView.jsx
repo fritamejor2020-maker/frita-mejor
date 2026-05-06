@@ -2030,16 +2030,23 @@ function PosConfigPanel() {
                 console.log(`--- PROBANDO APERTURA DE CAJÓN: ${code} ---`);
                 const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
                 const escChars = bytes.map(b => String.fromCharCode(b)).join('');
-                const testHtml = `<!DOCTYPE html><html><head><title>Test Cajón</title></head><body style="margin:0;padding:0;font-size:1px;color:white;">
-                  <pre style="font-size:0;line-height:0;color:transparent;">${escChars}</pre>
-                  <script>window.onload=function(){window.print();setTimeout(function(){window.close()},1000);}<\/script>
-                </body></html>`;
-                const win = window.open('', '_blank', 'width=1,height=1');
-                if (win) {
-                  win.document.open();
-                  win.document.write(testHtml);
-                  win.document.close();
-                }
+                // Usar iframe oculto para enviar comando ESC/POS sin popup
+                const iframe = document.createElement('iframe');
+                iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:none;opacity:0.01;';
+                document.body.appendChild(iframe);
+                const doc = iframe.contentWindow.document;
+                doc.open();
+                doc.write(`<!DOCTYPE html><html><head><title>Cajón</title></head><body style="margin:0;padding:0;"><pre style="font-size:0;line-height:0;color:transparent;">${escChars}</pre></body></html>`);
+                doc.close();
+                setTimeout(() => {
+                  try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                  } catch (e) {
+                    console.warn('Error al imprimir:', e);
+                  }
+                  setTimeout(() => document.body.removeChild(iframe), 3000);
+                }, 300);
               }}
             >
               🔓 Probar Cajón
