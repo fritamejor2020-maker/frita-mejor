@@ -475,13 +475,6 @@ export function PosView() {
       setTimeout(() => {
         printHTML(receiptHtml, 'Recibo de Venta');
       }, 100);
-    } else if (openDrawer) {
-      // Solo abrir cajón sin imprimir ticket — imprimir página invisible con comando
-      const code = posSettings?.cashDrawerCode || '27,112,0,25,250';
-      const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
-      const escChars = bytes.map(b => `&#${b};`).join('');
-      const drawerHtml = `<div style="width:78mm;"><span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span></div>`;
-      printHTML(drawerHtml, 'Apertura Cajón');
     }
   };
 
@@ -529,11 +522,9 @@ export function PosView() {
               className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
               title="Abrir cajón"
               onClick={() => {
-                const code = posSettings?.cashDrawerCode || '27,112,0,25,250';
-                const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
-                const escChars = bytes.map(b => `&#${b};`).join('');
-                const drawerHtml = `<div style="width:78mm;"><span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span></div>`;
-                printHTML(drawerHtml, 'Cajón');
+                // El cajón se abre automáticamente al imprimir tickets.
+                // No es posible abrirlo sin diálogo de impresión desde el navegador.
+                alert('💡 El cajón se abre automáticamente al imprimir un ticket de venta.\n\nPara abrir manualmente, usa el botón "Probar Cajón" desde Admin > Config Caja.');
               }}
             ><span>🔓</span></button>
             <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>
