@@ -249,7 +249,7 @@ export const useInventoryStore = create(
           const BRANCH_STORE_KEYS = [
             'warehouses', 'inventory', 'movements',
             'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
-            'contrataPayments', 'deletedShiftIds',
+            'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds',
           ];
 
           const updates = {};
@@ -267,6 +267,9 @@ export const useInventoryStore = create(
           if (branchId) {
             // Usuario de sede: cargar solo su sede
             const effectiveBranch = branchId;
+            const deletedShifts = get().deletedShiftIds || [];
+            const deletedInv = get().deletedInventoryIds || [];
+
             for (const key of BRANCH_STORE_KEYS) {
               const branchKeyName = `${key}_${effectiveBranch}`;
               const val = remote[branchKeyName] ?? remote[key];
@@ -274,9 +277,35 @@ export const useInventoryStore = create(
                 const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
                 if (isNonEmpty) {
                   let finalVal = val;
-                  if (key === 'posShifts') {
-                    const deleted = get().deletedShiftIds || [];
-                    finalVal = val.filter(s => !deleted.includes(s.id));
+
+                  // Para arrays: smart merge — local gana en IDs existentes
+                  if (Array.isArray(finalVal)) {
+                    const localArr = get()[key] || [];
+                    if (localArr.length > 0) {
+                      const localById = new Map(localArr.filter(x => x?.id).map(x => [x.id, x]));
+                      // Empezar con todos los locales (local gana)
+                      const merged = [...localArr];
+                      const mergedIds = new Set(localArr.map(x => x?.id).filter(Boolean));
+                      // Agregar items remotos que no existan localmente
+                      finalVal.forEach(item => {
+                        if (item?.id && !mergedIds.has(item.id)) {
+                          merged.push(item);
+                          mergedIds.add(item.id);
+                        }
+                      });
+                      finalVal = merged;
+                    }
+                    // Aplicar tombstones
+                    if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
+                    if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
+                  }
+
+                  // Para objetos (posSettings, etc.): deep merge, local gana
+                  if (finalVal && typeof finalVal === 'object' && !Array.isArray(finalVal)) {
+                    const localVal = get()[key];
+                    if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
+                      finalVal = { ...finalVal, ...localVal };
+                    }
                   }
                   updates[key] = finalVal;
                 }
@@ -287,7 +316,7 @@ export const useInventoryStore = create(
             // BUG-04 FIX: Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
             for (const key of BRANCH_STORE_KEYS) {
-              const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds'];
+              const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds','deletedInventoryIds'];
               let merged = remote[key] ? [...(Array.isArray(remote[key]) ? remote[key] : [])] : [];
               for (const bId of allBranchIds) {
                 const branchKeyName = `${key}_${bId}`;
@@ -302,14 +331,22 @@ export const useInventoryStore = create(
                     }
                   });
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-                  // For objects like posSettings: last branch wins (or use BRANCH-001)
-                  if (bId === 'BRANCH-001' || !updates[key]) {
+                  // Para objetos (posSettings, etc.): deep merge, local gana
+                  const localVal = get()[key];
+                  if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
+                    updates[key] = { ...val, ...localVal };
+                  } else if (bId === 'BRANCH-001' || !updates[key]) {
                     updates[key] = val;
                   }
                 }
               }
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') merged = merged.filter(s => !deleted.includes(s.id));
+                // Para deletedInventoryIds: fusionar con los locales
+                if (key === 'deletedInventoryIds') {
+                  const localDeleted = get().deletedInventoryIds || [];
+                  merged = [...new Set([...merged, ...localDeleted])];
+                }
                 updates[key] = merged;
               } else if (merged.length > 0 && !updates[key]) {
                 updates[key] = merged;
@@ -319,10 +356,12 @@ export const useInventoryStore = create(
           }
 
           // Smart merge para inventario: local siempre gana en items ya existentes
+          // Filtrar items que fueron eliminados localmente (tombstone)
           if (updates.inventory) {
             const localInventory = get().inventory;
+            const deletedInvIds = get().deletedInventoryIds || [];
             const localIds = new Set(localInventory.map(i => i.id));
-            const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id));
+            const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id) && !deletedInvIds.includes(i.id));
             updates.inventory = [...localInventory, ...remoteOnlyItems];
           }
           if (Object.keys(updates).length > 0) {
@@ -739,7 +778,14 @@ export const useInventoryStore = create(
         syncKey('inventory', useInventoryStore.getState().inventory);
       },
       updateInventoryItem: (id, data) => { set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) })); syncKey('inventory', useInventoryStore.getState().inventory); },
-      deleteInventoryItem: (id) => { set((s) => ({ inventory: s.inventory.filter((i) => i.id !== id) })); syncKey('inventory', useInventoryStore.getState().inventory); },
+      deleteInventoryItem: (id) => {
+        set((s) => ({
+          inventory: s.inventory.filter((i) => i.id !== id),
+          deletedInventoryIds: [...new Set([...(s.deletedInventoryIds || []), id])]
+        }));
+        syncKey('inventory', useInventoryStore.getState().inventory);
+        syncKey('deletedInventoryIds', useInventoryStore.getState().deletedInventoryIds);
+      },
 
       // Productos
       addProduct: (p) => { set((s) => ({ products: [...s.products, { ...p, id: `P-${Date.now()}` }] })); syncKey('products', useInventoryStore.getState().products); },
@@ -898,7 +944,7 @@ export const useInventoryStore = create(
     }),
     {
       name: 'frita-mejor-inventory',
-      version: 11, // v11: branchId en fryKitchens
+      version: 12, // v12: tombstone para inventario eliminado
       migrate: (persisted, fromVersion) => {
         // v9 → v10: agregar branchId a cajas POS que no lo tienen
         if (fromVersion < 10) {
@@ -912,6 +958,10 @@ export const useInventoryStore = create(
           persisted.fryKitchens = (persisted.fryKitchens || []).map(k =>
             k.branchId ? k : { ...k, branchId: 'BRANCH-001' }
           );
+        }
+        // v11 → v12: inicializar tombstone de inventario
+        if (fromVersion < 12) {
+          persisted.deletedInventoryIds = persisted.deletedInventoryIds || [];
         }
         return persisted;
       },
@@ -933,16 +983,21 @@ export const useInventoryStore = create(
         posSales:           state.posSales,
         posExpenses:        state.posExpenses,
         loadTemplates:      state.loadTemplates,
-        deletedShiftIds:    state.deletedShiftIds || [],
-        vendorLocations:    state.vendorLocations  || {},
-        contrataPayments:   state.contrataPayments || [],
+        deletedShiftIds:      state.deletedShiftIds || [],
+        deletedInventoryIds:  state.deletedInventoryIds || [],
+        vendorLocations:      state.vendorLocations  || {},
+        contrataPayments:     state.contrataPayments || [],
       }),
-      // Al rehidratar desde localStorage, filtrar posShifts borrados
+      // Al rehidratar desde localStorage, filtrar items borrados
       onRehydrateStorage: () => (state) => {
         if (!state) return;
-        const deleted = state.deletedShiftIds || [];
-        if (deleted.length > 0 && state.posShifts?.length > 0) {
-          state.posShifts = state.posShifts.filter(s => !deleted.includes(s.id));
+        const deletedShifts = state.deletedShiftIds || [];
+        if (deletedShifts.length > 0 && state.posShifts?.length > 0) {
+          state.posShifts = state.posShifts.filter(s => !deletedShifts.includes(s.id));
+        }
+        const deletedInv = state.deletedInventoryIds || [];
+        if (deletedInv.length > 0 && state.inventory?.length > 0) {
+          state.inventory = state.inventory.filter(i => !deletedInv.includes(i.id));
         }
       },
     }

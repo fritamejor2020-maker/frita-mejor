@@ -2057,10 +2057,20 @@ function PosConfigPanel() {
 
 // ─── Panel: Historial POS (Ventas y Cierres Z) ────────────────────────────────
 function PosHistoryPanel() {
-  const { posShifts, posSales } = useInventoryStore();
+  const { posShifts, posSales, updatePosShift, deletePosShift } = useInventoryStore();
   const [activeSubtab, setActiveSubtab] = useState('SHIFTS'); // SHIFTS | SALES
 
   const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+
+  const handleForceClose = (shiftId) => {
+    if (!window.confirm('¿Forzar cierre de este turno? Se registrará como cerrado con $0 de conteo real.')) return;
+    updatePosShift(shiftId, { closedAt: new Date().toISOString(), realAmount: 0, forceClosed: true });
+  };
+
+  const handleDeleteShift = (shiftId) => {
+    if (!window.confirm('¿Eliminar este turno permanentemente? Esta acción no se puede deshacer.')) return;
+    deletePosShift(shiftId);
+  };
 
   return (
     <div>
@@ -2087,9 +2097,27 @@ function PosHistoryPanel() {
                       <p className="text-xs text-gray-500 font-bold">Cajero: {shift.userName || 'Desconocido'}</p>
                     </div>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${shift.closedAt ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600 animate-pulse'}`}>
-                    {shift.closedAt ? 'CERRADO (Reporte Z)' : 'EN CURSO'}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${shift.closedAt ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600 animate-pulse'}`}>
+                      {shift.closedAt ? 'CERRADO (Reporte Z)' : 'EN CURSO'}
+                    </span>
+                    {!shift.closedAt && (
+                      <button
+                        onClick={() => handleForceClose(shift.id)}
+                        className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
+                        title="Forzar cierre del turno"
+                      >
+                        ⚡ Forzar Cierre
+                      </button>
+                    )}
+                    <button
+                      onClick={() => handleDeleteShift(shift.id)}
+                      className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                      title="Eliminar turno"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                    </button>
+                  </div>
                 </div>
                 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-50">

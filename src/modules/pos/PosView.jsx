@@ -2252,54 +2252,268 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
   );
 }
 
-// ─── Sales History Modal Component ───
+// ─── Sales History Modal Component — Full Screen Table ───
 function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
+  const [filterText, setFilterText] = useState('');
+  const [filterDate, setFilterDate] = useState('');
+  const [filterPayment, setFilterPayment] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
+  const [expandedId, setExpandedId] = useState(null);
+
+  // Unique payment methods and customers for filter dropdowns
+  const paymentMethods = [...new Set(sales.map(s => s.paymentMethod).filter(Boolean))];
+  const customerNames = [...new Set(sales.map(s => {
+    const c = customers?.find(c => c.id === s.customerId);
+    return c?.name || 'Consumidor Final';
+  }))];
+
+  // Filter logic
+  const filtered = sales.filter(s => {
+    const customerName = customers?.find(c => c.id === s.customerId)?.name || 'Consumidor Final';
+    const ticketNum = s.id.slice(-6).toLowerCase();
+    const itemsText = s.items.map(i => `${i.qty}x ${i.name}`).join(', ').toLowerCase();
+    const searchTarget = `${ticketNum} ${customerName} ${itemsText} ${s.paymentMethod || ''}`.toLowerCase();
+    
+    if (filterText && !searchTarget.includes(filterText.toLowerCase())) return false;
+    if (filterDate) {
+      const saleDate = new Date(s.timestamp);
+      const localDate = `${saleDate.getFullYear()}-${String(saleDate.getMonth()+1).padStart(2,'0')}-${String(saleDate.getDate()).padStart(2,'0')}`;
+      if (localDate !== filterDate) return false;
+    }
+    if (filterPayment && s.paymentMethod !== filterPayment) return false;
+    if (filterCustomer && customerName !== filterCustomer) return false;
+    return true;
+  });
+
+  const totalFiltered = filtered.reduce((s, sale) => s + sale.total, 0);
+  const hasFilters = filterText || filterDate || filterPayment || filterCustomer;
+
+  const paymentBadgeColor = (method) => {
+    const m = (method || '').toUpperCase();
+    if (m === 'EFECTIVO') return 'bg-green-500/20 text-green-400 border-green-500/30';
+    if (m === 'NEQUI')    return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+    if (m === 'TARJETA')  return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+    if (m === 'DAVIPLATA') return 'bg-red-500/20 text-red-400 border-red-500/30';
+    return 'bg-gray-700/50 text-gray-300 border-gray-600';
+  };
+
   return (
-    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[85vh] animate-bounce-in">
-        <div className="p-6 border-b border-gray-800 flex justify-between items-center">
-          <h2 className="text-2xl font-black text-white flex items-center gap-2">
-            <span>📜</span> Historial de Ventas (Turno Actual)
-          </h2>
-          <button className="text-gray-400 hover:text-white bg-[#16171d] p-2 rounded-full hover:bg-gray-800 transition-colors" onClick={onClose}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <div className="fixed inset-0 z-[70] bg-[#0c0d11] flex flex-col">
+      {/* ── Header ── */}
+      <div className="bg-[#1e1f26] border-b border-gray-800 px-4 sm:px-6 py-4 flex items-center justify-between shrink-0">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">📜</span>
+          <div>
+            <h2 className="text-xl font-black text-white">Historial de Ventas</h2>
+            <p className="text-xs font-bold text-gray-500">Turno Actual · {sales.length} venta{sales.length !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <button className="text-gray-400 hover:text-white bg-[#16171d] p-2.5 rounded-xl hover:bg-gray-800 transition-colors" onClick={onClose}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+
+      {/* ── Filters Bar ── */}
+      <div className="bg-[#16171d] border-b border-gray-800/50 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 shrink-0">
+        {/* Text search */}
+        <div className="relative flex-1 min-w-[180px] max-w-[300px]">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
+          <input
+            type="text"
+            placeholder="Buscar ticket, producto, cliente..."
+            value={filterText}
+            onChange={e => setFilterText(e.target.value)}
+            className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold text-white outline-none focus:border-chunky-main transition-colors placeholder:text-gray-600"
+          />
+        </div>
+        {/* Date filter */}
+        <input
+          type="date"
+          value={filterDate}
+          onChange={e => setFilterDate(e.target.value)}
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors"
+        />
+        {/* Payment method */}
+        <select
+          value={filterPayment}
+          onChange={e => setFilterPayment(e.target.value)}
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+        >
+          <option value="">Todos los pagos</option>
+          {paymentMethods.map(m => <option key={m} value={m}>{m}</option>)}
+        </select>
+        {/* Customer filter */}
+        <select
+          value={filterCustomer}
+          onChange={e => setFilterCustomer(e.target.value)}
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
+          style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
+        >
+          <option value="">Todos los clientes</option>
+          {customerNames.map(n => <option key={n} value={n}>{n}</option>)}
+        </select>
+        {/* Clear filters */}
+        {hasFilters && (
+          <button
+            onClick={() => { setFilterText(''); setFilterDate(''); setFilterPayment(''); setFilterCustomer(''); }}
+            className="text-xs font-bold text-red-400 hover:text-red-300 bg-red-950/40 border border-red-900/40 px-3 py-2 rounded-xl transition-colors"
+          >
+            ✕ Limpiar
           </button>
+        )}
+        {/* Totals badge */}
+        <div className="ml-auto bg-chunky-main/10 border border-chunky-main/30 rounded-xl px-4 py-2 flex items-center gap-2">
+          <span className="text-[10px] font-bold text-chunky-main uppercase tracking-wider">{filtered.length} ventas</span>
+          <span className="text-sm font-black text-chunky-main">{formatMoney(totalFiltered)}</span>
         </div>
-        
-        <div className="p-4 overflow-y-auto space-y-3 scrollbar-thin flex-1 bg-[#121318]">
-          {sales.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 opacity-50">
-              <span className="text-5xl mb-4">🛒</span>
-              <p className="text-center text-gray-400 font-bold">No hay ventas registradas en este turno.</p>
-            </div>
-          ) : (
-            sales.map(s => {
-              const customerName = customers?.find(c => c.id === s.customerId)?.name || 'Consumidor Final';
-              return (
-                <div key={s.id} className="bg-[#1e1f26] border border-gray-800 rounded-[20px] p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 hover:border-gray-600 transition-all hover:shadow-lg">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-1">
-                      <span className="bg-[#2a2d38] text-gray-300 text-xs font-black px-2 py-1 rounded-lg">#{s.id.slice(-6)}</span>
-                      <span className="text-xs text-gray-400 font-bold">{new Date(s.timestamp).toLocaleTimeString('es-CO')}</span>
-                      <span className="text-[10px] font-black uppercase text-white px-2 py-0.5 rounded-full border border-gray-700 bg-gray-800">{s.paymentMethod}</span>
-                    </div>
-                    <div className="flex flex-wrap gap-x-4 items-baseline">
-                      <h3 className="font-black text-white text-xl">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
-                      <p className="text-sm text-gray-400 font-bold truncate max-w-[200px]" title={customerName}>{customerName}</p>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-1 line-clamp-1">{s.items.map(i => `${i.qty}x ${i.name}`).join(', ')}</p>
-                  </div>
-                  <Button 
-                    className="w-full sm:w-auto rounded-[14px] bg-[#2a2d38] hover:bg-[#343846] text-white font-bold px-4 py-3 shadow-md border border-gray-700 hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2" 
-                    onClick={() => onReprint(s)}
-                  >
-                    <span>🖨️</span> Reimprimir
-                  </Button>
-                </div>
-              );
-            })
-          )}
-        </div>
+      </div>
+
+      {/* ── Table ── */}
+      <div className="flex-1 overflow-auto">
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 opacity-50">
+            <span className="text-5xl mb-4">🛒</span>
+            <p className="text-center text-gray-400 font-bold text-lg">
+              {hasFilters ? 'No hay ventas que coincidan con los filtros.' : 'No hay ventas registradas en este turno.'}
+            </p>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead className="sticky top-0 z-10">
+              <tr className="bg-[#1a1b23] border-b border-gray-800">
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left w-8"></th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left"># Ticket</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Hora</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Método Pago</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Cliente</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Items</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Descuento</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-chunky-main uppercase tracking-widest text-right">Total</th>
+                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(sale => {
+                const customerName = customers?.find(c => c.id === sale.customerId)?.name || 'Consumidor Final';
+                const isExpanded = expandedId === sale.id;
+                const totalItems = sale.items.reduce((sum, item) => sum + item.qty, 0);
+
+                return (
+                  <React.Fragment key={sale.id}>
+                    <tr
+                      className={`border-b border-gray-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-[#1e1f26]' : 'hover:bg-[#16171d]'}`}
+                      onClick={() => setExpandedId(isExpanded ? null : sale.id)}
+                    >
+                      {/* Expand arrow */}
+                      <td className="py-3 px-4 text-center">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                          className={`text-gray-500 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                        >
+                          <polyline points="9 18 15 12 9 6"/>
+                        </svg>
+                      </td>
+                      {/* Ticket */}
+                      <td className="py-3 px-4">
+                        <span className="bg-[#2a2d38] text-gray-200 text-xs font-black px-2.5 py-1 rounded-lg">#{sale.id.slice(-6)}</span>
+                      </td>
+                      {/* Time */}
+                      <td className="py-3 px-4 font-bold text-gray-400 text-xs whitespace-nowrap">
+                        {new Date(sale.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </td>
+                      {/* Payment */}
+                      <td className="py-3 px-4">
+                        <span className={`text-[10px] font-black uppercase px-2.5 py-1 rounded-full border ${paymentBadgeColor(sale.paymentMethod)}`}>
+                          {sale.paymentMethod || '—'}
+                        </span>
+                      </td>
+                      {/* Customer */}
+                      <td className="py-3 px-4 font-bold text-gray-300 text-sm truncate max-w-[150px]" title={customerName}>
+                        {customerName}
+                      </td>
+                      {/* Items count */}
+                      <td className="py-3 px-4 text-center">
+                        <span className="bg-gray-800 text-gray-300 text-xs font-bold px-2 py-0.5 rounded-md">
+                          {totalItems} item{totalItems !== 1 ? 's' : ''}
+                        </span>
+                      </td>
+                      {/* Discount */}
+                      <td className="py-3 px-4 text-right">
+                        {sale.discountAmount > 0 ? (
+                          <span className="text-red-400 font-bold text-sm">-{formatMoney(sale.discountAmount)}</span>
+                        ) : (
+                          <span className="text-gray-600 text-xs">—</span>
+                        )}
+                      </td>
+                      {/* Total */}
+                      <td className="py-3 px-4 text-right">
+                        <span className="font-black text-chunky-main text-base">{formatMoney(sale.total)}</span>
+                      </td>
+                      {/* Actions */}
+                      <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => onReprint(sale)}
+                          className="inline-flex items-center gap-1.5 bg-[#2a2d38] hover:bg-[#343846] text-white text-xs font-bold px-3 py-2 rounded-xl border border-gray-700 hover:scale-105 active:scale-95 transition-all"
+                        >
+                          🖨️ Reimprimir
+                        </button>
+                      </td>
+                    </tr>
+
+                    {/* ── Expanded Detail Row ── */}
+                    {isExpanded && (
+                      <tr className="bg-[#16171d]">
+                        <td colSpan={9} className="px-6 py-4">
+                          <div className="bg-[#0c0d11] rounded-2xl border border-gray-800 overflow-hidden">
+                            <div className="px-4 py-2.5 bg-[#1a1b23] border-b border-gray-800 flex items-center gap-2">
+                              <span className="text-sm">📋</span>
+                              <span className="text-xs font-black text-gray-400 uppercase tracking-widest">Detalle de la Venta #{sale.id.slice(-6)}</span>
+                            </div>
+                            <table className="w-full text-sm">
+                              <thead>
+                                <tr className="border-b border-gray-800/50">
+                                  <th className="py-2.5 px-4 text-[10px] font-bold text-gray-500 uppercase text-left">Producto</th>
+                                  <th className="py-2.5 px-4 text-[10px] font-bold text-gray-500 uppercase text-center">Cantidad</th>
+                                  <th className="py-2.5 px-4 text-[10px] font-bold text-gray-500 uppercase text-right">P. Unitario</th>
+                                  <th className="py-2.5 px-4 text-[10px] font-bold text-gray-500 uppercase text-right">Subtotal</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {sale.items.map((item, idx) => (
+                                  <tr key={idx} className="border-b border-gray-800/30 hover:bg-gray-900/30 transition-colors">
+                                    <td className="py-2.5 px-4 font-bold text-white">{item.name}</td>
+                                    <td className="py-2.5 px-4 text-center">
+                                      <span className="bg-chunky-main/10 text-chunky-main font-black text-xs px-2 py-0.5 rounded-md">{item.qty}</span>
+                                    </td>
+                                    <td className="py-2.5 px-4 text-right font-bold text-gray-400">{formatMoney(item.price)}</td>
+                                    <td className="py-2.5 px-4 text-right font-black text-white">{formatMoney(item.qty * item.price)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot>
+                                {sale.discountAmount > 0 && (
+                                  <tr className="border-t border-gray-800">
+                                    <td colSpan={3} className="py-2 px-4 text-right text-xs font-bold text-red-400 uppercase">Descuento:</td>
+                                    <td className="py-2 px-4 text-right font-black text-red-400">-{formatMoney(sale.discountAmount)}</td>
+                                  </tr>
+                                )}
+                                <tr className="border-t border-gray-700 bg-[#1a1b23]">
+                                  <td colSpan={3} className="py-3 px-4 text-right text-sm font-black text-chunky-main uppercase tracking-wider">Total:</td>
+                                  <td className="py-3 px-4 text-right text-lg font-black text-chunky-main">{formatMoney(sale.total)}</td>
+                                </tr>
+                              </tfoot>
+                            </table>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        )}
       </div>
     </div>
   );

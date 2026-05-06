@@ -76,50 +76,59 @@ export const useFinanceStore = create(
         }
       },
 
-      // ── Realtime: escuchar cambios en incomes de todos los usuarios ────────────
+      // ── Realtime: escuchar cambios en incomes (filtrado por sede) ────────────
       subscribeToIncomes: () => {
-        const channel = supabase
-          .channel('incomes-realtime')
-          .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'incomes' },
-            (payload) => {
-              const newRow = payload.new;
-              set((state) => {
-                // Reemplazar optimistic local o agregar nuevo
-                const exists = state.incomes.some((i) => i.id === newRow.id);
-                if (exists) {
-                  return { incomes: state.incomes.map((i) => i.id === newRow.id ? newRow : i) };
-                }
-                // También reemplazar el entry local temporal (id: local-...)
-                const withoutOptimistic = state.incomes.filter(
-                  (i) => !String(i.id).startsWith('local-')
-                    || i.ubicacion !== newRow.ubicacion
-                    || i.created_at?.slice(0, 16) !== newRow.created_at?.slice(0, 16)
-                );
-                return { incomes: [newRow, ...withoutOptimistic] };
-              });
-            }
-          )
-          .on('postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'incomes' },
-            (payload) => {
-              set((state) => ({
-                incomes: state.incomes.map((i) => i.id === payload.new.id ? payload.new : i),
-              }));
-            }
-          )
-          .on('postgres_changes',
-            { event: 'DELETE', schema: 'public', table: 'incomes' },
-            (payload) => {
-              set((state) => ({
-                incomes: state.incomes.filter((i) => i.id !== payload.old.id),
-              }));
-            }
-          )
-          .subscribe();
+        const branchId = getActiveBranchId();
+        // Si el usuario pertenece a una sede, filtrar solo los eventos de esa sede
+        const filterOpts = branchId
+          ? { event: '*', schema: 'public', table: 'incomes', filter: `branch_id=eq.${branchId}` }
+          : null;
+        const channelName = branchId ? `incomes-realtime-${branchId}` : 'incomes-realtime';
 
-        // Devolver función de cleanup para useEffect
-        return () => supabase.removeChannel(channel);
+        const builder = supabase.channel(channelName);
+
+        // Handler INSERT
+        const insertOpts = branchId
+          ? { event: 'INSERT', schema: 'public', table: 'incomes', filter: `branch_id=eq.${branchId}` }
+          : { event: 'INSERT', schema: 'public', table: 'incomes' };
+        builder.on('postgres_changes', insertOpts, (payload) => {
+          const newRow = payload.new;
+          set((state) => {
+            const exists = state.incomes.some((i) => i.id === newRow.id);
+            if (exists) {
+              return { incomes: state.incomes.map((i) => i.id === newRow.id ? newRow : i) };
+            }
+            const withoutOptimistic = state.incomes.filter(
+              (i) => !String(i.id).startsWith('local-')
+                || i.ubicacion !== newRow.ubicacion
+                || i.created_at?.slice(0, 16) !== newRow.created_at?.slice(0, 16)
+            );
+            return { incomes: [newRow, ...withoutOptimistic] };
+          });
+        });
+
+        // Handler UPDATE
+        const updateOpts = branchId
+          ? { event: 'UPDATE', schema: 'public', table: 'incomes', filter: `branch_id=eq.${branchId}` }
+          : { event: 'UPDATE', schema: 'public', table: 'incomes' };
+        builder.on('postgres_changes', updateOpts, (payload) => {
+          set((state) => ({
+            incomes: state.incomes.map((i) => i.id === payload.new.id ? payload.new : i),
+          }));
+        });
+
+        // Handler DELETE
+        const deleteOpts = branchId
+          ? { event: 'DELETE', schema: 'public', table: 'incomes', filter: `branch_id=eq.${branchId}` }
+          : { event: 'DELETE', schema: 'public', table: 'incomes' };
+        builder.on('postgres_changes', deleteOpts, (payload) => {
+          set((state) => ({
+            incomes: state.incomes.filter((i) => i.id !== payload.old.id),
+          }));
+        });
+
+        builder.subscribe();
+        return () => supabase.removeChannel(builder);
       },
 
       addIncome: async (incomeData) => {
@@ -264,48 +273,53 @@ export const useFinanceStore = create(
         }
       },
 
-      // ── Realtime para gastos ─────────────────────────────────────────
+      // ── Realtime para gastos (filtrado por sede) ──────────────────────
       subscribeToExpenses: () => {
-        const channel = supabase
-          .channel('expenses-realtime')
-          .on('postgres_changes',
-            { event: 'INSERT', schema: 'public', table: 'expenses' },
-            (payload) => {
-              const row = {
-                ...payload.new,
-                valor: payload.new.monto,
-                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
-              };
-              set((state) => {
-                const exists = state.expenses.some((e) => e.id === row.id);
-                if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
-                // Quitar el entry local temporal si coincide
-                const withoutLocal = state.expenses.filter(
-                  (e) => !String(e.id).startsWith('local-') || e.descripcion !== row.descripcion
-                );
-                return { expenses: [row, ...withoutLocal] };
-              });
-            }
-          )
-          .on('postgres_changes',
-            { event: 'UPDATE', schema: 'public', table: 'expenses' },
-            (payload) => {
-              const row = {
-                ...payload.new,
-                valor: payload.new.monto,
-                facturaUrl: payload.new.facturaUrl || payload.new.factura_url || null,
-              };
-              set((state) => ({ expenses: state.expenses.map((e) => e.id === row.id ? row : e) }));
-            }
-          )
-          .on('postgres_changes',
-            { event: 'DELETE', schema: 'public', table: 'expenses' },
-            (payload) => {
-              set((state) => ({ expenses: state.expenses.filter((e) => e.id !== payload.old.id) }));
-            }
-          )
-          .subscribe();
-        return () => supabase.removeChannel(channel);
+        const branchId = getActiveBranchId();
+        const channelName = branchId ? `expenses-realtime-${branchId}` : 'expenses-realtime';
+        const builder = supabase.channel(channelName);
+
+        const normalizeExpenseRow = (raw) => ({
+          ...raw,
+          valor: raw.monto,
+          facturaUrl: raw.facturaUrl || raw.factura_url || null,
+        });
+
+        // INSERT
+        const insertOpts = branchId
+          ? { event: 'INSERT', schema: 'public', table: 'expenses', filter: `branch_id=eq.${branchId}` }
+          : { event: 'INSERT', schema: 'public', table: 'expenses' };
+        builder.on('postgres_changes', insertOpts, (payload) => {
+          const row = normalizeExpenseRow(payload.new);
+          set((state) => {
+            const exists = state.expenses.some((e) => e.id === row.id);
+            if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
+            const withoutLocal = state.expenses.filter(
+              (e) => !String(e.id).startsWith('local-') || e.descripcion !== row.descripcion
+            );
+            return { expenses: [row, ...withoutLocal] };
+          });
+        });
+
+        // UPDATE
+        const updateOpts = branchId
+          ? { event: 'UPDATE', schema: 'public', table: 'expenses', filter: `branch_id=eq.${branchId}` }
+          : { event: 'UPDATE', schema: 'public', table: 'expenses' };
+        builder.on('postgres_changes', updateOpts, (payload) => {
+          const row = normalizeExpenseRow(payload.new);
+          set((state) => ({ expenses: state.expenses.map((e) => e.id === row.id ? row : e) }));
+        });
+
+        // DELETE
+        const deleteOpts = branchId
+          ? { event: 'DELETE', schema: 'public', table: 'expenses', filter: `branch_id=eq.${branchId}` }
+          : { event: 'DELETE', schema: 'public', table: 'expenses' };
+        builder.on('postgres_changes', deleteOpts, (payload) => {
+          set((state) => ({ expenses: state.expenses.filter((e) => e.id !== payload.old.id) }));
+        });
+
+        builder.subscribe();
+        return () => supabase.removeChannel(builder);
       },
     }),
     {
