@@ -211,14 +211,13 @@ export function PosView() {
     setLastClosedShift(closedShiftData);
     setShowClosingModal(false);
     
-    // Auto print Z report & Open Drawer without asking
-    const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
-    console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
+    // Auto print Z report & Open Drawer
+    const drawerCode = posSettings?.cashDrawerCode || '27,112,0,25,250';
     
     const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
     const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
     
-    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig);
+    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
 
     // Show prompt for logout
@@ -468,14 +467,21 @@ export function PosView() {
   const handlePrintReceipt = (sale, openDrawer = true, printReceipt = true) => {
     setLastSale(sale);
     
-    if (openDrawer) {
-      // Simulate drawer open via ESC/POS command
-      const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
-      console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
-    }
-    
     if (printReceipt) {
-      handleReprintSale(sale);
+      // Si openDrawer es true, incluir comando de cajón en el ticket impreso
+      const drawerCode = openDrawer ? (posSettings?.cashDrawerCode || '27,112,0,25,250') : '';
+      const saleCustomer = customers?.find(c => c.id === sale.customerId);
+      const receiptHtml = generateReceiptHTML(sale, saleCustomer, posSettings?.ticketConfig, customerTypes, drawerCode);
+      setTimeout(() => {
+        printHTML(receiptHtml, 'Recibo de Venta');
+      }, 100);
+    } else if (openDrawer) {
+      // Solo abrir cajón sin imprimir ticket — imprimir página invisible con comando
+      const code = posSettings?.cashDrawerCode || '27,112,0,25,250';
+      const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+      const escChars = bytes.map(b => `&#${b};`).join('');
+      const drawerHtml = `<div style="width:78mm;"><span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span></div>`;
+      printHTML(drawerHtml, 'Apertura Cajón');
     }
   };
 
@@ -523,8 +529,11 @@ export function PosView() {
               className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all"
               title="Abrir cajón"
               onClick={() => {
-                const code = posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA';
-                console.log(`--- ENVIANDO COMANDO DE APERTURA DE CAJÓN: ${code} ---`);
+                const code = posSettings?.cashDrawerCode || '27,112,0,25,250';
+                const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+                const escChars = bytes.map(b => `&#${b};`).join('');
+                const drawerHtml = `<div style="width:78mm;"><span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span></div>`;
+                printHTML(drawerHtml, 'Cajón');
               }}
             ><span>🔓</span></button>
             <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>

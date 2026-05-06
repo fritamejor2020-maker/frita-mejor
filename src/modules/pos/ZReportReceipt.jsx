@@ -3,7 +3,7 @@ import { LOGO_BASE64 } from './logoBase64';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}) => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '') => {
   if (!shift) return '';
 
   const tc = {
@@ -129,8 +129,19 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
     </div>
   ` : '';
 
+  // Generar bytes ESC/POS de apertura de cajón como caracteres invisibles
+  let drawerKickHtml = '';
+  if (cashDrawerCode) {
+    const bytes = cashDrawerCode.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+    if (bytes.length > 0) {
+      const escChars = bytes.map(b => `&#${b};`).join('');
+      drawerKickHtml = `<span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span>`;
+    }
+  }
+
   return `
     <div style="width: 80mm; color: black; font-family: sans-serif; font-size: 14px; padding: 16px; margin: 0 auto;">
+      ${drawerKickHtml}
       <style>
         @page { size: auto; margin: 0; }
         * { color: black !important; font-weight: bold !important; }

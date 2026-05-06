@@ -4,7 +4,7 @@ import { generateBarcodeSVG } from './barcodeUtils';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
 
-export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerTypes = []) => {
+export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerTypes = [], cashDrawerCode = '') => {
   if (!sale) return '';
 
   const tc = {
@@ -69,8 +69,19 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
 
   const ticketNo = (sale.id || 'N/A').replace('SALE-', '').slice(-6);
 
+  // Generar bytes ESC/POS de apertura de cajón como caracteres invisibles
+  let drawerKickHtml = '';
+  if (cashDrawerCode) {
+    const bytes = cashDrawerCode.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+    if (bytes.length > 0) {
+      const escChars = bytes.map(b => `&#${b};`).join('');
+      drawerKickHtml = `<span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span>`;
+    }
+  }
+
     return `
     <div style="width: 78mm; color: black; font-family: 'Courier New', Courier, monospace; font-size: 12px; padding: 8px; margin: 0 auto;">
+      ${drawerKickHtml}
       <style>
         @page { size: 80mm auto; margin: 0; }
         * { color: black !important; font-weight: bold !important; }
