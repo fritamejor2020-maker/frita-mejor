@@ -899,16 +899,20 @@ export const useInventoryStore = create(
 
       addPosShift: (shift) => {
         // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) ──
+        // Solo aplica a turnos de VENDEDOR/DEJADOR que tienen type, pointId y shift.
+        // Los turnos POS de caja NO tienen esos campos y usan registerId en su lugar.
         const current = useInventoryStore.getState().posShifts || [];
-        const duplicate = current.find(
-          s => s.type === shift.type &&
-               s.pointId === shift.pointId &&
-               s.shift === shift.shift &&
-               !s.closedAt
-        );
-        if (duplicate) {
-          console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — omitiendo duplicado`);
-          return duplicate;
+        if (shift.type && shift.pointId && shift.shift) {
+          const duplicate = current.find(
+            s => s.type === shift.type &&
+                 s.pointId === shift.pointId &&
+                 s.shift === shift.shift &&
+                 !s.closedAt
+          );
+          if (duplicate) {
+            console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — omitiendo duplicado`);
+            return duplicate;
+          }
         }
 
         const deleted = useInventoryStore.getState().deletedShiftIds || [];
