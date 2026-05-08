@@ -75,10 +75,23 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: v });
     applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
     applicators[`posShifts_${bid}`]        = (v) => {
-      // Filtrar tombstones: no re-introducir turnos que el Admin ya borró
-      const deleted = new Set(useInventoryStore.getState().deletedShiftIds || []);
-      const filtered = (v || []).filter(s => !deleted.has(s.id));
-      useInventoryStore.setState({ posShifts: filtered });
+      const state = useInventoryStore.getState();
+      const deleted = new Set(state.deletedShiftIds || []);
+      const localShifts = (state.posShifts || []).filter(s => !deleted.has(s.id));
+      const remote = (v || []).filter(s => !deleted.has(s.id));
+      // Merge: nunca eliminar un turno local abierto por una actualización remota
+      // (evita que el POS pierda el turno si Supabase llega con datos viejos)
+      const existingIds = new Set(localShifts.map(s => s?.id).filter(Boolean));
+      const newFromRemote = remote.filter(s => s?.id && !existingIds.has(s.id));
+      // Actualizar turnos locales con datos remotos solo si el remoto cierra el turno
+      const updatedLocal = localShifts.map(local => {
+        if (deleted.has(local.id)) return null;
+        const remoteVersion = remote.find(r => r.id === local.id);
+        // Si el remoto tiene closedAt y el local no, aplicar cierre remoto
+        if (remoteVersion && remoteVersion.closedAt && !local.closedAt) return remoteVersion;
+        return local;
+      }).filter(Boolean);
+      useInventoryStore.setState({ posShifts: [...updatedLocal, ...newFromRemote] });
     };
     applicators[`posSales_${bid}`]         = (v) => useInventoryStore.setState({ posSales: v });
     applicators[`posExpenses_${bid}`]      = (v) => useInventoryStore.setState({ posExpenses: v });
