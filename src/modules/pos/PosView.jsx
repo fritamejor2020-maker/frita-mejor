@@ -87,12 +87,29 @@ export function PosView() {
   const [variablePriceProduct, setVariablePriceProduct] = useState(null);
   const [variablePriceInput, setVariablePriceInput] = useState('');
 
-  // Auto-open shift modal if none is active when component mounts
+  // Esperar a que la sincronización con Supabase termine antes de mostrar "ABRIR CAJA"
+  const [syncReady, setSyncReady] = useState(false);
+
   useEffect(() => {
-    if (!activeShift) {
+    // Si ya hay turno activo, la sync ya trajo datos — listo
+    if (activeShift) {
+      setSyncReady(true);
+      setShowShiftModal(false);
+      return;
+    }
+    // Dar tiempo a loadFromRemote para traer turnos de Supabase (max 3s)
+    const timer = setTimeout(() => {
+      setSyncReady(true);
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [activeShift]);
+
+  // Auto-open shift modal only AFTER sync is ready and there's truly no shift
+  useEffect(() => {
+    if (syncReady && !activeShift && selectedRegisterId) {
       setShowShiftModal(true);
     }
-  }, [activeShift]);
+  }, [syncReady, activeShift, selectedRegisterId]);
 
   // Detectar si el agente de impresión está corriendo
   useEffect(() => {
@@ -560,10 +577,17 @@ export function PosView() {
         {/* ── Botones de pago — SIEMPRE VISIBLES ── */}
         <div className="flex items-center gap-1.5 flex-1 flex-wrap">
           {!activeShift ? (
-            <button
-              className="shrink-0 bg-red-600 text-white rounded-xl px-3 py-2 text-xs font-black border-none animate-pulse active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
-              onClick={() => setShowShiftModal(true)}
-            >⚠️ ABRIR CAJA</button>
+            !syncReady ? (
+              <button
+                className="shrink-0 bg-gray-700 text-gray-300 rounded-xl px-3 py-2 text-xs font-black border-none whitespace-nowrap min-h-[36px] cursor-wait"
+                disabled
+              >⏳ Sincronizando...</button>
+            ) : (
+              <button
+                className="shrink-0 bg-red-600 text-white rounded-xl px-3 py-2 text-xs font-black border-none animate-pulse active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+                onClick={() => setShowShiftModal(true)}
+              >⚠️ ABRIR CAJA</button>
+            )
           ) : (
             <>
               {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
