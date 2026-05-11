@@ -147,14 +147,32 @@ export function PosView() {
   const total = subtotal - discountAmount;
 
   // -- PRINT HELPER --
-  // Uses a hidden iframe to print the HTML string.
-  // Falls back to window.open if iframe printing fails.
+  // In Electron: sends HTML to main process for silent printing (no dialog).
+  // In browser: uses a hidden iframe + window.print().
   const printHTML = (htmlContent, title = 'Imprimir') => {
     if (!htmlContent) return;
 
     const fullHtml = `<!DOCTYPE html><html><head><title>${title}</title></head><body>${htmlContent}</body></html>`;
 
-    // Try iframe method first
+    // 🖨️ Electron: impresión silenciosa directa a la impresora configurada
+    if (window.cajeroAPI && window.cajeroAPI.silentPrint) {
+      window.cajeroAPI.silentPrint(fullHtml).then(res => {
+        if (!res.ok) {
+          console.warn('[Print] Error silencioso:', res.error);
+          // Fallback: si falla la impresión silenciosa, usar el método normal
+          printHTMLFallback(fullHtml);
+        }
+      }).catch(() => {
+        printHTMLFallback(fullHtml);
+      });
+      return;
+    }
+
+    // 🌐 Navegador: método con iframe
+    printHTMLFallback(fullHtml);
+  };
+
+  const printHTMLFallback = (fullHtml) => {
     try {
       const iframe = document.createElement('iframe');
       iframe.style.position = 'fixed';
