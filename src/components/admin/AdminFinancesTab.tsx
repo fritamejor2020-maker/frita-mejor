@@ -5,6 +5,7 @@ import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { refreshAllFromSupabase } from '../../lib/useRealtimeSync';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
+import { useBranchStore } from '../../store/useBranchStore';
 import { useVendorTransferStore } from '../../store/useVendorTransferStore';
 import * as XLSX from 'xlsx';
 
@@ -346,11 +347,22 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
   const user = useAuthStore((s: any) => s.user);
   const vehicles = useVehicleStore((s: any) => s.vehicles);
+  const allBranches = useBranchStore((s: any) => s.branches) || [];
   const vendorTransfers = useVendorTransferStore((s: any) => s.transfers);
+
+  // Determinar sedes permitidas para el filtro
+  const allowedBranches: string[] = user?.allowedBranches || [];
+  const effectiveBranches = allowedBranches.length > 0 
+    ? allowedBranches 
+    : user?.branchId ? [user.branchId] : [];
+  const branchOptions = effectiveBranches.length > 0 
+    ? allBranches.filter((b: any) => effectiveBranches.includes(b.id))
+    : allBranches;
 
   // Cierres filters
   const [filterDate, setFilterDate] = useState('');
   const [filterShift, setFilterShift] = useState('');
+  const [filterBranchId, setFilterBranchId] = useState('');
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [expandedHistorialId, setExpandedHistorialId] = useState<string | null>(null);
   const [editingClosing, setEditingClosing] = useState<any | null>(null);
@@ -725,11 +737,18 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
     if (filterDate && c.date !== filterDate) return false;
     if (filterShift && c.shift !== filterShift) return false;
 
-    // Filtrar por sede si es AUDITOR y tiene sede asignada
+    // Obtener la sede del cierre actual
+    const vehicle = vehicles?.find((v: any) => v.abbreviation === c._raw?.pointId || v.name === c._raw?.pointId);
+    const shiftBranchId = vehicle?.branchId || c._raw?.branchId;
+
+    // Filtrar por sede si es AUDITOR y tiene sede asignada por seguridad
     if (user?.role === 'AUDITOR' && user?.branchId) {
-      const vehicle = vehicles?.find((v: any) => v.abbreviation === c._raw?.pointId || v.name === c._raw?.pointId);
-      const shiftBranchId = vehicle?.branchId || c._raw?.branchId;
       if (shiftBranchId && shiftBranchId !== user.branchId) return false;
+    }
+
+    // Filtro manual por UI (para Admins o Auditores con múltiples sedes)
+    if (filterBranchId && shiftBranchId !== filterBranchId) {
+      return false;
     }
 
     return true;
@@ -775,6 +794,22 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
       {/* Filters + Actualizar */}
       <div className="flex items-center justify-center gap-3 flex-wrap mt-2">
         <div className="inline-flex items-center gap-3 bg-white rounded-full px-5 py-2.5 shadow-sm border border-gray-100 flex-wrap justify-center">
+          {branchOptions.length > 1 && (
+            <>
+              <select
+                value={filterBranchId}
+                onChange={(e) => setFilterBranchId(e.target.value)}
+                className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer appearance-none pr-6"
+                style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
+              >
+                <option value="">Todas las Sedes</option>
+                {branchOptions.map((b: any) => (
+                  <option key={b.id} value={b.id}>{b.name}</option>
+                ))}
+              </select>
+              <div className="w-px h-6 bg-gray-200" />
+            </>
+          )}
           <input
             type="date"
             value={filterDate}
