@@ -702,7 +702,10 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
         cashAmount: s.cashAmount || 0,
         transferAmount: s.transferAmount || 0,
         expenses,
-        details
+        details,
+        shiftTransfers: s.type === 'VENDEDOR' 
+          ? vendorTransfers.filter((t: any) => t.pointId === s.pointId && inWindow(t.createdAt))
+          : []
      };
   });
 
@@ -1001,13 +1004,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
                     </div>
                     <button
                       className="py-3 px-4 text-center group hover:bg-blue-50/60 rounded-xl transition-colors cursor-pointer w-full"
-                      onClick={() => {
-                        const shiftTransfers = vendorTransfers.filter((t: any) => 
-                          t.pointId === closing._raw?.pointId &&
-                          t.shiftOpenedAt === closing._raw?.openedAt
-                        );
-                        setTransfersModal({ transfers: shiftTransfers, pointName: closing.pointName });
-                      }}
+                      onClick={() => setTransfersModal({ transfers: closing.shiftTransfers || [], pointName: closing.pointName })}
                       title="Ver transferencias"
                     >
                       <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
