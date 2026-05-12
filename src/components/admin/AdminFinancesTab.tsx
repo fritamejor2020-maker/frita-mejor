@@ -373,6 +373,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
   const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string } | null>(null);
+  const [transfersModal, setTransfersModal] = useState<{ transfers: any[]; pointName: string } | null>(null);
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
@@ -998,10 +999,21 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
                       <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">💵 Efectivo</p>
                       <p className="text-base font-black text-green-700">{fmt(closing.cashAmount)}</p>
                     </div>
-                    <div className="py-3 px-4 text-center">
+                    <button
+                      className="py-3 px-4 text-center group hover:bg-blue-50/60 rounded-xl transition-colors cursor-pointer w-full"
+                      onClick={() => {
+                        const shiftTransfers = vendorTransfers.filter((t: any) => 
+                          t.pointId === closing._raw?.pointId &&
+                          t.shiftOpenedAt === closing._raw?.openedAt
+                        );
+                        setTransfersModal({ transfers: shiftTransfers, pointName: closing.pointName });
+                      }}
+                      title="Ver transferencias"
+                    >
                       <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
-                      <p className="text-base font-black text-blue-600">{fmt(closing.transferAmount)}</p>
-                    </div>
+                      <p className="text-base font-black text-blue-600 group-hover:text-blue-700 transition-colors">{fmt(closing.transferAmount)}</p>
+                      <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
+                    </button>
                      <button
                        className="py-3 px-4 text-center group hover:bg-red-50/60 rounded-xl transition-colors cursor-pointer w-full"
                        onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
@@ -1244,55 +1256,6 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
                       <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
                       <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
                     </div>
-
-                    {/* Transferencias del Vendedor */}
-                    {(() => {
-                      const shiftTransfers = vendorTransfers.filter((t: any) => 
-                        t.pointId === closing._raw?.pointId &&
-                        t.shiftOpenedAt === closing._raw?.openedAt
-                      );
-                      if (shiftTransfers.length === 0) return null;
-                      return (
-                        <div className="border-t border-gray-100 bg-white">
-                          <div className="px-5 py-3 bg-purple-50/50 flex items-center justify-between">
-                            <h4 className="text-sm font-black text-purple-700 flex items-center gap-2">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-                              Transferencias Registradas
-                            </h4>
-                            <span className="text-xs font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">{shiftTransfers.length}</span>
-                          </div>
-                          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {shiftTransfers.map((t: any, i: number) => (
-                              <div key={t.id || i} className="border border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-shadow bg-gray-50/30">
-                                <div className="flex-1 min-w-0">
-                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monto Transferido</p>
-                                  <p className="text-lg font-black text-gray-800 mb-2">{fmt(t.amount)}</p>
-                                  {t.note && (
-                                    <p className="text-xs font-bold text-gray-500 bg-white border border-gray-100 p-2 rounded-lg truncate">
-                                      {t.note}
-                                    </p>
-                                  )}
-                                  <p className="text-[10px] font-bold text-gray-400 mt-2">
-                                    Hora: {new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                                  </p>
-                                </div>
-                                {t.photoBase64 && (
-                                  <button 
-                                    onClick={() => setFullscreenPhoto(t.photoBase64)}
-                                    className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 border-gray-200 hover:border-purple-400 transition-colors relative group"
-                                  >
-                                    <img src={t.photoBase64} alt="Comprobante" className="w-full h-full object-cover" />
-                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
-                                    </div>
-                                  </button>
-                                )}
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      );
-                    })()}
                   </div>
                 )}
               </div>
@@ -1593,6 +1556,81 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
             <button
               onClick={() => setExpensesDescModal(null)}
               className="mt-5 w-full py-3 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Transferencias del Turno ─── */}
+      {transfersModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4"
+          onClick={() => setTransfersModal(null)}
+        >
+          <div
+            className="bg-white rounded-[28px] p-6 sm:p-8 shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-[fadeIn_0.2s_ease-out]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-6 flex-shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-xl">📲</div>
+                <div>
+                  <h3 className="font-black text-gray-900 text-lg leading-tight">Transferencias</h3>
+                  <p className="text-xs font-bold text-gray-400">{transfersModal.pointName}</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setTransfersModal(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-black transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2" style={{ scrollbarWidth: 'thin' }}>
+              {transfersModal.transfers.length === 0 ? (
+                <div className="text-center py-12 text-gray-400 bg-gray-50 rounded-2xl border border-gray-100">
+                  <p className="text-4xl mb-3">👻</p>
+                  <p className="font-bold text-sm">No hay transferencias registradas en este turno.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {transfersModal.transfers.map((t: any, i: number) => (
+                    <div key={t.id || i} className="border border-gray-100 rounded-2xl p-4 flex gap-4 bg-gray-50/50">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monto Transferido</p>
+                        <p className="text-lg font-black text-gray-800 mb-2">{fmt(t.amount)}</p>
+                        {t.note && (
+                          <p className="text-xs font-bold text-gray-500 bg-white border border-gray-100 p-2 rounded-lg truncate">
+                            {t.note}
+                          </p>
+                        )}
+                        <p className="text-[10px] font-bold text-gray-400 mt-2">
+                          Hora: {new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                      {t.photoBase64 && (
+                        <button 
+                          onClick={() => setFullscreenPhoto(t.photoBase64)}
+                          className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 border-gray-200 hover:border-blue-400 transition-colors relative group"
+                        >
+                          <img src={t.photoBase64} alt="Comprobante" className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                          </div>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <button
+              onClick={() => setTransfersModal(null)}
+              className="mt-6 w-full py-3.5 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95 flex-shrink-0"
             >
               Cerrar
             </button>
