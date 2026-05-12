@@ -52,3 +52,33 @@ export const parseMoney = (str: string): number => {
   }
   return parseFloat(s) || 0;
 };
+
+/**
+ * Comprime una imagen usando canvas
+ * @param file Archivo a comprimir
+ * @param maxWidth Ancho máximo (px)
+ * @param quality Calidad JPEG (0 - 1)
+ */
+export const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target?.result as string;
+      img.onload = () => {
+        const scaleSize = maxWidth / img.width;
+        // Si la imagen es más pequeña que el maxWidth, no agrandar
+        const scale = scaleSize < 1 ? scaleSize : 1;
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width * scale;
+        canvas.height = img.height * scale;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = (err) => reject(err);
+    };
+    reader.onerror = (err) => reject(err);
+  });
+};

@@ -6,7 +6,7 @@ import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { calculateClosingStatus } from '../utils/financeUtils';
-import { formatMoney, getProductAbbreviation } from '../utils/formatUtils';
+import { formatMoney, getProductAbbreviation, compressImage } from '../utils/formatUtils';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { MoneyInput } from '../components/ui/MoneyInput';
 import { BottomNav } from '../components/ui/BottomNav';
@@ -654,12 +654,16 @@ export const VendedorDashboard = () => {
                 accept="image/*"
                 capture="environment"
                 className="hidden"
-                onChange={(e) => {
+                onChange={async (e) => {
                   const file = e.target.files?.[0];
                   if (!file) return;
-                  const reader = new FileReader();
-                  reader.onload = (ev) => setTransferPhoto(ev.target?.result as string);
-                  reader.readAsDataURL(file);
+                  try {
+                    const compressedBase64 = await compressImage(file, 800, 0.7);
+                    setTransferPhoto(compressedBase64);
+                  } catch (err) {
+                    console.error('Error comprimiendo foto:', err);
+                    toast.error('No se pudo procesar la foto');
+                  }
                   e.target.value = '';
                 }}
               />
@@ -701,19 +705,25 @@ export const VendedorDashboard = () => {
                 onClick={() => {
                   const amount = parseInt(transferAmount) || 0;
                   if (amount <= 0) { toast.error('Ingresa un valor válido'); return; }
-                  addVendorTransfer({
-                    pointId,
-                    shiftOpenedAt: openedAt,
-                    amount,
-                    photoBase64: transferPhoto,
-                    note: transferNote,
-                  });
-                  toast.success(`✔ Transferencia de ${formatMoney(amount)} registrada`);
-                  setTransferAmount('');
-                  setTransferNote('');
-                  setTransferPhoto(null);
-                  if (transferFileRef.current) {
-                    transferFileRef.current.value = '';
+                  try {
+                    addVendorTransfer({
+                      pointId,
+                      shiftOpenedAt: openedAt,
+                      amount,
+                      photoBase64: transferPhoto,
+                      note: transferNote,
+                    });
+                    toast.success(`✔ Transferencia de ${formatMoney(amount)} registrada`);
+                  } catch (err) {
+                    console.error('Error al guardar transferencia (probablemente cuota de almacenamiento llena):', err);
+                    toast.error('La transferencia se procesó pero podrías estar sin espacio local. Por favor reinicia la app.');
+                  } finally {
+                    setTransferAmount('');
+                    setTransferNote('');
+                    setTransferPhoto(null);
+                    if (transferFileRef.current) {
+                      transferFileRef.current.value = '';
+                    }
                   }
                 }}
                 disabled={!(parseInt(transferAmount) > 0)}
