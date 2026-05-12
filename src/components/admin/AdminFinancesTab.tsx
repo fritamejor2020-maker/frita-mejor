@@ -3,6 +3,9 @@ import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { refreshAllFromSupabase } from '../../lib/useRealtimeSync';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useVehicleStore } from '../../store/useVehicleStore';
+import { useVendorTransferStore } from '../../store/useVendorTransferStore';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -341,6 +344,9 @@ interface ClosingDetail {
 export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean } = {}) => {
   const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
+  const user = useAuthStore((s: any) => s.user);
+  const vehicles = useVehicleStore((s: any) => s.vehicles);
+  const vendorTransfers = useVendorTransferStore((s: any) => s.transfers);
 
   // Cierres filters
   const [filterDate, setFilterDate] = useState('');
@@ -355,6 +361,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
   const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string } | null>(null);
+  const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const handleRefresh = async () => {
@@ -717,6 +724,14 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   const filteredClosings = deduplicatedClosings.filter((c: any) => {
     if (filterDate && c.date !== filterDate) return false;
     if (filterShift && c.shift !== filterShift) return false;
+
+    // Filtrar por sede si es AUDITOR y tiene sede asignada
+    if (user?.role === 'AUDITOR' && user?.branchId) {
+      const vehicle = vehicles?.find((v: any) => v.abbreviation === c._raw?.pointId || v.name === c._raw?.pointId);
+      const shiftBranchId = vehicle?.branchId || c._raw?.branchId;
+      if (shiftBranchId && shiftBranchId !== user.branchId) return false;
+    }
+
     return true;
   });
 
@@ -1194,6 +1209,55 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
                       <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
                       <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
                     </div>
+
+                    {/* Transferencias del Vendedor */}
+                    {(() => {
+                      const shiftTransfers = vendorTransfers.filter((t: any) => 
+                        t.pointId === closing._raw?.pointId &&
+                        t.shiftOpenedAt === closing._raw?.openedAt
+                      );
+                      if (shiftTransfers.length === 0) return null;
+                      return (
+                        <div className="border-t border-gray-100 bg-white">
+                          <div className="px-5 py-3 bg-purple-50/50 flex items-center justify-between">
+                            <h4 className="text-sm font-black text-purple-700 flex items-center gap-2">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="5" width="20" height="14" rx="2" ry="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+                              Transferencias Registradas
+                            </h4>
+                            <span className="text-xs font-bold bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full">{shiftTransfers.length}</span>
+                          </div>
+                          <div className="p-5 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {shiftTransfers.map((t: any, i: number) => (
+                              <div key={t.id || i} className="border border-gray-100 rounded-2xl p-4 flex gap-4 hover:shadow-md transition-shadow bg-gray-50/30">
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monto Transferido</p>
+                                  <p className="text-lg font-black text-gray-800 mb-2">{fmt(t.amount)}</p>
+                                  {t.note && (
+                                    <p className="text-xs font-bold text-gray-500 bg-white border border-gray-100 p-2 rounded-lg truncate">
+                                      {t.note}
+                                    </p>
+                                  )}
+                                  <p className="text-[10px] font-bold text-gray-400 mt-2">
+                                    Hora: {new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                                  </p>
+                                </div>
+                                {t.photoBase64 && (
+                                  <button 
+                                    onClick={() => setFullscreenPhoto(t.photoBase64)}
+                                    className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 border-gray-200 hover:border-purple-400 transition-colors relative group"
+                                  >
+                                    <img src={t.photoBase64} alt="Comprobante" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                                    </div>
+                                  </button>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
               </div>
@@ -1688,6 +1752,29 @@ export const AdminExpensesTab = () => {
             >
               Cerrar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Foto en Pantalla Completa ─── */}
+      {fullscreenPhoto && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-[fadeIn_0.2s_ease-out]"
+          onClick={() => setFullscreenPhoto(null)}
+        >
+          <div className="relative max-w-4xl max-h-screen w-full h-full flex flex-col items-center justify-center pointer-events-none">
+            <button
+              onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(null); }}
+              className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors pointer-events-auto shadow-lg"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+            <img 
+              src={fullscreenPhoto} 
+              alt="Comprobante Completo" 
+              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl pointer-events-auto"
+              onClick={(e) => e.stopPropagation()}
+            />
           </div>
         </div>
       )}

@@ -712,6 +712,9 @@ export const VendedorDashboard = () => {
                   setTransferAmount('');
                   setTransferNote('');
                   setTransferPhoto(null);
+                  if (transferFileRef.current) {
+                    transferFileRef.current.value = '';
+                  }
                 }}
                 disabled={!(parseInt(transferAmount) > 0)}
                 className="w-full flex items-center justify-center gap-2 bg-[#FF4040] text-white font-black text-lg py-4 rounded-[28px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95 disabled:opacity-40 disabled:active:scale-100"
