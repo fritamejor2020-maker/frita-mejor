@@ -1,9 +1,10 @@
 import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { calculateCartTotal } from '../utils/financeUtils';
+import { useInventoryStore } from './useInventoryStore';
 
 export const usePosStore = create((set, get) => ({
-  // Array de items [{ productId, name, price, qty }]
+  // Array de items [{ productId, name, price, qty, isExternal }]
   cart: [], 
   total: 0,
 
@@ -50,6 +51,49 @@ export const usePosStore = create((set, get) => ({
    */
   clearCart: () => {
     set({ cart: [], total: 0 });
+  },
+
+  /**
+   * Carga los ítems de un pedido externo (OlaClick) en el carrito actual.
+   * Busca coincidencias de nombres de forma robusta e inteligente.
+   */
+  loadExternalOrder: (items) => {
+    const inventory = useInventoryStore.getState().inventory || [];
+    const newCart = [];
+
+    items.forEach(item => {
+      const normalizedItemName = item.name.toLowerCase().trim();
+      
+      // Buscar en el inventario de venta por nombre exacto (case-insensitive)
+      const match = inventory.find(i => 
+        ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && 
+        i.price != null && 
+        i.name.toLowerCase().trim() === normalizedItemName
+      );
+
+      if (match) {
+        newCart.push({
+          productId: match.id,
+          cartItemId: match.id,
+          name: match.name,
+          price: match.price,
+          qty: item.qty
+        });
+      } else {
+        // Fallback: Cargar como ítem externo genérico para no truncar la venta
+        const genericId = item.productId || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+        newCart.push({
+          productId: genericId,
+          cartItemId: genericId,
+          name: `${item.name} (OlaClick)`,
+          price: item.price,
+          qty: item.qty,
+          isExternal: true
+        });
+      }
+    });
+
+    set({ cart: newCart, total: calculateCartTotal(newCart) });
   },
 
   /**

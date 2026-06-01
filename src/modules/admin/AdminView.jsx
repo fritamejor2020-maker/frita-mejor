@@ -24,6 +24,7 @@ import { AdminContratasTab } from '../../components/admin/AdminContratasTab';
 import { AdminTicketConfigTab } from '../../components/admin/AdminTicketConfigTab';
 import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { formatMoney } from '../../utils/formatUtils';
+import { AdminGeofencesTab } from './AdminGeofencesTab';
 
 // ─── Componente de fila editable genérica ─────────────────────────────────────
 // ─── Componente para subida de imagen inline ──────────────────────────────────
@@ -2570,6 +2571,7 @@ export function AdminView() {
       { id: 'VEHICULOS',  label: '🛵 Triciclos & Vehículos' },
       { id: 'PRECIOS',    label: '🛺 Productos Triciclos' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
+      { id: 'GEOCERCAS',  label: '🛡️ Geocercas & Pedidos' },
     ],
     FINANZAS: [
       { id: 'INGRESOS',   label: '💰 Ingresos' },
@@ -2727,6 +2729,7 @@ export function AdminView() {
 
         { activeTab === 'INVENTARIO_FLOTA' && <AdminVehicleInventoryTab /> }
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
+        { activeTab === 'GEOCERCAS' && <AdminGeofencesTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
         { activeTab === 'NOMINA' && <NominaAdminPanel /> }

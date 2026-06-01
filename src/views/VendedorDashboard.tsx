@@ -14,6 +14,7 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useVendorTracking } from '../lib/useVendorTracking';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
+import { supabase } from '../lib/supabase';
 
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
@@ -53,6 +54,144 @@ export const VendedorDashboard = () => {
   );
 
   const [activeTab, setActiveTab] = useState('pos');
+
+  // --- Estados de Pedidos Móviles (Uber / Rappi-style) ---
+  const [pendingDelivery, setPendingDelivery] = useState<any>(null);
+  const [activeDelivery, setActiveDelivery] = useState<any>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  useEffect(() => {
+    if (!trackingId || !isSetupComplete) return;
+
+    // 1. Cargar si ya hay un pedido activo aceptado por mí
+    const fetchActiveDelivery = async () => {
+      const { data } = await supabase
+        .from('delivery_requests')
+        .select('*')
+        .eq('assigned_vendor_id', trackingId)
+        .eq('status', 'accepted')
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        setActiveDelivery(data[0]);
+      }
+    };
+
+    // 2. Cargar si hay algún pedido pendiente asignado a mí
+    const fetchPendingDelivery = async () => {
+      const { data } = await supabase
+        .from('delivery_requests')
+        .select('*')
+        .eq('assigned_vendor_id', trackingId)
+        .eq('status', 'pending')
+        .limit(1);
+      
+      if (data && data.length > 0) {
+        setPendingDelivery(data[0]);
+        if (!audioRef.current) {
+          audioRef.current = new Audio('/sounds/mixkit_bell.wav');
+          audioRef.current.loop = true;
+        }
+        audioRef.current.play().catch(() => {});
+      }
+    };
+
+    fetchActiveDelivery();
+    fetchPendingDelivery();
+
+    // 3. Suscribirse a cambios en tiempo real
+    const channel = supabase.channel(`vendor-delivery-${trackingId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'delivery_requests',
+        filter: `assigned_vendor_id=eq.${trackingId}`
+      }, (payload: any) => {
+        const order = payload.new;
+        if (!order) return;
+
+        if (order.status === 'pending') {
+          setPendingDelivery(order);
+          if (!audioRef.current) {
+            audioRef.current = new Audio('/sounds/mixkit_bell.wav');
+            audioRef.current.loop = true;
+          }
+          audioRef.current.play().catch(() => {});
+        } else if (order.status === 'accepted') {
+          setActiveDelivery(order);
+          setPendingDelivery(null);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+        } else if (order.status === 'completed' || order.status === 'rejected') {
+          setActiveDelivery(null);
+          setPendingDelivery(null);
+          if (audioRef.current) {
+            audioRef.current.pause();
+            audioRef.current.currentTime = 0;
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    };
+  }, [trackingId, isSetupComplete]);
+
+  const handleAcceptDelivery = async (orderId: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    const { error } = await supabase
+      .from('delivery_requests')
+      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+      .eq('id', orderId);
+    
+    if (error) {
+      toast.error('Error al aceptar el pedido: ' + error.message);
+    } else {
+      toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
+    }
+  };
+
+  const handleRejectDelivery = async (orderId: string) => {
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current.currentTime = 0;
+    }
+    const { error } = await supabase
+      .from('delivery_requests')
+      .update({ status: 'rejected' })
+      .eq('id', orderId);
+    
+    if (error) {
+      toast.error('Error al rechazar el pedido: ' + error.message);
+    } else {
+      setPendingDelivery(null);
+      toast.success('Pedido rechazado.');
+    }
+  };
+
+  const handleCompleteDelivery = async (orderId: string) => {
+    const { error } = await supabase
+      .from('delivery_requests')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('id', orderId);
+    
+    if (error) {
+      toast.error('Error al finalizar el pedido: ' + error.message);
+    } else {
+      setActiveDelivery(null);
+      toast.success('¡Pedido entregado con éxito! 🎉 Stock descontado.');
+    }
+  };
+
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
   const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
   // Campo de observación para el pedido de surtido
@@ -303,6 +442,71 @@ export const VendedorDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#FFD56B] font-sans w-full flex flex-col" style={{ paddingBottom: activeTab === 'pos' ? '240px' : '160px' }}>
+      
+      {/* OVERLAY DE PEDIDO ENTRANTE (UBER-STYLE ALERT) */}
+      {pendingDelivery && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[40px] w-full max-w-md p-6 sm:p-8 shadow-2xl border-4 border-[#FFB700] animate-bounce flex flex-col gap-5 text-center relative overflow-hidden">
+            <div className="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-amber-400 via-red-500 to-amber-400"></div>
+            
+            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center text-4xl mx-auto border-4 border-amber-300 animate-pulse">
+              🔔
+            </div>
+
+            <div>
+              <span className="bg-[#FF4040] text-white font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider">
+                ¡Nuevo Pedido Recibido!
+              </span>
+              <h3 className="text-2xl font-black text-gray-900 mt-2 leading-none">{pendingDelivery.client_name}</h3>
+              <p className="text-sm font-bold text-gray-400 mt-1">📞 {pendingDelivery.client_phone}</p>
+            </div>
+
+            {/* Address & Items */}
+            <div className="bg-gray-50 rounded-3xl p-4 text-left flex flex-col gap-2 border border-gray-100">
+              {pendingDelivery.client_address && (
+                <div className="text-xs font-bold text-gray-700">
+                  <span className="text-gray-400 block text-[9px] font-black uppercase tracking-wider">Dirección de Entrega:</span>
+                  📍 {pendingDelivery.client_address}
+                </div>
+              )}
+              
+              <div>
+                <span className="text-gray-400 block text-[9px] font-black uppercase tracking-wider mb-1">Productos Solicitados:</span>
+                <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
+                  {(pendingDelivery.items || []).map((item: any, i: number) => (
+                    <div key={i} className="flex justify-between font-bold text-xs text-gray-700">
+                      <span>{item.name} <span className="text-[#FF4040]">× {item.qty}</span></span>
+                      <span className="font-black text-gray-900">{formatMoney(item.price * item.qty)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 border-t border-gray-200/50 flex justify-between items-center mt-1">
+                <span className="text-xs font-black text-gray-400 uppercase tracking-wide">Monto Total:</span>
+                <span className="text-lg font-black text-gray-900">{formatMoney(pendingDelivery.total_amount)}</span>
+              </div>
+            </div>
+
+            {/* Botones */}
+            <div className="grid grid-cols-2 gap-3 mt-2">
+              <button
+                onClick={() => handleRejectDelivery(pendingDelivery.id)}
+                className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-black py-4 px-6 rounded-2xl border-2 border-red-100 transition-all active:scale-95 text-base flex items-center justify-center gap-1.5"
+              >
+                <X size={18} strokeWidth={3} /> Rechazar
+              </button>
+              <button
+                onClick={() => handleAcceptDelivery(pendingDelivery.id)}
+                className="bg-green-500 hover:bg-green-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-green-200 transition-all active:scale-95 text-base flex items-center justify-center gap-1.5"
+              >
+                <Check size={18} strokeWidth={3} /> Aceptar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* HEADER */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">
         <div className="max-w-7xl mx-auto pt-5 sm:pt-8 pb-4 sm:pb-6 px-4 sm:px-6 relative">
@@ -351,6 +555,40 @@ export const VendedorDashboard = () => {
       </div>
 
       <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+        
+        {/* BANNER DE PEDIDO ACTIVO (CAMINO AL CLIENTE) */}
+        {activeDelivery && (
+          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-[32px] p-5 text-white shadow-xl shadow-green-200/50 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-4 border-white animate-pulse">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shrink-0 mt-0.5">
+                🛵
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="bg-white/20 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider w-max">
+                  Pedido Activo en Curso
+                </span>
+                <h3 className="text-lg font-black leading-tight">Cliente: {activeDelivery.client_name}</h3>
+                <p className="text-xs font-bold opacity-90">
+                  📞 <a href={`tel:${activeDelivery.client_phone}`} className="underline font-black">{activeDelivery.client_phone}</a>
+                  {activeDelivery.client_address && ` · 📍 ${activeDelivery.client_address}`}
+                </p>
+                <div className="flex flex-wrap gap-1 mt-1.5">
+                  {(activeDelivery.items || []).map((item: any, i: number) => (
+                    <span key={i} className="text-[10px] bg-white/10 font-bold px-2 py-0.5 rounded-full">
+                      {item.name} ×{item.qty}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <button
+              onClick={() => handleCompleteDelivery(activeDelivery.id)}
+              className="bg-white hover:bg-green-50 text-green-700 font-black py-3.5 px-6 rounded-2xl shadow-md transition-all active:scale-95 text-sm whitespace-nowrap shrink-0 flex items-center justify-center gap-1.5"
+            >
+              <CheckCircle size={16} strokeWidth={2.5} /> ENTREGAR PEDIDO
+            </button>
+          </div>
+        )}
         
         {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (

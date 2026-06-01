@@ -30,6 +30,7 @@ import { ModuleSelectorView }  from './views/ModuleSelectorView';
 import { CierresView }         from './modules/cierres/CierresView';
 import { DashboardView }       from './modules/dashboard/DashboardView';
 import { ManagerDashboard }    from './views/ManagerDashboard';
+import { ClientePedirView }   from './views/ClientePedirView';
 
 import { Link } from 'react-router-dom';
 
@@ -232,6 +233,7 @@ function App() {
           <Routes>
             {/* ── Pública: única ruta sin login ───────────────── */}
             <Route path="/login" element={<LoginView />} />
+            <Route path="/pedir" element={<ClientePedirView />} />
 
             {/* ── Todo lo demás requiere estar autenticado ─────── */}
             <Route element={<ProtectedRoute />}>

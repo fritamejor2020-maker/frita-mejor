@@ -10,6 +10,8 @@ import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
 import { useSupplierStore }      from '../../store/useSupplierStore';
 import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printerAgent';
+import { OlaClickOrdersTab } from './components/OlaClickOrdersTab';
+import { supabase } from '../../lib/supabase';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -89,6 +91,44 @@ export function PosView() {
 
   // Esperar a que la sincronización con Supabase termine antes de mostrar "ABRIR CAJA"
   const [syncReady, setSyncReady] = useState(false);
+
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
+
+  // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
+  useEffect(() => {
+    async function loadPendingCount() {
+      try {
+        const { count, error } = await supabase
+          .from('olaclick_orders')
+          .select('*', { count: 'exact', head: true })
+          .eq('status', 'PENDING');
+        
+        if (!error) {
+          setPendingOrdersCount(count || 0);
+        }
+      } catch (err) {
+        console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
+      }
+    }
+
+    loadPendingCount();
+
+    const channel = supabase
+      .channel('olaclick_pos_count')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'olaclick_orders' },
+        () => {
+          loadPendingCount();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
 
   useEffect(() => {
     // Si ya hay turno activo, la sync ya trajo datos — listo
@@ -636,13 +676,18 @@ export function PosView() {
         {/* ── Hamburguesa ── */}
         <div className="relative shrink-0">
           <button
-            className="w-11 h-11 flex flex-col items-center justify-center gap-[5px] border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all"
+            className="w-11 h-11 flex flex-col items-center justify-center gap-[5px] border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all relative"
             onClick={() => setShowHamburgerMenu(v => !v)}
             title="Más opciones"
           >
             <span className="w-5 h-[2px] bg-current rounded-full" />
             <span className="w-5 h-[2px] bg-current rounded-full" />
             <span className="w-5 h-[2px] bg-current rounded-full" />
+            {pendingOrdersCount > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-badge-pulse shadow-md">
+                {pendingOrdersCount}
+              </span>
+            )}
           </button>
 
           {/* Dropdown */}
@@ -654,9 +699,25 @@ export function PosView() {
                   <span className="text-base">⚠️</span> Abrir Caja
                 </button>
               ) : (
-                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowClosingModal(true); setShowHamburgerMenu(false); }}>
-                  <span className="text-base">🔴</span> Cierre Z
-                </button>
+                <>
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowClosingModal(true); setShowHamburgerMenu(false); }}>
+                    <span className="text-base">🔴</span> Cierre Z
+                  </button>
+                  <div className="h-px bg-gray-800" />
+                  <button 
+                    className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-yellow-300 hover:bg-yellow-950/40 transition-colors" 
+                    onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); }}
+                  >
+                    <span className="flex items-center gap-3">
+                      <span className="text-base">📱</span> Pedidos OlaClick
+                    </span>
+                    {pendingOrdersCount > 0 && (
+                      <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
+                        {pendingOrdersCount}
+                      </span>
+                    )}
+                  </button>
+                </>
               )}
 
               {activeShift && (
@@ -1191,6 +1252,26 @@ export function PosView() {
           onClose={() => setShowZHistoryModal(false)}
           formatMoney={formatMoney}
         />
+      )}
+
+      {showOlaClickOrdersModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-overlay-in">
+          <div className="bg-[#12131a] rounded-[32px] border border-gray-800 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden relative animate-modal-in">
+            <button 
+              onClick={() => setShowOlaClickOrdersModal(false)}
+              className="absolute top-4 right-4 z-[55] w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold active:scale-95 transition-all shadow-md"
+            >
+              ✕
+            </button>
+            <div className="flex-grow flex flex-col h-full overflow-hidden">
+              <OlaClickOrdersTab
+                activeShiftId={activeShift?.id}
+                selectedRegisterId={selectedRegisterId}
+                formatMoney={formatMoney}
+              />
+            </div>
+          </div>
+        </div>
       )}
 
       {showClientAccountModal && selectedCustomer && (() => {
