@@ -398,124 +398,133 @@ export function ClientePedirView() {
           <p className="text-xs font-bold text-gray-400 mt-0.5">Seguimiento en Vivo de tu Frito Caliente</p>
         </header>
 
-        <div className="flex-1 p-4 flex flex-col gap-4 max-w-lg mx-auto w-full">
-          {/* Tarjeta de Estado */}
-          <div className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col items-center text-center gap-3">
-            {isPending && (
-              <>
-                <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-3xl animate-bounce">
-                  🔔
-                </div>
-                <h2 className="text-lg font-black text-gray-900">Esperando Confirmación</h2>
-                <p className="text-sm font-bold text-gray-500 leading-snug">
-                  Tu pedido ha sido enviado a <span className="text-amber-500 font-extrabold">{activeOrder.vendor_name || 'repartidores cercanos'}</span>. 
-                  Por favor mantén esta pantalla abierta. ¡Te avisaremos cuando lo acepten!
-                </p>
-                <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
-                  <div className="bg-[#FFB700] h-full rounded-full animate-[pulse_1.5s_infinite]" style={{ width: '65%' }}></div>
-                </div>
-              </>
-            )}
-
-            {isAccepted && (
-              <>
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl animate-pulse">
-                  🛵
-                </div>
-                <h2 className="text-lg font-black text-green-600">¡Pedido Aceptado!</h2>
-                <p className="text-sm font-bold text-gray-500 leading-snug">
-                  <span className="text-gray-800 font-extrabold">{activeOrder.vendor_name}</span> aceptó tu pedido y se dirige hacia ti. 
-                  ¡Sigue su ubicación en el mapa de abajo!
-                </p>
-              </>
-            )}
-
-            {isCompleted && (
-              <>
-                <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">
-                  🎉
-                </div>
-                <h2 className="text-lg font-black text-green-600">¡Pedido Entregado!</h2>
-                <p className="text-sm font-bold text-gray-500 leading-snug">
-                  ¡Qué disfrutes tu frito calientico! Gracias por comprar en Frita Mejor.
-                </p>
-                <button
-                  onClick={handleResetOrder}
-                  className="mt-2 bg-[#FF4040] hover:bg-red-600 text-white font-black py-3 px-8 rounded-full shadow-md active:scale-95 transition-all text-sm w-full"
-                >
-                  VOLVER A PEDIR
-                </button>
-              </>
-            )}
-
-            {isRejected && (
-              <>
-                <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-3xl">
-                  😢
-                </div>
-                <h2 className="text-lg font-black text-red-600">Pedido Rechazado</h2>
-                <p className="text-sm font-bold text-gray-500 leading-snug">
-                  Lo sentimos, el repartidor no pudo tomar tu pedido en este momento. Por favor reintenta en unos minutos.
-                </p>
-                <button
-                  onClick={handleResetOrder}
-                  className="mt-2 bg-gray-900 text-white font-black py-3 px-8 rounded-full shadow-md active:scale-95 transition-all text-sm w-full"
-                >
-                  REINTENTAR PEDIDO
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Mapa de Seguimiento (Solo si está pendiente o aceptado) */}
+        <div className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
+          {/* COLUMNA IZQUIERDA: MAPA DE SEGUIMIENTO */}
           {(isPending || isAccepted) && (
-            <div className="bg-white rounded-[32px] overflow-hidden shadow-sm h-[300px] border-2 border-white relative">
-              <MapContainer
-                center={[activeOrder.client_lat, activeOrder.client_lng]}
-                zoom={15}
-                style={{ width: '100%', height: '100%', zIndex: 1 }}
-                zoomControl={false}
-              >
-                <TileLayer
-                  attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-                  url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                />
-                
-                {/* Pin del Cliente */}
-                <Marker position={[activeOrder.client_lat, activeOrder.client_lng]} icon={clientIcon} />
-
-                {/* Pin del Vendedor (si hay asignado y tenemos sus coordenadas) */}
-                {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
-                  <Marker 
-                    position={[activeOrder.vendor_lat, activeOrder.vendor_lng]} 
-                    icon={createVendorIcon(activeOrder.vendor_name || 'Vendedor', true)} 
+            <div className="w-full lg:w-3/5 lg:sticky lg:top-6 flex flex-col gap-4">
+              <div className="bg-white rounded-[32px] overflow-hidden shadow-sm h-[300px] lg:h-[calc(100vh-180px)] lg:min-h-[500px] border-2 border-white relative">
+                <MapContainer
+                  center={[activeOrder.client_lat, activeOrder.client_lng]}
+                  zoom={15}
+                  style={{ width: '100%', height: '100%', zIndex: 1 }}
+                  zoomControl={false}
+                >
+                  <TileLayer
+                    attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                   />
-                )}
-              </MapContainer>
+                  
+                  {/* Pin del Cliente */}
+                  <Marker position={[activeOrder.client_lat, activeOrder.client_lng]} icon={clientIcon} />
 
-              {/* Distancia flotante */}
-              {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
-                <div className="absolute top-3 right-3 bg-white/95 backdrop-blur shadow-md rounded-2xl px-4 py-2 text-xs font-black text-gray-800 z-[1000] border border-gray-100 flex items-center gap-1.5 animate-pulse">
-                  <Navigation size={12} className="text-green-500 fill-green-500 rotate-45" />
-                  Repartidor a {formatDistance(getHaversineDistance(activeOrder.client_lat, activeOrder.client_lng, activeOrder.vendor_lat, activeOrder.vendor_lng))}
-                </div>
-              )}
+                  {/* Pin del Vendedor (si hay asignado y tenemos sus coordenadas) */}
+                  {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
+                    <Marker 
+                      position={[activeOrder.vendor_lat, activeOrder.vendor_lng]} 
+                      icon={createVendorIcon(activeOrder.vendor_name || 'Vendedor', true)} 
+                    />
+                  )}
+                </MapContainer>
+
+                {/* Distancia flotante */}
+                {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
+                  <div className="absolute top-3 right-3 bg-white/95 backdrop-blur shadow-md rounded-2xl px-4 py-2 text-xs font-black text-gray-800 z-[1000] border border-gray-100 flex items-center gap-1.5 animate-pulse">
+                    <Navigation size={12} className="text-green-500 fill-green-500 rotate-45" />
+                    Repartidor a {formatDistance(getHaversineDistance(activeOrder.client_lat, activeOrder.client_lng, activeOrder.vendor_lat, activeOrder.vendor_lng))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
-          {/* Resumen del pedido */}
-          <div className="bg-white rounded-[32px] p-5 shadow-sm">
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Detalle del Pedido</h3>
-            <div className="divide-y divide-gray-100">
-              {(activeOrder.items || []).map((item: any, i: number) => (
-                <div key={i} className="py-2.5 flex items-center justify-between font-bold text-sm text-gray-700">
-                  <span>{item.name} <span className="text-gray-400">× {item.qty}</span></span>
-                  <span className="font-black text-gray-900">{formatMoney(item.price * item.qty)}</span>
+          {/* COLUMNA DERECHA: ESTADO Y DETALLE DEL PEDIDO */}
+          <div className={`w-full flex flex-col gap-4 ${
+            (isPending || isAccepted) 
+              ? 'lg:w-2/5 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto pr-1 shrink-0' 
+              : 'max-w-lg mx-auto'
+          }`}>
+            {/* Tarjeta de Estado */}
+            <div className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col items-center text-center gap-3">
+              {isPending && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-amber-100 flex items-center justify-center text-3xl animate-bounce">
+                    🔔
+                  </div>
+                  <h2 className="text-lg font-black text-gray-900">Esperando Confirmación</h2>
+                  <p className="text-sm font-bold text-gray-500 leading-snug">
+                    Tu pedido ha sido enviado a <span className="text-amber-500 font-extrabold">{activeOrder.vendor_name || 'repartidores cercanos'}</span>. 
+                    Por favor mantén esta pantalla abierta. ¡Te avisaremos cuando lo acepten!
+                  </p>
+                  <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                    <div className="bg-[#FFB700] h-full rounded-full animate-[pulse_1.5s_infinite]" style={{ width: '65%' }}></div>
+                  </div>
+                </>
+              )}
+
+              {isAccepted && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl animate-pulse">
+                    🛵
+                  </div>
+                  <h2 className="text-lg font-black text-green-600">¡Pedido Aceptado!</h2>
+                  <p className="text-sm font-bold text-gray-500 leading-snug">
+                    <span className="text-gray-800 font-extrabold">{activeOrder.vendor_name}</span> aceptó tu pedido y se dirige hacia ti. 
+                    ¡Sigue su ubicación en el mapa!
+                  </p>
+                </>
+              )}
+
+              {isCompleted && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center text-3xl">
+                    🎉
+                  </div>
+                  <h2 className="text-lg font-black text-green-600">¡Pedido Entregado!</h2>
+                  <p className="text-sm font-bold text-gray-500 leading-snug">
+                    ¡Qué disfrutes tu frito calientico! Gracias por comprar en Frita Mejor.
+                  </p>
+                  <button
+                    onClick={handleResetOrder}
+                    className="mt-2 bg-[#FF4040] hover:bg-red-600 text-white font-black py-3 px-8 rounded-full shadow-md active:scale-95 transition-all text-sm w-full"
+                  >
+                    VOLVER A PEDIR
+                  </button>
+                </>
+              )}
+
+              {isRejected && (
+                <>
+                  <div className="w-16 h-16 rounded-full bg-red-100 flex items-center justify-center text-3xl">
+                    😢
+                  </div>
+                  <h2 className="text-lg font-black text-red-600">Pedido Rechazado</h2>
+                  <p className="text-sm font-bold text-gray-500 leading-snug">
+                    Lo sentimos, el repartidor no pudo tomar tu pedido en este momento. Por favor reintenta en unos minutos.
+                  </p>
+                  <button
+                    onClick={handleResetOrder}
+                    className="mt-2 bg-gray-900 text-white font-black py-3 px-8 rounded-full shadow-md active:scale-95 transition-all text-sm w-full"
+                  >
+                    REINTENTAR PEDIDO
+                  </button>
+                </>
+              )}
+            </div>
+
+            {/* Resumen del pedido */}
+            <div className="bg-white rounded-[32px] p-5 shadow-sm">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Detalle del Pedido</h3>
+              <div className="divide-y divide-gray-100">
+                {(activeOrder.items || []).map((item: any, i: number) => (
+                  <div key={i} className="py-2.5 flex items-center justify-between font-bold text-sm text-gray-700">
+                    <span>{item.name} <span className="text-gray-400">× {item.qty}</span></span>
+                    <span className="font-black text-gray-900">{formatMoney(item.price * item.qty)}</span>
+                  </div>
+                ))}
+                <div className="pt-3 mt-1 flex items-center justify-between text-base font-black text-gray-900">
+                  <span>Total</span>
+                  <span className="text-[#FF4040] text-lg">{formatMoney(activeOrder.total_amount)}</span>
                 </div>
-              ))}
-              <div className="pt-3 mt-1 flex items-center justify-between text-base font-black text-gray-900">
-                <span>Total</span>
-                <span className="text-[#FF4040] text-lg">{formatMoney(activeOrder.total_amount)}</span>
               </div>
             </div>
           </div>
@@ -545,263 +554,268 @@ export function ClientePedirView() {
       </header>
 
       {/* CONTENIDO PRINCIPAL */}
-      <div className="flex-1 p-3 sm:p-5 flex flex-col gap-4 max-w-lg mx-auto w-full">
+      <div className="flex-1 p-3 sm:p-6 w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
         
-        {/* MAPA Y GEOFENCE WARNING */}
-        <div className="bg-white rounded-[32px] overflow-hidden shadow-sm h-[260px] border-2 border-white relative">
-          <MapContainer
-            center={clientPos}
-            zoom={DEFAULT_ZOOM}
-            style={{ width: '100%', height: '100%', zIndex: 1 }}
-            zoomControl={false}
-          >
-            <TileLayer
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-            />
-            
-            <MapController 
-              onLocationChange={(lat, lng) => setClientPos([lat, lng])} 
-              triggerGeolocation={triggerGeolocation}
-              setTriggerGeolocation={setTriggerGeolocation}
-            />
-
-            {/* Dibujar Geocercas */}
-            {geofences.map(geo => (
-              <Polygon 
-                key={geo.id} 
-                positions={geo.coordinates} 
-                pathOptions={{
-                  fillColor: '#FFB700',
-                  fillOpacity: 0.25,
-                  color: '#FFB700',
-                  weight: 3,
-                  dashArray: '5, 8'
-                }} 
+        {/* COLUMNA IZQUIERDA: MAPA Y ESTADO */}
+        <div className="w-full lg:w-3/5 lg:sticky lg:top-6 flex flex-col gap-4">
+          {/* MAPA Y GEOFENCE WARNING */}
+          <div className="bg-white rounded-[32px] overflow-hidden shadow-sm h-[260px] lg:h-[calc(100vh-180px)] min-h-[300px] lg:min-h-[500px] border-2 border-white relative">
+            <MapContainer
+              center={clientPos}
+              zoom={DEFAULT_ZOOM}
+              style={{ width: '100%', height: '100%', zIndex: 1 }}
+              zoomControl={false}
+            >
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
-            ))}
-
-            {/* Pin del Cliente */}
-            <Marker position={clientPos} icon={clientIcon} />
-
-            {/* Vendedores Cercanos */}
-            {vendorsInProximity.map(v => (
-              <Marker
-                key={v.vendor_id}
-                position={[v.lat, v.lng]}
-                icon={createVendorIcon(v.vendor_name, selectedVendorId === v.vendor_id)}
-                eventHandlers={{
-                  click: () => setSelectedVendorId(v.vendor_id)
-                }}
+              
+              <MapController 
+                onLocationChange={(lat, lng) => setClientPos([lat, lng])} 
+                triggerGeolocation={triggerGeolocation}
+                setTriggerGeolocation={setTriggerGeolocation}
               />
-            ))}
-          </MapContainer>
 
-          {/* Indicador de Geocerca Flotante */}
-          <div className={`absolute bottom-3 left-3 right-3 py-2.5 px-4 rounded-2xl text-xs font-black flex items-center gap-2 shadow-md border z-[1000] backdrop-blur ${
-            isInsideCoverage 
-              ? 'bg-green-50/95 border-green-200 text-green-700' 
-              : 'bg-red-50/95 border-red-200 text-red-700 animate-bounce'
-          }`}>
-            {isInsideCoverage ? (
-              <>
-                <Check size={14} className="text-green-500 stroke-[3px]" />
-                Zona de entrega disponible
-              </>
-            ) : (
-              <>
-                <ShieldAlert size={14} className="text-red-500 fill-red-50" />
-                Fuera de cobertura. Arrastra tu pin.
-              </>
-            )}
+              {/* Dibujar Geocercas */}
+              {geofences.map(geo => (
+                <Polygon 
+                  key={geo.id} 
+                  positions={geo.coordinates} 
+                  pathOptions={{
+                    fillColor: '#FFB700',
+                    fillOpacity: 0.25,
+                    color: '#FFB700',
+                    weight: 3,
+                    dashArray: '5, 8'
+                  }} 
+                />
+              ))}
+
+              {/* Pin del Cliente */}
+              <Marker position={clientPos} icon={clientIcon} />
+
+              {/* Vendedores Cercanos */}
+              {vendorsInProximity.map(v => (
+                <Marker
+                  key={v.vendor_id}
+                  position={[v.lat, v.lng]}
+                  icon={createVendorIcon(v.vendor_name, selectedVendorId === v.vendor_id)}
+                  eventHandlers={{
+                    click: () => setSelectedVendorId(v.vendor_id)
+                  }}
+                />
+              ))}
+            </MapContainer>
+
+            {/* Indicador de Geocerca Flotante */}
+            <div className={`absolute bottom-3 left-3 right-3 py-2.5 px-4 rounded-2xl text-xs font-black flex items-center gap-2 shadow-md border z-[1000] backdrop-blur ${
+              isInsideCoverage 
+                ? 'bg-green-50/95 border-green-200 text-green-700' 
+                : 'bg-red-50/95 border-red-200 text-red-700 animate-bounce'
+            }`}>
+              {isInsideCoverage ? (
+                <>
+                  <Check size={14} className="text-green-500 stroke-[3px]" />
+                  Zona de entrega disponible
+                </>
+              ) : (
+                <>
+                  <ShieldAlert size={14} className="text-red-500 fill-red-50" />
+                  Fuera de cobertura. Arrastra tu pin.
+                </>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* SI NO HAY COBERTURA: MENSAJE AMIGABLE */}
-        {!isInsideCoverage && (
-          <div className="bg-white rounded-[32px] p-6 text-center flex flex-col items-center gap-3 shadow-sm">
-            <span className="text-4xl">🤷‍♂️</span>
-            <h2 className="text-lg font-black text-gray-800">¡Sin cobertura en tu zona!</h2>
-            <p className="text-sm font-bold text-gray-400 leading-snug">
-              Actualmente no tenemos carritos prestando servicio en tu ubicación. 
-              Por favor toca el mapa o arrastra el pin dentro de un área con cobertura (amarilla) para ordenar.
-            </p>
-          </div>
-        )}
-
-        {/* SI TIENE COBERTURA PERO NO HAY TRICICLOS CERCANOS */}
-        {isInsideCoverage && vendorsInProximity.length === 0 && (
-          <div className="bg-white rounded-[32px] p-6 text-center flex flex-col items-center gap-3 shadow-sm">
-            <span className="text-4xl">🛵💨</span>
-            <h2 className="text-lg font-black text-gray-800">Sin carritos de fritos cerca</h2>
-            <p className="text-sm font-bold text-gray-400 leading-snug">
-              ¡Estás dentro de nuestra zona de servicio! Sin embargo, en este momento no hay triciclos móviles en un radio de 3 km. 
-              Por favor vuelve a intentar en unos minutos.
-            </p>
-          </div>
-        )}
-
-        {/* SELECCIONAR REPARTIDOR MÓVIL */}
-        {isInsideCoverage && vendorsInProximity.length > 0 && (
-          <div className="bg-white rounded-[32px] p-4 shadow-sm flex flex-col gap-2.5">
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">Triciclos Cercanos</h3>
-            <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
-              {vendorsInProximity.map(v => {
-                const isSelected = selectedVendorId === v.vendor_id;
-                return (
-                  <button
-                    key={v.vendor_id}
-                    onClick={() => setSelectedVendorId(v.vendor_id)}
-                    className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shrink-0 border-2 ${
-                      isSelected 
-                        ? 'bg-amber-50 border-[#FFB700] text-gray-900 shadow-sm' 
-                        : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white'
-                    }`}
-                  >
-                    <span>🛵 {v.vendor_name.split(' ')[0]}</span>
-                    <span className="text-[10px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full font-bold">
-                      {formatDistance(v.distance)}
-                    </span>
-                  </button>
-                );
-              })}
+        {/* COLUMNA DERECHA: SELECCIÓN DE REPARTIDOR, MENÚ Y FORMULARIO */}
+        <div className="w-full lg:w-2/5 flex flex-col gap-4 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto pr-1 shrink-0">
+          {/* SI NO HAY COBERTURA: MENSAJE AMIGABLE */}
+          {!isInsideCoverage && (
+            <div className="bg-white rounded-[32px] p-6 text-center flex flex-col items-center gap-3 shadow-sm">
+              <span className="text-4xl">🤷‍♂️</span>
+              <h2 className="text-lg font-black text-gray-800">¡Sin cobertura en tu zona!</h2>
+              <p className="text-sm font-bold text-gray-400 leading-snug">
+                Actualmente no tenemos carritos prestando servicio en tu ubicación. 
+                Por favor toca el mapa o arrastra el pin dentro de un área con cobertura (amarilla) para ordenar.
+              </p>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* MENÚ DE PRODUCTOS DEL CARRITO SELECCIONADO */}
-        {isInsideCoverage && selectedVendorId && (
-          <div className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col gap-4">
-            <div className="flex items-center justify-between border-b border-gray-50 pb-3">
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Menú Disponible</h3>
-              <span className="text-[10px] bg-red-50 text-[#FF4040] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
-                <Sparkles size={10} /> Recién Frito
-              </span>
+          {/* SI TIENE COBERTURA PERO NO HAY TRICICLOS CERCANOS */}
+          {isInsideCoverage && vendorsInProximity.length === 0 && (
+            <div className="bg-white rounded-[32px] p-6 text-center flex flex-col items-center gap-3 shadow-sm">
+              <span className="text-4xl">🛵💨</span>
+              <h2 className="text-lg font-black text-gray-800">Sin carritos de fritos cerca</h2>
+              <p className="text-sm font-bold text-gray-400 leading-snug">
+                ¡Estás dentro de nuestra zona de servicio! Sin embargo, en este momento no hay triciclos móviles en un radio de 3 km. 
+                Por favor vuelve a intentar en unos minutos.
+              </p>
             </div>
+          )}
 
-            {vendorProducts.length === 0 ? (
-              <p className="text-sm font-bold text-gray-400 text-center py-4">Este carrito no tiene stock disponible en este momento.</p>
-            ) : (
-              <div className="grid grid-cols-1 gap-2.5">
-                {vendorProducts.map(p => {
-                  const qtyInCart = cart[p.id] || 0;
+          {/* SELECCIONAR REPARTIDOR MÓVIL */}
+          {isInsideCoverage && vendorsInProximity.length > 0 && (
+            <div className="bg-white rounded-[32px] p-4 shadow-sm flex flex-col gap-2.5">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">Triciclos Cercanos</h3>
+              <div className="flex gap-2 overflow-x-auto pb-1.5 scrollbar-hide">
+                {vendorsInProximity.map(v => {
+                  const isSelected = selectedVendorId === v.vendor_id;
                   return (
-                    <div key={p.id} className="flex items-center justify-between bg-gray-50/70 rounded-2xl p-2.5 border border-gray-100 shadow-sm">
-                      <div className="flex flex-col">
-                        <span className="font-black text-gray-800 text-sm">{p.name}</span>
-                        <span className="text-xs font-bold text-gray-400">
-                          {formatMoney(p.price)} · <span className="text-amber-500">{p.stock} disponibles</span>
-                        </span>
-                      </div>
-                      
-                      <div className="flex items-center gap-2">
-                        {qtyInCart > 0 && (
-                          <>
-                            <button
-                              onClick={() => removeFromCart(String(p.id))}
-                              className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-500 font-black flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors active:scale-90"
-                            >
-                              -
-                            </button>
-                            <span className="font-black text-gray-800 text-sm min-w-[16px] text-center">{qtyInCart}</span>
-                          </>
-                        )}
-                        <button
-                          onClick={() => addToCart(String(p.id), p.stock)}
-                          disabled={qtyInCart >= p.stock}
-                          className={`w-8 h-8 rounded-full font-black flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:scale-100 ${
-                            qtyInCart > 0 
-                              ? 'bg-amber-400 text-white' 
-                              : 'bg-white border border-gray-200 text-gray-700 hover:border-amber-400 hover:text-amber-500'
-                          }`}
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
+                    <button
+                      key={v.vendor_id}
+                      onClick={() => setSelectedVendorId(v.vendor_id)}
+                      className={`flex items-center gap-2 px-4 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 shrink-0 border-2 ${
+                        isSelected 
+                          ? 'bg-amber-50 border-[#FFB700] text-gray-900 shadow-sm' 
+                          : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-white'
+                      }`}
+                    >
+                      <span>🛵 {v.vendor_name.split(' ')[0]}</span>
+                      <span className="text-[10px] bg-white border border-gray-100 px-1.5 py-0.5 rounded-full font-bold">
+                        {formatDistance(v.distance)}
+                      </span>
+                    </button>
                   );
                 })}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* FORMULARIO DE ENVÍO */}
-        {isInsideCoverage && getCartItemsCount() > 0 && (
-          <form onSubmit={handleCheckout} className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col gap-4">
-            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">Información de Entrega</h3>
-            
-            <div className="space-y-3">
-              {/* Nombre */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <User size={12} className="text-amber-400" /> Nombre Completo
-                </label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Ej. Juan Pérez"
-                  value={name}
-                  onChange={e => setName(e.target.value)}
-                  className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
-                />
-              </div>
-
-              {/* Teléfono */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Phone size={12} className="text-amber-400" /> Teléfono Móvil
-                </label>
-                <input
-                  type="tel"
-                  required
-                  placeholder="Ej. 3123456789"
-                  value={phone}
-                  onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
-                  className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
-                />
-              </div>
-
-              {/* Dirección */}
-              <div className="flex flex-col gap-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <MapPin size={12} className="text-amber-400" /> Dirección / Indicaciones
-                </label>
-                <input
-                  type="text"
-                  placeholder="Ej. Calle 5 # 4-20 (Frente al parque)"
-                  value={address}
-                  onChange={e => setAddress(e.target.value)}
-                  className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
-                />
-              </div>
             </div>
+          )}
 
-            {/* Total Resumen */}
-            <div className="bg-amber-50 rounded-2xl p-4 flex items-center justify-between border border-amber-200/50 mt-1">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Total a Pagar</span>
-                <span className="text-[10px] font-bold text-gray-400">Paga en efectivo al recibir</span>
+          {/* MENÚ DE PRODUCTOS DEL CARRITO SELECCIONADO */}
+          {isInsideCoverage && selectedVendorId && (
+            <div className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col gap-4">
+              <div className="flex items-center justify-between border-b border-gray-50 pb-3">
+                <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Menú Disponible</h3>
+                <span className="text-[10px] bg-red-50 text-[#FF4040] font-black px-2 py-0.5 rounded-full uppercase tracking-wider flex items-center gap-1">
+                  <Sparkles size={10} /> Recién Frito
+                </span>
               </div>
-              <span className="text-2xl font-black text-gray-900">{formatMoney(getCartTotal())}</span>
-            </div>
 
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="w-full bg-[#FF4040] text-white font-black text-lg py-4 rounded-[24px] shadow-[0_12px_24px_-8px_rgba(255,64,64,0.5)] transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50 disabled:scale-100"
-            >
-              {isSubmitting ? (
-                <span>Procesando...</span>
+              {vendorProducts.length === 0 ? (
+                <p className="text-sm font-bold text-gray-400 text-center py-4">Este carrito no tiene stock disponible en este momento.</p>
               ) : (
-                <>
-                  <ShoppingBag size={18} /> Pedir Ahora
-                </>
+                <div className="grid grid-cols-1 gap-2.5">
+                  {vendorProducts.map(p => {
+                    const qtyInCart = cart[p.id] || 0;
+                    return (
+                      <div key={p.id} className="flex items-center justify-between bg-gray-50/70 rounded-2xl p-2.5 border border-gray-100 shadow-sm">
+                        <div className="flex flex-col">
+                          <span className="font-black text-gray-800 text-sm">{p.name}</span>
+                          <span className="text-xs font-bold text-gray-400">
+                            {formatMoney(p.price)} · <span className="text-amber-500">{p.stock} disponibles</span>
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {qtyInCart > 0 && (
+                            <>
+                              <button
+                                onClick={() => removeFromCart(String(p.id))}
+                                className="w-8 h-8 rounded-full bg-white border border-gray-200 text-gray-500 font-black flex items-center justify-center hover:bg-red-50 hover:text-red-500 hover:border-red-100 transition-colors active:scale-90"
+                              >
+                                -
+                              </button>
+                              <span className="font-black text-gray-800 text-sm min-w-[16px] text-center">{qtyInCart}</span>
+                            </>
+                          )}
+                          <button
+                            onClick={() => addToCart(String(p.id), p.stock)}
+                            disabled={qtyInCart >= p.stock}
+                            className={`w-8 h-8 rounded-full font-black flex items-center justify-center transition-all active:scale-90 disabled:opacity-40 disabled:scale-100 ${
+                              qtyInCart > 0 
+                                ? 'bg-amber-400 text-white' 
+                                : 'bg-white border border-gray-200 text-gray-700 hover:border-amber-400 hover:text-amber-500'
+                            }`}
+                          >
+                            +
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-            </button>
-          </form>
-        )}
-      </div>
+            </div>
+          )}
+
+          {/* FORMULARIO DE ENVÍO */}
+          {isInsideCoverage && getCartItemsCount() > 0 && (
+            <form onSubmit={handleCheckout} className="bg-white rounded-[32px] p-5 shadow-sm flex flex-col gap-4">
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 pb-2">Información de Entrega</h3>
+              
+              <div className="space-y-3">
+                {/* Nombre */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <User size={12} className="text-amber-400" /> Nombre Completo
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Ej. Juan Pérez"
+                    value={name}
+                    onChange={e => setName(e.target.value)}
+                    className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
+                  />
+                </div>
+
+                {/* Teléfono */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <Phone size={12} className="text-amber-400" /> Teléfono Móvil
+                  </label>
+                  <input
+                    type="tel"
+                    required
+                    placeholder="Ej. 3123456789"
+                    value={phone}
+                    onChange={e => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                    className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
+                  />
+                </div>
+
+                {/* Dirección */}
+                <div className="flex flex-col gap-1">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider flex items-center gap-1.5">
+                    <MapPin size={12} className="text-amber-400" /> Dirección / Indicaciones
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Ej. Calle 5 # 4-20 (Frente al parque)"
+                    value={address}
+                    onChange={e => setAddress(e.target.value)}
+                    className="bg-gray-50 border-none rounded-xl py-3 px-4 text-sm font-bold text-gray-700 outline-none focus:ring-2 ring-amber-400 transition-all shadow-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Total Resumen */}
+              <div className="bg-amber-50 rounded-2xl p-4 flex items-center justify-between border border-amber-200/50 mt-1">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Total a Pagar</span>
+                  <span className="text-[10px] font-bold text-gray-400">Paga en efectivo al recibir</span>
+                </div>
+                <span className="text-2xl font-black text-gray-900">{formatMoney(getCartTotal())}</span>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full bg-[#FF4040] text-white font-black text-lg py-4 rounded-[24px] shadow-[0_12px_24px_-8px_rgba(255,64,64,0.5)] transition-all active:scale-95 flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50 disabled:scale-100"
+              >
+                {isSubmitting ? (
+                  <span>Procesando...</span>
+                ) : (
+                  <>
+                    <ShoppingBag size={18} /> Pedir Ahora
+                  </>
+                )}
+              </button>
+            </form>
+          )}
+        </div>
 
       {/* CSS animaciones */}
       <style>{`
