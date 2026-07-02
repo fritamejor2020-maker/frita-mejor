@@ -94,24 +94,29 @@ export function PosView() {
 
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
+  const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
+
+  const heldSales = usePosStore(s => s.heldSales || []);
+  const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
+  const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
-  useEffect(() => {
-    async function loadPendingCount() {
-      try {
-        const { count, error } = await supabase
-          .from('olaclick_orders')
-          .select('*', { count: 'exact', head: true })
-          .eq('status', 'PENDING');
-        
-        if (!error) {
-          setPendingOrdersCount(count || 0);
-        }
-      } catch (err) {
-        console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
+  const loadPendingCount = async () => {
+    try {
+      const { data, count, error } = await supabase
+        .from('olaclick_orders')
+        .select('id', { count: 'exact' })
+        .eq('status', 'PENDING');
+      
+      if (!error) {
+        setPendingOrdersCount(count ?? (data ? data.length : 0));
       }
+    } catch (err) {
+      console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
     }
+  };
 
+  useEffect(() => {
     loadPendingCount();
 
     const channel = supabase
@@ -623,9 +628,10 @@ export function PosView() {
               <span>🔓</span>
               <span className={`absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full border border-gray-900 ${printerAgentOk ? 'bg-green-400' : 'bg-red-400'}`} />
             </button>
-            <button className="shrink-0 w-11 h-11 flex items-center justify-center bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowSuspendedModal(true)}>
+            <button className="shrink-0 h-11 px-3 flex items-center justify-center gap-1.5 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowHeldSalesModal(true)}>
               <span>🕐</span>
-              {suspendedCount > 0 && <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg">{suspendedCount}</span>}
+              <span className="text-xs font-bold hidden sm:inline">En Espera</span>
+              {heldSales.length > 0 && <span className="bg-amber-500 text-gray-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-pulse">{heldSales.length}</span>}
             </button>
           </>
         )}
@@ -1268,7 +1274,127 @@ export function PosView() {
                 activeShiftId={activeShift?.id}
                 selectedRegisterId={selectedRegisterId}
                 formatMoney={formatMoney}
+                onClose={() => {
+                  setShowOlaClickOrdersModal(false);
+                  loadPendingCount();
+                }}
+                onOrderProcessed={loadPendingCount}
               />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showHeldSalesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-overlay-in">
+          <div className="bg-[#12131a] text-white rounded-[32px] border border-gray-800 shadow-2xl max-w-3xl w-full h-[80vh] flex flex-col overflow-hidden relative animate-modal-in">
+            {/* Header Modal */}
+            <div className="p-6 border-b border-gray-800/80 flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-black text-white flex items-center gap-2">
+                  <span>⏸️ Ventas en Espera</span>
+                  <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
+                    {heldSales.length} pausadas
+                  </span>
+                </h2>
+                <p className="text-xs text-gray-400 font-bold mt-0.5">
+                  Pedidos de OlaClick aceptados y ventas pausadas de caja listos para procesar.
+                </p>
+              </div>
+              <button 
+                onClick={() => setShowHeldSalesModal(false)}
+                className="w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold transition-all shadow-md"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Listado de Ventas en Espera */}
+            <div className="p-6 flex-grow overflow-y-auto space-y-4">
+              {heldSales.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 py-12">
+                  <span className="text-5xl mb-3">🛒</span>
+                  <p className="text-base font-black text-gray-300">No hay ventas en espera</p>
+                  <p className="text-xs text-gray-500 font-medium max-w-sm mt-1">
+                    Cuando aceptes un pedido de OlaClick o iguales una venta en espera, aparecerá aquí.
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {heldSales.map((sale) => (
+                    <div 
+                      key={sale.id}
+                      className="bg-[#181a24] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-700 transition-all shadow-md"
+                    >
+                      <div>
+                        <div className="flex items-start justify-between gap-2 pb-2 border-b border-gray-800">
+                          <div>
+                            <span className="font-black text-sm text-white flex items-center gap-1.5">
+                              {sale.customerName}
+                              {sale.isOlaClick && (
+                                <span className="bg-yellow-500/10 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
+                                  📱 OlaClick
+                                </span>
+                              )}
+                            </span>
+                            <span className="text-[11px] text-gray-400 font-semibold block mt-0.5">
+                              {sale.publicId ? `#${sale.publicId}` : sale.id} • {new Date(sale.heldAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                          </div>
+                          <span className="text-base font-black text-green-400">
+                            {formatMoney(sale.total)}
+                          </span>
+                        </div>
+
+                        {sale.deliveryAddress && (
+                          <p className="text-xs text-gray-400 font-medium mt-2">
+                            📍 {sale.deliveryAddress} {sale.customerPhone ? `(${sale.customerPhone})` : ''}
+                          </p>
+                        )}
+
+                        <div className="bg-[#111218] rounded-xl p-2.5 mt-3 border border-gray-800/60 max-h-36 overflow-y-auto">
+                          <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider mb-1.5">Ítems</p>
+                          <ul className="space-y-1 text-xs">
+                            {sale.items.map((item, idx) => (
+                              <li key={idx} className="flex justify-between text-gray-300 font-semibold">
+                                <span><span className="text-yellow-400 font-black">{item.qty}x</span> {item.name}</span>
+                                <span className="text-gray-400 font-bold">{formatMoney(item.price * item.qty)}</span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-800">
+                        <button
+                          onClick={() => {
+                            const saleToLoad = heldSales.find(h => h.id === sale.id);
+                            if (saleToLoad) {
+                              setTicketItems(saleToLoad.items);
+                              deleteHeldSale(sale.id);
+                              setShowHeldSalesModal(false);
+                              toast.success(`Venta de ${sale.customerName} cargada al carrito`, { icon: '🛒' });
+                            }
+                          }}
+                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                        >
+                          🛒 Cargar al Carrito
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteHeldSale(sale.id);
+                            toast.error('Venta en espera eliminada');
+                          }}
+                          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs p-2.5 rounded-xl border border-red-500/20 active:scale-95 transition-all"
+                          title="Eliminar de ventas en espera"
+                        >
+                          🗑️
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -38,13 +38,15 @@ const playChime = () => {
   }
 };
 
-export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney }) {
+export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney, onClose, onOrderProcessed }) {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('PENDING'); // 'PENDING' | 'ACCEPTED' | 'REJECTED'
   const loadExternalOrder = usePosStore(s => s.loadExternalOrder);
   const clearCart = usePosStore(s => s.clearCart);
+  const parkOlaClickOrder = usePosStore(s => s.parkOlaClickOrder);
+  const posSettings = useInventoryStore(s => s.posSettings);
 
   // 1. Cargar pedidos iniciales desde Supabase
   useEffect(() => {
@@ -82,7 +84,6 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
           setOrders((prev) => {
             if (eventType === 'INSERT') {
-              // Si entra un pedido pendiente, reproducir campana
               if (newRecord.status === 'PENDING') {
                 if (soundEnabled) playChime();
                 toast(`📱 ¡Nuevo pedido en línea de ${newRecord.customer_name}!`, {
@@ -94,7 +95,6 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
               return [newRecord, ...prev];
             }
             if (eventType === 'UPDATE') {
-              // Si el estado cambia a pendiente (por ejemplo, re-intento), reproducir sonido
               const oldMatch = prev.find(o => o.id === newRecord.id);
               if (newRecord.status === 'PENDING' && (!oldMatch || oldMatch.status !== 'PENDING')) {
                 if (soundEnabled) playChime();
@@ -116,52 +116,115 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     };
   }, [soundEnabled]);
 
-  // 3. Aceptar e importar pedido al POS
+  // 3. Aceptar e importar pedido a Ventas en Espera
   const handleAcceptOrder = async (order) => {
-    if (!activeShiftId) {
-      toast.error('Debes abrir el turno de caja antes de aceptar pedidos');
-      return;
-    }
-
     try {
-      // Limpiar carrito actual y cargar los ítems del pedido OlaClick
-      clearCart();
-      loadExternalOrder(order.items);
+      // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'ACCEPTED' } : o)));
 
-      // Cambiar estado a ACEPTADO en base de datos
+      // 2. Guardar directamente en Ventas en Espera del POS
+      parkOlaClickOrder(order);
+
+      // 3. Cambiar estado a ACEPTADO en Supabase
       const { error } = await supabase
         .from('olaclick_orders')
         .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
         .eq('id', order.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('[OlaClickTab] Error DB:', error.message);
+      }
 
-      toast.success('Pedido cargado con éxito en el carrito del POS', {
+      // 4. Sincronizar estado 'ACCEPTED' con OlaClick API
+      try {
+        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+        const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
+        if (apiToken) {
+          const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${apiToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'ACCEPTED' }) // Dependiendo de la versión puede ser ACCEPTED o PREPARING
+          });
+          if (!res.ok) {
+            console.warn('[OlaClickTab] La API de OlaClick no actualizó el estado a ACCEPTED', await res.text());
+          }
+        }
+      } catch (apiErr) {
+        console.error('[OlaClickTab] Error al sincronizar con OlaClick:', apiErr);
+      }
+
+      toast.success(`📱 Pedido de ${order.customer_name || 'OlaClick'} guardado en Ventas en Espera`, {
         className: 'bg-green-500 text-white font-black rounded-2xl shadow-chunky-lg'
       });
+
+      if (onOrderProcessed) onOrderProcessed();
+
+      // 4. Cerrar el modal para mostrar la interfaz del POS
+      if (onClose) {
+        setTimeout(() => onClose(), 200);
+      }
     } catch (err) {
       console.error('[OlaClickTab] Error al aceptar pedido:', err.message);
       toast.error('No se pudo procesar la aceptación del pedido');
     }
   };
 
-  // 4. Rechazar pedido con motivo
-  const handleRejectOrder = async (order) => {
-    const reason = prompt('Por favor, ingresa el motivo del rechazo o cancelación del pedido:');
-    if (reason === null) return; // Canceló el prompt
+  // 4. Rechazar pedido con confirmación nativa
+  const handleRejectOrder = async (e, order) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
 
     try {
+      const rejectionReason = 'OTHER';
+
+      // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
+      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o)));
+
+      // 2. Cambiar estado a REJECTED en Supabase DB
       const { error } = await supabase
         .from('olaclick_orders')
         .update({
           status: 'REJECTED',
-          rejection_reason: reason || 'Rechazado por el cajero',
+          rejection_reason: rejectionReason,
           updated_at: new Date().toISOString()
         })
         .eq('id', order.id);
 
-      if (error) throw error;
-      toast.error('Pedido rechazado');
+      if (error) {
+        console.error('[OlaClickTab] Error DB al rechazar:', error.message);
+      }
+
+      // 3. Sincronizar estado con OlaClick API
+      try {
+        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+        const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
+        if (apiToken) {
+          const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${apiToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ status: 'REJECTED', reason: rejectionReason })
+          });
+          if (!res.ok) {
+            console.warn('[OlaClickTab] La API de OlaClick no actualizó el estado a REJECTED', await res.text());
+          }
+        }
+      } catch (apiErr) {
+        console.error('[OlaClickTab] Error al sincronizar con OlaClick:', apiErr);
+      }
+
+      toast.error(`❌ Pedido rechazado exitosamente`, {
+        className: 'bg-red-600 text-white font-black rounded-2xl shadow-chunky-lg'
+      });
+
+      if (onOrderProcessed) onOrderProcessed();
     } catch (err) {
       console.error('[OlaClickTab] Error al rechazar pedido:', err.message);
       toast.error('No se pudo rechazar el pedido');
@@ -271,22 +334,28 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                 {/* Cabecera Tarjeta: Nombre + ID */}
                 <div className="flex items-start justify-between gap-2 pb-3 border-b border-gray-900/60">
                   <div>
-                    <h3 className="text-sm font-black text-white flex items-center gap-1">
-                      {order.customer_name}
-                      {order.store_id && (
-                        <span className="bg-purple-500/10 text-purple-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-                          Sede: {order.store_id}
+                    <h3 className="text-sm font-black text-white flex items-center gap-1.5">
+                      {order.customer_name || 'Cliente'}
+                      {order.service_type && (
+                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-md ${
+                          order.service_type === 'DELIVERY' 
+                            ? 'bg-blue-500/10 text-blue-400' 
+                            : 'bg-orange-500/10 text-orange-400'
+                        }`}>
+                          {order.service_type === 'DELIVERY' ? '🛵 Domicilio' : '🏪 Recoger'}
                         </span>
                       )}
                     </h3>
                     <p className="text-[11px] text-gray-500 font-bold mt-0.5">
-                      OlaClick ID: #{order.id} • {new Date(order.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                      Pedido {order.public_id || `#${order.id?.substring(0, 8)}`} • {new Date(order.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[11px] font-black text-yellow-500 bg-yellow-500/10 px-2.5 py-1 rounded-full">
-                      {order.payment_method}
-                    </span>
+                    {order.delivery_price > 0 && (
+                      <span className="text-[10px] font-bold text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                        Envío: {formatMoney(order.delivery_price)}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -309,23 +378,35 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                   {/* Listado de Productos */}
                   <div className="bg-[#181a23] rounded-xl p-3 border border-gray-900/40">
                     <p className="text-[10px] text-gray-500 font-black uppercase tracking-wider mb-2">Desglose de Ítems</p>
-                    <ul className="space-y-2">
-                      {order.items.map((item, idx) => (
-                        <li key={idx} className="flex justify-between items-start gap-2 text-xs">
-                          <span className="text-gray-300 font-bold leading-normal">
-                            <span className="text-yellow-500 font-black">{item.qty}x</span> {item.name}
-                            {item.note && (
-                              <span className="block text-[10px] text-gray-500 font-semibold italic mt-0.5">
-                                Nota: "{item.note}"
+                    {Array.isArray(order.items) && order.items.length > 0 ? (
+                      <ul className="space-y-2">
+                        {order.items.map((item, idx) => {
+                          const qty = item.quantity || item.qty || 1;
+                          const name = item.product_name || item.name || 'Producto';
+                          const unitPrice = item.combo_price || item.variant_price || item.price || 0;
+                          const note = item.comment || item.note || '';
+
+                          return (
+                            <li key={idx} className="flex justify-between items-start gap-2 text-xs">
+                              <span className="text-gray-300 font-bold leading-normal">
+                                <span className="text-yellow-500 font-black">{qty}x</span>{' '}
+                                {name}
+                                {note && (
+                                  <span className="block text-[10px] text-gray-500 font-semibold italic mt-0.5">
+                                    Nota: "{note}"
+                                  </span>
+                                )}
                               </span>
-                            )}
-                          </span>
-                          <span className="text-white font-black shrink-0">
-                            {formatMoney(item.price * item.qty)}
-                          </span>
-                        </li>
-                      ))}
-                    </ul>
+                              <span className="text-white font-black shrink-0">
+                                {formatMoney(unitPrice * qty)}
+                              </span>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    ) : (
+                      <p className="text-xs text-gray-500 italic">Sin desglose disponible</p>
+                    )}
                   </div>
 
                   {/* Motivo de rechazo si aplica */}
@@ -349,17 +430,19 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
                   {/* Acciones */}
                   {order.status === 'PENDING' && (
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2">
                       <button
-                        onClick={() => handleRejectOrder(order)}
-                        className="bg-red-500/10 hover:bg-red-500 text-red-500 hover:text-white p-2.5 rounded-xl border border-red-500/20 transition-all active:scale-95 flex items-center justify-center"
+                        type="button"
+                        onClick={(e) => handleRejectOrder(e, order)}
+                        className="w-10 h-10 rounded-full bg-[#f85151] hover:bg-red-600 text-white shadow-lg active:scale-90 transition-all flex items-center justify-center font-bold shrink-0 cursor-pointer"
                         title="Rechazar pedido"
                       >
-                        <X size={16} />
+                        <X size={18} strokeWidth={3} />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleAcceptOrder(order)}
-                        className="bg-green-500 hover:bg-green-600 text-white font-black text-xs px-4 py-2.5 rounded-xl transition-all active:scale-95 shadow-md flex items-center gap-1.5"
+                        className="bg-green-500 hover:bg-green-600 text-white font-black text-xs px-5 py-2.5 rounded-xl transition-all active:scale-95 shadow-md flex items-center gap-1.5"
                       >
                         <Check size={14} /> Aceptar
                       </button>

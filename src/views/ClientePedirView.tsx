@@ -816,14 +816,15 @@ export function ClientePedirView() {
             </form>
           )}
         </div>
+      </div>
 
       {/* CSS animaciones */}
-      <style>{`
+      <style dangerouslySetInnerHTML={{ __html: `
         @keyframes bounce {
           0%, 100% { transform: translateY(0); }
           50% { transform: translateY(-8px); }
         }
-      `}</style>
+      ` }} />
     </div>
   );
 }

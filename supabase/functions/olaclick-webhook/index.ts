@@ -52,31 +52,55 @@ serve(async (req: Request) => {
     const body = await req.json();
     console.log('[olaclick-webhook] Payload recibido:', JSON.stringify(body, null, 2));
 
-    // Identificar el evento (OlaClick envía 'order_created', 'order_updated', 'order_deleted')
-    const eventType = body.event || body.event_type || body.type || 'order_created';
+    // Identificar el evento (OlaClick envía 'ORDER_CREATED', 'ORDER_UPDATED', etc.)
+    const eventType = body.event_type || body.event || body.type || 'ORDER_CREATED';
     
-    // OlaClick envuelve los datos del pedido en `order` u `order_data` o directamente en la raíz
-    const orderRaw = body.order || body.order_data || body.data || body;
+    // OlaClick envuelve los datos del pedido en `data`
+    const orderRaw = body.data || body;
 
     // Normalizar los campos principales de forma robusta
-    const orderId = String(orderRaw.order_id || orderRaw.id || orderRaw.number || `OLA-${Date.now()}`);
-    const customerName = orderRaw.customer_name || orderRaw.customer?.name || 'Cliente OlaClick';
-    const customerPhone = orderRaw.customer_phone || orderRaw.customer?.phone || '';
-    const deliveryAddress = orderRaw.delivery_address || orderRaw.customer?.address || '';
-    const totalAmount = Math.round(Number(orderRaw.total_amount || orderRaw.total || 0));
-    const paymentMethod = orderRaw.payment_method || orderRaw.payment || 'No especificado';
-    const storeId = String(orderRaw.store_id || orderRaw.store?.id || '');
+    const orderId = String(orderRaw.id || `OLA-${Date.now()}`);
+    const publicId = orderRaw.public_id || '';
+    const customerName = orderRaw.client?.name || 'Cliente OlaClick';
+    const customerPhone = orderRaw.client?.phone || '';
+    // Construir dirección desde address.area + address.city
+    const addressArea = orderRaw.address?.area || '';
+    const addressCity = orderRaw.address?.city || '';
+    const deliveryAddress = [addressArea, addressCity].filter(Boolean).join(', ') || '';
+    // El total de OlaClick viene en COP (pesos colombianos), NO en centavos
+    const totalAmount = Math.round(Number(orderRaw.total || 0));
+    const deliveryPrice = Math.round(Number(orderRaw.delivery_price || 0));
+    const serviceType = orderRaw.service_type || 'DELIVERY';
+    const paymentMethod = orderRaw.service_type || 'No especificado';
+    const storeId = String(body.merchant_id || orderRaw.store_id || '');
 
-    // Normalizar los ítems del pedido
-    const rawItems = orderRaw.items || orderRaw.products || [];
+    // Normalizar los ítems del pedido (OlaClick usa "combos")
+    const rawItems = orderRaw.combos || orderRaw.items || [];
     const normalizedItems = Array.isArray(rawItems)
-      ? rawItems.map((item: any) => ({
-          productId: String(item.productId || item.product_id || item.id || ''),
-          name: String(item.name || item.product_name || 'Producto'),
-          price: Math.round(Number(item.price || 0)),
-          qty: Math.max(1, Number(item.qty || item.quantity || 1)),
-          note: String(item.note || item.comment || item.description || ''),
-        }))
+      ? rawItems.map((item: any) => {
+          const name = String(item.product_name || item.name || 'Producto');
+          const qty = Math.max(1, Number(item.quantity || item.qty || 1));
+          const price = Math.round(Number(item.combo_price || item.variant_price || item.price || 0));
+          const note = String(item.comment || item.note || '');
+
+          return {
+            productId: String(item.product_id || item.productId || item.id || ''),
+            product_id: String(item.product_id || item.productId || item.id || ''),
+            name: name,
+            product_name: name,
+            qty: qty,
+            quantity: qty,
+            price: price,
+            combo_price: price,
+            variant_price: Math.round(Number(item.variant_price || price)),
+            note: note,
+            comment: note,
+            sku: item.sku || null,
+            category: item.product_category_name || '',
+            modifiers: item.modifiers || [],
+            variantName: item.variant_name || null,
+          };
+        })
       : [];
 
     // ── 3. Inicializar Cliente Supabase (Service Role para bypass de RLS si es necesario) ──
@@ -86,7 +110,7 @@ serve(async (req: Request) => {
     );
 
     // ── 4. Procesar el Evento ─────────────────────────────────
-    if (eventType === 'order_deleted') {
+    if (eventType === 'ORDER_DELETED' || eventType === 'order_deleted') {
       // Si el pedido se elimina, lo marcamos como CANCELADO
       console.log(`[olaclick-webhook] Pedido eliminado: ${orderId}`);
       const { error } = await supabaseAdmin
@@ -96,29 +120,35 @@ serve(async (req: Request) => {
 
       if (error) throw error;
     } else {
-      // Para order_created o order_updated, hacemos un UPSERT
-      // Si el status general de OlaClick es CANCELLED, lo mapeamos a REJECTED en Frita Mejor
+      // Para ORDER_CREATED o ORDER_UPDATED, hacemos un UPSERT
+      // Mapear estados de OlaClick a estados locales de Frita Mejor:
+      //   PENDING → PENDING, PREPARING → ACCEPTED, COMPLETED → ACCEPTED,
+      //   CANCELLED → REJECTED, REJECTED → REJECTED
       const orderStatusRaw = String(orderRaw.status || '').toUpperCase();
       let localStatus = 'PENDING';
       
       if (orderStatusRaw === 'CANCELLED' || orderStatusRaw === 'REJECTED') {
         localStatus = 'REJECTED';
-      } else if (orderStatusRaw === 'CONFIRMED' || orderStatusRaw === 'ACCEPTED') {
+      } else if (orderStatusRaw === 'PREPARING' || orderStatusRaw === 'COMPLETED' || orderStatusRaw === 'CONFIRMED' || orderStatusRaw === 'ACCEPTED') {
         localStatus = 'ACCEPTED';
       }
 
-      console.log(`[olaclick-webhook] Upsert del pedido ${orderId}. Estado: ${localStatus}`);
+      console.log(`[olaclick-webhook] Upsert del pedido ${orderId} (${publicId}). Estado OlaClick: ${orderStatusRaw} → Local: ${localStatus}`);
 
       const orderData = {
         id: orderId,
+        public_id: publicId,
         customer_name: customerName,
         customer_phone: customerPhone,
         delivery_address: deliveryAddress,
         items: normalizedItems,
         total_amount: totalAmount,
+        delivery_price: deliveryPrice,
+        service_type: serviceType,
         payment_method: paymentMethod,
         store_id: storeId,
         status: localStatus,
+        raw_payload: body,
         updated_at: new Date().toISOString(),
       };
 
@@ -131,7 +161,7 @@ serve(async (req: Request) => {
 
     // ── 5. Retornar Respuesta HTTP 200 OK (Sync Acknowledged) ──
     return new Response(
-      JSON.stringify({ success: true, orderId }),
+      JSON.stringify({ success: true, orderId, publicId }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
 
