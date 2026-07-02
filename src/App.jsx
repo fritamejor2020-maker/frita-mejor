@@ -143,7 +143,26 @@ class ErrorBoundary extends React.Component {
             wordBreak: 'break-all'
           }}>{this.state.error?.toString()}</pre>
           <button
-            onClick={() => { this.setState({ hasError: false, error: null }); window.location.reload(); }}
+            onClick={async () => {
+              try {
+                if ('serviceWorker' in navigator) {
+                  const registrations = await navigator.serviceWorker.getRegistrations();
+                  for (let registration of registrations) {
+                    await registration.unregister();
+                  }
+                }
+                if ('caches' in window) {
+                  const keys = await caches.keys();
+                  for (let key of keys) {
+                    await caches.delete(key);
+                  }
+                }
+              } catch (e) {
+                console.error('Error clearing cache:', e);
+              }
+              this.setState({ hasError: false, error: null });
+              window.location.href = window.location.href.split('#')[0] + '?v=' + Date.now();
+            }}
             style={{
               background: '#e74c3c',
               color: 'white',
@@ -156,7 +175,7 @@ class ErrorBoundary extends React.Component {
               marginTop: '8px'
             }}
           >
-            🔄 Recargar aplicación
+            🔄 Recargar aplicación (Limpiar Caché)
           </button>
         </div>
       );
