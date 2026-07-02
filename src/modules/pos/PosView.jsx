@@ -12,6 +12,7 @@ import { useSupplierStore }      from '../../store/useSupplierStore';
 import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printerAgent';
 import { OlaClickOrdersTab } from './components/OlaClickOrdersTab';
 import { supabase } from '../../lib/supabase';
+import { usePosStore } from '../../store/usePosStore';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
