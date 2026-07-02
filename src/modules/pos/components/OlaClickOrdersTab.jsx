@@ -250,7 +250,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         </div>
 
         {/* Control de sonido & Filtros */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 mr-12">
           {/* Botón de Sonido Mute/Unmute */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
