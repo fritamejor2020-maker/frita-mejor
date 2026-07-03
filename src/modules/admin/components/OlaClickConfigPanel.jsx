@@ -1,19 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { useInventoryStore } from '../../../store/useInventoryStore';
+import { useBranchStore } from '../../../store/useBranchStore';
 import { toast } from 'react-hot-toast';
 import { Store, Key, Link2, CheckCircle2, RefreshCw, Layers, Save, SlidersHorizontal, AlertCircle } from 'lucide-react';
 
 export function OlaClickConfigPanel() {
-  const { posSettings, updatePosSettings, inventory, branches } = useInventoryStore();
-  
+  const { posSettings, updatePosSettings, inventory } = useInventoryStore();
+  const rawBranches = useBranchStore(s => s.branches) || [];
+  const realBranches = rawBranches.filter(b => b.active !== false);
+
   // Available Sedes / Branches
-  const activeBranches = branches && branches.length > 0 
-    ? branches 
-    : [
-        { id: 'GLOBAL', name: 'Sede Principal (Global)' },
-        { id: 'SEDE-001', name: 'Sede Centro' },
-        { id: 'SEDE-002', name: 'Sede Norte' }
-      ];
+  const activeBranches = [
+    { id: 'GLOBAL', name: 'Todas las Sedes (Global)' },
+    ...realBranches.map(b => ({ id: b.id, name: b.name }))
+  ];
 
   const [selectedBranchId, setSelectedBranchId] = useState(activeBranches[0]?.id || 'GLOBAL');
   const [isTesting, setIsTesting] = useState(false);

@@ -1,18 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { useInventoryStore } from '../../../store/useInventoryStore';
+import { useBranchStore } from '../../../store/useBranchStore';
 import toast from 'react-hot-toast';
 import { Gift, Sliders, DollarSign, Clock, Percent, Award, CheckCircle2, Save, Sparkles } from 'lucide-react';
 
 export function LuckyRewardsConfigPanel() {
-  const { posSettings, updatePosSettings, branches, posRegisters } = useInventoryStore();
+  const { posSettings, updatePosSettings, posRegisters } = useInventoryStore();
+  const rawBranches = useBranchStore(s => s.branches) || [];
+  const realBranches = rawBranches.filter(b => b.active !== false);
 
-  const activeBranches = branches && branches.length > 0 
-    ? branches 
-    : [
-        { id: 'GLOBAL', name: 'Sede Principal (Global)' },
-        { id: 'SEDE-001', name: 'Sede Centro' },
-        { id: 'SEDE-002', name: 'Sede Norte' }
-      ];
+  const activeBranches = [
+    { id: 'GLOBAL', name: 'Todas las Sedes (Global)' },
+    ...realBranches.map(b => ({ id: b.id, name: b.name }))
+  ];
 
   const [selectedBranchId, setSelectedBranchId] = useState(activeBranches[0]?.id || 'GLOBAL');
   const [selectedRegisterId, setSelectedRegisterId] = useState('ALL');
