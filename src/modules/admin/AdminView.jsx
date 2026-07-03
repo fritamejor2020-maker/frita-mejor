@@ -24,6 +24,7 @@ import { AdminContratasTab } from '../../components/admin/AdminContratasTab';
 import { AdminTicketConfigTab } from '../../components/admin/AdminTicketConfigTab';
 import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { OlaClickConfigPanel } from './components/OlaClickConfigPanel';
+import { LuckyRewardsConfigPanel } from './components/LuckyRewardsConfigPanel';
 import { formatMoney } from '../../utils/formatUtils';
 import { AdminGeofencesTab } from './AdminGeofencesTab';
 
@@ -2716,7 +2717,7 @@ export function AdminView() {
         {activeTab === 'USUARIOS'      && <AdminUsersTab />}
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
-        { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><OlaClickConfigPanel /><PosCategoriesPanel /></div> }
+        { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><OlaClickConfigPanel /><LuckyRewardsConfigPanel /><PosCategoriesPanel /></div> }
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
 
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }

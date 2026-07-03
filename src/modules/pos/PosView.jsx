@@ -65,7 +65,31 @@ export function PosView() {
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [showIncomesModal, setShowIncomesModal] = useState(false);
   const [showExpensesModal, setShowExpensesModal] = useState(false);
+  const [showLuckyWinnerModal, setShowLuckyWinnerModal] = useState(false);
+  const [winnerInfo, setWinnerInfo] = useState(null);
   const [pinPromptConfig, setPinPromptConfig] = useState(null); // { message, expectedPin, onSuccess }
+
+  // ── Reproductor sintetizado de Campana Triunfal (Web Audio API) ──
+  const playVictoryChime = () => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+      const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6
+      notes.forEach((freq, idx) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, ctx.currentTime + idx * 0.12);
+        gain.gain.setValueAtTime(0.3, ctx.currentTime + idx * 0.12);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + idx * 0.12 + 0.5);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime + idx * 0.12);
+        osc.stop(ctx.currentTime + idx * 0.12 + 0.5);
+      });
+    } catch (_) {}
+  };
 
   // Navigation states
   const [currentFolder, setCurrentFolder] = useState(null); // null = root
@@ -537,6 +561,49 @@ export function PosView() {
       updatePosSale(activeSuspendedId, saleData);
     } else {
       addPosSale(saleData);
+    }
+
+    // ── EVALUAR CAMPANA DE LA SUERTE & PREMIACIÓN ALEATORIA ──
+    try {
+      const userBranch = user?.branchId || 'GLOBAL';
+      const branchRewardsConfig = posSettings?.luckyRewardsConfig?.[userBranch] || posSettings?.luckyRewardsConfig?.['GLOBAL'] || {};
+      const rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
+
+      if (rewardConfig && rewardConfig.enabled) {
+        const minAmount = rewardConfig.minPurchaseAmount || 0;
+        if (total >= minAmount) {
+          const now = new Date();
+          const hour = now.getHours();
+          let currentSlot = '16-19';
+          if (hour >= 6 && hour < 10) currentSlot = '06-10';
+          else if (hour >= 10 && hour < 12) currentSlot = '10-12';
+          else if (hour >= 12 && hour < 14) currentSlot = '12-14';
+          else if (hour >= 14 && hour < 16) currentSlot = '14-16';
+          else if (hour >= 16 && hour < 19) currentSlot = '16-19';
+          else if (hour >= 19 && hour < 21) currentSlot = '19-21';
+
+          const slotPercent = rewardConfig.hourlyDistribution?.[currentSlot] ?? 20;
+          const dailyTotal = rewardConfig.dailyPrizes || 100;
+          const slotQuota = Math.max(1, Math.round((dailyTotal * slotPercent) / 100));
+
+          // Probabilidad de ganar ponderada por cuota del horario
+          const probability = Math.min(0.85, Math.max(0.1, slotQuota / 35));
+          const isLuckyWinner = Math.random() < probability;
+
+          if (isLuckyWinner) {
+            playVictoryChime();
+            setWinnerInfo({
+              prizeType: rewardConfig.prizeType || 'RASPA_Y_GANA',
+              discountPercentage: rewardConfig.discountPercentage || 10,
+              customerName: saleCustomer?.name || 'Cliente',
+              amount: total
+            });
+            setShowLuckyWinnerModal(true);
+          }
+        }
+      }
+    } catch (luckyErr) {
+      console.error('[LuckyRewards] Error al evaluar premio:', luckyErr);
     }
     
     // Clear ticket
@@ -1197,6 +1264,14 @@ export function PosView() {
         <LogoutPromptModal 
           onContinue={() => setShowLogoutPromptModal(false)} 
           onLogout={signOut} 
+        />
+      )}
+
+      {showLuckyWinnerModal && (
+        <LuckyWinnerModal
+          winnerInfo={winnerInfo}
+          formatMoney={formatMoney}
+          onClose={() => setShowLuckyWinnerModal(false)}
         />
       )}
 
@@ -2958,6 +3033,67 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney }) {
             })
           )}
         </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal de Celebración Cliente Ganador ───
+function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
+  if (!winnerInfo) return null;
+
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+      <div className="bg-gradient-to-b from-[#1c1a24] to-[#121118] border-2 border-amber-500/50 rounded-[36px] max-w-lg w-full p-8 shadow-[0_0_50px_rgba(245,158,11,0.3)] text-center relative overflow-hidden animate-bounce-in">
+        
+        {/* Adorno brillante superior */}
+        <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-40 h-40 bg-amber-500/20 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="w-20 h-20 mx-auto rounded-full bg-gradient-to-tr from-amber-500 to-yellow-300 text-gray-950 flex items-center justify-center text-4xl shadow-xl shadow-amber-500/20 animate-pulse mb-4">
+          🔔
+        </div>
+
+        <span className="inline-block bg-amber-500/20 text-amber-300 text-xs font-black px-4 py-1 rounded-full border border-amber-500/30 uppercase tracking-widest mb-2">
+          ¡CAMPANA DE LA SUERTE!
+        </span>
+
+        <h2 className="text-3xl font-black text-white leading-tight mb-2">
+          ¡CLIENTE GANADOR! 🎉
+        </h2>
+
+        <p className="text-sm font-semibold text-gray-300 max-w-sm mx-auto mb-6">
+          Esta compra superó el monto mínimo y ha sido seleccionada como la ganadora de la jornada.
+        </p>
+
+        {winnerInfo.prizeType === 'RASPA_Y_GANA' ? (
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 mb-6 text-center space-y-2">
+            <span className="text-4xl block">🎟️</span>
+            <h3 className="text-base font-black text-amber-300 uppercase tracking-wide">
+              ¡Entregar Tarjeta Raspa y Gana!
+            </h3>
+            <p className="text-xs text-gray-400 font-semibold">
+              Entrega una tarjeta física de regalo al cliente por su compra de {formatMoney(winnerInfo.amount)}.
+            </p>
+          </div>
+        ) : (
+          <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-5 mb-6 text-center space-y-2">
+            <span className="text-4xl block">🏷️</span>
+            <h3 className="text-base font-black text-purple-300 uppercase tracking-wide">
+              ¡{winnerInfo.discountPercentage}% De Descuento Ganado!
+            </h3>
+            <p className="text-xs text-gray-400 font-semibold">
+              El cliente ha ganado un descuento directo del {winnerInfo.discountPercentage}% en esta venta.
+            </p>
+          </div>
+        )}
+
+        <button
+          onClick={onClose}
+          className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 font-black text-base py-4 rounded-2xl shadow-xl active:scale-95 transition-all"
+        >
+          ¡Entendido y Continuar!
+        </button>
+
       </div>
     </div>
   );
