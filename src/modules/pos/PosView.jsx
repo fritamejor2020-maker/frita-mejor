@@ -93,6 +93,43 @@ export function PosView() {
     } catch (_) {}
   };
 
+  // ── Verificación de Tareas Pendientes para Cierre Z ──
+  const { tasks: currentPosTasks } = useTaskStore();
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const pendingObligatoryTasks = (currentPosTasks || []).filter(t => {
+    const matchesUser = (!t.assignedToUserId && !t.assignedToRole) ||
+                        t.assignedToUserId === user?.id ||
+                        t.assignedToRole === user?.role;
+    const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === user?.branchId;
+    return matchesUser && matchesBranch && !t.completed && t.enforcementLevel === 'OBLIGATORIA' && t.dueDate <= todayStr;
+  });
+
+  const pendingImportantTasks = (currentPosTasks || []).filter(t => {
+    const matchesUser = (!t.assignedToUserId && !t.assignedToRole) ||
+                        t.assignedToUserId === user?.id ||
+                        t.assignedToRole === user?.role;
+    const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === user?.branchId;
+    return matchesUser && matchesBranch && !t.completed && t.enforcementLevel === 'IMPORTANTE' && t.dueDate <= todayStr;
+  });
+
+  const handleAttemptShiftClose = () => {
+    setShowHamburgerMenu(false);
+    if (pendingObligatoryTasks.length > 0) {
+      alert(`🚫 NO PUEDES REALIZAR EL CIERRE Z\n\nTienes ${pendingObligatoryTasks.length} tarea(s) OBLIGATORIA(S) pendientes por completar.\nPor favor abre el panel de tareas 📋 y complétalas antes de cerrar turno.`);
+      return;
+    }
+    if (pendingImportantTasks.length > 0) {
+      setPinPromptConfig({
+        message: `🔑 Tienes ${pendingImportantTasks.length} tarea(s) importante(s) pendientes. Ingresa el PIN de Admin para autorizar el Cierre Z:`,
+        expectedPin: '7',
+        onSuccess: () => setShowClosingModal(true)
+      });
+      return;
+    }
+    setShowClosingModal(true);
+  };
+
   // Navigation states
   const [currentFolder, setCurrentFolder] = useState(null); // null = root
   const searchInputRef = useRef(null);
@@ -776,7 +813,7 @@ export function PosView() {
                 </button>
               ) : (
                 <>
-                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={() => { setShowClosingModal(true); setShowHamburgerMenu(false); }}>
+                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={handleAttemptShiftClose}>
                     <span className="text-base">🔴</span> Cierre Z
                   </button>
                   <div className="h-px bg-gray-800" />
