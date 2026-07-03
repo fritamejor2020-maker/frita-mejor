@@ -860,6 +860,14 @@ export function PosView() {
               )}
 
               <div className="h-px bg-gray-800" />
+              <button 
+                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" 
+                onClick={() => { navigate('/tareas'); setShowHamburgerMenu(false); }}
+              >
+                <span className="flex items-center gap-3">
+                  <span className="text-base">📋</span> Módulo Tareas
+                </span>
+              </button>
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" onClick={() => { setShowContratasPanel(true); setShowHamburgerMenu(false); }}>
                 <span className="text-base">🤝</span> Contratas
               </button>
