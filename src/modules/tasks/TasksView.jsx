@@ -4,24 +4,34 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { 
   CheckCircle2, Circle, Clock, AlertTriangle, Camera, Plus, ChevronRight, 
   ChevronDown, X, Sparkles, Filter, Lock, ShieldAlert, Tag, Calendar, 
-  FolderPlus, Flag, CheckSquare, Layers, Trash2, Edit2, ArrowLeft
+  FolderPlus, Flag, CheckSquare, Layers, Trash2, Edit2, ArrowLeft,
+  QrCode, UserCheck, Phone, Video, Wrench
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
-function TaskCard({ task, userId, todayStr, proj, pBadge, onToggle, onDelete, onToggleSubtask }) {
+function TaskCard({ task, userId, userName, todayStr, proj, pBadge, onToggle, onDelete, onToggleSubtask, onReassign }) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const isOverdue = !task.completed && task.dueDate < todayStr;
   const completedSubtasks = task.subtasks ? task.subtasks.filter(s => s.completed).length : 0;
   const totalSubtasks = task.subtasks ? task.subtasks.length : 0;
+
+  const handleSelfAssign = () => {
+    onReassign(task.id, userId, userName || 'Administrador');
+    setShowAssignModal(false);
+    toast.success('👤 Te has asignado esta tarea');
+  };
 
   return (
     <div
       className={
         task.completed
           ? 'border rounded-2xl p-4 transition-all bg-[#14151b] opacity-60 border-gray-800'
+          : task.isDamageReport
+          ? 'border-2 rounded-2xl p-4 transition-all bg-red-950/20 border-red-500/80 shadow-lg shadow-red-950/40'
           : isOverdue
-          ? 'border rounded-2xl p-4 transition-all bg-red-950 border-red-500'
+          ? 'border rounded-2xl p-4 transition-all bg-red-950/40 border-red-500'
           : 'border rounded-2xl p-4 transition-all bg-[#181920] border-gray-800 hover:border-gray-700'
       }
     >
@@ -50,6 +60,13 @@ function TaskCard({ task, userId, todayStr, proj, pBadge, onToggle, onDelete, on
                 {pBadge.label}
               </span>
 
+              {/* Damage Report Badge */}
+              {task.isDamageReport && (
+                <span className="bg-red-500/20 text-red-400 text-[10px] font-black px-2 py-0.5 rounded-md border border-red-500/40 flex items-center gap-1">
+                  <Wrench size={10} /> Reporte de Falla
+                </span>
+              )}
+
               {/* Enforcement */}
               {task.enforcementLevel === 'OBLIGATORIA' && (
                 <span className="bg-red-950 text-red-400 text-[10px] font-black px-2 py-0.5 rounded-md border border-red-500">
@@ -63,19 +80,56 @@ function TaskCard({ task, userId, todayStr, proj, pBadge, onToggle, onDelete, on
               )}
             </div>
 
-            <button
-              onClick={() => onDelete(task.id)}
-              className="text-gray-600 hover:text-red-400 p-1 opacity-0 hover:opacity-100 transition-opacity"
-              title="Eliminar tarea"
-            >
-              <Trash2 size={14} />
-            </button>
+            <div className="flex items-center gap-2">
+              {/* Botón Asignar */}
+              <button
+                onClick={() => handleSelfAssign()}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1"
+                title="Asignarme a mí mismo"
+              >
+                <UserCheck size={12} />
+                <span>{task.assignedToUserName ? `Asignado: ${task.assignedToUserName}` : 'Asignarme'}</span>
+              </button>
+
+              <button
+                onClick={() => onDelete(task.id)}
+                className="text-gray-600 hover:text-red-400 p-1 opacity-0 hover:opacity-100 transition-opacity"
+                title="Eliminar tarea"
+              >
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
 
           {task.description && (
-            <p className="text-xs text-gray-400 mt-1">
+            <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
               {task.description}
             </p>
+          )}
+
+          {/* Información del Reportante si aplica */}
+          {(task.reportedBy || task.contactPhone) && (
+            <div className="mt-2 text-[11px] text-gray-400 bg-[#121318] p-2 rounded-xl border border-gray-800 flex items-center gap-4 flex-wrap">
+              {task.reportedBy && (
+                <span>👤 Reportado por: <strong className="text-white">{task.reportedBy}</strong></span>
+              )}
+              {task.contactPhone && (
+                <span className="flex items-center gap-1 text-emerald-400 font-mono">
+                  <Phone size={10} /> {task.contactPhone}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Previsualización Media (Foto o Video) */}
+          {(task.mediaUrl || task.photoUrl) && (
+            <div className="mt-3">
+              {task.mediaType === 'video' ? (
+                <video src={task.mediaUrl || task.photoUrl} controls className="w-full max-h-48 object-cover rounded-xl border border-gray-700 bg-black" />
+              ) : (
+                <img src={task.mediaUrl || task.photoUrl} alt="Evidencia de Daño" className="w-full max-h-48 object-cover rounded-xl border border-gray-700" />
+              )}
+            </div>
           )}
 
           {/* Footer Badges */}
@@ -95,8 +149,8 @@ function TaskCard({ task, userId, todayStr, proj, pBadge, onToggle, onDelete, on
             )}
 
             {task.requirePhoto && (
-              <span className={task.photoUrl ? 'flex items-center gap-1 text-emerald-400' : 'flex items-center gap-1 text-amber-400'}>
-                <Camera size={12} /> {task.photoUrl ? 'Foto subida' : 'Requiere Foto'}
+              <span className={task.photoUrl || task.mediaUrl ? 'flex items-center gap-1 text-emerald-400' : 'flex items-center gap-1 text-amber-400'}>
+                <Camera size={12} /> {task.photoUrl || task.mediaUrl ? 'Foto/Video adjunto' : 'Requiere Foto'}
               </span>
             )}
 
@@ -144,12 +198,13 @@ export function TasksView() {
   const { user } = useAuthStore();
   const { 
     tasks, projects, addTask, toggleTaskCompleted, toggleSubtaskCompleted, 
-    deleteTask, addProject, deleteProject, checkAndGenerateRecurrentTasks 
+    deleteTask, addProject, deleteProject, reassignTask, checkAndGenerateRecurrentTasks 
   } = useTaskStore();
 
-  const [activeNav, setActiveNav] = useState('HOY'); // 'HOY' | 'ATRASADAS' | 'PROXIMO' | projectId
+  const [activeNav, setActiveNav] = useState('HOY'); // 'HOY' | 'ATRASADAS' | 'PROXIMO' | 'DANOS' | projectId
   const [showAddBox, setShowAddBox] = useState(false);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Formulario Inline de Tarea Nueva (Estilo Todoist)
   const [title, setTitle] = useState('');
@@ -168,9 +223,13 @@ export function TasksView() {
   const [newProjectColor, setNewProjectColor] = useState('#f59e0b');
 
   const userId = user?.id || null;
+  const userName = user?.name || 'Administrador';
   const userRole = user?.role || 'pos';
   const userBranchId = user?.branchId || null;
   const todayStr = new Date().toISOString().split('T')[0];
+
+  const publicReportUrl = window.location.origin + '/reportar-dano';
+  const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(publicReportUrl);
 
   useEffect(() => {
     checkAndGenerateRecurrentTasks();
@@ -185,6 +244,7 @@ export function TasksView() {
     return matchesUser && matchesBranch;
   });
 
+  const damageTasks = tasks.filter(t => t.isDamageReport || t.projectId === 'PROJ-MANTENIMIENTO');
   const overdueTasks = myTasks.filter(t => !t.completed && t.dueDate < todayStr);
   const todayTasks = myTasks.filter(t => t.dueDate === todayStr);
 
@@ -192,6 +252,7 @@ export function TasksView() {
     if (activeNav === 'ATRASADAS') return overdueTasks;
     if (activeNav === 'HOY') return myTasks.filter(t => t.dueDate === todayStr || (!t.completed && t.dueDate < todayStr));
     if (activeNav === 'PROXIMO') return myTasks.filter(t => t.dueDate > todayStr);
+    if (activeNav === 'DANOS') return damageTasks;
     return myTasks.filter(t => t.projectId === activeNav);
   };
 
@@ -228,6 +289,7 @@ export function TasksView() {
       projectId,
       priority,
       assignedToUserId: userId,
+      assignedToUserName: userName,
       assignedToRole: userRole,
       branchId: userBranchId,
       dueDate,
@@ -286,13 +348,24 @@ export function TasksView() {
           </div>
         </div>
 
-        <button
-          onClick={() => setShowAddBox(true)}
-          className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
-        >
-          <Plus size={16} />
-          <span>Añadir Tarea</span>
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Botón QR Reportes de Daños */}
+          <button
+            onClick={() => setShowQRModal(true)}
+            className="bg-red-500/20 hover:bg-red-500/30 text-red-300 font-bold text-xs px-3.5 py-2.5 rounded-xl border border-red-500/40 transition-all flex items-center gap-2"
+          >
+            <QrCode size={16} />
+            <span className="hidden sm:inline">QR Reportar Daño</span>
+          </button>
+
+          <button
+            onClick={() => setShowAddBox(true)}
+            className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-lg active:scale-95 transition-all flex items-center gap-2"
+          >
+            <Plus size={16} />
+            <span>Añadir Tarea</span>
+          </button>
+        </div>
       </header>
 
       {/* ── BODY DOS COLUMNAS (SIDEBAR + MAIN) ── */}
@@ -338,6 +411,25 @@ export function TasksView() {
                 {overdueTasks.length > 0 && (
                   <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
                     {overdueTasks.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => setActiveNav('DANOS')}
+                className={
+                  activeNav === 'DANOS'
+                    ? 'w-full px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between bg-red-600/30 text-red-300 border border-red-500'
+                    : 'w-full px-3 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between text-gray-400 hover:bg-gray-800 hover:text-white'
+                }
+              >
+                <div className="flex items-center gap-2.5">
+                  <Wrench size={16} className="text-red-400" />
+                  <span>Equipos Dañados</span>
+                </div>
+                {damageTasks.length > 0 && (
+                  <span className="bg-red-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {damageTasks.length}
                   </span>
                 )}
               </button>
@@ -412,8 +504,9 @@ export function TasksView() {
               <h2 className="text-2xl font-black text-white capitalize flex items-center gap-2">
                 {activeNav === 'HOY' && '📅 Hoy'}
                 {activeNav === 'ATRASADAS' && '🔴 Tareas Atrasadas'}
+                {activeNav === 'DANOS' && '🚨 Reportes de Equipos Dañados'}
                 {activeNav === 'PROXIMO' && '📆 Próximos Días'}
-                {activeNav !== 'HOY' && activeNav !== 'ATRASADAS' && activeNav !== 'PROXIMO' && (
+                {activeNav !== 'HOY' && activeNav !== 'ATRASADAS' && activeNav !== 'DANOS' && activeNav !== 'PROXIMO' && (
                   <React.Fragment>
                     <span>{getProject(activeNav).icon}</span>
                     <span>{getProject(activeNav).name}</span>
@@ -424,6 +517,15 @@ export function TasksView() {
                 {currentTaskList.length} tarea(s) en esta lista
               </p>
             </div>
+
+            {/* Enlace a formulario público de reporte */}
+            <button
+              onClick={() => window.open(publicReportUrl, '_blank')}
+              className="text-xs text-amber-400 hover:underline font-bold flex items-center gap-1"
+            >
+              <span>Abrir Formulario QR</span>
+              <QrCode size={14} />
+            </button>
           </div>
 
           {/* ── CAJA DE CREACIÓN INLINE ESTILO TODOIST ── */}
@@ -576,12 +678,14 @@ export function TasksView() {
                   key={task.id}
                   task={task}
                   userId={userId}
+                  userName={userName}
                   todayStr={todayStr}
                   proj={getProject(task.projectId)}
                   pBadge={getPriorityBadge(task.priority)}
                   onToggle={(tId) => toggleTaskCompleted(tId, userId)}
                   onDelete={(tId) => deleteTask(tId)}
                   onToggleSubtask={(tId, stId) => toggleSubtaskCompleted(tId, stId)}
+                  onReassign={(tId, uId, uName) => reassignTask(tId, uId, uName)}
                 />
               ))
             )}
@@ -648,6 +752,48 @@ export function TasksView() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {/* MODAL MOSTRAR QR PARA IMPRIMIR Y PEGAR EN LA COCINA */}
+      {showQRModal && (
+        <div className="fixed inset-0 z-[100] bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#181920] border border-gray-800 rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-2xl">
+            <h3 className="text-base font-black text-white flex items-center justify-center gap-2">
+              <QrCode className="text-amber-400" size={20} />
+              QR de Reportes de Daños
+            </h3>
+
+            <p className="text-xs text-gray-300">
+              Imprime o escanea este código para acceder directamente al formulario donde cualquiera puede tomar fotos o grabar videos de equipos averiados.
+            </p>
+
+            <div className="bg-white p-4 rounded-2xl inline-block shadow-lg mx-auto">
+              <img src={qrUrl} alt="Código QR Reportes" className="w-52 h-52 object-contain mx-auto" />
+            </div>
+
+            <p className="text-[11px] text-amber-400 font-mono break-all bg-gray-900 p-2 rounded-xl border border-gray-800">
+              {publicReportUrl}
+            </p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(publicReportUrl);
+                  toast.success('📋 Enlace copiado al portapapeles');
+                }}
+                className="flex-1 bg-amber-500 hover:bg-amber-600 text-gray-950 font-black text-xs py-2.5 rounded-xl transition-all"
+              >
+                Copiar Link
+              </button>
+              <button
+                onClick={() => setShowQRModal(false)}
+                className="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-200 font-bold text-xs py-2.5 rounded-xl transition-all"
+              >
+                Cerrar
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

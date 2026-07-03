@@ -20,6 +20,7 @@ import { PosView }        from './modules/pos/PosView';
 import { FritadoView }    from './modules/fritado/FritadoView';
 import { TransfersView }  from './modules/transfers/TransfersView';
 import { TasksView }      from './modules/tasks/TasksView';
+import { PublicDamageReportView } from './modules/tasks/PublicDamageReportView';
 
 import { SellerSetupView }     from './views/SellerSetupView';
 import { DejadorSetupView }    from './views/DejadorSetupView';
@@ -251,9 +252,10 @@ function App() {
       <BrowserRouter>
         <ErrorBoundary>
           <Routes>
-            {/* ── Pública: única ruta sin login ───────────────── */}
+            {/* ── Pública: rutas sin login ───────────────── */}
             <Route path="/login" element={<LoginView />} />
             <Route path="/pedir" element={<ClientePedirView />} />
+            <Route path="/reportar-dano" element={<PublicDamageReportView />} />
 
             {/* ── Todo lo demás requiere estar autenticado ─────── */}
             <Route element={<ProtectedRoute />}>

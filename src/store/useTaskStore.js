@@ -233,6 +233,62 @@ export const useTaskStore = create(
         });
       },
 
+      reassignTask: (id, userId, userName = null) => {
+        set(state => {
+          const updated = {
+            tasks: state.tasks.map(t => t.id === id ? { 
+              ...t, 
+              assignedToUserId: userId,
+              assignedToUserName: userName || (userId ? 'Usuario' : 'Sin Asignar')
+            } : t)
+          };
+          syncTasks({ ...state, ...updated });
+          return updated;
+        });
+      },
+
+      addDamageReport: (reportData) => {
+        const newTask = {
+          id: `DAMAGE-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+          title: `🚨 DAÑO: ${reportData.equipmentName || 'Equipo / Instalación'}`,
+          description: reportData.description || '',
+          projectId: 'PROJ-MANTENIMIENTO',
+          priority: 'P1',
+          assignedToUserId: reportData.assignedToUserId || null,
+          assignedToUserName: reportData.assignedToUserName || null,
+          assignedToRole: 'admin',
+          branchId: reportData.branchId || 'GLOBAL',
+          dueDate: new Date().toISOString().split('T')[0],
+          dueTime: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          enforcementLevel: 'IMPORTANTE',
+          requirePhoto: true,
+          requireNote: false,
+          isDamageReport: true,
+          equipmentName: reportData.equipmentName || '',
+          reportedBy: reportData.reportedBy || 'Anónimo / QR Público',
+          contactPhone: reportData.contactPhone || '',
+          mediaUrl: reportData.mediaUrl || null,
+          mediaType: reportData.mediaType || 'photo', // 'photo' | 'video'
+          photoUrl: reportData.mediaType !== 'video' ? reportData.mediaUrl : null,
+          subtasks: [
+            { id: `ST-DMG-1`, title: 'Inspeccionar equipo y evaluar daño', completed: false },
+            { id: `ST-DMG-2`, title: 'Contactar técnico o proveedor de repuesto', completed: false },
+            { id: `ST-DMG-3`, title: 'Prueba de funcionamiento y cierre de reporte', completed: false },
+          ],
+          completed: false,
+          completedAt: null,
+          completedByUserId: null,
+          createdAt: new Date().toISOString(),
+        };
+
+        set(state => {
+          const updated = { tasks: [newTask, ...state.tasks] };
+          syncTasks({ ...state, ...updated });
+          return updated;
+        });
+        return newTask;
+      },
+
       deleteTask: (id) => {
         set(state => {
           const updated = {
