@@ -247,7 +247,6 @@ function App() {
   return (
     <>
       <SyncStatusIndicator />
-      <VersionBadge />
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
         <ErrorBoundary>
