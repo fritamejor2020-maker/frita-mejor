@@ -2562,6 +2562,7 @@ export function AdminView() {
     ],
     POS: [
       { id: 'POS_CONFIG',   label: '⚙️ Config Caja'  },
+      { id: 'POS_REWARDS',  label: '🎁 Premios & Gamificación' },
       { id: 'POS_CARPETAS', label: '🗂️ Carpetas POS' },
       { id: 'POS_HISTORY',  label: '🧾 Historial POS'},
 
@@ -2718,6 +2719,7 @@ export function AdminView() {
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
         { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><OlaClickConfigPanel /><LuckyRewardsConfigPanel /><PosCategoriesPanel /></div> }
+        { activeTab === 'POS_REWARDS' && <LuckyRewardsConfigPanel /> }
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
 
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
