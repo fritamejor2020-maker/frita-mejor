@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useLocation } from 'react-router-dom';
 import { useTaskStore } from '../../store/useTaskStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { 
@@ -6,6 +7,8 @@ import {
   ChevronDown, X, Sparkles, Filter, Lock, ShieldAlert, Tag, Calendar
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+
+const ALLOWED_FLOATING_PATHS = ['/cierres', '/admin', '/finanzas'];
 
 function QuickTaskCard({ task, userId, todayStr, proj, onToggleTask, toggleSubtaskCompleted, handleFileUpload, uploadingTaskId }) {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -160,6 +163,7 @@ function QuickTaskCard({ task, userId, todayStr, proj, onToggleTask, toggleSubta
 }
 
 export function QuickTaskDrawer() {
+  const location = useLocation();
   const { user } = useAuthStore();
   const { 
     tasks, projects, toggleTaskCompleted, toggleSubtaskCompleted, 
@@ -180,6 +184,9 @@ export function QuickTaskDrawer() {
   const userRole = user?.role || 'pos';
   const userBranchId = user?.branchId || null;
   const todayStr = new Date().toISOString().split('T')[0];
+
+  // Determinar si debemos mostrar el botón flotante en esta ruta
+  const showFloatingButton = ALLOWED_FLOATING_PATHS.includes(location.pathname);
 
   // Filtrar tareas correspondientes al usuario
   const myTasks = tasks.filter(t => {
@@ -248,137 +255,164 @@ export function QuickTaskDrawer() {
     toggleTaskCompleted(task.id, userId);
   };
 
-  if (!isDrawerOpen) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex justify-end bg-black bg-opacity-75 backdrop-blur-sm animate-fade-in">
-      <div className="w-full max-w-md bg-[#16171d] border-l border-gray-800 flex flex-col h-full shadow-2xl animate-slide-left">
-        
-        {/* Header del Drawer */}
-        <div className="p-5 border-b border-gray-800 bg-[#1e1f26] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-amber-500 bg-opacity-20 border border-amber-500 flex items-center justify-center text-xl">
-              📋
-            </div>
-            <div>
-              <h2 className="text-base font-black text-white flex items-center gap-2">
-                Mis Tareas
-                {overdueTasks.length > 0 && (
-                  <span className="bg-red-500 bg-opacity-20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500">
-                    {overdueTasks.length} atrasada(s)
-                  </span>
-                )}
-              </h2>
-              <p className="text-xs text-gray-400 font-medium">
-                {pendingCount === 0 ? '🎉 Todo completado por hoy' : `${pendingCount} tarea(s) pendiente(s)`}
-              </p>
-            </div>
-          </div>
-          <button 
-            onClick={() => setDrawerOpen(false)} 
-            className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
+    <>
+      {/* ── BOTÓN FLOTANTE PERMANENTE BADGE SÓLO EN MÓDULOS PERMITIDOS ── */}
+      {showFloatingButton && (
+        <div className="fixed bottom-5 right-5 z-[80]">
+          <button
+            onClick={() => setDrawerOpen(!isDrawerOpen)}
+            className={
+              pendingObligatory.length > 0
+                ? 'relative group flex items-center gap-2.5 px-4 py-3 rounded-full shadow-2xl font-black text-xs transition-all active:scale-95 border-2 bg-gradient-to-r from-red-600 to-amber-600 text-white border-red-400 animate-pulse shadow-red-500'
+                : overdueTasks.length > 0
+                ? 'relative group flex items-center gap-2.5 px-4 py-3 rounded-full shadow-2xl font-black text-xs transition-all active:scale-95 border-2 bg-gradient-to-r from-amber-600 to-yellow-600 text-white border-amber-400 shadow-amber-500'
+                : 'relative group flex items-center gap-2.5 px-4 py-3 rounded-full shadow-2xl font-black text-xs transition-all active:scale-95 border-2 bg-[#1e1f26] text-gray-200 border-gray-700 hover:border-amber-500 shadow-black'
+            }
           >
-            <X size={16} />
+            <span className="text-lg">📋</span>
+            <span className="hidden sm:inline">TAREAS</span>
+            {pendingCount > 0 && (
+              <span className={pendingObligatory.length > 0 ? 'px-2 py-0.5 rounded-full text-xs font-black bg-white text-red-600' : 'px-2 py-0.5 rounded-full text-xs font-black bg-amber-400 text-gray-950'}>
+                {pendingCount}
+              </span>
+            )}
           </button>
         </div>
+      )}
 
-        {/* Alerta de Tareas Obligatorias */}
-        {pendingObligatory.length > 0 && (
-          <div className="bg-red-500 bg-opacity-10 border-b border-red-500 px-5 py-3 flex items-center gap-3">
-            <ShieldAlert className="text-red-400 shrink-0" size={18} />
-            <p className="text-xs font-bold text-red-300">
-              Tienes <span className="underline">{pendingObligatory.length} tarea(s) obligatoria(s)</span> pendientes antes de cerrar el turno.
-            </p>
-          </div>
-        )}
-
-        {/* Filtros estilo Todoist */}
-        <div className="px-5 py-3 border-b border-gray-800 bg-[#181920] flex items-center gap-2 overflow-x-auto">
-          {[
-            { id: 'HOY', label: 'Hoy', count: todayTasks.length },
-            { id: 'ATRASADAS', label: 'Atrasadas', count: overdueTasks.length },
-            { id: 'TODAS', label: 'Todas', count: myTasks.length },
-          ].map(f => (
-            <button
-              key={f.id}
-              onClick={() => setActiveFilter(f.id)}
-              className={
-                activeFilter === f.id
-                  ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-500 text-gray-950 font-black shadow-md'
-                  : 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
-              }
-            >
-              {f.label}
-              {f.count > 0 && (
-                <span className={activeFilter === f.id ? 'px-1.5 py-0.2 rounded-full text-[10px] bg-gray-950 text-amber-400' : 'px-1.5 py-0.2 rounded-full text-[10px] bg-gray-700 text-gray-300'}>
-                  {f.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
-
-        {/* Lista de Tareas */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-3">
-          {filteredTasks.length === 0 ? (
-            <div className="text-center py-16 text-gray-500">
-              <span className="text-4xl block mb-2">🎉</span>
-              <p className="font-bold text-sm text-gray-400">¡No hay tareas en esta lista!</p>
-              <p className="text-xs mt-1">Estás completamente al día con tus actividades.</p>
+      {/* ── SLIDE-OVER DRAWER ESTILO TODOIST ── */}
+      {isDrawerOpen && (
+        <div className="fixed inset-0 z-[100] flex justify-end bg-black bg-opacity-75 backdrop-blur-sm animate-fade-in">
+          <div className="w-full max-w-md bg-[#16171d] border-l border-gray-800 flex flex-col h-full shadow-2xl animate-slide-left">
+            
+            {/* Header del Drawer */}
+            <div className="p-5 border-b border-gray-800 bg-[#1e1f26] flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500 bg-opacity-20 border border-amber-500 flex items-center justify-center text-xl">
+                  📋
+                </div>
+                <div>
+                  <h2 className="text-base font-black text-white flex items-center gap-2">
+                    Mis Tareas
+                    {overdueTasks.length > 0 && (
+                      <span className="bg-red-500 bg-opacity-20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500">
+                        {overdueTasks.length} atrasada(s)
+                      </span>
+                    )}
+                  </h2>
+                  <p className="text-xs text-gray-400 font-medium">
+                    {pendingCount === 0 ? '🎉 Todo completado por hoy' : `${pendingCount} tarea(s) pendiente(s)`}
+                  </p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setDrawerOpen(false)} 
+                className="w-8 h-8 rounded-full bg-gray-800 hover:bg-gray-700 text-gray-400 hover:text-white flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
             </div>
-          ) : (
-            filteredTasks.map(task => (
-              <QuickTaskCard
-                key={task.id}
-                task={task}
-                userId={userId}
-                todayStr={todayStr}
-                proj={getProject(task.projectId)}
-                onToggleTask={handleToggleTask}
-                toggleSubtaskCompleted={toggleSubtaskCompleted}
-                handleFileUpload={handleFileUpload}
-                uploadingTaskId={uploadingTaskId}
-              />
-            ))
-          )}
-        </div>
 
-        {/* Quick Add Form en el footer */}
-        <form onSubmit={handleQuickAdd} className="p-4 border-t border-gray-800 bg-[#1e1f26] space-y-2">
-          <div className="flex gap-2">
-            <input
-              type="text"
-              placeholder="+ Añadir tarea rápida..."
-              value={newTitle}
-              onChange={(e) => setNewTitle(e.target.value)}
-              className="flex-1 bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
-            />
-            <button
-              type="submit"
-              disabled={!newTitle.trim()}
-              className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-gray-950 font-black text-xs px-4 py-2 rounded-xl active:scale-95 transition-all"
-            >
-              Añadir
-            </button>
-          </div>
+            {/* Alerta de Tareas Obligatorias */}
+            {pendingObligatory.length > 0 && (
+              <div className="bg-red-500 bg-opacity-10 border-b border-red-500 px-5 py-3 flex items-center gap-3">
+                <ShieldAlert className="text-red-400 shrink-0" size={18} />
+                <p className="text-xs font-bold text-red-300">
+                  Tienes <span className="underline">{pendingObligatory.length} tarea(s) obligatoria(s)</span> pendientes antes de cerrar el turno.
+                </p>
+              </div>
+            )}
 
-          {/* Categoría Opcional */}
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] text-gray-400 font-bold">Categoría (Opcional):</span>
-            <select
-              value={selectedProjectId}
-              onChange={(e) => setSelectedProjectId(e.target.value)}
-              className="bg-[#121318] border border-gray-700 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none"
-            >
-              <option value="">Sin Categoría</option>
-              {projects.map(p => (
-                <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+            {/* Filtros estilo Todoist */}
+            <div className="px-5 py-3 border-b border-gray-800 bg-[#181920] flex items-center gap-2 overflow-x-auto">
+              {[
+                { id: 'HOY', label: 'Hoy', count: todayTasks.length },
+                { id: 'ATRASADAS', label: 'Atrasadas', count: overdueTasks.length },
+                { id: 'TODAS', label: 'Todas', count: myTasks.length },
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setActiveFilter(f.id)}
+                  className={
+                    activeFilter === f.id
+                      ? 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-amber-500 text-gray-950 font-black shadow-md'
+                      : 'px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-gray-200'
+                  }
+                >
+                  {f.label}
+                  {f.count > 0 && (
+                    <span className={activeFilter === f.id ? 'px-1.5 py-0.2 rounded-full text-[10px] bg-gray-950 text-amber-400' : 'px-1.5 py-0.2 rounded-full text-[10px] bg-gray-700 text-gray-300'}>
+                      {f.count}
+                    </span>
+                  )}
+                </button>
               ))}
-            </select>
-          </div>
-        </form>
+            </div>
 
-      </div>
-    </div>
+            {/* Lista de Tareas */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-3">
+              {filteredTasks.length === 0 ? (
+                <div className="text-center py-16 text-gray-500">
+                  <span className="text-4xl block mb-2">🎉</span>
+                  <p className="font-bold text-sm text-gray-400">¡No hay tareas en esta lista!</p>
+                  <p className="text-xs mt-1">Estás completamente al día con tus actividades.</p>
+                </div>
+              ) : (
+                filteredTasks.map(task => (
+                  <QuickTaskCard
+                    key={task.id}
+                    task={task}
+                    userId={userId}
+                    todayStr={todayStr}
+                    proj={getProject(task.projectId)}
+                    onToggleTask={handleToggleTask}
+                    toggleSubtaskCompleted={toggleSubtaskCompleted}
+                    handleFileUpload={handleFileUpload}
+                    uploadingTaskId={uploadingTaskId}
+                  />
+                ))
+              )}
+            </div>
+
+            {/* Quick Add Form en el footer */}
+            <form onSubmit={handleQuickAdd} className="p-4 border-t border-gray-800 bg-[#1e1f26] space-y-2">
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="+ Añadir tarea rápida..."
+                  value={newTitle}
+                  onChange={(e) => setNewTitle(e.target.value)}
+                  className="flex-1 bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white placeholder-gray-500 focus:outline-none focus:border-amber-500"
+                />
+                <button
+                  type="submit"
+                  disabled={!newTitle.trim()}
+                  className="bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-gray-950 font-black text-xs px-4 py-2 rounded-xl active:scale-95 transition-all"
+                >
+                  Añadir
+                </button>
+              </div>
+
+              {/* Categoría Opcional */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400 font-bold">Categoría (Opcional):</span>
+                <select
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                  className="bg-[#121318] border border-gray-700 rounded-lg px-2 py-1 text-[11px] text-gray-300 focus:outline-none"
+                >
+                  <option value="">Sin Categoría</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
+                  ))}
+                </select>
+              </div>
+            </form>
+
+          </div>
+        </div>
+      )}
+    </>
   );
 }
