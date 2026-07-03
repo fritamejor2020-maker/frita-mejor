@@ -88,6 +88,9 @@ export const useTaskStore = create(
       projects: DEFAULT_PROJECTS,
       taskTemplates: DEFAULT_TEMPLATES,
       lastRecurrenceCheckDate: null,
+      isDrawerOpen: false,
+
+      setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
       // --- Carga remota ---
       loadFromRemote: (data) => {
@@ -191,7 +194,7 @@ export const useTaskStore = create(
           id: `TASK-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
           title: taskData.title,
           description: taskData.description || '',
-          projectId: taskData.projectId || 'PROJ-OPERACION',
+          projectId: taskData.projectId || null,
           priority: taskData.priority || 'P3',
           assignedToUserId: taskData.assignedToUserId || null,
           assignedToRole: taskData.assignedToRole || null,

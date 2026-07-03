@@ -209,7 +209,7 @@ export function TasksView() {
   // Formulario Inline de Tarea Nueva (Estilo Todoist)
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [projectId, setProjectId] = useState(projects[0]?.id || 'PROJ-OPERACION');
+  const [projectId, setProjectId] = useState('');
   const [priority, setPriority] = useState('P3');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueTime, setDueTime] = useState('');
@@ -557,6 +557,7 @@ export function TasksView() {
                   onChange={(e) => setProjectId(e.target.value)}
                   className="bg-[#22242e] border border-gray-700 text-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
                 >
+                  <option value="">📂 Sin Categoría</option>
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
                   ))}

@@ -94,7 +94,7 @@ export function PosView() {
   };
 
   // ── Verificación de Tareas Pendientes para Cierre Z ──
-  const { tasks: currentPosTasks } = useTaskStore();
+  const { tasks: currentPosTasks, setDrawerOpen } = useTaskStore();
   const todayStr = new Date().toISOString().split('T')[0];
 
   const pendingObligatoryTasks = (currentPosTasks || []).filter(t => {
@@ -862,11 +862,16 @@ export function PosView() {
               <div className="h-px bg-gray-800" />
               <button 
                 className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" 
-                onClick={() => { navigate('/tareas'); setShowHamburgerMenu(false); }}
+                onClick={() => { setDrawerOpen(true); setShowHamburgerMenu(false); }}
               >
                 <span className="flex items-center gap-3">
-                  <span className="text-base">📋</span> Módulo Tareas
+                  <span className="text-base">📋</span> Tareas del Día
                 </span>
+                {((pendingObligatoryTasks?.length || 0) + (pendingImportantTasks?.length || 0)) > 0 && (
+                  <span className="bg-amber-500 text-gray-950 text-[10px] font-black px-2 py-0.5 rounded-full">
+                    {(pendingObligatoryTasks?.length || 0) + (pendingImportantTasks?.length || 0)}
+                  </span>
+                )}
               </button>
               <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" onClick={() => { setShowContratasPanel(true); setShowHamburgerMenu(false); }}>
                 <span className="text-base">🤝</span> Contratas
