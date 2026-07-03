@@ -21,6 +21,7 @@ import { FritadoView }    from './modules/fritado/FritadoView';
 import { TransfersView }  from './modules/transfers/TransfersView';
 import { TasksView }      from './modules/tasks/TasksView';
 import { PublicDamageReportView } from './modules/tasks/PublicDamageReportView';
+import { QuickTaskDrawer } from './components/ui/QuickTaskDrawer';
 
 import { SellerSetupView }     from './views/SellerSetupView';
 import { DejadorSetupView }    from './views/DejadorSetupView';
@@ -249,6 +250,7 @@ function App() {
       <SyncStatusIndicator />
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
+        <QuickTaskDrawer />
         <ErrorBoundary>
           <Routes>
             {/* ── Pública: rutas sin login ───────────────── */}
