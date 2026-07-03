@@ -19,6 +19,7 @@ import { AdminView }      from './modules/admin/AdminView';
 import { PosView }        from './modules/pos/PosView';
 import { FritadoView }    from './modules/fritado/FritadoView';
 import { TransfersView }  from './modules/transfers/TransfersView';
+import { TasksView }      from './modules/tasks/TasksView';
 
 import { SellerSetupView }     from './views/SellerSetupView';
 import { DejadorSetupView }    from './views/DejadorSetupView';
@@ -314,6 +315,8 @@ function App() {
               <Route element={<ProtectedRoute allowedModules={['gerente']} />}>
                 <Route path="/gerente" element={<ManagerDashboard />} />
               </Route>
+
+              <Route path="/tareas" element={<TasksView />} />
 
               {/* Sin acceso al módulo */}
               <Route path="/unauthorized" element={<UnauthorizedView />} />

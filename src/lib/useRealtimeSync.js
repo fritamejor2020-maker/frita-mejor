@@ -9,6 +9,7 @@ import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useBranchStore } from '../store/useBranchStore';
+import { useTaskStore } from '../store/useTaskStore';
 import { useTransferStore } from '../store/useTransferStore';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
 
@@ -62,6 +63,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['branches']          = (v) => useBranchStore.getState().loadFromRemote(v);
   applicators['vendorLocations']   = (v) => useInventoryStore.setState({ vendorLocations: v });
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
+  applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
 
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.

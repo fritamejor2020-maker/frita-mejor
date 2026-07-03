@@ -25,6 +25,7 @@ import { AdminTicketConfigTab } from '../../components/admin/AdminTicketConfigTa
 import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInventoryTab';
 import { OlaClickConfigPanel } from './components/OlaClickConfigPanel';
 import { LuckyRewardsConfigPanel } from './components/LuckyRewardsConfigPanel';
+import { AdminTasksConfigPanel } from './components/AdminTasksConfigPanel';
 import { formatMoney } from '../../utils/formatUtils';
 import { AdminGeofencesTab } from './AdminGeofencesTab';
 
@@ -2585,6 +2586,7 @@ export function AdminView() {
     ],
     SISTEMA: [
       { id: 'SEDES',            label: '🏢 Sedes y Sucursales' },
+      { id: 'TAREAS',           label: '📋 Tareas & Supervisión' },
       { id: 'PERMISOS_MANAGER', label: '🔑 Permisos Gerentes' },
       { id: 'USUARIOS',         label: '👥 Usuarios del Sistema' },
       { id: 'RESET_GENERAL',    label: '🗑️ Reset General' },
@@ -2740,6 +2742,7 @@ export function AdminView() {
 
         {/* Nuevas pestañas multisede */}
         { activeTab === 'SEDES' && <GlobalSettingsPanel /> }
+        { activeTab === 'TAREAS' && <AdminTasksConfigPanel /> }
         { activeTab === 'PERMISOS_MANAGER' && <PermissionsPanel /> }
       </div>
     </div>

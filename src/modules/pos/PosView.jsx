@@ -13,6 +13,8 @@ import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printe
 import { OlaClickOrdersTab } from './components/OlaClickOrdersTab';
 import { supabase } from '../../lib/supabase';
 import { usePosStore } from '../../store/usePosStore';
+import { useTaskStore } from '../../store/useTaskStore';
+import { QuickTaskDrawer } from '../../components/ui/QuickTaskDrawer';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -1325,6 +1327,9 @@ export function PosView() {
           updatePosSale={updatePosSale}
         />
       )}
+
+      {/* Drawer y Badge Flotante de Tareas */}
+      <QuickTaskDrawer />
 
       {showZHistoryModal && (
         <ZHistoryModal
