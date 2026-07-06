@@ -738,7 +738,7 @@ export function ClientePedirView() {
 
   // --- INTERFAZ PRINCIPAL INTERACTIVA UBER-FIRST ---
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gray-900 font-sans select-none">
+    <div className="fixed inset-0 w-full overflow-hidden bg-gray-900 font-sans select-none" style={{ height: '100dvh' }}>
       
       {/* ── MAPA COMPLETO INTERACTIVO TIPO UBER ── */}
       <div className="absolute inset-0 z-0">
@@ -823,7 +823,7 @@ export function ClientePedirView() {
       </header>
 
       {/* ── BADGE SUPERIOR DE CARRITOS DISPONIBLES ── */}
-      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+      <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-20">
         <div className="bg-gray-900/90 text-white backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 text-xs font-black flex items-center gap-2 animate-bounce">
           <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
           <span>{activeVendorsAround.length} Carritos activos cerca de ti</span>
