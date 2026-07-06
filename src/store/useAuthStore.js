@@ -19,7 +19,7 @@ const DEFAULT_USERS = [
     active: true,
     branchId: null,        // null = acceso global a todas las sedes
     permissions: [],       // ADMIN tiene todos los permisos implícitamente
-    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'dejador', 'tracking', 'cierres', 'traslados', 'dashboard'],
+    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor', 'dejador', 'tracking', 'cierres', 'traslados', 'dashboard', 'tareas'],
   },
   {
     id: 'USR-002',
@@ -63,7 +63,7 @@ const DEFAULT_USERS = [
     active: true,
     branchId: 'BRANCH-001',
     permissions: [],
-    access: ['vendedor-setup', 'vendedor'],
+    access: ['vendedor'],
   },
   {
     id: 'USR-006',
@@ -113,14 +113,14 @@ const DEFAULT_USERS = [
 
 // Acceso de ruta por rol (para guardia de rutas)
 export const ROLE_ACCESS = {
-  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor-setup', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados', 'dashboard'],
+  ADMIN:     ['produccion', 'bodega', 'admin', 'pos', 'vendedor', 'dejador', 'tracking', 'finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina', 'fritado', 'cierres', 'traslados', 'dashboard', 'tareas'],
   // MANAGER: módulo dedicado con Dashboard, Mapa, Finanzas y Config (filtrado por sede).
   MANAGER:   ['gerente'],
   OPERARIO:  ['produccion'],
   FRITADOR:  ['fritado'],
   BODEGUERO: ['bodega'],
   CAJERO:    ['pos'],
-  VENDEDOR:  ['vendedor-setup', 'vendedor'],
+  VENDEDOR:  ['vendedor'],
   DEJADOR:   ['dejador', 'tracking'],
   // FINANZAS por defecto tiene ambos; el admin puede personalizar cuál de los tres
   FINANZAS:  ['finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina'],

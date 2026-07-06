@@ -24,7 +24,7 @@ export function ProtectedRoute({ allowedRoles, allowedModules }) {
   // Verificar por módulo/access si se especifica (más granular)
   if (allowedModules) {
     const userAccess = user.access || [];
-    const hasAccess = allowedModules.some((mod) => userAccess.includes(mod));
+    const hasAccess = user.role === 'ADMIN' || allowedModules.some((mod) => userAccess.includes(mod));
     if (!hasAccess) {
       return <Navigate to="/unauthorized" replace />;
     }

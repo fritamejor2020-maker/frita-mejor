@@ -355,15 +355,26 @@ export const useInventoryStore = create(
           } else {
             // BUG-04 FIX: Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
+            const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds','deletedInventoryIds'];
             for (const key of BRANCH_STORE_KEYS) {
-              const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds','deletedInventoryIds'];
-              let merged = remote[key] ? [...(Array.isArray(remote[key]) ? remote[key] : [])] : [];
+              const localArr = get()[key] || [];
+              let merged = Array.isArray(localArr) ? [...localArr] : [];
+              const existingIds = new Set(merged.map(x => x?.id).filter(Boolean));
+
+              if (remote[key] && Array.isArray(remote[key])) {
+                remote[key].forEach(item => {
+                  if (item?.id && !existingIds.has(item.id)) {
+                    merged.push(item);
+                    existingIds.add(item.id);
+                  }
+                });
+              }
+
               for (const bId of allBranchIds) {
                 const branchKeyName = `${key}_${bId}`;
                 const val = remote[branchKeyName];
                 if (Array.isArray(val) && val.length > 0) {
                   // Merge arrays, avoiding duplicate IDs
-                  const existingIds = new Set(merged.map(x => x?.id).filter(Boolean));
                   val.forEach(item => {
                     if (item?.id && !existingIds.has(item.id)) {
                       merged.push(item);

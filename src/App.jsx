@@ -323,7 +323,9 @@ function App() {
                 <Route path="/gerente" element={<ManagerDashboard />} />
               </Route>
 
-              <Route path="/tareas" element={<TasksView />} />
+              <Route element={<ProtectedRoute allowedModules={['tareas']} />}>
+                <Route path="/tareas" element={<TasksView />} />
+              </Route>
 
               {/* Sin acceso al módulo */}
               <Route path="/unauthorized" element={<UnauthorizedView />} />
