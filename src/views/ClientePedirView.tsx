@@ -96,10 +96,9 @@ function MapController({
   useMapEvents({
     locationfound(e) {
       onLocationChange(e.latlng.lat, e.latlng.lng);
-      toast.success('¡Ubicación GPS encontrada! 📍');
     },
     locationerror() {
-      toast.error('No se pudo acceder a tu GPS. Arrastra el pin en el mapa.');
+      toast.error('No se pudo acceder a tu GPS. Puedes elegir tu ubicación en el mapa.');
     },
   });
 
@@ -140,6 +139,48 @@ export function ClientePedirView() {
   const [activeOrderToken, setActiveOrderToken] = useState<string | null>(() => localStorage.getItem('fm_active_order_token'));
   const [activeOrder, setActiveOrder] = useState<any>(null);
 
+  // Auto-seleccionar la sede más cercana cuando la ubicación del cliente cambia
+  const handleLocationUpdate = (lat: number, lng: number) => {
+    setClientPos([lat, lng]);
+
+    if (branches && branches.length > 0) {
+      let nearestBranch = branches[0];
+      let minDistance = Infinity;
+
+      branches.forEach(b => {
+        if (b.settings?.lat && b.settings?.lng) {
+          const dist = getHaversineDistance(lat, lng, b.settings.lat, b.settings.lng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearestBranch = b;
+          }
+        }
+      });
+
+      if (nearestBranch && nearestBranch.id !== selectedBranchId) {
+        setSelectedBranchId(nearestBranch.id);
+        toast.success(`📍 Sede detectada por tu ubicación: ${nearestBranch.name}`);
+      }
+    }
+  };
+
+  // Obtener GPS del navegador al cargar la página por primera vez
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          handleLocationUpdate(lat, lng);
+        },
+        (err) => {
+          console.warn('GPS inicial no disponible:', err.message);
+        },
+        { enableHighAccuracy: true, timeout: 8000 }
+      );
+    }
+  }, [branches]);
+
   // Cargar datos al cambiar de sede/municipio
   useEffect(() => {
     fetchGeofences();
@@ -148,13 +189,6 @@ export function ClientePedirView() {
     
     if (activeOrderId && activeOrderToken) {
       monitorOrder();
-    }
-  }, [selectedBranchId]);
-
-  // Actualizar centro del mapa al cambiar de sede
-  useEffect(() => {
-    if (currentBranch?.settings?.lat && currentBranch?.settings?.lng) {
-      setClientPos([currentBranch.settings.lat, currentBranch.settings.lng]);
     }
   }, [selectedBranchId]);
 
@@ -676,7 +710,7 @@ export function ClientePedirView() {
           </div>
         </div>
 
-        {/* Selector de Sede / Municipio */}
+        {/* Selector de Sede / Municipio con detección automática */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-3 py-1.5 border border-gray-200">
             <span className="text-xs">📍</span>
@@ -908,7 +942,7 @@ export function ClientePedirView() {
               <div className="h-44 rounded-2xl overflow-hidden border border-gray-200 relative">
                 <MapContainer center={clientPos} zoom={DEFAULT_ZOOM} style={{ width: '100%', height: '100%' }} zoomControl={false}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <MapController onLocationChange={(lat, lng) => setClientPos([lat, lng])} triggerGeolocation={triggerGeolocation} setTriggerGeolocation={setTriggerGeolocation} centerPos={clientPos} />
+                  <MapController onLocationChange={(lat, lng) => handleLocationUpdate(lat, lng)} triggerGeolocation={triggerGeolocation} setTriggerGeolocation={setTriggerGeolocation} centerPos={clientPos} />
                   {geofences.map(geo => (
                     <Polygon key={geo.id} positions={geo.coordinates} pathOptions={{ fillColor: '#FFB700', fillOpacity: 0.2, color: '#FFB700', weight: 2 }} />
                   ))}
