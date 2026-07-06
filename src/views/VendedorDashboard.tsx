@@ -165,16 +165,54 @@ export const VendedorDashboard = () => {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    const { error } = await supabase
-      .from('delivery_requests')
-      .update({ status: 'rejected' })
-      .eq('id', orderId);
-    
-    if (error) {
-      toast.error('Error al rechazar el pedido: ' + error.message);
-    } else {
+
+    try {
+      // 1. Obtener la orden actual
+      const { data: order } = await supabase.from('delivery_requests').select('*').eq('id', orderId).single();
+      if (!order) return;
+
+      const rejectedList = [...(order.rejected_vendor_ids || []), trackingId];
+
+      // 2. Buscar otros vendedores activos
+      const { data: allVendors } = await supabase.from('vendor_locations').select('*').eq('is_active', true);
+      
+      const candidates = (allVendors || [])
+        .filter(v => !rejectedList.includes(v.vendor_id))
+        .map(v => ({
+          ...v,
+          distance: getHaversineDistance(order.client_lat, order.client_lng, v.lat, v.lng)
+        }))
+        .sort((a, b) => a.distance - b.distance);
+
+      if (candidates.length > 0) {
+        // Reasignar al siguiente carrito más cercano
+        const nextVendor = candidates[0];
+        await supabase
+          .from('delivery_requests')
+          .update({
+            assigned_vendor_id: nextVendor.vendor_id,
+            rejected_vendor_ids: rejectedList,
+            status: 'pending'
+          })
+          .eq('id', orderId);
+        
+        toast.success('Pedido rechazado y reasignado al siguiente carrito.');
+      } else {
+        // No hay más carritos candidatos
+        await supabase
+          .from('delivery_requests')
+          .update({
+            status: 'rejected',
+            rejected_vendor_ids: rejectedList
+          })
+          .eq('id', orderId);
+        
+        toast.success('Pedido rechazado.');
+      }
+    } catch (err: any) {
+      toast.error('Error al rechazar: ' + err.message);
+    } finally {
       setPendingDelivery(null);
-      toast.success('Pedido rechazado.');
     }
   };
 
