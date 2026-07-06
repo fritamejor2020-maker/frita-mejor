@@ -149,12 +149,14 @@ export function ClientePedirView() {
     setClientPos([lat, lng]);
 
     if (branches && branches.length > 0) {
-      let nearestBranch = branches[0];
+      let nearestBranch: any = null;
       let minDistance = Infinity;
 
       branches.forEach(b => {
-        if (b.settings?.lat && b.settings?.lng) {
-          const dist = getHaversineDistance(lat, lng, b.settings.lat, b.settings.lng);
+        const bLat = Number(b.settings?.lat);
+        const bLng = Number(b.settings?.lng);
+        if (!isNaN(bLat) && !isNaN(bLng) && bLat !== 0 && bLng !== 0) {
+          const dist = getHaversineDistance(lat, lng, bLat, bLng);
           if (dist < minDistance) {
             minDistance = dist;
             nearestBranch = b;
@@ -164,8 +166,16 @@ export function ClientePedirView() {
 
       if (nearestBranch && nearestBranch.id !== selectedBranchId) {
         setSelectedBranchId(nearestBranch.id);
-        toast.success(`📍 Sede detectada por tu GPS: ${nearestBranch.name}`);
+        toast.success(`📍 Sede asignada por tu GPS: ${nearestBranch.name}`);
       }
+    }
+  };
+
+  const handleBranchSelect = (branchId: string) => {
+    setSelectedBranchId(branchId);
+    const selected = branches.find(b => b.id === branchId);
+    if (selected && selected.settings?.lat && selected.settings?.lng) {
+      setClientPos([selected.settings.lat, selected.settings.lng]);
     }
   };
 
@@ -745,7 +755,7 @@ export function ClientePedirView() {
               </h1>
               <select
                 value={selectedBranchId}
-                onChange={(e) => setSelectedBranchId(e.target.value)}
+                onChange={(e) => handleBranchSelect(e.target.value)}
                 className="bg-transparent text-[11px] font-bold text-gray-500 outline-none cursor-pointer p-0 m-0 border-none w-full truncate"
               >
                 {branches.map(b => (
