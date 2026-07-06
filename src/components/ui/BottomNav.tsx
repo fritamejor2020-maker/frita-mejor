@@ -8,6 +8,7 @@ interface TabItem {
   id: string;
   label: string;
   icon: React.ReactNode;
+  badge?: number;
 }
 
 interface BottomNavProps {
@@ -34,9 +35,14 @@ export const BottomNav = ({ activeTab, onTabSelect, tabs }: BottomNavProps) => {
           >
             <span
               style={{ transition: 'transform 0.35s cubic-bezier(0.34,1.56,0.64,1)' }}
-              className={`${isActive ? 'scale-105' : 'scale-90'}`}
+              className={`relative ${isActive ? 'scale-105' : 'scale-90'}`}
             >
               {tab.icon}
+              {tab.badge && tab.badge > 0 ? (
+                <span className="absolute -top-1 -right-2 bg-red-500 text-white font-black text-[9px] w-4.5 h-4.5 rounded-full flex items-center justify-center border-2 border-white shadow-sm">
+                  {tab.badge}
+                </span>
+              ) : null}
             </span>
             <span
               style={{ transition: 'opacity 0.2s ease, color 0.2s ease' }}

@@ -460,8 +460,11 @@ export const VendedorDashboard = () => {
     }
   };
 
+  const activeOrdersCount = (pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
+
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },
+    { id: 'deliveries', label: 'Pedidos', icon: <Clock size={24} />, badge: activeOrdersCount },
     { id: 'restock', label: 'Pedir', icon: <Package size={24} /> },
     { id: 'transfers', label: 'Transf.', icon: <ArrowRightLeft size={24} /> },
     { id: 'close', label: 'Cierre', icon: <DollarSign size={24} /> }
@@ -469,6 +472,7 @@ export const VendedorDashboard = () => {
 
   const getHeaderTitle = () => {
     if (activeTab === 'pos') return 'Venta Rápida';
+    if (activeTab === 'deliveries') return 'Pedidos Clientes';
     if (activeTab === 'restock') return 'Pedir Surtido';
     if (activeTab === 'transfers') return 'Transferencias';
     if (activeTab === 'close') return 'Cierre Caja';
@@ -651,6 +655,156 @@ export const VendedorDashboard = () => {
                 </span>
               </button>
             ))}
+          </div>
+        )}
+
+        {/* SUBVISTA: PEDIDOS CLIENTES */}
+        {activeTab === 'deliveries' && (
+          <div className="max-w-md mx-auto space-y-4">
+            {/* Pedido Pendiente (si lo hay) */}
+            {pendingDelivery && (
+              <div className="bg-white rounded-[32px] p-6 border-4 border-amber-400 shadow-lg space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl animate-pulse">🔔</span>
+                  <div>
+                    <span className="bg-[#FF4040] text-white font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Pedido Pendiente
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 mt-1 leading-none">{pendingDelivery.client_name}</h3>
+                  </div>
+                </div>
+                
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm text-gray-700">
+                  <p className="font-bold">📞 Celular: {pendingDelivery.client_phone}</p>
+                  {pendingDelivery.client_address && (
+                    <p className="font-bold">📍 Dirección: {pendingDelivery.client_address}</p>
+                  )}
+                  <div className="pt-2 border-t border-gray-200">
+                    <span className="text-xs font-black text-gray-400 uppercase block mb-1">Productos:</span>
+                    {(pendingDelivery.items || []).map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between font-bold text-xs">
+                        <span>{item.name} × {item.qty}</span>
+                        <span>{formatMoney(item.price * item.qty)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                    <span className="font-black text-gray-900">Total:</span>
+                    <span className="font-black text-lg text-gray-900">{formatMoney(pendingDelivery.total_amount)}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleRejectDelivery(pendingDelivery.id)}
+                    className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-black py-3 px-4 rounded-xl border border-red-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <X size={16} strokeWidth={3} /> Rechazar
+                  </button>
+                  <button
+                    onClick={() => handleAcceptDelivery(pendingDelivery.id)}
+                    className="bg-green-500 hover:bg-green-600 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                  >
+                    <Check size={16} strokeWidth={3} /> Aceptar
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Pedido Activo (si lo hay) */}
+            {activeDelivery && (
+              <div className="bg-white rounded-[32px] p-6 border-4 border-green-500 shadow-lg space-y-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl animate-pulse">🛵</span>
+                  <div>
+                    <span className="bg-green-500 text-white font-black text-[10px] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                      Pedido en Curso
+                    </span>
+                    <h3 className="text-xl font-black text-gray-900 mt-1 leading-none">{activeDelivery.client_name}</h3>
+                  </div>
+                </div>
+
+                <div className="bg-gray-50 rounded-2xl p-4 space-y-2 text-sm text-gray-700">
+                  <p className="font-bold">
+                    📞 Celular: <a href={`tel:${activeDelivery.client_phone}`} className="underline text-green-600 font-black">{activeDelivery.client_phone}</a>
+                  </p>
+                  {activeDelivery.client_address && (
+                    <p className="font-bold">📍 Dirección: {activeDelivery.client_address}</p>
+                  )}
+                  <div className="pt-2 border-t border-gray-200">
+                    <span className="text-xs font-black text-gray-400 uppercase block mb-1">Productos:</span>
+                    {(activeDelivery.items || []).map((item: any, i: number) => (
+                      <div key={i} className="flex justify-between font-bold text-xs">
+                        <span>{item.name} × {item.qty}</span>
+                        <span>{formatMoney(item.price * item.qty)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="pt-2 border-t border-gray-200 flex justify-between items-center">
+                    <span className="font-black text-gray-900">Total:</span>
+                    <span className="font-black text-lg text-gray-900">{formatMoney(activeDelivery.total_amount)}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleCompleteDelivery(activeDelivery.id)}
+                  className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg transition-all active:scale-95 text-base flex items-center justify-center gap-1.5"
+                >
+                  <CheckCircle size={18} strokeWidth={2.5} /> ENTREGAR PEDIDO
+                </button>
+              </div>
+            )}
+
+            {/* Si no hay pedidos activos ni pendientes */}
+            {!pendingDelivery && !activeDelivery && (
+              <div className="bg-white rounded-[32px] p-8 text-center border-2 border-dashed border-gray-300 space-y-3">
+                <span className="text-5xl block">📥</span>
+                <h3 className="font-black text-gray-800 text-lg">Sin pedidos activos</h3>
+                <p className="text-xs text-gray-400 font-bold max-w-xs mx-auto">
+                  Los pedidos que realicen los clientes cercanos aparecerán aquí automáticamente en tiempo real.
+                </p>
+              </div>
+            )}
+
+            {/* Historial de pedidos del turno */}
+            <div className="bg-white rounded-[32px] p-6 shadow-sm space-y-4">
+              <h4 className="font-black text-gray-800 text-sm border-b border-gray-100 pb-2">
+                📝 Historial del Turno
+              </h4>
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {(() => {
+                  const isThisShift = (req: any) => req.openedAt === openedAt || (req.pointId === pointId && req.shift === shift);
+                  const myCompleted = (completedRequests || []).filter(isThisShift);
+                  const myRejected = (rejectedRequests || []).filter(isThisShift);
+                  
+                  const allHistory = [
+                    ...myCompleted.map(c => ({ ...c, _status: 'completed' })),
+                    ...myRejected.map(r => ({ ...r, _status: 'rejected' }))
+                  ].sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime());
+
+                  if (allHistory.length === 0) {
+                    return <p className="text-xs text-gray-400 font-bold text-center py-4">Aún no has procesado pedidos hoy.</p>;
+                  }
+
+                  return allHistory.map((req: any, i: number) => {
+                    const isCompleted = req._status === 'completed';
+                    return (
+                      <div key={i} className="flex justify-between items-center text-xs p-2.5 bg-gray-50 rounded-xl border border-gray-100">
+                        <div>
+                          <p className="font-black text-gray-800">{req.clientName || req.client_name || 'Cliente'}</p>
+                          <p className="text-[10px] text-gray-400 font-bold mt-0.5">
+                            {isCompleted ? '✅ Entregado' : '❌ Rechazado'} · {formatMoney(req.total_amount || req.total || 0)}
+                          </p>
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-bold">
+                          {new Date(req.completed_at || req.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                    );
+                  });
+                })()}
+              </div>
+            </div>
           </div>
         )}
 
