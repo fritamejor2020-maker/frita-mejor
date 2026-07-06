@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, useMapEvents } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -265,22 +265,33 @@ export function ClientePedirView() {
 
   // Consolidado de stock total en los carritos de este municipio
   const availableProducts = products.map(prod => {
-    // Sumar existencias en todos los carritos de este municipio
     const totalStock = inventorySnapshots
       .filter(snap => snap.product_id === prod.id)
       .reduce((sum, snap) => sum + (snap.quantity || 0), 0);
 
     return {
       ...prod,
-      stock: totalStock > 0 ? totalStock : 10 // Fallback si no hay snapshots guardados
+      stock: totalStock > 0 ? totalStock : 10
     };
   });
 
-  // Filtrar productos por búsqueda y categoría
+  // Categorías dinámicas adaptadas exactamente a los productos de los triciclos/carritos
+  const dynamicCategories = useMemo(() => {
+    const catsSet = new Set<string>();
+    availableProducts.forEach(p => {
+      if (p.category && p.category.trim()) {
+        catsSet.add(p.category.trim());
+      }
+    });
+    const list = Array.from(catsSet).sort();
+    return ['TODOS', ...list];
+  }, [availableProducts]);
+
+  // Filtrar productos por búsqueda y categoría dinámica
   const filteredProducts = availableProducts.filter(prod => {
     const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (selectedCategory === 'TODOS') return matchesSearch;
-    return matchesSearch && (prod.category || 'EMPANADAS').toUpperCase() === selectedCategory;
+    return matchesSearch && (prod.category || '').trim().toUpperCase() === selectedCategory.toUpperCase();
   });
 
   const addToCart = (productId: string, stock: number) => {
@@ -314,10 +325,9 @@ export function ClientePedirView() {
     return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   };
 
-  // Algoritmo Uber/Rappi Dispatch: encontrar el carrito más cercano que tenga stock
   const findBestVendorForCart = () => {
     if (vendorsInProximity.length === 0) return null;
-    return vendorsInProximity[0]; // Retorna el más cercano
+    return vendorsInProximity[0];
   };
 
   const handleCheckout = async (e: React.FormEvent) => {
@@ -408,7 +418,7 @@ export function ClientePedirView() {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
   };
 
-  // --- VISTA DE SEGUIMIENTO Y DISPATCH UBER / RAPPI EN VIVO ---
+  // --- VISTA DE SEGUIMIENTO EN VIVO ---
   if (activeOrder) {
     const isPending = activeOrder.status === 'pending';
     const isAccepted = activeOrder.status === 'accepted';
@@ -424,7 +434,7 @@ export function ClientePedirView() {
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] flex flex-col font-sans">
-        {/* HEADER DE SEGUIMIENTO RAPPI */}
+        {/* HEADER DE SEGUIMIENTO */}
         <header className="bg-white px-6 py-4 shadow-sm text-center flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-full bg-[#FF4040] text-white flex items-center justify-center font-black text-lg shadow-sm">
@@ -432,7 +442,7 @@ export function ClientePedirView() {
             </div>
             <div className="text-left">
               <h1 className="text-sm font-black text-gray-900 leading-none">
-                {isPickup ? 'Recoger en Puesto' : 'Rappi Frita Delivery'}
+                {isPickup ? 'Recoger en Puesto' : 'Frita Mejor Delivery'}
               </h1>
               <p className="text-[10px] font-bold text-gray-400 mt-0.5">Seguimiento GPS en vivo</p>
             </div>
@@ -446,7 +456,7 @@ export function ClientePedirView() {
         </header>
 
         <div className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
-          {/* MAPA ANIMADO UBER CON POLYLINE DE RUTA */}
+          {/* MAPA ANIMADO UBER CON POLYLINE */}
           {(isPending || isAccepted) && (
             <div className="w-full lg:w-3/5 lg:sticky lg:top-6 flex flex-col gap-4">
               <div className="bg-white rounded-[32px] overflow-hidden shadow-md h-[340px] lg:h-[calc(100vh-180px)] lg:min-h-[520px] border border-gray-100 relative">
@@ -486,7 +496,7 @@ export function ClientePedirView() {
                   )}
                 </MapContainer>
 
-                {/* Badge de Distancia y ETA Estilo Uber */}
+                {/* Badge de Distancia y ETA */}
                 {isAccepted && distanceKm !== null && (
                   <div className="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur shadow-2xl rounded-2xl p-4 z-[1000] border border-gray-100 flex items-center justify-between animate-fade-in">
                     <div className="flex items-center gap-3">
@@ -525,7 +535,7 @@ export function ClientePedirView() {
           }`}>
             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex flex-col gap-5 text-center">
               
-              {/* Pasos Estilo Rappi */}
+              {/* Pasos */}
               {(isPending || isAccepted) && (
                 <div className="flex items-center justify-between border-b border-gray-100 pb-5">
                   {[
@@ -648,11 +658,11 @@ export function ClientePedirView() {
     );
   }
 
-  // --- INTERFAZ PRINCIPAL TIPO RAPPI / UBER EATS (MENÚ & CATÁLOGO PRIMERO) ---
+  // --- INTERFAZ PRINCIPAL DE CATÁLOGO (FRITA MEJOR MÓVIL) ---
   return (
     <div className="min-h-screen bg-[#F6F7FB] flex flex-col font-sans pb-28">
       
-      {/* ── HEADER SUPERIOR RAPPI ── */}
+      {/* ── HEADER SUPERIOR ── */}
       <header className="bg-white sticky top-0 z-40 shadow-xs border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 flex-wrap">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-[#FF4040] text-white flex items-center justify-center font-black text-xl shadow-md">
@@ -660,7 +670,7 @@ export function ClientePedirView() {
           </div>
           <div>
             <h1 className="text-base font-black text-gray-900 leading-none tracking-tight flex items-center gap-1">
-              Rappi Frita <span className="text-[#FF4040]">Mejor</span>
+              Frita Mejor <span className="text-[#FF4040]">Móvil</span>
             </h1>
             <p className="text-[10px] font-bold text-gray-400 mt-0.5">Empanadas calienticas en tu puerta</p>
           </div>
@@ -672,7 +682,10 @@ export function ClientePedirView() {
             <span className="text-xs">📍</span>
             <select
               value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
+              onChange={(e) => {
+                setSelectedBranchId(e.target.value);
+                setSelectedCategory('TODOS');
+              }}
               className="bg-transparent text-gray-800 text-xs font-black outline-none cursor-pointer"
             >
               {branches.map(b => (
@@ -693,10 +706,10 @@ export function ClientePedirView() {
         </div>
       </header>
 
-      {/* ── CONTENIDO DEL CATÁLOGO RAPPI ── */}
+      {/* ── CONTENIDO DEL CATÁLOGO ── */}
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
         
-        {/* BANNER PROMOCIONAL TIPO RAPPI */}
+        {/* BANNER PROMOCIONAL */}
         <div className="bg-gradient-to-r from-[#FF4040] to-amber-500 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="space-y-1.5 z-10 max-w-lg">
             <span className="bg-white/20 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur">
@@ -718,38 +731,35 @@ export function ClientePedirView() {
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
           <input
             type="text"
-            placeholder="Buscar empanadas, papas rellenas, deditos, bebidas..."
+            placeholder="Buscar por nombre de producto..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="w-full bg-white border border-gray-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold text-gray-800 placeholder-gray-400 outline-none focus:ring-2 ring-[#FF4040] shadow-xs transition-all"
           />
         </div>
 
-        {/* CATEGORÍAS RAPPI (BARRA HORIZONTAL) */}
+        {/* CATEGORÍAS DINÁMICAS (BASADAS EN LOS TRICICLOS DE ESTE MUNICIPIO) */}
         <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {[
-            { id: 'TODOS', label: '🔥 Todas', icon: '🔥' },
-            { id: 'EMPANADAS', label: '🥟 Empanadas', icon: '🥟' },
-            { id: 'PAPAS', label: '🥔 Papas', icon: '🥔' },
-            { id: 'DEDITOS', label: '🥖 Deditos', icon: '🥖' },
-            { id: 'BEBIDAS', label: '🥤 Bebidas', icon: '🥤' },
-            { id: 'COMBOS', label: '📦 Combos', icon: '📦' },
-          ].map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setSelectedCategory(cat.id)}
-              className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all shrink-0 border ${
-                selectedCategory === cat.id
-                  ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                  : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-              }`}
-            >
-              {cat.label}
-            </button>
-          ))}
+          {dynamicCategories.map(cat => {
+            const isSelected = selectedCategory === cat;
+            const label = cat === 'TODOS' ? '🔥 Todas' : `🍽️ ${cat}`;
+            return (
+              <button
+                key={cat}
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all shrink-0 border ${
+                  isSelected
+                    ? 'bg-gray-900 text-white border-gray-900 shadow-md'
+                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
+                }`}
+              >
+                {label}
+              </button>
+            );
+          })}
         </div>
 
-        {/* GRILLA DE PRODUCTOS ESTILO RAPPI */}
+        {/* GRILLA DE PRODUCTOS */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredProducts.map(prod => {
             const qtyInCart = cart[prod.id] || 0;
@@ -811,7 +821,7 @@ export function ClientePedirView() {
         </div>
       </main>
 
-      {/* ── BARRA FLOTANTE INFERIOR ESTILO RAPPI ── */}
+      {/* ── BARRA FLOTANTE INFERIOR ── */}
       {getCartItemsCount() > 0 && (
         <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto animate-slide-up">
           <button
@@ -832,7 +842,7 @@ export function ClientePedirView() {
         </div>
       )}
 
-      {/* ── MODAL / DRAWER DE CHECKOUT RAPPI ── */}
+      {/* ── MODAL / DRAWER DE CHECKOUT ── */}
       {showCheckoutModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowCheckoutModal(false)}>
           <div 
@@ -842,7 +852,7 @@ export function ClientePedirView() {
             {/* Header del Modal */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-base font-black text-gray-900 flex items-center gap-2">
-                🛒 Tu Pedido Rappi Frita
+                🛒 Tu Pedido Frita Mejor
               </h2>
               <button 
                 onClick={() => setShowCheckoutModal(false)}
@@ -852,7 +862,7 @@ export function ClientePedirView() {
               </button>
             </div>
 
-            {/* SELECTOR DE MODALIDAD (2 BOTONES GIGANTES) */}
+            {/* SELECTOR DE MODALIDAD */}
             <div className="space-y-2">
               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">¿Cómo deseas recibir tu pedido?</h3>
               <div className="grid grid-cols-2 gap-2.5">
