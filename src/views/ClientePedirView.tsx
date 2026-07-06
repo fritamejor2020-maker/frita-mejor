@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 
 const DEFAULT_CENTER: [number, number] = [1.8485, -76.0522]; // Pitalito, Huila por defecto
-const DEFAULT_ZOOM = 14;
+const DEFAULT_ZOOM = 15;
 
 // Iconos Leaflet
 const clientIcon = L.divIcon({
@@ -20,18 +20,18 @@ const clientIcon = L.divIcon({
   html: `
     <div style="
       display: flex; flex-direction: column; align-items: center;
-      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.25));
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
     ">
       <div style="
         background: #FF4040; border: 3px solid white;
-        border-radius: 50%; width: 42px; height: 42px;
+        border-radius: 50%; width: 44px; height: 44px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 20px; animation: bounce 1.5s infinite;
+        font-size: 22px; animation: bounce 1.5s infinite;
       ">😋</div>
       <div style="
-        background: #1f2937; border-radius: 8px; padding: 2px 6px;
+        background: #1f2937; border-radius: 8px; padding: 2px 8px;
         font-size: 10px; font-weight: 900; color: white;
-        margin-top: 2px; white-space: nowrap; box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+        margin-top: 2px; white-space: nowrap; box-shadow: 0 2px 5px rgba(0,0,0,0.3);
       ">Tu Ubicación</div>
     </div>`,
   iconSize: [50, 50],
@@ -43,20 +43,20 @@ const createVendorIcon = (name: string, isSelected: boolean, isStationary = fals
   html: `
     <div style="
       display: flex; flex-direction: column; align-items: center;
-      filter: drop-shadow(0 3px 5px rgba(0,0,0,0.3));
+      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
     ">
       <div style="
         background: ${isSelected ? '#FF4040' : (isStationary ? '#3b82f6' : '#FFB700')}; 
         border: 3px solid white;
-        border-radius: 50%; width: 44px; height: 44px;
+        border-radius: 50%; width: 46px; height: 46px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 22px; transition: all 0.2s;
+        font-size: 24px; transition: all 0.2s;
       ">${isStationary ? '🏪' : '🛵'}</div>
       <div style="
         background: white; border: 2px solid ${isSelected ? '#FF4040' : (isStationary ? '#3b82f6' : '#FFB700')};
-        border-radius: 10px; padding: 1px 6px;
+        border-radius: 10px; padding: 2px 8px;
         font-size: 9px; font-weight: 900; color: #1f2937;
-        margin-top: 1px; white-space: nowrap; max-width: 90px; overflow: hidden;
+        margin-top: 2px; white-space: nowrap; max-width: 100px; overflow: hidden;
       ">${name}</div>
     </div>`,
   iconSize: [60, 60],
@@ -98,7 +98,7 @@ function MapController({
       onLocationChange(e.latlng.lat, e.latlng.lng);
     },
     locationerror() {
-      toast.error('No se pudo acceder a tu GPS. Puedes elegir tu ubicación en el mapa.');
+      toast.error('No se pudo acceder a tu GPS. Puedes tocar en el mapa para ubicarte.');
     },
   });
 
@@ -116,14 +116,19 @@ export function ClientePedirView() {
   const [isInsideCoverage, setIsInsideCoverage] = useState(true);
   const [triggerGeolocation, setTriggerGeolocation] = useState(true);
 
+  // --- Pasos del Flujo Uber ---
+  // Step 'MAP': Ver mapa interactivo Uber con carritos alrededor + Botón grande PEDIR
+  // Step 'MENU': Ver catálogo de productos disponibles en los triciclos
+  // Step 'CHECKOUT': Elegir si el carrito va o el cliente va + formulario
+  const [uiStep, setUiStep] = useState<'MAP' | 'MENU' | 'CHECKOUT'>('MAP');
+
   // --- Modalidad & Carrito ---
   const [deliveryMode, setDeliveryMode] = useState<'delivery' | 'pickup'>('delivery');
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
 
-  // --- Catálogo y Stock Consolidado del Municipio ---
+  // --- Catálogo y Stock Consolidado ---
   const [vendors, setVendors] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [inventorySnapshots, setInventorySnapshots] = useState<any[]>([]);
@@ -134,12 +139,12 @@ export function ClientePedirView() {
   const [address, setAddress] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // --- Tracking y Dispatch Uber/Rappi ---
+  // --- Tracking y Dispatch Uber ---
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('fm_active_order_id'));
   const [activeOrderToken, setActiveOrderToken] = useState<string | null>(() => localStorage.getItem('fm_active_order_token'));
   const [activeOrder, setActiveOrder] = useState<any>(null);
 
-  // Auto-seleccionar la sede más cercana cuando la ubicación del cliente cambia
+  // Auto-seleccionar la sede más cercana cuando la ubicación del cliente cambia por GPS
   const handleLocationUpdate = (lat: number, lng: number) => {
     setClientPos([lat, lng]);
 
@@ -159,19 +164,17 @@ export function ClientePedirView() {
 
       if (nearestBranch && nearestBranch.id !== selectedBranchId) {
         setSelectedBranchId(nearestBranch.id);
-        toast.success(`📍 Sede detectada por tu ubicación: ${nearestBranch.name}`);
+        toast.success(`📍 Sede detectada por tu GPS: ${nearestBranch.name}`);
       }
     }
   };
 
-  // Obtener GPS del navegador al cargar la página por primera vez
+  // GPS Inicial al cargar
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
-          const lat = pos.coords.latitude;
-          const lng = pos.coords.longitude;
-          handleLocationUpdate(lat, lng);
+          handleLocationUpdate(pos.coords.latitude, pos.coords.longitude);
         },
         (err) => {
           console.warn('GPS inicial no disponible:', err.message);
@@ -181,7 +184,7 @@ export function ClientePedirView() {
     }
   }, [branches]);
 
-  // Cargar datos al cambiar de sede/municipio
+  // Cargar datos al cambiar de sede
   useEffect(() => {
     fetchGeofences();
     fetchVendors();
@@ -192,7 +195,7 @@ export function ClientePedirView() {
     }
   }, [selectedBranchId]);
 
-  // Recalcular cobertura
+  // Recalcular cobertura de Geocercas
   useEffect(() => {
     if (geofences.length === 0) {
       setIsInsideCoverage(true);
@@ -291,13 +294,13 @@ export function ClientePedirView() {
     };
   };
 
-  // Vendedores ordenados por distancia
-  const vendorsInProximity = vendors.map(v => {
+  // Carritos activos ordenados por cercanía GPS
+  const activeVendorsAround = vendors.map(v => {
     const distance = getHaversineDistance(clientPos[0], clientPos[1], v.lat, v.lng);
     return { ...v, distance };
-  }).filter(v => v.distance <= 5.0).sort((a, b) => a.distance - b.distance);
+  }).filter(v => v.distance <= 6.0).sort((a, b) => a.distance - b.distance);
 
-  // Consolidado de stock total en los carritos de este municipio
+  // Stock disponible consolidado de los carritos del municipio
   const availableProducts = products.map(prod => {
     const totalStock = inventorySnapshots
       .filter(snap => snap.product_id === prod.id)
@@ -309,7 +312,7 @@ export function ClientePedirView() {
     };
   });
 
-  // Categorías dinámicas adaptadas exactamente a los productos de los triciclos/carritos
+  // Categorías dinámicas adaptadas exactamente a los productos de los triciclos
   const dynamicCategories = useMemo(() => {
     const catsSet = new Set<string>();
     availableProducts.forEach(p => {
@@ -321,7 +324,7 @@ export function ClientePedirView() {
     return ['TODOS', ...list];
   }, [availableProducts]);
 
-  // Filtrar productos por búsqueda y categoría dinámica
+  // Filtrar productos
   const filteredProducts = availableProducts.filter(prod => {
     const matchesSearch = prod.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (selectedCategory === 'TODOS') return matchesSearch;
@@ -359,15 +362,10 @@ export function ClientePedirView() {
     return Object.values(cart).reduce((sum, qty) => sum + qty, 0);
   };
 
-  const findBestVendorForCart = () => {
-    if (vendorsInProximity.length === 0) return null;
-    return vendorsInProximity[0];
-  };
-
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (getCartItemsCount() === 0) {
-      toast.error('Agrega productos al catálogo antes de continuar.');
+      toast.error('Selecciona al menos un producto antes de continuar.');
       return;
     }
     if (!name.trim() || !phone.trim()) {
@@ -379,9 +377,9 @@ export function ClientePedirView() {
       return;
     }
 
-    const targetVendor = findBestVendorForCart();
+    const targetVendor = activeVendorsAround[0];
     if (!targetVendor) {
-      toast.error('No hay carritos activos disponibles en este municipio en este momento.');
+      toast.error('No hay carritos activos disponibles cerca en este momento.');
       return;
     }
 
@@ -424,7 +422,7 @@ export function ClientePedirView() {
       localStorage.setItem('fm_active_order_token', token);
       setActiveOrderId(data.id);
       setActiveOrderToken(token);
-      setShowCheckoutModal(false);
+      setUiStep('MAP');
       setCart({});
       
       setTimeout(() => {
@@ -446,13 +444,14 @@ export function ClientePedirView() {
     setActiveOrderToken(null);
     setActiveOrder(null);
     setCart({});
+    setUiStep('MAP');
   };
 
   const formatMoney = (v: number) => {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
   };
 
-  // --- VISTA DE SEGUIMIENTO EN VIVO ---
+  // --- VISTA DE SEGUIMIENTO Y DISPATCH UBER EN VIVO ---
   if (activeOrder) {
     const isPending = activeOrder.status === 'pending';
     const isAccepted = activeOrder.status === 'accepted';
@@ -468,7 +467,6 @@ export function ClientePedirView() {
 
     return (
       <div className="min-h-screen bg-[#F6F7FB] flex flex-col font-sans">
-        {/* HEADER DE SEGUIMIENTO */}
         <header className="bg-white px-6 py-4 shadow-sm text-center flex items-center justify-between border-b border-gray-100">
           <div className="flex items-center gap-2">
             <div className="w-9 h-9 rounded-full bg-[#FF4040] text-white flex items-center justify-center font-black text-lg shadow-sm">
@@ -478,7 +476,7 @@ export function ClientePedirView() {
               <h1 className="text-sm font-black text-gray-900 leading-none">
                 {isPickup ? 'Recoger en Puesto' : 'Frita Mejor Delivery'}
               </h1>
-              <p className="text-[10px] font-bold text-gray-400 mt-0.5">Seguimiento GPS en vivo</p>
+              <p className="text-[10px] font-bold text-gray-400 mt-0.5">Seguimiento en vivo por GPS</p>
             </div>
           </div>
           <button
@@ -490,7 +488,6 @@ export function ClientePedirView() {
         </header>
 
         <div className="flex-1 p-4 sm:p-6 w-full max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 items-start">
-          {/* MAPA ANIMADO UBER CON POLYLINE */}
           {(isPending || isAccepted) && (
             <div className="w-full lg:w-3/5 lg:sticky lg:top-6 flex flex-col gap-4">
               <div className="bg-white rounded-[32px] overflow-hidden shadow-md h-[340px] lg:h-[calc(100vh-180px)] lg:min-h-[520px] border border-gray-100 relative">
@@ -500,11 +497,7 @@ export function ClientePedirView() {
                   style={{ width: '100%', height: '100%', zIndex: 1 }}
                   zoomControl={false}
                 >
-                  <TileLayer
-                    attribution='&copy; OpenStreetMap'
-                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                  />
-                  
+                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                   <Marker position={[activeOrder.client_lat, activeOrder.client_lng]} icon={clientIcon} />
 
                   {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
@@ -530,7 +523,6 @@ export function ClientePedirView() {
                   )}
                 </MapContainer>
 
-                {/* Badge de Distancia y ETA */}
                 {isAccepted && distanceKm !== null && (
                   <div className="absolute top-4 left-4 right-4 bg-white/95 backdrop-blur shadow-2xl rounded-2xl p-4 z-[1000] border border-gray-100 flex items-center justify-between animate-fade-in">
                     <div className="flex items-center gap-3">
@@ -542,7 +534,7 @@ export function ClientePedirView() {
                           {isPickup ? 'Puesto a' : 'Carrito a'} {formatDistance(distanceKm)}
                         </p>
                         <p className="text-xs font-bold text-amber-600 flex items-center gap-1">
-                          <Clock size={13} /> LLegada estimada: ~{etaMinutes} min
+                          <Clock size={13} /> Llegada estimada: ~{etaMinutes} min
                         </p>
                       </div>
                     </div>
@@ -561,7 +553,6 @@ export function ClientePedirView() {
             </div>
           )}
 
-          {/* DERECHA: BARRA DE PROGRESO DE ESTADO */}
           <div className={`w-full flex flex-col gap-4 ${
             (isPending || isAccepted) 
               ? 'lg:w-2/5 lg:max-h-[calc(100vh-180px)] lg:overflow-y-auto pr-1 shrink-0' 
@@ -569,7 +560,6 @@ export function ClientePedirView() {
           }`}>
             <div className="bg-white rounded-[32px] p-6 shadow-sm border border-gray-100 flex flex-col gap-5 text-center">
               
-              {/* Pasos */}
               {(isPending || isAccepted) && (
                 <div className="flex items-center justify-between border-b border-gray-100 pb-5">
                   {[
@@ -670,7 +660,6 @@ export function ClientePedirView() {
               )}
             </div>
 
-            {/* Resumen del pedido */}
             <div className="bg-white rounded-[32px] p-5 shadow-sm border border-gray-100">
               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-3">Detalle del Pedido</h3>
               <div className="divide-y divide-gray-100">
@@ -692,47 +681,85 @@ export function ClientePedirView() {
     );
   }
 
-  // --- INTERFAZ PRINCIPAL DE CATÁLOGO (FRITA MEJOR MÓVIL) ---
+  // --- INTERFAZ PRINCIPAL INTERACTIVA UBER-FIRST ---
   return (
-    <div className="min-h-screen bg-[#F6F7FB] flex flex-col font-sans pb-28">
+    <div className="relative w-full h-screen overflow-hidden bg-gray-900 font-sans select-none">
       
-      {/* ── HEADER SUPERIOR ── */}
-      <header className="bg-white sticky top-0 z-40 shadow-xs border-b border-gray-100 px-4 sm:px-6 py-3.5 flex items-center justify-between gap-3 flex-wrap">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-[#FF4040] text-white flex items-center justify-center font-black text-xl shadow-md">
-            ⚡
-          </div>
-          <div>
-            <h1 className="text-base font-black text-gray-900 leading-none tracking-tight flex items-center gap-1">
-              Frita Mejor <span className="text-[#FF4040]">Móvil</span>
-            </h1>
-            <p className="text-[10px] font-bold text-gray-400 mt-0.5">Empanadas calienticas en tu puerta</p>
-          </div>
-        </div>
+      {/* ── MAPA COMPLETO INTERACTIVO TIPO UBER ── */}
+      <div className="absolute inset-0 z-0">
+        <MapContainer
+          center={clientPos}
+          zoom={DEFAULT_ZOOM}
+          style={{ width: '100%', height: '100%' }}
+          zoomControl={false}
+        >
+          <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+          
+          <MapController 
+            onLocationChange={(lat, lng) => handleLocationUpdate(lat, lng)} 
+            triggerGeolocation={triggerGeolocation} 
+            setTriggerGeolocation={setTriggerGeolocation} 
+            centerPos={clientPos} 
+          />
 
-        {/* Selector de Sede / Municipio con detección automática */}
-        <div className="flex items-center gap-2">
-          <div className="flex items-center gap-1 bg-gray-100 rounded-xl px-3 py-1.5 border border-gray-200">
-            <span className="text-xs">📍</span>
-            <select
-              value={selectedBranchId}
-              onChange={(e) => {
-                setSelectedBranchId(e.target.value);
-                setSelectedCategory('TODOS');
-              }}
-              className="bg-transparent text-gray-800 text-xs font-black outline-none cursor-pointer"
+          {/* Polígonos de Geocercas de la Sede */}
+          {geofences.map(geo => (
+            <Polygon 
+              key={geo.id} 
+              positions={geo.coordinates} 
+              pathOptions={{ fillColor: '#FFB700', fillOpacity: 0.18, color: '#FFB700', weight: 2 }} 
+            />
+          ))}
+
+          {/* Marcador del Cliente */}
+          <Marker position={clientPos} icon={clientIcon} />
+
+          {/* Marcadores de Carritos y Triciclos en tiempo real alrededor */}
+          {activeVendorsAround.map(v => (
+            <Marker
+              key={v.id}
+              position={[v.lat, v.lng]}
+              icon={createVendorIcon(v.name || 'Carrito Móvil', false, false)}
             >
-              {branches.map(b => (
-                <option key={b.id} value={b.id}>
-                  {b.name} ({b.settings?.city || b.settings?.address || 'Municipio'})
-                </option>
-              ))}
-            </select>
+              <Popup>
+                <div className="p-1 font-sans text-center">
+                  <p className="font-black text-xs text-gray-900">🛵 {v.name || 'Carrito Móvil'}</p>
+                  <p className="text-[10px] text-gray-500 font-bold">A {formatDistance(v.distance)} de ti</p>
+                </div>
+              </Popup>
+            </Marker>
+          ))}
+        </MapContainer>
+      </div>
+
+      {/* ── HEADER FLOTANTE TIPO UBER ── */}
+      <header className="absolute top-4 left-4 right-4 z-20 max-w-md mx-auto">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-2xl border border-gray-100 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2.5 overflow-hidden">
+            <div className="w-9 h-9 rounded-xl bg-[#FF4040] text-white flex items-center justify-center font-black text-base shadow-sm shrink-0">
+              ⚡
+            </div>
+            <div className="overflow-hidden">
+              <h1 className="text-xs font-black text-gray-900 leading-none truncate">
+                Frita Mejor Móvil
+              </h1>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-transparent text-[11px] font-bold text-gray-500 outline-none cursor-pointer p-0 m-0 border-none w-full truncate"
+              >
+                {branches.map(b => (
+                  <option key={b.id} value={b.id}>
+                    📍 {b.name} ({b.settings?.city || b.settings?.address || 'Municipio'})
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
 
           <button
             onClick={() => setTriggerGeolocation(true)}
-            className="w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-[#FF4040] border border-red-100 flex items-center justify-center transition-all active:scale-95 shadow-xs"
+            className="w-9 h-9 rounded-xl bg-red-50 hover:bg-red-100 text-[#FF4040] border border-red-100 flex items-center justify-center transition-all active:scale-95 shrink-0"
             title="Mi ubicación GPS"
           >
             📍
@@ -740,145 +767,157 @@ export function ClientePedirView() {
         </div>
       </header>
 
-      {/* ── CONTENIDO DEL CATÁLOGO ── */}
-      <main className="flex-1 w-full max-w-7xl mx-auto p-4 sm:p-6 space-y-5">
-        
-        {/* BANNER PROMOCIONAL */}
-        <div className="bg-gradient-to-r from-[#FF4040] to-amber-500 rounded-[32px] p-6 text-white shadow-xl relative overflow-hidden flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-          <div className="space-y-1.5 z-10 max-w-lg">
-            <span className="bg-white/20 text-white text-[10px] font-black px-2.5 py-1 rounded-full uppercase tracking-wider backdrop-blur">
-              🔥 Fritos Recién Hechos
-            </span>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight leading-snug">
-              ¡Pide empanadas crujientes y calientes!
-            </h2>
-            <p className="text-xs font-bold opacity-90">
-              Entrega ultra-rápida por carritos móviles en <span className="underline">{currentBranch.name}</span>.
-            </p>
-          </div>
-          <div className="text-5xl sm:text-6xl z-10">🥟🔥</div>
-          <div className="absolute -right-10 -bottom-10 w-44 h-44 bg-white/10 rounded-full blur-xl"></div>
+      {/* ── BADGE SUPERIOR DE CARRITOS DISPONIBLES ── */}
+      <div className="absolute top-20 left-1/2 -translate-x-1/2 z-20">
+        <div className="bg-gray-900/90 text-white backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 text-xs font-black flex items-center gap-2 animate-bounce">
+          <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
+          <span>{activeVendorsAround.length} Carritos activos cerca de ti</span>
         </div>
+      </div>
 
-        {/* BUSCADOR DE PRODUCTOS */}
-        <div className="relative">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-          <input
-            type="text"
-            placeholder="Buscar por nombre de producto..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-white border border-gray-200 rounded-2xl pl-11 pr-4 py-3.5 text-xs font-bold text-gray-800 placeholder-gray-400 outline-none focus:ring-2 ring-[#FF4040] shadow-xs transition-all"
-          />
-        </div>
-
-        {/* CATEGORÍAS DINÁMICAS (BASADAS EN LOS TRICICLOS DE ESTE MUNICIPIO) */}
-        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
-          {dynamicCategories.map(cat => {
-            const isSelected = selectedCategory === cat;
-            const label = cat === 'TODOS' ? '🔥 Todas' : `🍽️ ${cat}`;
-            return (
-              <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat)}
-                className={`px-4 py-2.5 rounded-2xl font-black text-xs transition-all shrink-0 border ${
-                  isSelected
-                    ? 'bg-gray-900 text-white border-gray-900 shadow-md'
-                    : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50'
-                }`}
-              >
-                {label}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* GRILLA DE PRODUCTOS */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {filteredProducts.map(prod => {
-            const qtyInCart = cart[prod.id] || 0;
-            return (
-              <div key={prod.id} className="bg-white rounded-[28px] p-4 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col justify-between gap-3 group">
-                <div className="space-y-2">
-                  <div className="w-full h-36 rounded-2xl bg-gray-50 overflow-hidden relative border border-gray-100 flex items-center justify-center">
-                    {prod.image_url ? (
-                      <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                    ) : (
-                      <span className="text-5xl">🥟</span>
-                    )}
-                    <span className="absolute top-2 right-2 bg-red-50 text-[#FF4040] text-[9px] font-black px-2 py-0.5 rounded-full border border-red-100 flex items-center gap-1 shadow-xs">
-                      <Zap size={10} /> Calientico
-                    </span>
-                  </div>
-
-                  <div>
-                    <h3 className="font-black text-gray-900 text-sm leading-tight">{prod.name}</h3>
-                    <p className="text-xs text-gray-400 font-medium line-clamp-1 mt-0.5">
-                      {prod.description || 'Delicioso frito recién preparado.'}
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between pt-2 border-t border-gray-50">
-                  <span className="text-base font-black text-gray-900">
-                    {formatMoney(prod.price)}
-                  </span>
-
-                  <div className="flex items-center gap-2">
-                    {qtyInCart > 0 && (
-                      <>
-                        <button
-                          onClick={() => removeFromCart(String(prod.id))}
-                          className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 font-black flex items-center justify-center hover:bg-red-50 hover:text-red-500 active:scale-90 transition-all"
-                        >
-                          -
-                        </button>
-                        <span className="font-black text-gray-900 text-sm min-w-[16px] text-center">{qtyInCart}</span>
-                      </>
-                    )}
-                    <button
-                      onClick={() => addToCart(String(prod.id), prod.stock)}
-                      disabled={qtyInCart >= prod.stock}
-                      className={`h-9 px-4 rounded-xl font-black text-xs transition-all active:scale-95 flex items-center gap-1.5 shadow-xs ${
-                        qtyInCart > 0 
-                          ? 'bg-[#FF4040] text-white' 
-                          : 'bg-amber-400 hover:bg-amber-500 text-gray-950'
-                      }`}
-                    >
-                      {qtyInCart > 0 ? '+ Agregar Más' : '+ AGREGAR'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </main>
-
-      {/* ── BARRA FLOTANTE INFERIOR ── */}
-      {getCartItemsCount() > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 z-40 max-w-md mx-auto animate-slide-up">
+      {/* ── BARRA INFERIOR DE ACCIÓN GIGANTE ESTILO UBER (STEP MAP) ── */}
+      {uiStep === 'MAP' && (
+        <div className="absolute bottom-6 left-4 right-4 z-20 max-w-md mx-auto animate-slide-up">
           <button
-            onClick={() => setShowCheckoutModal(true)}
-            className="w-full bg-[#FF4040] hover:bg-red-600 text-white font-black py-4 px-6 rounded-[24px] shadow-2xl flex items-center justify-between transition-all active:scale-95 border-2 border-white/20"
+            onClick={() => setUiStep('MENU')}
+            className="w-full bg-[#FF4040] hover:bg-red-600 text-white font-black py-4 px-6 rounded-[28px] shadow-2xl flex items-center justify-between transition-all active:scale-95 border-2 border-white/20"
           >
             <div className="flex items-center gap-3">
-              <span className="w-7 h-7 rounded-full bg-white/20 flex items-center justify-center text-xs font-black">
-                {getCartItemsCount()}
-              </span>
-              <span className="text-sm font-black tracking-tight">Ver Tu Pedido</span>
+              <span className="text-2xl">🛍️</span>
+              <div className="text-left leading-tight">
+                <span className="text-base font-black tracking-tight block">PEDIR EMPANADAS Y FRITOS</span>
+                <span className="text-[10px] font-bold text-white/80 block">
+                  Empanadas recién fritas en tu puerta
+                </span>
+              </div>
             </div>
-            <div className="flex items-center gap-2 text-base font-black">
-              <span>{formatMoney(getCartTotal())}</span>
-              <ArrowRight size={18} />
-            </div>
+            <ArrowRight size={22} className="shrink-0" />
           </button>
         </div>
       )}
 
-      {/* ── MODAL / DRAWER DE CHECKOUT ── */}
-      {showCheckoutModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setShowCheckoutModal(false)}>
+      {/* ── MODAL / BOTTOM SHEET DEL CATÁLOGO DE PRODUCTOS (STEP MENU) ── */}
+      {uiStep === 'MENU' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setUiStep('MAP')}>
+          <div 
+            onClick={e => e.stopPropagation()} 
+            className="bg-white w-full max-w-lg rounded-t-[36px] sm:rounded-[36px] p-6 max-h-[85vh] overflow-y-auto shadow-2xl flex flex-col gap-4 animate-slide-up"
+          >
+            {/* Header del Menú */}
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div>
+                <h2 className="text-base font-black text-gray-900 flex items-center gap-2">
+                  🥟 Menú de Fritos en {currentBranch.name}
+                </h2>
+                <p className="text-[10px] font-bold text-gray-400">Productos disponibles en carritos cercanos</p>
+              </div>
+              <button 
+                onClick={() => setUiStep('MAP')}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center font-bold"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Buscador */}
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+              <input
+                type="text"
+                placeholder="Buscar empanadas, papas, bebidas..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-200 rounded-2xl pl-10 pr-4 py-2.5 text-xs font-bold text-gray-800 outline-none focus:ring-2 ring-[#FF4040]"
+              />
+            </div>
+
+            {/* Categorías Dinámicas */}
+            <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide">
+              {dynamicCategories.map(cat => {
+                const isSelected = selectedCategory === cat;
+                return (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`px-3.5 py-2 rounded-xl font-black text-[11px] transition-all shrink-0 border ${
+                      isSelected
+                        ? 'bg-gray-900 text-white border-gray-900 shadow-sm'
+                        : 'bg-gray-50 text-gray-600 border-gray-200'
+                    }`}
+                  >
+                    {cat === 'TODOS' ? '🔥 Todas' : `🍽️ ${cat}`}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Lista Vertical de Productos con Fotos */}
+            <div className="space-y-3 overflow-y-auto max-h-[50vh] pr-1">
+              {filteredProducts.map(prod => {
+                const qtyInCart = cart[prod.id] || 0;
+                return (
+                  <div key={prod.id} className="bg-gray-50 rounded-2xl p-3 border border-gray-100 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-14 h-14 rounded-xl bg-white border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center">
+                        {prod.image_url ? (
+                          <img src={prod.image_url} alt={prod.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <span className="text-2xl">🥟</span>
+                        )}
+                      </div>
+                      <div>
+                        <h3 className="font-black text-gray-900 text-xs">{prod.name}</h3>
+                        <p className="text-[10px] text-gray-400 font-medium line-clamp-1">{prod.description || 'Frito recién hecho'}</p>
+                        <p className="text-xs font-black text-[#FF4040] mt-0.5">{formatMoney(prod.price)}</p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5">
+                      {qtyInCart > 0 && (
+                        <>
+                          <button
+                            onClick={() => removeFromCart(String(prod.id))}
+                            className="w-7 h-7 rounded-full bg-white border border-gray-200 text-gray-700 font-black flex items-center justify-center active:scale-90"
+                          >
+                            -
+                          </button>
+                          <span className="font-black text-gray-900 text-xs min-w-[14px] text-center">{qtyInCart}</span>
+                        </>
+                      )}
+                      <button
+                        onClick={() => addToCart(String(prod.id), prod.stock)}
+                        disabled={qtyInCart >= prod.stock}
+                        className={`h-8 px-3 rounded-xl font-black text-xs transition-all active:scale-95 shadow-xs ${
+                          qtyInCart > 0 
+                            ? 'bg-[#FF4040] text-white' 
+                            : 'bg-amber-400 hover:bg-amber-500 text-gray-950'
+                        }`}
+                      >
+                        {qtyInCart > 0 ? '+' : '+ AGREGAR'}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Botón Continuar si hay items en carrito */}
+            {getCartItemsCount() > 0 && (
+              <button
+                onClick={() => setUiStep('CHECKOUT')}
+                className="w-full bg-[#FF4040] hover:bg-red-600 text-white font-black py-4 px-6 rounded-2xl shadow-xl flex items-center justify-between transition-all active:scale-95 mt-2"
+              >
+                <span>Continuar al Pedido ({getCartItemsCount()} ítems)</span>
+                <span>{formatMoney(getCartTotal())} ➔</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL DE MODALIDAD Y DATOS (STEP CHECKOUT) ── */}
+      {uiStep === 'CHECKOUT' && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-end sm:items-center justify-center p-0 sm:p-4 animate-fade-in" onClick={() => setUiStep('MENU')}>
           <div 
             onClick={e => e.stopPropagation()} 
             className="bg-white w-full max-w-lg rounded-t-[36px] sm:rounded-[36px] p-6 max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col gap-5 animate-slide-up"
@@ -886,17 +925,17 @@ export function ClientePedirView() {
             {/* Header del Modal */}
             <div className="flex items-center justify-between border-b border-gray-100 pb-3">
               <h2 className="text-base font-black text-gray-900 flex items-center gap-2">
-                🛒 Tu Pedido Frita Mejor
+                🛵 Opciones de Entrega
               </h2>
               <button 
-                onClick={() => setShowCheckoutModal(false)}
+                onClick={() => setUiStep('MENU')}
                 className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 text-gray-500 flex items-center justify-center font-bold"
               >
                 ✕
               </button>
             </div>
 
-            {/* SELECTOR DE MODALIDAD */}
+            {/* SELECCIÓN SI EL CARRITO VA AL CLIENTE O EL CLIENTE VA AL CARRITO */}
             <div className="space-y-2">
               <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">¿Cómo deseas recibir tu pedido?</h3>
               <div className="grid grid-cols-2 gap-2.5">
@@ -909,7 +948,7 @@ export function ClientePedirView() {
                     }
                     setDeliveryMode('delivery');
                   }}
-                  className={`p-3.5 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1 transition-all border-2 active:scale-95 ${
+                  className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
                     deliveryMode === 'delivery'
                       ? 'bg-[#FF4040] text-white border-[#FF4040] shadow-md'
                       : !isInsideCoverage
@@ -917,37 +956,22 @@ export function ClientePedirView() {
                       : 'bg-gray-50 text-gray-700 border-gray-100'
                   }`}
                 >
-                  <span className="text-2xl">🛵</span>
-                  <span>Que el Carrito Venga a Mí</span>
+                  <span className="text-3xl">🛵</span>
+                  <span className="leading-tight">Que el Carrito Móvil Venga a Mí</span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setDeliveryMode('pickup')}
-                  className={`p-3.5 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1 transition-all border-2 active:scale-95 ${
+                  className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
                     deliveryMode === 'pickup'
                       ? 'bg-blue-600 text-white border-blue-600 shadow-md'
                       : 'bg-gray-50 text-gray-700 border-gray-100'
                   }`}
                 >
-                  <span className="text-2xl">📍</span>
-                  <span>Voy a Recoger al Puesto</span>
+                  <span className="text-3xl">📍</span>
+                  <span className="leading-tight">Voy a Recoger al Triciclo</span>
                 </button>
-              </div>
-            </div>
-
-            {/* MAPA DE UBICACIÓN */}
-            <div className="space-y-2">
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">Confirma tu Ubicación en Mapa</h3>
-              <div className="h-44 rounded-2xl overflow-hidden border border-gray-200 relative">
-                <MapContainer center={clientPos} zoom={DEFAULT_ZOOM} style={{ width: '100%', height: '100%' }} zoomControl={false}>
-                  <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                  <MapController onLocationChange={(lat, lng) => handleLocationUpdate(lat, lng)} triggerGeolocation={triggerGeolocation} setTriggerGeolocation={setTriggerGeolocation} centerPos={clientPos} />
-                  {geofences.map(geo => (
-                    <Polygon key={geo.id} positions={geo.coordinates} pathOptions={{ fillColor: '#FFB700', fillOpacity: 0.2, color: '#FFB700', weight: 2 }} />
-                  ))}
-                  <Marker position={clientPos} icon={clientIcon} />
-                </MapContainer>
               </div>
             </div>
 
@@ -990,11 +1014,10 @@ export function ClientePedirView() {
                 </div>
               )}
 
-              {/* TOTAL */}
               <div className="bg-amber-50 rounded-2xl p-4 flex items-center justify-between border border-amber-200/50">
                 <div>
                   <p className="text-[10px] font-black text-amber-600 uppercase tracking-wide">Total a Pagar</p>
-                  <p className="text-[10px] font-bold text-gray-400">Pagas en efectivo al recibir</p>
+                  <p className="text-[10px] font-bold text-gray-400">Pagas al recibir en efectivo</p>
                 </div>
                 <span className="text-2xl font-black text-gray-900">{formatMoney(getCartTotal())}</span>
               </div>
@@ -1008,7 +1031,7 @@ export function ClientePedirView() {
                   <span>Procesando...</span>
                 ) : (
                   <>
-                    <ShoppingBag size={18} /> Confirmar y Buscar Carrito
+                    <ShoppingBag size={18} /> Confirmar y Notificar Carrito
                   </>
                 )}
               </button>
