@@ -655,7 +655,7 @@ export function ClientePedirView() {
           >
             {branches.map(b => (
               <option key={b.id} value={b.id}>
-                📍 {b.name} ({b.settings?.address || 'Municipio'})
+                📍 {b.name} ({b.settings?.city || b.settings?.address || 'Municipio'})
               </option>
             ))}
           </select>

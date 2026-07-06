@@ -52,10 +52,10 @@ function BranchCard({ branch, onEdit, onToggle, onDelete }) {
           <div>
             <h3 className="font-black text-gray-900 text-base leading-tight">{branch.name}</h3>
             <span className="text-xs font-bold text-gray-400">{typeInfo.label}</span>
-            {branch.settings?.address && (
-              <p className="text-xs text-gray-400 font-medium mt-0.5 flex items-center gap-1">
+            {(branch.settings?.city || branch.settings?.address) && (
+              <p className="text-xs text-amber-600 font-bold mt-0.5 flex items-center gap-1">
                 <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
-                {branch.settings.address}
+                {branch.settings?.city || branch.settings?.address}
               </p>
             )}
           </div>
@@ -153,6 +153,7 @@ function BranchModal({ branch, onSave, onClose }) {
       businessName: branch.settings?.businessName || '',
       nit: branch.settings?.nit || '',
       phone: branch.settings?.phone || '',
+      city: branch.settings?.city || branch.settings?.address || '',
       address: branch.settings?.address || '',
       printerName: branch.settings?.printerName || 'POS-58',
       allowedTransferTypes: branch.settings?.allowedTransferTypes ?? ['fritos', 'crudos', 'insumos', 'productos'],
@@ -188,7 +189,13 @@ function BranchModal({ branch, onSave, onClose }) {
     if (city) {
       setForm(f => ({
         ...f,
-        settings: { ...f.settings, lat: city.lat, lng: city.lng }
+        settings: { 
+          ...f.settings, 
+          lat: city.lat, 
+          lng: city.lng,
+          city: city.name,
+          address: f.settings.address || city.name
+        }
       }));
     }
   };

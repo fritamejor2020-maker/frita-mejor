@@ -222,7 +222,7 @@ export function AdminGeofencesTab() {
             >
               {branches.map(b => (
                 <option key={b.id} value={b.id}>
-                  📍 {b.name} ({b.settings?.address || 'Municipio'})
+                  📍 {b.name} ({b.settings?.city || b.settings?.address || 'Sin Municipio'})
                 </option>
               ))}
             </select>
@@ -473,7 +473,7 @@ export function AdminGeofencesTab() {
         {/* Badge Indicador de Sede Activa en Mapa */}
         <div className="absolute top-4 right-4 bg-white/95 backdrop-blur shadow-md rounded-2xl px-4 py-2 text-xs font-black text-gray-800 z-[1000] border border-gray-100 flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
-          <span>Sede: {selectedBranch?.name} ({selectedBranch?.settings?.address || 'Municipio'})</span>
+          <span>Sede: {selectedBranch?.name} ({selectedBranch?.settings?.city || selectedBranch?.settings?.address || 'Sin Municipio'})</span>
         </div>
       </div>
     </div>
