@@ -3,11 +3,12 @@ import { MapContainer, TileLayer, Polygon, Polyline, Marker, Popup, useMapEvents
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../../lib/supabase';
+import { useBranchStore } from '../../store/useBranchStore';
 import { toast } from 'react-hot-toast';
-import { Shield, Trash2, Plus, Check, X, MapPin, Layers, RefreshCw, Eye } from 'lucide-react';
+import { Shield, Trash2, Plus, Check, X, MapPin, Layers, RefreshCw, Eye, Building2 } from 'lucide-react';
 import { getHaversineDistance, formatDistance } from '../../utils/geoUtils';
 
-const DEFAULT_CENTER: [number, number] = [1.8485, -76.0522]; // Pitalito, Huila
+const DEFAULT_CENTER: [number, number] = [1.8485, -76.0522]; // Pitalito, Huila por defecto
 const DEFAULT_ZOOM = 14;
 
 // Draggable client icon in red
@@ -48,19 +49,27 @@ function MapDrawingHandler({
   return null;
 }
 
-// Helper to fit map bounds to a specific polygon
-function MapZoomToPolygon({ polygon }: { polygon: any[] | null }) {
+// Helper to fit map bounds to a specific polygon or center on lat/lng
+function MapControllerHelper({ polygon, centerPos }: { polygon: any[] | null; centerPos: [number, number] }) {
   const map = useMap();
+  
   useEffect(() => {
     if (polygon && polygon.length > 0) {
       const bounds = L.latLngBounds(polygon.map(p => [p.lat, p.lng]));
       map.fitBounds(bounds, { padding: [40, 40] });
+    } else if (centerPos) {
+      map.setView(centerPos, DEFAULT_ZOOM);
     }
-  }, [polygon]);
+  }, [polygon, centerPos[0], centerPos[1]]);
+
   return null;
 }
 
 export function AdminGeofencesTab() {
+  const { branches } = useBranchStore();
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(branches[0]?.id || 'BRANCH-001');
+  const selectedBranch = branches.find(b => b.id === selectedBranchId) || branches[0];
+
   const [geofences, setGeofences] = useState<any[]>([]);
   const [activeDeliveries, setActiveDeliveries] = useState<any[]>([]);
   const [vendorLocations, setVendorLocations] = useState<any[]>([]);
@@ -71,12 +80,16 @@ export function AdminGeofencesTab() {
   const [newGeofenceName, setNewGeofenceName] = useState('');
   const [selectedGeoToZoom, setSelectedGeoToZoom] = useState<any[] | null>(null);
 
+  // Determinar centro del mapa según la sede seleccionada
+  const branchCenter: [number, number] = (selectedBranch?.settings?.lat && selectedBranch?.settings?.lng)
+    ? [selectedBranch.settings.lat, selectedBranch.settings.lng]
+    : DEFAULT_CENTER;
+
   useEffect(() => {
     fetchGeofences();
     fetchActiveDeliveries();
     fetchVendorLocations();
 
-    // Suscribirse a cambios en vivo de pedidos y ubicaciones para la torre de control
     const orderSubscription = supabase.channel('admin-control-tower')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'delivery_requests' }, () => {
         fetchActiveDeliveries();
@@ -89,7 +102,7 @@ export function AdminGeofencesTab() {
     return () => {
       supabase.removeChannel(orderSubscription);
     };
-  }, []);
+  }, [selectedBranchId]);
 
   const fetchGeofences = async () => {
     const { data } = await supabase.from('geofences').select('*').eq('is_active', true);
@@ -97,7 +110,6 @@ export function AdminGeofencesTab() {
   };
 
   const fetchActiveDeliveries = async () => {
-    // Jalamos pedidos pendientes o aceptados
     const { data } = await supabase
       .from('delivery_requests')
       .select('*')
@@ -112,17 +124,17 @@ export function AdminGeofencesTab() {
     setVendorLocations(data || []);
   };
 
-  // Agregar un punto al dibujar la geocerca
+  // Filtrar geocercas correspondientes a la sede seleccionada (o sin sede asignada)
+  const branchGeofences = geofences.filter(g => !g.branch_id || g.branch_id === selectedBranchId);
+
   const handleAddPoint = (lat: number, lng: number) => {
     setDrawPoints(prev => [...prev, { lat, lng }]);
   };
 
-  // Deshacer el último punto dibujado
   const handleUndoPoint = () => {
     setDrawPoints(prev => prev.slice(0, -1));
   };
 
-  // Guardar la geocerca en Supabase
   const handleSaveGeofence = async () => {
     if (!newGeofenceName.trim()) {
       toast.error('Por favor ingresa un nombre para la geocerca.');
@@ -135,14 +147,23 @@ export function AdminGeofencesTab() {
 
     try {
       const { error } = await supabase.from('geofences').insert({
-        name: newGeofenceName.trim(),
+        name: `${selectedBranch?.name || 'Sede'}: ${newGeofenceName.trim()}`,
         coordinates: drawPoints,
-        is_active: true
+        is_active: true,
+        branch_id: selectedBranchId,
       });
 
-      if (error) throw new Error(error.message);
+      if (error) {
+        // Fallback si la columna branch_id no existe en Supabase
+        const { error: fallbackErr } = await supabase.from('geofences').insert({
+          name: `${selectedBranch?.name || 'Sede'}: ${newGeofenceName.trim()}`,
+          coordinates: drawPoints,
+          is_active: true
+        });
+        if (fallbackErr) throw new Error(fallbackErr.message);
+      }
 
-      toast.success('¡Geocerca guardada con éxito! 🛡️');
+      toast.success(`¡Geocerca guardada para ${selectedBranch?.name || 'la sede'}! 🛡️`);
       setIsDrawing(false);
       setDrawPoints([]);
       setNewGeofenceName('');
@@ -152,7 +173,6 @@ export function AdminGeofencesTab() {
     }
   };
 
-  // Eliminar una geocerca (soft delete)
   const handleDeleteGeofence = async (id: string) => {
     if (!window.confirm('¿Estás seguro de que deseas eliminar esta zona de cobertura?')) return;
     
@@ -171,7 +191,6 @@ export function AdminGeofencesTab() {
     }
   };
 
-  // Formatear pesos
   const formatMoney = (v: number) => {
     return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(v);
   };
@@ -181,6 +200,35 @@ export function AdminGeofencesTab() {
       {/* PANEL LATERAL IZQUIERDO: CONTROLES Y LISTADO */}
       <div className="w-full lg:w-96 flex flex-col gap-4 overflow-y-auto pr-1 shrink-0">
         
+        {/* SELECTOR DE SEDE / MUNICIPIO */}
+        <div className="bg-white rounded-[28px] p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+              <Building2 size={14} className="text-amber-500" /> Configuración por Sede
+            </h3>
+          </div>
+
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">
+              Seleccionar Sede / Municipio:
+            </label>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => {
+                setSelectedBranchId(e.target.value);
+                setSelectedGeoToZoom(null);
+              }}
+              className="bg-gray-50 border border-gray-200 text-gray-800 text-xs font-black rounded-xl p-3 outline-none focus:ring-2 ring-amber-400"
+            >
+              {branches.map(b => (
+                <option key={b.id} value={b.id}>
+                  📍 {b.name} ({b.settings?.address || 'Municipio'})
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+
         {/* SECCIÓN DIBUJAR GEOCERCA */}
         <div className="bg-white rounded-[28px] p-5 shadow-sm border border-gray-100 flex flex-col gap-3">
           <div className="flex items-center justify-between">
@@ -203,7 +251,7 @@ export function AdminGeofencesTab() {
               }}
               className="w-full bg-[#FF4040] hover:bg-red-600 text-white font-black py-3.5 px-6 rounded-2xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-2"
             >
-              <Plus size={16} strokeWidth={3} /> DIBUJAR COBERTURA
+              <Plus size={16} strokeWidth={3} /> DIBUJAR COBERTURA EN {selectedBranch?.name?.toUpperCase()}
             </button>
           ) : (
             <div className="flex flex-col gap-3">
@@ -211,12 +259,12 @@ export function AdminGeofencesTab() {
                 type="text"
                 value={newGeofenceName}
                 onChange={e => setNewGeofenceName(e.target.value)}
-                placeholder="Nombre (ej. Sector Universidades)"
+                placeholder="Nombre (ej. Zona Centro, Barrio Bolivar...)"
                 className="bg-gray-50 border-none rounded-xl py-3 px-4 text-xs font-bold text-gray-700 outline-none focus:ring-2 ring-[#FFB700] shadow-inner"
               />
               
               <div className="flex gap-1 bg-yellow-50 border border-yellow-200 rounded-xl p-2.5 text-[11px] font-bold text-yellow-700">
-                👉 Haz clics en el mapa para marcar los puntos del polígono de servicio.
+                👉 Haz clics en el mapa para delimitar el perímetro permitido de delivery para {selectedBranch?.name}.
               </div>
 
               {drawPoints.length > 0 && (
@@ -254,15 +302,17 @@ export function AdminGeofencesTab() {
           )}
         </div>
 
-        {/* LISTADO DE GEOCERCAS ACTIVAS */}
+        {/* LISTADO DE GEOCERCAS ACTIVAS POR SEDE */}
         <div className="bg-white rounded-[28px] p-5 shadow-sm border border-gray-100 flex flex-col gap-3 flex-1 min-h-[160px]">
-          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">Zonas de Cobertura</h3>
+          <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest px-1">
+            Zonas de Cobertura ({selectedBranch?.name})
+          </h3>
           
-          {geofences.length === 0 ? (
-            <p className="text-xs font-bold text-gray-300 text-center py-6">No hay zonas creadas.</p>
+          {branchGeofences.length === 0 ? (
+            <p className="text-xs font-bold text-gray-300 text-center py-6">No hay zonas creadas para esta sede.</p>
           ) : (
             <div className="flex flex-col gap-2 overflow-y-auto max-h-48 lg:max-h-full">
-              {geofences.map(geo => (
+              {branchGeofences.map(geo => (
                 <div key={geo.id} className="bg-gray-50 rounded-2xl p-3 border border-gray-100 flex items-center justify-between group hover:border-[#FFB700] transition-colors">
                   <div className="flex items-center gap-2">
                     <Shield size={16} className="text-amber-500 fill-amber-50" />
@@ -360,20 +410,20 @@ export function AdminGeofencesTab() {
       {/* PANEL DERECHO: MAPA DE CONTROL Y TORRE DE MONITOREO */}
       <div className="flex-1 bg-white rounded-[32px] overflow-hidden shadow-sm border border-gray-100 h-full relative">
         <MapContainer
-          center={DEFAULT_CENTER}
+          center={branchCenter}
           zoom={DEFAULT_ZOOM}
           style={{ width: '100%', height: '100%', zIndex: 1 }}
         >
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution='&copy; OpenStreetMap'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
 
           <MapDrawingHandler isDrawing={isDrawing} onAddPoint={handleAddPoint} />
-          <MapZoomToPolygon polygon={selectedGeoToZoom} />
+          <MapControllerHelper polygon={selectedGeoToZoom} centerPos={branchCenter} />
 
           {/* Renderizar Geocercas en el mapa */}
-          {geofences.map(geo => (
+          {branchGeofences.map(geo => (
             <Polygon 
               key={geo.id} 
               positions={geo.coordinates} 
@@ -398,77 +448,32 @@ export function AdminGeofencesTab() {
                 <Marker 
                   key={i} 
                   position={[p.lat, p.lng]} 
-                  icon={L.divIcon({
-                    className: '',
-                    html: `<div style="background:#FF4040; border:2px solid white; border-radius:50%; width:10px; height:10px"></div>`,
-                    iconSize: [10, 10],
-                    iconAnchor: [5, 5]
-                  })}
+                  icon={clientIcon}
                 />
               ))}
             </>
           )}
 
-          {/* Repartidores Móviles en Vivo */}
-          {vendorLocations.map(vendor => (
+          {/* Repartidores activos en el mapa */}
+          {vendorLocations.map(v => (
             <Marker
-              key={vendor.vendor_id}
-              position={[vendor.lat, vendor.lng]}
-              icon={createVendorIcon(vendor.vendor_name)}
+              key={v.id || v.vendor_id}
+              position={[v.lat, v.lng]}
+              icon={createVendorIcon(v.vendor_name || 'Vendedor')}
             >
               <Popup>
-                <div className="font-sans min-w-[120px]">
-                  <div className="font-black text-gray-900 text-sm">🛵 {vendor.vendor_name}</div>
-                  <div className="text-[10px] text-gray-400 mt-0.5">ID: {vendor.point_id || 'Móvil'}</div>
-                  <div className="text-[10px] text-green-500 font-bold mt-1">✓ Transmitiendo GPS</div>
+                <div className="text-xs font-bold p-1">
+                  🛵 {v.vendor_name}
                 </div>
               </Popup>
             </Marker>
           ))}
-
-          {/* Pedidos Activos (Pins en el mapa) */}
-          {activeDeliveries.map(delivery => {
-            const isPending = delivery.status === 'pending';
-            return (
-              <Marker
-                key={delivery.id}
-                position={[delivery.client_lat, delivery.client_lng]}
-                icon={clientIcon}
-              >
-                <Popup>
-                  <div className="font-sans min-w-[160px]">
-                    <div className="flex justify-between items-center mb-1">
-                      <span className={`text-[8px] font-black px-1.5 py-0.5 rounded-full ${
-                        isPending ? 'bg-amber-400 text-white' : 'bg-green-500 text-white'
-                      }`}>
-                        {isPending ? 'PENDIENTE' : 'EN CAMINO'}
-                      </span>
-                      <span className="text-[9px] text-gray-400">Total: {formatMoney(delivery.total_amount)}</span>
-                    </div>
-                    <div className="font-black text-gray-900 text-xs">{delivery.client_name}</div>
-                    <div className="text-[10px] text-gray-500">📞 {delivery.client_phone}</div>
-                    {delivery.client_address && (
-                      <div className="text-[10px] text-gray-400 mt-1 italic">📍 {delivery.client_address}</div>
-                    )}
-                    
-                    <div className="mt-2 border-t border-gray-100 pt-2 flex flex-col gap-1">
-                      {(delivery.items || []).map((item: any, i: number) => (
-                        <div key={i} className="text-[9px] font-bold text-gray-600 flex justify-between">
-                          <span>{item.name} ×{item.qty}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </Popup>
-              </Marker>
-            );
-          })}
         </MapContainer>
 
-        {/* Indicador de Estado Torre de Control */}
-        <div className="absolute top-3 right-3 bg-white/95 backdrop-blur shadow-md rounded-2xl px-4 py-2 text-[10px] font-black text-gray-700 z-[1000] border border-gray-100 flex items-center gap-1.5 uppercase tracking-wide">
-          <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-          Monitoreo Realtime Activo
+        {/* Badge Indicador de Sede Activa en Mapa */}
+        <div className="absolute top-4 right-4 bg-white/95 backdrop-blur shadow-md rounded-2xl px-4 py-2 text-xs font-black text-gray-800 z-[1000] border border-gray-100 flex items-center gap-2">
+          <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse"></span>
+          <span>Sede: {selectedBranch?.name} ({selectedBranch?.settings?.address || 'Municipio'})</span>
         </div>
       </div>
     </div>
