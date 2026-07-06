@@ -72,12 +72,16 @@ function RoleRedirect() {
   if (access.length === 1) {
     const key = access[0];
 
-    if (key === 'vendedor-setup' || key === 'vendedor') {
+    if (key === 'vendedor') {
       try {
         const raw = localStorage.getItem('frita-seller-session');
         if (raw && JSON.parse(raw)?.state?.isSetupComplete)
           return <Navigate to="/vendedor" replace />;
       } catch (_) {}
+      return <Navigate to="/vendedor-setup" replace />;
+    }
+
+    if (key === 'vendedor-setup') {
       return <Navigate to="/vendedor-setup" replace />;
     }
 
