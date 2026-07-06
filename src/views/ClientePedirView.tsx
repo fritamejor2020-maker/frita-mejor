@@ -74,9 +74,14 @@ function MapController({
   setTriggerGeolocation: (val: boolean) => void;
   centerPos?: [number, number];
 }) {
+  const onLocationChangeRef = useRef(onLocationChange);
+  useEffect(() => {
+    onLocationChangeRef.current = onLocationChange;
+  }, [onLocationChange]);
+
   const map = useMapEvents({
     click(e) {
-      onLocationChange(e.latlng.lat, e.latlng.lng);
+      onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
     },
   });
 
@@ -95,7 +100,7 @@ function MapController({
 
   useMapEvents({
     locationfound(e) {
-      onLocationChange(e.latlng.lat, e.latlng.lng);
+      onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
     },
     locationerror() {
       toast.error('No se pudo acceder a tu GPS. Puedes tocar en el mapa para ubicarte.');
@@ -144,15 +149,30 @@ export function ClientePedirView() {
   const [activeOrderToken, setActiveOrderToken] = useState<string | null>(() => localStorage.getItem('fm_active_order_token'));
   const [activeOrder, setActiveOrder] = useState<any>(null);
 
+  // Refs para prevenir clausuras obsoletas en callbacks asíncronos y eventos de Leaflet
+  const branchesRef = useRef(branches);
+  const selectedBranchIdRef = useRef(selectedBranchId);
+
+  useEffect(() => {
+    branchesRef.current = branches;
+  }, [branches]);
+
+  useEffect(() => {
+    selectedBranchIdRef.current = selectedBranchId;
+  }, [selectedBranchId]);
+
   // Auto-seleccionar la sede más cercana cuando la ubicación del cliente cambia por GPS
   const handleLocationUpdate = (lat: number, lng: number) => {
     setClientPos([lat, lng]);
 
-    if (branches && branches.length > 0) {
+    const currentBranches = branchesRef.current;
+    const currentSelectedId = selectedBranchIdRef.current;
+
+    if (currentBranches && currentBranches.length > 0) {
       let nearestBranch: any = null;
       let minDistance = Infinity;
 
-      branches.forEach(b => {
+      currentBranches.forEach(b => {
         const bLat = Number(b.settings?.lat);
         const bLng = Number(b.settings?.lng);
         if (!isNaN(bLat) && !isNaN(bLng) && bLat !== 0 && bLng !== 0) {
@@ -164,7 +184,7 @@ export function ClientePedirView() {
         }
       });
 
-      if (nearestBranch && nearestBranch.id !== selectedBranchId) {
+      if (nearestBranch && nearestBranch.id !== currentSelectedId) {
         setSelectedBranchId(nearestBranch.id);
         toast.success(`📍 Sede asignada por tu GPS: ${nearestBranch.name}`);
       }
@@ -179,7 +199,32 @@ export function ClientePedirView() {
     }
   };
 
-  // GPS Inicial al cargar
+  // Re-evaluar la sede más cercana a clientPos de manera reactiva cada vez que branches se cargue/actualice
+  useEffect(() => {
+    if (branches && branches.length > 0) {
+      let nearestBranch: any = null;
+      let minDistance = Infinity;
+
+      branches.forEach(b => {
+        const bLat = Number(b.settings?.lat);
+        const bLng = Number(b.settings?.lng);
+        if (!isNaN(bLat) && !isNaN(bLng) && bLat !== 0 && bLng !== 0) {
+          const dist = getHaversineDistance(clientPos[0], clientPos[1], bLat, bLng);
+          if (dist < minDistance) {
+            minDistance = dist;
+            nearestBranch = b;
+          }
+        }
+      });
+
+      if (nearestBranch && nearestBranch.id !== selectedBranchId) {
+        setSelectedBranchId(nearestBranch.id);
+        toast.success(`📍 Sede asignada por cercanía: ${nearestBranch.name}`);
+      }
+    }
+  }, [branches]);
+
+  // GPS Inicial al cargar (ejecuta solo una vez al montar)
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -192,7 +237,7 @@ export function ClientePedirView() {
         { enableHighAccuracy: true, timeout: 8000 }
       );
     }
-  }, [branches]);
+  }, []);
 
   // Cargar datos al cambiar de sede
   useEffect(() => {
