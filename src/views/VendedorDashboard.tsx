@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
