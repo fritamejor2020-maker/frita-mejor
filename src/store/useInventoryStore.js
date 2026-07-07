@@ -177,6 +177,11 @@ const INITIAL_POS_SETTINGS = {
     saleBottomLine: 'Sistema POS • fritamejor.com',
     zReportFooterMsg: 'FIN DE INFORME Z',
   },
+  inventoryControl: {
+    linkProduction: false,       // Ligado de Crudos a Fritos en Producción y Fritado
+    linkSalesToInventory: false, // Ligado de Caja POS/Ventas a Inventario (descuento automático)
+    strictTricycleStock: false,  // Ligado de stock físico estricto en Triciclos
+  },
 };
 
 const INITIAL_POS_REGISTERS = [
@@ -508,43 +513,46 @@ export const useInventoryStore = create(
           };
         }
 
-        const { canProduce, missing } = get().checkStock(recipe.id, batches);
-        if (!canProduce) {
-          const detail = missing.map(
-            (m) => `${m.name}: necesitas ${m.need.toFixed(2)} ${m.unit}, hay ${m.have.toFixed(2)}`
-          ).join('\n');
-          return { ok: false, message: `Insumos insuficientes:\n${detail}` };
+        const linkProduction = get().posSettings?.inventoryControl?.linkProduction ?? false;
+
+        if (linkProduction) {
+          const { canProduce, missing } = get().checkStock(recipe.id, batches);
+          if (!canProduce) {
+            const detail = missing.map(
+              (m) => `${m.name}: necesitas ${m.need.toFixed(2)} ${m.unit}, hay ${m.have.toFixed(2)}`
+            ).join('\n');
+            return { ok: false, message: `Insumos insuficientes:\n${detail}` };
+          }
         }
 
         const produced = recipe.yieldQty * batches;
 
         set((state) => {
-          // 1. Descontar insumos
-          let newInventory = state.inventory.map((item) => {
-            const ingredient = recipe.ingredients.find((i) => i.inventoryId === item.id);
-            if (ingredient) {
-              return { ...item, qty: Math.max(0, +(item.qty - (ingredient.qty * batches)).toFixed(3)) };
-            }
-            return item;
-          });
+          // 1. Descontar insumos (solo si está ligado)
+          let newInventory = state.inventory;
+          if (linkProduction) {
+            newInventory = state.inventory.map((item) => {
+              const ingredient = recipe.ingredients.find((i) => i.inventoryId === item.id);
+              if (ingredient) {
+                return { ...item, qty: Math.max(0, +(item.qty - (ingredient.qty * batches)).toFixed(3)) };
+              }
+              return item;
+            });
+          }
 
           // 2. Sumar al producto terminado
           const outputId = product?.outputInventoryId;
-          // Buscar primero por ID explícito, luego por nombre + tipo
           const targetItemIndex = newInventory.findIndex(
             (item) => (outputId && item.id === outputId) || (!outputId && item.type === 'PRODUCTO' && item.name === product.name)
           );
 
           if (targetItemIndex !== -1) {
-            // El producto ya existe en alguna bodega, sumarle
             const targetItem = newInventory[targetItemIndex];
             newInventory[targetItemIndex] = {
               ...targetItem,
               qty: +(targetItem.qty + produced).toFixed(3)
             };
           } else {
-            // El producto no existe o fue eliminado, crearlo en la bodega principal (BOD-003 es asumiendo que es Secos/Terminados)
-            // Si el nombre dice 'Crudo' lo mandamos a BOD-002 (Refrigerada). Si no sabemos, BOD-003.
             const targetWarehouseId = product.name.toLowerCase().includes('crudo') ? 'BOD-002' : 'BOD-003';
             const newItem = {
               id: outputId || `PRD-${Date.now()}`,
@@ -588,8 +596,12 @@ export const useInventoryStore = create(
         const rawItem = get().inventory.find(i => i.id === rawInventoryId);
         const fritoItem = get().inventory.find(i => i.id === fritoInventoryId);
 
-        if (!rawItem || rawItem.qty < qty) {
-           return { ok: false, message: `No hay suficiente stock de ${rawItem?.name ?? 'crudo'} (Disponible: ${rawItem?.qty ?? 0}).` };
+        const linkProduction = get().posSettings?.inventoryControl?.linkProduction ?? false;
+
+        if (linkProduction) {
+          if (!rawItem || rawItem.qty < qty) {
+             return { ok: false, message: `No hay suficiente stock de ${rawItem?.name ?? 'crudo'} (Disponible: ${rawItem?.qty ?? 0}).` };
+          }
         }
         if (!fritoItem) {
            return { ok: false, message: 'Producto frito destino no encontrado.' };
@@ -597,7 +609,7 @@ export const useInventoryStore = create(
 
         set((state) => {
           const newInventory = state.inventory.map(i => {
-            if (i.id === rawInventoryId) return { ...i, qty: +(i.qty - qty).toFixed(3) };
+            if (i.id === rawInventoryId && linkProduction) return { ...i, qty: +(i.qty - qty).toFixed(3) };
             if (i.id === fritoInventoryId) return { ...i, qty: +(i.qty + qty).toFixed(3) };
             return i;
           });
@@ -904,8 +916,52 @@ export const useInventoryStore = create(
       deleteLoadTemplate: (id) => { set((s) => ({ loadTemplates: (s.loadTemplates || []).filter(t => t.id !== id) })); syncKey('loadTemplates', useInventoryStore.getState().loadTemplates); },
 
       // Ventas / Caja
-      addPosSale: (sale) => { set((s) => ({ posSales: [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])] })); syncKey('posSales', useInventoryStore.getState().posSales); },
-      updatePosSale: (id, data) => { set((s) => ({ posSales: (s.posSales || []).map((sale) => sale.id === id ? { ...sale, ...data } : sale) })); syncKey('posSales', useInventoryStore.getState().posSales); },
+      addPosSale: (sale) => {
+        set((s) => {
+          const updatedSales = [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])];
+          let newInventory = s.inventory;
+          const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
+          if (linkSales && sale.items && sale.status === 'PAID') {
+            newInventory = s.inventory.map(invItem => {
+              const soldItem = sale.items.find(i => String(i.productId || i.id) === String(invItem.id));
+              if (soldItem) {
+                return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
+              }
+              return invItem;
+            });
+          }
+          return { posSales: updatedSales, inventory: newInventory };
+        });
+        syncKey('posSales', useInventoryStore.getState().posSales);
+        syncKey('inventory', useInventoryStore.getState().inventory);
+      },
+      updatePosSale: (id, data) => {
+        set((s) => {
+          const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
+          let newInventory = s.inventory;
+          const updatedSales = (s.posSales || []).map((sale) => {
+            if (sale.id === id) {
+              const wasPaid = sale.status === 'PAID';
+              const isPaid = data.status === 'PAID';
+              if (linkSales && !wasPaid && isPaid && (data.items || sale.items)) {
+                const saleItems = data.items || sale.items || [];
+                newInventory = s.inventory.map(invItem => {
+                  const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
+                  if (soldItem) {
+                    return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
+                  }
+                  return invItem;
+                });
+              }
+              return { ...sale, ...data };
+            }
+            return sale;
+          });
+          return { posSales: updatedSales, inventory: newInventory };
+        });
+        syncKey('posSales', useInventoryStore.getState().posSales);
+        syncKey('inventory', useInventoryStore.getState().inventory);
+      },
       deletePosSale: (id) => { set((s) => ({ posSales: (s.posSales || []).filter((sale) => sale.id !== id) })); syncKey('posSales', useInventoryStore.getState().posSales); },
 
       addPosShift: (shift) => {

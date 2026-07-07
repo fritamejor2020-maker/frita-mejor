@@ -137,6 +137,7 @@ export function ClientePedirView() {
   const [vendors, setVendors] = useState<any[]>([]);
   const [products, setProducts] = useState<any[]>([]);
   const [inventorySnapshots, setInventorySnapshots] = useState<any[]>([]);
+  const [posSettings, setPosSettings] = useState<any>(null);
 
   // --- Formulario Checkout ---
   const [name, setName] = useState('');
@@ -298,6 +299,15 @@ export function ClientePedirView() {
         items = globalData?.value || [];
       }
 
+      const { data: settingsData } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'posSettings')
+        .maybeSingle();
+      if (settingsData?.value) {
+        setPosSettings(settingsData.value);
+      }
+
       const saleItems = (items || []).filter(
         (i: any) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type || i.tipo) && i.price != null
       );
@@ -388,10 +398,11 @@ export function ClientePedirView() {
 
   // Stock disponible consolidado de los carritos del municipio
   const availableProducts = products.map(prod => {
+    const strictStock = posSettings?.inventoryControl?.strictTricycleStock ?? false;
     const totalStock = prod.stock || 0;
     return {
       ...prod,
-      stock: totalStock > 0 ? totalStock : 10
+      stock: strictStock ? totalStock : (totalStock > 0 ? totalStock : 10)
     };
   });
 

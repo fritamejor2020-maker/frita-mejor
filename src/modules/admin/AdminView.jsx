@@ -466,12 +466,146 @@ function FryKitchensPanel() {
 }
 
 // ─── Panel: Inventario General ────────────────────────────────────────────────
+const parseCSV = (text) => {
+  const lines = text.split(/\r?\n/);
+  if (lines.length < 2) return [];
+  const headerLine = lines[0];
+  const delimiter = headerLine.includes(';') ? ';' : ',';
+  const headers = headerLine.split(delimiter).map(h => h.trim().replace(/^"|"$/g, ''));
+  const result = [];
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    let row = [];
+    let insideQuote = false;
+    let entry = '';
+    for (let charIndex = 0; charIndex < line.length; charIndex++) {
+      const char = line[charIndex];
+      if (char === '"') {
+        insideQuote = !insideQuote;
+      } else if (char === delimiter && !insideQuote) {
+        row.push(entry.trim().replace(/^"|"$/g, ''));
+        entry = '';
+      } else {
+        entry += char;
+      }
+    }
+    row.push(entry.trim().replace(/^"|"$/g, ''));
+    if (row.length === headers.length) {
+      const obj = {};
+      headers.forEach((header, idx) => {
+        obj[header] = row[idx];
+      });
+      result.push(obj);
+    }
+  }
+  return result;
+};
+
 function InventoryPanel() {
-  const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem } = useInventoryStore();
+  const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory } = useInventoryStore();
   const [editingId, setEditingId] = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
   const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
   const [filterWh,  setFilterWh]  = useState('ALL');
+
+  const handleCsvUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const text = event.target?.result;
+        if (typeof text !== 'string') return;
+        
+        const rows = parseCSV(text);
+        if (rows.length === 0) {
+          alert('El archivo CSV está vacío o no tiene el formato correcto.');
+          return;
+        }
+
+        let currentCategories = [...posCategories];
+        let updatedCount = 0;
+        let createdCount = 0;
+
+        rows.forEach((row) => {
+          const name = row.Name || row.name;
+          if (!name) return;
+
+          const groupName = row.ProductGroup || row.productGroup;
+          let catId = '';
+          if (groupName && groupName.trim() !== '' && groupName.trim() !== 'No Leido') {
+            const trimmedGroup = groupName.trim();
+            const existingCat = currentCategories.find(c => c.name.toLowerCase() === trimmedGroup.toLowerCase());
+            if (existingCat) {
+              catId = existingCat.id;
+            } else {
+              const newCatId = `CAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+              const newCat = { id: newCatId, name: trimmedGroup, icon: '📦', color: '#ffb700' };
+              addPosCategory(newCat);
+              currentCategories.push(newCat);
+              catId = newCatId;
+            }
+          }
+
+          let quantity = parseFloat(row.Quantity || row.quantity) || 0;
+          if (quantity < 0) quantity = 0;
+
+          const lowerName = name.toLowerCase();
+          let tipo = 'PRODUCTO';
+          let estado = 'N/A';
+          if (lowerName.includes('empanada') || lowerName.includes('pastel') || lowerName.includes('maduro') || lowerName.includes('chorizo') || lowerName.includes('hamburguesa') || lowerName.includes('bofe') || lowerName.includes('rellena') || lowerName.includes('chicharrón') || lowerName.includes('hueso') || lowerName.includes('arepa de huevo') || lowerName.includes('azadura') || lowerName.includes('chunchulla') || lowerName.includes('picada')) {
+            tipo = 'PRODUCTO';
+            estado = 'FRITO';
+          }
+
+          const barcode = row.Barcode || row.SKU || '';
+          const price = parseFloat(row.Price || row.price) || 0;
+          const unit = row.MeasurementUnit || 'unidades';
+
+          const existingItem = inventory.find(i => 
+            (barcode && i.barcode === barcode) || 
+            (i.name.toLowerCase().trim() === name.toLowerCase().trim())
+          );
+
+          const typeVal = buildType(tipo, estado);
+          if (existingItem) {
+            updateInventoryItem(existingItem.id, {
+              price,
+              barcode,
+              qty: quantity || existingItem.qty,
+              posCategoryId: catId || existingItem.posCategoryId,
+              type: typeVal
+            });
+            updatedCount++;
+          } else {
+            addInventoryItem({
+              name,
+              barcode,
+              qty: quantity,
+              unit,
+              type: typeVal,
+              estado,
+              alert: 5,
+              warehouseId: 'BOD-001',
+              price,
+              posCategoryId: catId,
+              imageUrl: ''
+            });
+            createdCount++;
+          }
+        });
+
+        alert(`¡Importación exitosa! Se crearon ${createdCount} productos nuevos y se actualizaron ${updatedCount} existentes.`);
+      } catch (err) {
+        console.error('Error al procesar el archivo CSV:', err);
+        alert('Error al procesar el archivo CSV: ' + err.message);
+      }
+    };
+    reader.readAsText(file, 'UTF-8');
+    e.target.value = '';
+  };
 
   const fields = [
     { key: 'name',        label: 'Nombre',          wide: true },
@@ -519,6 +653,15 @@ function InventoryPanel() {
             <option value="ALL">Todas las bodegas</option>
             {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </select>
+          <label className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs py-2.5 px-5 rounded-full shadow-sm hover:opacity-90 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95">
+            📥 Importar CSV
+            <input
+              type="file"
+              accept=".csv"
+              className="hidden"
+              onChange={handleCsvUpload}
+            />
+          </label>
           <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
             + Agregar ítem
           </Button>
@@ -1938,12 +2081,22 @@ function PosConfigPanel() {
   const [printerName, setPrinterName] = useState(posSettings?.printerName || 'POS-58');
   const [gridSize, setGridSize] = useState(posSettings?.gridSize || 'medium');
 
+  // Control de inventario modular
+  const [linkProduction, setLinkProduction] = useState(posSettings?.inventoryControl?.linkProduction || false);
+  const [linkSalesToInventory, setLinkSalesToInventory] = useState(posSettings?.inventoryControl?.linkSalesToInventory || false);
+  const [strictTricycleStock, setStrictTricycleStock] = useState(posSettings?.inventoryControl?.strictTricycleStock || false);
+
   const handleSave = () => {
     updatePosSettings({
       paymentMethods: methods,
       cashDrawerCode,
       printerName,
-      gridSize
+      gridSize,
+      inventoryControl: {
+        linkProduction,
+        linkSalesToInventory,
+        strictTricycleStock
+      }
     });
     alert('Configuración POS guardada correctamente');
   };
@@ -2080,6 +2233,80 @@ function PosConfigPanel() {
             <option value="medium">Módulos Medianos (Predeterminado)</option>
             <option value="large">Módulos Grandes (Ideal para pantallas táctiles)</option>
           </select>
+        </div>
+
+        <div className="bg-amber-50/50 border border-amber-200/60 rounded-3xl p-6 my-8">
+          <h4 className="font-black text-amber-800 text-base mb-2">⚙️ Control de Inventario Modular</h4>
+          <p className="text-xs text-amber-600 font-bold mb-5">
+            Activa o desactiva de forma modular los enlaces automáticos de stock. Esto te permite ir incorporando el control estricto paso a paso.
+          </p>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div>
+                <span className="block font-black text-gray-800 text-sm">🏭 Ligado de Producción y Fritado (Crudos a Fritos)</span>
+                <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                  Si está activo, producir o freír fritos requiere insumos/crudos y los descuenta del inventario. Si está inactivo, se puede producir/freír de forma libre.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkProduction(!linkProduction)}
+                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
+                  linkProduction ? 'bg-amber-500' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
+                    linkProduction ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div>
+                <span className="block font-black text-gray-800 text-sm">🛒 Ligado de Caja POS/Ventas a Inventario</span>
+                <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                  Si está activo, las ventas registradas en caja POS y los pedidos entregados por triciclo descuentan stock de forma automática.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setLinkSalesToInventory(!linkSalesToInventory)}
+                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
+                  linkSalesToInventory ? 'bg-amber-500' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
+                    linkSalesToInventory ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div>
+                <span className="block font-black text-gray-800 text-sm">🛵 Ligado de Stock Físico a Triciclos</span>
+                <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                  Si está activo, los clientes que piden por la app solo verán stock disponible si el Dejador ha cargado previamente mercancía en los triciclos. Si está inactivo, el stock se asume siempre disponible (10 unidades por defecto).
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStrictTricycleStock(!strictTricycleStock)}
+                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
+                  strictTricycleStock ? 'bg-amber-500' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
+                    strictTricycleStock ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+          </div>
         </div>
 
         <Button className="rounded-full text-md py-3 px-8 shadow-sm bg-chunky-secondary hover:opacity-90 mt-4" onClick={handleSave}>
