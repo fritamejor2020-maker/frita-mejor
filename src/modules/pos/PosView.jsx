@@ -733,19 +733,26 @@ export function PosView() {
 
   // GRID RENDER LOGIC --
   // Include all items that are products or fritos, regardless of price (variable price)
-  let sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
-
-  // Filtrar según la configuración de visibilidad del administrador
-  if (posSettings?.layout?.showOnlySelected) {
-    const allowedIds = new Set(posSettings.layout.selectedProductIds || []);
-    sellableItems = sellableItems.filter(i => allowedIds.has(i.id));
-  }
+  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
   
   // If in root, show folders + unassigned items. If in folder, show items assigned to that folder.
   const displayedFolders = currentFolder ? [] : posCategories;
-  const displayedItems = currentFolder 
-    ? sellableItems.filter(i => i.posCategoryId === currentFolder)
-    : sellableItems.filter(i => !i.posCategoryId); // Items outside any folder
+  
+  let displayedItems = [];
+  if (currentFolder) {
+    // Si estamos dentro de una categoría, mostrar todos los productos de esa categoría sin filtrar
+    displayedItems = sellableItems.filter(i => i.posCategoryId === currentFolder);
+  } else {
+    // Si estamos en la raíz del feed:
+    if (posSettings?.layout?.showOnlySelected) {
+      // Mostrar solo los productos seleccionados en la configuración de visibilidad
+      const allowedIds = new Set(posSettings.layout.selectedProductIds || []);
+      displayedItems = sellableItems.filter(i => allowedIds.has(i.id));
+    } else {
+      // Mostrar solo los productos que no tienen categoría asignada
+      displayedItems = sellableItems.filter(i => !i.posCategoryId);
+    }
+  }
 
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
 
