@@ -2071,7 +2071,7 @@ function CustomersPanel() {
 
 // ─── Panel: Configuración POS General ──────────────────────────────────────────
 function PosConfigPanel() {
-  const { posSettings, updatePosSettings } = useInventoryStore();
+  const { posSettings, updatePosSettings, inventory = [] } = useInventoryStore();
   
   // Local state to handle array edits cleanly before saving
   const [methods, setMethods] = useState(posSettings?.paymentMethods || [
@@ -2086,6 +2086,16 @@ function PosConfigPanel() {
   const [linkSalesToInventory, setLinkSalesToInventory] = useState(posSettings?.inventoryControl?.linkSalesToInventory || false);
   const [strictTricycleStock, setStrictTricycleStock] = useState(posSettings?.inventoryControl?.strictTricycleStock || false);
 
+  // Configuración de Diseño y Feed
+  const [gridColumns, setGridColumns] = useState(posSettings?.layout?.gridColumns || 6);
+  const [gridRows, setGridRows] = useState(posSettings?.layout?.gridRows || 4);
+  const [showOnlySelected, setShowOnlySelected] = useState(posSettings?.layout?.showOnlySelected || false);
+  const [selectedProductIds, setSelectedProductIds] = useState(posSettings?.layout?.selectedProductIds || []);
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const sellableProducts = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+  const filteredProducts = sellableProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
   const handleSave = () => {
     updatePosSettings({
       paymentMethods: methods,
@@ -2096,6 +2106,12 @@ function PosConfigPanel() {
         linkProduction,
         linkSalesToInventory,
         strictTricycleStock
+      },
+      layout: {
+        gridColumns: parseInt(gridColumns, 10) || 6,
+        gridRows: parseInt(gridRows, 10) || 4,
+        showOnlySelected,
+        selectedProductIds
       }
     });
     alert('Configuración POS guardada correctamente');
@@ -2233,6 +2249,122 @@ function PosConfigPanel() {
             <option value="medium">Módulos Medianos (Predeterminado)</option>
             <option value="large">Módulos Grandes (Ideal para pantallas táctiles)</option>
           </select>
+        </div>
+
+        {/* 🎨 Diseño y Feed del POS */}
+        <div className="bg-blue-50/50 border border-blue-200/60 rounded-3xl p-6 my-8">
+          <h4 className="font-black text-blue-800 text-base mb-2">🎨 Diseño y Feed del POS</h4>
+          <p className="text-xs text-blue-600 font-bold mb-5">
+            Configura el número de filas y columnas del menú del POS, y selecciona exactamente qué productos deseas mostrar en el feed principal de la caja registradora.
+          </p>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div>
+              <label className="text-sm font-bold text-gray-700 block mb-2">Número de Columnas</label>
+              <input 
+                type="number" 
+                min="3" 
+                max="8"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
+                value={gridColumns}
+                onChange={(e) => setGridColumns(e.target.value)}
+              />
+              <span className="text-[10px] text-gray-400 font-bold mt-1 block">Columnas de productos mostradas en la rejilla (Recomendado: 6)</span>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-700 block mb-2">Número de Filas</label>
+              <input 
+                type="number" 
+                min="2" 
+                max="20"
+                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
+                value={gridRows}
+                onChange={(e) => setGridRows(e.target.value)}
+              />
+              <span className="text-[10px] text-gray-400 font-bold mt-1 block">Filas máximas visibles (el resto requerirá scroll)</span>
+            </div>
+          </div>
+
+          <div className="border-t border-blue-100 pt-5 space-y-4">
+            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div>
+                <span className="block font-black text-gray-800 text-sm">👁️ Mostrar solo productos seleccionados en la Caja</span>
+                <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                  Si está activo, podrás marcar abajo individualmente los productos que deseas que aparezcan en el POS, ocultando los demás del catálogo general.
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowOnlySelected(!showOnlySelected)}
+                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
+                  showOnlySelected ? 'bg-blue-500' : 'bg-gray-200'
+                }`}
+              >
+                <div
+                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
+                    showOnlySelected ? 'translate-x-6' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {showOnlySelected && (
+              <div className="bg-white rounded-2xl p-5 border border-gray-100 space-y-4 animate-[fadeIn_0.2s_ease-out]">
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    placeholder="🔍 Buscar producto a configurar..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-chunky-main"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                  />
+                  {selectedProductIds.length > 0 && (
+                    <button 
+                      onClick={() => setSelectedProductIds([])}
+                      className="text-xs font-bold text-red-500 hover:underline shrink-0"
+                    >
+                      Desmarcar Todos ({selectedProductIds.length})
+                    </button>
+                  )}
+                </div>
+
+                <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1">
+                  {filteredProducts.map(p => {
+                    const isChecked = selectedProductIds.includes(p.id);
+                    return (
+                      <label 
+                        key={p.id} 
+                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-xs font-bold ${
+                          isChecked ? 'bg-blue-50/50 text-blue-800' : 'hover:bg-gray-50 text-gray-600'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="w-4 h-4 accent-blue-500 cursor-pointer"
+                          checked={isChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedProductIds([...selectedProductIds, p.id]);
+                            } else {
+                              setSelectedProductIds(selectedProductIds.filter(id => id !== p.id));
+                            }
+                          }}
+                        />
+                        <div className="flex-1 flex justify-between">
+                          <span>{p.name}</span>
+                          <span className="text-[10px] text-gray-400 font-semibold uppercase">{p.type}</span>
+                        </div>
+                      </label>
+                    );
+                  })}
+                  {filteredProducts.length === 0 && (
+                    <p className="text-center py-4 text-xs font-bold text-gray-400">No se encontraron productos</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="bg-amber-50/50 border border-amber-200/60 rounded-3xl p-6 my-8">

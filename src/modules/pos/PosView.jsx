@@ -733,7 +733,13 @@ export function PosView() {
 
   // GRID RENDER LOGIC --
   // Include all items that are products or fritos, regardless of price (variable price)
-  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+  let sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+
+  // Filtrar según la configuración de visibilidad del administrador
+  if (posSettings?.layout?.showOnlySelected) {
+    const allowedIds = new Set(posSettings.layout.selectedProductIds || []);
+    sellableItems = sellableItems.filter(i => allowedIds.has(i.id));
+  }
   
   // If in root, show folders + unassigned items. If in folder, show items assigned to that folder.
   const displayedFolders = currentFolder ? [] : posCategories;
@@ -1181,12 +1187,21 @@ export function PosView() {
         </div>
 
         {/* Grid Area */}
-        <div className="flex-1 p-4 overflow-y-auto scrollbar-thin bg-gradient-to-br from-[#1e1f26] to-[#16171d]">
-          <div className={`grid gap-3 sm:gap-4 pb-20 ${
-              posSettings?.gridSize === 'small' ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8' :
-              posSettings?.gridSize === 'large' ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
-              'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
-          }`}>
+        <div className={`flex-1 p-4 bg-gradient-to-br from-[#1e1f26] to-[#16171d] ${posSettings?.layout?.gridRows ? 'overflow-hidden h-full pb-6' : 'overflow-y-auto scrollbar-thin'}`}>
+          <div 
+            className={`grid gap-3 sm:gap-4 pb-20 ${
+              !posSettings?.layout?.gridColumns ? (
+                posSettings?.gridSize === 'small' ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8' :
+                posSettings?.gridSize === 'large' ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
+                'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6'
+              ) : ''
+            }`}
+            style={{
+              gridTemplateColumns: posSettings?.layout?.gridColumns ? `repeat(${posSettings.layout.gridColumns}, minmax(0, 1fr))` : undefined,
+              gridTemplateRows: posSettings?.layout?.gridRows ? `repeat(${posSettings.layout.gridRows}, minmax(0, 1fr))` : undefined,
+              height: posSettings?.layout?.gridRows ? '100%' : undefined
+            }}
+          >
             
             {/* Folders (Removed per user request) */}
 
@@ -1194,7 +1209,7 @@ export function PosView() {
             {displayedItems.map(item => (
               <button 
                 key={item.id} 
-                className="aspect-square bg-[#21242d] hover:bg-[#2a2d38] border-2 border-transparent hover:border-chunky-main/50 rounded-[32px] flex flex-col justify-between p-4 text-left shadow-xl shadow-black/20 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-300 relative overflow-hidden group"
+                className={`${posSettings?.layout?.gridRows ? 'h-full' : 'aspect-square'} bg-[#21242d] hover:bg-[#2a2d38] border-2 border-transparent hover:border-chunky-main/50 rounded-[32px] flex flex-col justify-between p-4 text-left shadow-xl shadow-black/20 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-300 relative overflow-hidden group`}
                 onClick={() => handleItemAdd(item)}
               >
                 {/* Background Image if available */}

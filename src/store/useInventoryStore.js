@@ -236,6 +236,12 @@ const INITIAL_POS_SETTINGS = {
     linkSalesToInventory: false, // Ligado de Caja POS/Ventas a Inventario (descuento automático)
     strictTricycleStock: false,  // Ligado de stock físico estricto en Triciclos
   },
+  layout: {
+    gridColumns: 6,
+    gridRows: 4,
+    showOnlySelected: false,
+    selectedProductIds: [],
+  },
 };
 
 const INITIAL_POS_REGISTERS = [
