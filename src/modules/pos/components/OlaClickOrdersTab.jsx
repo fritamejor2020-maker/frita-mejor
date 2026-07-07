@@ -161,11 +161,6 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       });
 
       if (onOrderProcessed) onOrderProcessed();
-
-      // 4. Cerrar el modal para mostrar la interfaz del POS
-      if (onClose) {
-        setTimeout(() => onClose(), 200);
-      }
     } catch (err) {
       console.error('[OlaClickTab] Error al aceptar pedido:', err.message);
       toast.error('No se pudo procesar la aceptación del pedido');
@@ -228,6 +223,121 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     } catch (err) {
       console.error('[OlaClickTab] Error al rechazar pedido:', err.message);
       toast.error('No se pudo rechazar el pedido');
+    }
+  };
+
+  const handleAcceptAll = async () => {
+    const pendingOrders = orders.filter(o => o.status === 'PENDING');
+    if (pendingOrders.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de aceptar los ${pendingOrders.length} pedidos pendientes de una vez?`)) {
+      return;
+    }
+
+    try {
+      // 1. Update state local
+      setOrders(prev => prev.map(o => o.status === 'PENDING' ? { ...o, status: 'ACCEPTED' } : o));
+
+      // 2. Park each order in Ventas en Espera
+      for (const order of pendingOrders) {
+        parkOlaClickOrder(order);
+      }
+
+      // 3. Update DB
+      const ids = pendingOrders.map(o => o.id);
+      const { error } = await supabase
+        .from('olaclick_orders')
+        .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
+        .in('id', ids);
+
+      if (error) {
+        console.error('[OlaClickTab] Error al actualizar estado masivo en DB:', error.message);
+      }
+
+      // 4. Sync with OlaClick API asynchronously
+      const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+      const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
+      if (apiToken) {
+        Promise.all(
+          pendingOrders.map(order => 
+            fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ status: 'ACCEPTED' })
+            }).catch(e => console.warn(`[OlaClickTab] Error al notificar OlaClick para orden ${order.id}:`, e))
+          )
+        );
+      }
+
+      toast.success(`📱 ${pendingOrders.length} pedidos aceptados y guardados en Ventas en Espera`, {
+        className: 'bg-green-500 text-white font-black rounded-2xl shadow-chunky-lg'
+      });
+
+      if (onOrderProcessed) onOrderProcessed();
+    } catch (err) {
+      console.error('[OlaClickTab] Error en handleAcceptAll:', err.message);
+      toast.error('Error al procesar la aceptación masiva');
+    }
+  };
+
+  const handleRejectAll = async () => {
+    const pendingOrders = orders.filter(o => o.status === 'PENDING');
+    if (pendingOrders.length === 0) return;
+    
+    if (!confirm(`¿Estás seguro de RECHAZAR los ${pendingOrders.length} pedidos pendientes?`)) {
+      return;
+    }
+
+    try {
+      const rejectionReason = 'OTHER';
+
+      // 1. Update state local
+      setOrders(prev => prev.map(o => o.status === 'PENDING' ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o));
+
+      // 2. Update DB
+      const ids = pendingOrders.map(o => o.id);
+      const { error } = await supabase
+        .from('olaclick_orders')
+        .update({ 
+          status: 'REJECTED', 
+          rejection_reason: rejectionReason,
+          updated_at: new Date().toISOString() 
+        })
+        .in('id', ids);
+
+      if (error) {
+        console.error('[OlaClickTab] Error al rechazar masivo en DB:', error.message);
+      }
+
+      // 3. Sync with OlaClick API asynchronously
+      const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+      const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
+      if (apiToken) {
+        Promise.all(
+          pendingOrders.map(order => 
+            fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+              method: 'PATCH',
+              headers: {
+                'Authorization': `Bearer ${apiToken}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({ status: 'REJECTED', reason: rejectionReason })
+            }).catch(e => console.warn(`[OlaClickTab] Error al notificar rechazo a OlaClick para orden ${order.id}:`, e))
+          )
+        );
+      }
+
+      toast.error(`❌ ${pendingOrders.length} pedidos rechazados exitosamente`, {
+        className: 'bg-red-600 text-white font-black rounded-2xl shadow-chunky-lg'
+      });
+
+      if (onOrderProcessed) onOrderProcessed();
+    } catch (err) {
+      console.error('[OlaClickTab] Error en handleRejectAll:', err.message);
+      toast.error('Error al procesar el rechazo masivo');
     }
   };
 
@@ -325,7 +435,24 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <>
+            {activeTab === 'PENDING' && (
+              <div className="flex justify-end gap-3 pb-2">
+                <button
+                  onClick={handleRejectAll}
+                  className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-black text-xs px-4 py-2.5 rounded-xl border border-red-500/20 active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <X size={14} /> Rechazar Todos ({filteredOrders.length})
+                </button>
+                <button
+                  onClick={handleAcceptAll}
+                  className="bg-green-600 hover:bg-green-500 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow-md active:scale-95 transition-all flex items-center gap-1.5"
+                >
+                  <Check size={14} /> Aceptar Todos ({filteredOrders.length})
+                </button>
+              </div>
+            )}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {filteredOrders.map((order) => (
               <div
                 key={order.id}
@@ -462,6 +589,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
               </div>
             ))}
           </div>
+          </>
         )}
       </div>
     </div>
