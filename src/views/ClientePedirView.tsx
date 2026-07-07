@@ -309,7 +309,7 @@ export function ClientePedirView() {
       }
 
       const saleItems = (items || []).filter(
-        (i: any) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type || i.tipo) && i.price != null
+        (i: any) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type || i.tipo) && i.inTricycles === true
       );
 
       const mappedProducts = saleItems.map((item: any) => ({

@@ -71,14 +71,14 @@ export const usePosStore = create((set, get) => ({
       // 1. Buscar coincidencia por ID de producto o por nombre exacto
       let match = inventory.find(i => 
         (i.id === productId || (i.name && i.name.toLowerCase().trim() === normalizedItemName)) &&
-        i.price != null
+        i.inTricycles === true
       );
 
       // 2. Si no hay coincidencia exacta por nombre/ID, intentar búsqueda por coincidencia parcial (p. ej. "Empanada")
       if (!match) {
         match = inventory.find(i => 
           i.name && 
-          i.price != null && 
+          i.inTricycles === true && 
           (i.name.toLowerCase().includes(normalizedItemName) || normalizedItemName.includes(i.name.toLowerCase()))
         );
       }
@@ -145,14 +145,14 @@ export const usePosStore = create((set, get) => ({
       if (!match) {
         match = inventory.find(i => 
           (i.id === productId || (i.name && i.name.toLowerCase().trim() === normalizedItemName)) &&
-          i.price != null
+          i.inTricycles === true
         );
       }
 
       if (!match) {
         match = inventory.find(i => 
           i.name && 
-          i.price != null && 
+          i.inTricycles === true && 
           (i.name.toLowerCase().includes(normalizedItemName) || normalizedItemName.includes(i.name.toLowerCase()))
         );
       }

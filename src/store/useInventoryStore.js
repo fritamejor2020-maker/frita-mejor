@@ -51,17 +51,17 @@ const INITIAL_INVENTORY = [
   { id: 'INS-007', warehouseId: 'BOD-002', name: 'Paprika',          qty: 2,   unit: 'kg',  type: 'INSUMO',   alert: 0.5, barcode: '7701234000007' },
   { id: 'INS-008', warehouseId: 'BOD-002', name: 'Hielo',            qty: 200, unit: 'kg',  type: 'INSUMO',   alert: 30,  barcode: '7701234000008' },
   // Bodega de Secos — Productos terminados listos para despacho
-  { id: 'PRD-001', warehouseId: 'BOD-003', name: 'Chorizo Tradicional', qty: 30, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100001', price: 15000, posCategoryId: 'CAT-003' },
-  { id: 'PRD-002', warehouseId: 'BOD-003', name: 'Salchicha Viena',     qty: 15, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100002', price: 12000, posCategoryId: 'CAT-003' },
-  { id: 'PRD-003', warehouseId: 'BOD-003', name: 'Morcilla Negra',      qty: 8,  unit: 'kg', type: 'PRODUCTO', alert: 3, barcode: '7701234100003', price: 14000, posCategoryId: 'CAT-003' },
-  { id: 'PRD-004', warehouseId: 'BOD-003', name: 'Jamón del Diablo',    qty: 20, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100004', price: 25000, posCategoryId: 'CAT-003' },
+  { id: 'PRD-001', warehouseId: 'BOD-003', name: 'Chorizo Tradicional', qty: 30, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100001', price: 15000, posCategoryId: 'CAT-003', inTricycles: true },
+  { id: 'PRD-002', warehouseId: 'BOD-003', name: 'Salchicha Viena',     qty: 15, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100002', price: 12000, posCategoryId: 'CAT-003', inTricycles: true },
+  { id: 'PRD-003', warehouseId: 'BOD-003', name: 'Morcilla Negra',      qty: 8,  unit: 'kg', type: 'PRODUCTO', alert: 3, barcode: '7701234100003', price: 14000, posCategoryId: 'CAT-003', inTricycles: true },
+  { id: 'PRD-004', warehouseId: 'BOD-003', name: 'Jamón del Diablo',    qty: 20, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100004', price: 25000, posCategoryId: 'CAT-003', inTricycles: true },
   
   // Productos listos para freír / Fritos
   // Productos listos para freír / Fritos
   { id: 'PRD-RAW-005', warehouseId: 'BOD-002', name: 'Empanadas Crudas', qty: 150, unit: 'ud', type: 'PRODUCTO', alert: 30, barcode: '7701234100005C' },
   { id: 'PRD-RAW-006', warehouseId: 'BOD-002', name: 'Pasteles Crudos',  qty: 80,  unit: 'ud', type: 'PRODUCTO', alert: 15, barcode: '7701234100006C' },
-  { id: 'PRD-005', warehouseId: 'BOD-003', name: 'Empanadas Fritas',    qty: 100, unit: 'ud', type: 'FRITO',    alert: 20, barcode: '7701234100005', price: 2000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1626202868472-3580436d6a2f?q=80&w=300&auto=format&fit=crop' },
-  { id: 'PRD-006', warehouseId: 'BOD-003', name: 'Pasteles Fritos',     qty: 50,  unit: 'ud', type: 'FRITO',    alert: 10, barcode: '7701234100006', price: 4000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1604467715878-83e57e8ba129?q=80&w=300&auto=format&fit=crop' },
+  { id: 'PRD-005', warehouseId: 'BOD-003', name: 'Empanadas Fritas',    qty: 100, unit: 'ud', type: 'FRITO',    alert: 20, barcode: '7701234100005', price: 2000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1626202868472-3580436d6a2f?q=80&w=300&auto=format&fit=crop', inTricycles: true },
+  { id: 'PRD-006', warehouseId: 'BOD-003', name: 'Pasteles Fritos',     qty: 50,  unit: 'ud', type: 'FRITO',    alert: 10, barcode: '7701234100006', price: 4000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1604467715878-83e57e8ba129?q=80&w=300&auto=format&fit=crop', inTricycles: true },
 ];
 
 const INITIAL_PRODUCTS = [
@@ -457,7 +457,7 @@ export const useInventoryStore = create(
        */
       getPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true
         ),
 
       /**
@@ -467,7 +467,7 @@ export const useInventoryStore = create(
        */
       getDeliveryItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null && !i.showInTricicloPos
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true && !i.showInTricicloPos
         ),
 
       /**
@@ -477,7 +477,7 @@ export const useInventoryStore = create(
        */
       getVendedorPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.price != null && i.showInPos !== false
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true && i.showInPos !== false
         ),
 
 

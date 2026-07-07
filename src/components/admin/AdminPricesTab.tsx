@@ -41,9 +41,9 @@ export const AdminPricesTab = () => {
   const [customPresets, setCustomPresets] = useState<string[]>(['5', '10', '15', '20']);
   const [presetInput, setPresetInput] = useState('');
 
-  // Products SHOWN in the Precios Maestros list = any item that already has a price set
+  // Products SHOWN in the Precios Maestros list = any item that is marked inTricycles === true
   const products = inventory.filter(
-    (i: any) => (i.type === 'PRODUCTO' || i.type === 'FRITO') && i.price != null
+    (i: any) => (i.type === 'PRODUCTO' || i.type === 'FRITO') && i.inTricycles === true
   );
 
   // ALL inventory items NOT already in the priced list (any type)
@@ -88,10 +88,11 @@ export const AdminPricesTab = () => {
   };
 
   const handleAddFromInventory = (item: any) => {
-    // Set price=0, variablePrice=true and ensure type is PRODUCTO so getPosItems() includes it in Dejador/Vendedor
+    // Set inTricycles=true, price=0, variablePrice=true and ensure type is PRODUCTO/FRITO
     updateInventoryItem(item.id, {
-      price: 0,
-      variablePrice: true,
+      inTricycles: true,
+      price: item.price || 0,
+      variablePrice: item.variablePrice !== false,
       type: item.type === 'FRITO' ? 'FRITO' : 'PRODUCTO',
     });
     setMode('list');
@@ -99,10 +100,11 @@ export const AdminPricesTab = () => {
     // Open the full edit editor immediately so admin can configure everything
     openEdit({
       ...item,
-      price: 0,
-      variablePrice: true,
-      referencePrice: 0,
-      inventoryPresets: ['5', '10', '15', '20']
+      inTricycles: true,
+      price: item.price || 0,
+      variablePrice: item.variablePrice !== false,
+      referencePrice: item.referencePrice || 0,
+      inventoryPresets: item.inventoryPresets || ['5', '10', '15', '20']
     });
   };
 
@@ -125,6 +127,7 @@ export const AdminPricesTab = () => {
       referencePrice: customPriceType === 'variable' ? customReferencePrice : undefined,
       abbreviation: customAbbrev.trim() || undefined,
       inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
+      inTricycles: true,
     });
     setCustomName('');
     setCustomPrice(0);
@@ -137,13 +140,13 @@ export const AdminPricesTab = () => {
 
   const handleDelete = (id: string) => {
     // Find the item — if it's a custom product (added via addInventoryItem with qty=0), delete it;
-    // otherwise just remove the price so it goes back to the inventory pool without breaking other modules.
+    // otherwise just remove the inTricycles flag so it goes back to the inventory pool without breaking other modules.
     const item = inventory.find((i: any) => i.id === id);
     const isCustom = item?.qty === 0 && item?.alert === 0 && item?.unit === 'ud' && item?.warehouseId === 'BOD-003';
     if (isCustom) {
       deleteInventoryItem(id);
     } else {
-      updateInventoryItem(id, { price: null });
+      updateInventoryItem(id, { inTricycles: false });
     }
     setConfirmDeleteId(null);
   };
