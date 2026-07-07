@@ -281,11 +281,42 @@ export function ClientePedirView() {
   };
 
   const fetchCatalog = async () => {
-    const { data: prodData } = await supabase.from('products').select('*');
-    const { data: snapData } = await supabase.from('inventory_snapshots').select('*');
-    
-    setProducts(prodData || []);
-    setInventorySnapshots(snapData || []);
+    try {
+      const { data: stateData } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', `inventory_${selectedBranchId}`)
+        .maybeSingle();
+
+      let items = stateData?.value || [];
+      if (!items || items.length === 0) {
+        const { data: globalData } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'inventory')
+          .maybeSingle();
+        items = globalData?.value || [];
+      }
+
+      const saleItems = (items || []).filter(
+        (i: any) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type || i.tipo) && i.price != null
+      );
+
+      const mappedProducts = saleItems.map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        price: item.price,
+        category: item.posCategoryId || 'Fritos',
+        description: item.description || 'Recién preparado',
+        image_url: item.imageUrl || null,
+        stock: item.qty || 0
+      }));
+
+      setProducts(mappedProducts);
+      setInventorySnapshots([]);
+    } catch (err) {
+      console.error('Error fetching catalog:', err);
+    }
   };
 
   const monitorOrder = async () => {
@@ -357,10 +388,7 @@ export function ClientePedirView() {
 
   // Stock disponible consolidado de los carritos del municipio
   const availableProducts = products.map(prod => {
-    const totalStock = inventorySnapshots
-      .filter(snap => snap.product_id === prod.id)
-      .reduce((sum, snap) => sum + (snap.quantity || 0), 0);
-
+    const totalStock = prod.stock || 0;
     return {
       ...prod,
       stock: totalStock > 0 ? totalStock : 10
@@ -408,7 +436,7 @@ export function ClientePedirView() {
 
   const getCartTotal = () => {
     return Object.entries(cart).reduce((sum, [pId, qty]) => {
-      const prod = products.find(p => p.id === Number(pId));
+      const prod = products.find(p => String(p.id) === String(pId));
       return sum + (prod ? prod.price * qty : 0);
     }, 0);
   };
@@ -442,9 +470,9 @@ export function ClientePedirView() {
     const token = crypto.randomUUID ? crypto.randomUUID() : 'c-' + Math.random().toString(36).substring(2, 15);
 
     const itemsPayload = Object.entries(cart).map(([pId, qty]) => {
-      const prod = products.find(p => p.id === Number(pId));
+      const prod = products.find(p => String(p.id) === String(pId));
       return {
-        productId: Number(pId),
+        productId: pId,
         qty,
         name: prod?.name || 'Producto',
         price: prod?.price || 0
