@@ -164,6 +164,29 @@ export function PosView() {
   const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
   const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
+  const suspendedSales = (posSales || []).filter(s => s.status === 'SUSPENDED');
+  const allHeldAndSuspended = [
+    ...(heldSales || []).map(h => ({
+      ...h,
+      isOlaClick: h.isOlaClick,
+      source: 'local',
+      heldAt: h.heldAt || new Date().toISOString()
+    })),
+    ...suspendedSales.map(s => {
+      const cust = (customers || []).find(c => c.id === s.customerId);
+      return {
+        id: s.id,
+        customerName: cust?.name || 'Cliente General',
+        items: s.items,
+        total: s.total,
+        heldAt: s.timestamp || new Date().toISOString(),
+        isOlaClick: false,
+        source: 'db',
+        customerId: s.customerId
+      };
+    })
+  ].sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
+
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const loadPendingCount = async () => {
     try {
@@ -738,7 +761,7 @@ export function PosView() {
             <button className="shrink-0 h-11 px-3 flex items-center justify-center gap-1.5 bg-gray-800 text-gray-300 rounded-xl border border-gray-700 active:scale-95 active:bg-gray-600 transition-all relative" title="Ventas en Espera" onClick={() => setShowHeldSalesModal(true)}>
               <span>🕐</span>
               <span className="text-xs font-bold hidden sm:inline">En Espera</span>
-              {heldSales.length > 0 && <span className="bg-amber-500 text-gray-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-pulse">{heldSales.length}</span>}
+              {allHeldAndSuspended.length > 0 && <span className="bg-amber-500 text-gray-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-pulse">{allHeldAndSuspended.length}</span>}
             </button>
           </>
         )}
@@ -1425,7 +1448,7 @@ export function PosView() {
                 <h2 className="text-xl font-black text-white flex items-center gap-2">
                   <span>⏸️ Ventas en Espera</span>
                   <span className="bg-amber-500/20 text-amber-400 text-xs px-2.5 py-0.5 rounded-full font-bold">
-                    {heldSales.length} pausadas
+                    {allHeldAndSuspended.length} pausadas
                   </span>
                 </h2>
                 <p className="text-xs text-gray-400 font-bold mt-0.5">
@@ -1442,7 +1465,7 @@ export function PosView() {
 
             {/* Listado de Ventas en Espera */}
             <div className="p-6 flex-grow overflow-y-auto space-y-4">
-              {heldSales.length === 0 ? (
+              {allHeldAndSuspended.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center text-gray-500 py-12">
                   <span className="text-5xl mb-3">🛒</span>
                   <p className="text-base font-black text-gray-300">No hay ventas en espera</p>
@@ -1452,7 +1475,7 @@ export function PosView() {
                 </div>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {heldSales.map((sale) => (
+                  {allHeldAndSuspended.map((sale) => (
                     <div 
                       key={sale.id}
                       className="bg-[#181a24] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-700 transition-all shadow-md"
@@ -1499,12 +1522,20 @@ export function PosView() {
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-800">
                         <button
                           onClick={() => {
-                            const saleToLoad = heldSales.find(h => h.id === sale.id);
-                            if (saleToLoad) {
-                              setTicketItems(saleToLoad.items);
-                              deleteHeldSale(sale.id);
+                            if (sale.source === 'local') {
+                              const saleToLoad = heldSales.find(h => h.id === sale.id);
+                              if (saleToLoad) {
+                                setTicketItems(saleToLoad.items);
+                                deleteHeldSale(sale.id);
+                                setShowHeldSalesModal(false);
+                                toast.success(`Venta de ${sale.customerName} cargada al carrito`, { icon: '🛒' });
+                              }
+                            } else {
+                              setTicketItems(sale.items);
+                              setSelectedCustomer(sale.customerId || '');
+                              setActiveSuspendedId(sale.id);
                               setShowHeldSalesModal(false);
-                              toast.success(`Venta de ${sale.customerName} cargada al carrito`, { icon: '🛒' });
+                              toast.success(`Venta de ${sale.customerName} recuperada`, { icon: '🛒' });
                             }
                           }}
                           className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
@@ -1513,7 +1544,11 @@ export function PosView() {
                         </button>
                         <button
                           onClick={() => {
-                            deleteHeldSale(sale.id);
+                            if (sale.source === 'local') {
+                              deleteHeldSale(sale.id);
+                            } else {
+                              deletePosSale(sale.id);
+                            }
                             toast.error('Venta en espera eliminada');
                           }}
                           className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs p-2.5 rounded-xl border border-red-500/20 active:scale-95 transition-all"
