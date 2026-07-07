@@ -71,6 +71,24 @@ export function PosView() {
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [pinPromptConfig, setPinPromptConfig] = useState(null); // { message, expectedPin, onSuccess }
 
+  const isClosingLocalRef = useRef(false);
+  const prevActiveShiftRef = useRef(null);
+
+  useEffect(() => {
+    if (prevActiveShiftRef.current && !activeShift && selectedRegisterId) {
+      if (isClosingLocalRef.current) {
+        setSelectedRegisterId(null);
+        setShowRegisterModal(true);
+        isClosingLocalRef.current = false;
+      } else {
+        setSelectedRegisterId(null);
+        setShowRegisterModal(true);
+        alert("El turno de esta caja ha sido cerrado desde otro dispositivo.");
+      }
+    }
+    prevActiveShiftRef.current = activeShift;
+  }, [activeShift, selectedRegisterId]);
+
   // ── Reproductor sintetizado de Campana Triunfal (Web Audio API) ──
   const playVictoryChime = () => {
     try {
@@ -379,6 +397,7 @@ export function PosView() {
 
   const handleCloseShift = (realCount) => {
     if (!activeShift) return;
+    isClosingLocalRef.current = true;
     const closedDate = new Date().toISOString();
     const closedShiftData = { ...activeShift, closedAt: closedDate, realAmount: parseFloat(realCount) || 0 };
     updatePosShift(activeShift.id, {
