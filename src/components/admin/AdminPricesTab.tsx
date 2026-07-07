@@ -5,7 +5,7 @@ import { formatMoney } from '../../utils/formatUtils';
 import { MoneyInput } from '../ui/MoneyInput';
 import { push } from '../../lib/syncManager';
 
-type Mode = 'list' | 'add-select' | 'add-custom';
+type Mode = 'list' | 'add-select' | 'add-custom' | 'edit';
 type PriceType = 'fijo' | 'variable';
 
 export const AdminPricesTab = () => {
@@ -14,6 +14,13 @@ export const AdminPricesTab = () => {
   const [editPrice, setEditPrice] = useState<number>(0);
   const [editIsVariable, setEditIsVariable] = useState<boolean>(false);
   const [editReferencePrice, setEditReferencePrice] = useState<number>(0);
+  
+  // States for full-product editing modal
+  const [editName, setEditName] = useState('');
+  const [editAbbrev, setEditAbbrev] = useState('');
+  const [editPresets, setEditPresets] = useState<string[]>([]);
+  const [editPresetInput, setEditPresetInput] = useState('');
+
   const [mode, setMode] = useState<Mode>('list');
   const [search, setSearch] = useState('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -50,18 +57,34 @@ export const AdminPricesTab = () => {
 
   const openEdit = (p: any) => {
     setEditingId(p.id);
-    setEditPrice(p.price);
+    setEditName(p.name || '');
+    setEditAbbrev(p.abbreviation || '');
+    setEditPrice(p.price || 0);
     setEditIsVariable(p.variablePrice === true || p.price === 0);
     setEditReferencePrice(p.referencePrice || 0);
+    setEditPresets((p.inventoryPresets || []).map(String));
+    setEditPresetInput('');
+    setMode('edit');
   };
 
-  const handleSave = (id: string) => {
-    updateInventoryItem(id, {
+  const handleSave = () => {
+    if (!editingId) return;
+    const parsedPresets = editPresets
+      .map(v => v.trim())
+      .filter(v => v.length > 0)
+      .map(v => isNaN(Number(v)) ? v : Number(v));
+
+    updateInventoryItem(editingId, {
+      name: editName.trim(),
+      abbreviation: editAbbrev.trim() || undefined,
       price: editIsVariable ? 0 : editPrice,
       variablePrice: editIsVariable,
       referencePrice: editIsVariable ? editReferencePrice : undefined,
+      inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
     });
+    
     setEditingId(null);
+    setMode('list');
   };
 
   const handleAddFromInventory = (item: any) => {
@@ -73,10 +96,14 @@ export const AdminPricesTab = () => {
     });
     setMode('list');
     setSearch('');
-    // Open the price editor immediately so admin can set the price
-    setEditingId(item.id);
-    setEditPrice(0);
-    setEditIsVariable(true);
+    // Open the full edit editor immediately so admin can configure everything
+    openEdit({
+      ...item,
+      price: 0,
+      variablePrice: true,
+      referencePrice: 0,
+      inventoryPresets: ['5', '10', '15', '20']
+    });
   };
 
   const handleAddCustom = () => {
@@ -157,16 +184,7 @@ export const AdminPricesTab = () => {
                 <ProductRow
                   key={p.id}
                   p={p}
-                  editingId={editingId}
-                  editPrice={editPrice}
-                  editIsVariable={editIsVariable}
-                  editReferencePrice={editReferencePrice}
-                  setEditPrice={setEditPrice}
-                  setEditIsVariable={setEditIsVariable}
-                  setEditReferencePrice={setEditReferencePrice}
-                  handleSave={handleSave}
                   openEdit={openEdit}
-                  setEditingId={setEditingId}
                   confirmDeleteId={confirmDeleteId}
                   setConfirmDeleteId={setConfirmDeleteId}
                   handleDelete={handleDelete}
@@ -190,16 +208,7 @@ export const AdminPricesTab = () => {
                 <ProductRow
                   key={p.id}
                   p={p}
-                  editingId={editingId}
-                  editPrice={editPrice}
-                  editIsVariable={editIsVariable}
-                  editReferencePrice={editReferencePrice}
-                  setEditPrice={setEditPrice}
-                  setEditIsVariable={setEditIsVariable}
-                  setEditReferencePrice={setEditReferencePrice}
-                  handleSave={handleSave}
                   openEdit={openEdit}
-                  setEditingId={setEditingId}
                   confirmDeleteId={confirmDeleteId}
                   setConfirmDeleteId={setConfirmDeleteId}
                   handleDelete={handleDelete}
@@ -467,6 +476,183 @@ export const AdminPricesTab = () => {
           </div>
         </div>
       )}
+
+      {/* ── Modal: editar producto ───────── */}
+      {mode === 'edit' && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm px-4 pb-4 sm:pb-0"
+          onClick={() => { setEditingId(null); setMode('list'); }}
+        >
+          <div
+            className="bg-white rounded-[28px] p-6 w-full max-w-sm shadow-2xl max-h-[90vh] overflow-y-auto animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-5">
+              <h3 className="font-black text-gray-900 text-lg">Editar Producto</h3>
+              <button onClick={() => { setEditingId(null); setMode('list'); }} className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 hover:bg-gray-200 transition-colors">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              {/* Nombre */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Nombre</label>
+                <input
+                  type="text"
+                  placeholder="Ej: Salchicha Ranchera"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 outline-none focus:border-gray-900"
+                  autoFocus
+                />
+              </div>
+
+              {/* Abreviación + preview */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Abreviación <span className="normal-case font-medium text-gray-300">(máx. 3 letras)</span></label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="text"
+                    maxLength={3}
+                    placeholder="Ej: SR"
+                    value={editAbbrev}
+                    onChange={(e) => setEditAbbrev(e.target.value.toUpperCase())}
+                    className="w-24 px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-sm font-black text-gray-800 outline-none focus:border-gray-900 text-center tracking-widest"
+                  />
+                  <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center text-white text-xs font-black">
+                    {editAbbrev || (editName ? editName.slice(0,3).toUpperCase() : '??')}
+                  </div>
+                  <p className="text-xs text-gray-400 font-bold flex-1">Así aparece en los reportes y tarjetas</p>
+                </div>
+              </div>
+
+              {/* ── Tipo de Precio ── */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Tipo de Precio</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditIsVariable(false)}
+                    className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border-2 transition-all font-black text-sm ${
+                      !editIsVariable
+                        ? 'border-gray-900 bg-gray-900 text-white shadow-md'
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-400'
+                    }`}
+                  >
+                    📌 Fijo
+                    <span className="text-[10px] font-bold opacity-70">Precio definido</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditIsVariable(true)}
+                    className={`flex flex-col items-center gap-1 py-3 px-3 rounded-2xl border-2 transition-all font-black text-sm ${
+                      editIsVariable
+                        ? 'border-amber-500 bg-amber-500 text-white shadow-md'
+                        : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-amber-300'
+                    }`}
+                  >
+                    💱 Variable
+                    <span className="text-[10px] font-bold opacity-70">Vendedor ingresa</span>
+                  </button>
+                </div>
+                {editIsVariable && (
+                  <div className="mt-2 bg-amber-50 border border-amber-200 rounded-xl p-3 flex flex-col gap-2">
+                    <p className="text-[11px] font-bold text-amber-700">
+                      💱 El vendedor ingresa el precio real al vender.
+                      Aquí defines el <strong>precio promedio</strong> usado solo para calcular el teórico del cierre.
+                    </p>
+                    <div>
+                      <label className="block text-[10px] font-black text-amber-600 uppercase tracking-wider mb-1">Precio Promedio / Referencial</label>
+                      <div className="flex bg-white border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
+                        <span className="px-3 py-2.5 text-amber-400 font-bold">$</span>
+                        <MoneyInput
+                          value={String(editReferencePrice)}
+                          onChange={(v) => setEditReferencePrice(parseFloat(v) || 0)}
+                          className="bg-transparent outline-none font-black py-2.5 text-amber-700 flex-1"
+                          allowDecimal
+                        />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Precio (solo si fijo) */}
+              {!editIsVariable && (
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1.5">Precio de venta</label>
+                  <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-gray-900">
+                    <span className="px-4 py-3 text-gray-400 font-bold">$</span>
+                    <MoneyInput
+                      value={String(editPrice)}
+                      onChange={(v) => setEditPrice(parseFloat(v) || 0)}
+                      className="bg-transparent outline-none font-black py-3 text-gray-900 flex-1"
+                      allowDecimal
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Valores de los botones */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Botones de cantidad</label>
+                <p className="text-[11px] text-gray-400 mb-2">Pueden ser números o letras (ej: S, M, L, XL)</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {editPresets.map((v, i) => (
+                    <div key={i} className="flex items-center gap-1">
+                      <span className="w-9 h-9 rounded-full border-2 border-gray-900 bg-gray-50 flex items-center justify-center text-xs font-black text-gray-900">{v}</span>
+                      <button
+                        onClick={() => setEditPresets(prev => prev.filter((_, idx) => idx !== i))}
+                        className="w-5 h-5 rounded-full bg-red-100 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center text-[10px] font-black transition-colors"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                {editPresets.length < 6 && (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      maxLength={4}
+                      placeholder="Valor…"
+                      value={editPresetInput}
+                      onChange={(e) => setEditPresetInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && editPresetInput.trim()) {
+                          setEditPresets(prev => [...prev, editPresetInput.trim()]);
+                          setEditPresetInput('');
+                        }
+                      }}
+                      className="flex-1 px-3 py-2 rounded-xl bg-gray-50 border border-gray-200 text-sm font-bold text-gray-800 outline-none focus:border-gray-900"
+                    />
+                    <button
+                      onClick={() => {
+                        if (editPresetInput.trim()) {
+                          setEditPresets(prev => [...prev, editPresetInput.trim()]);
+                          setEditPresetInput('');
+                        }
+                      }}
+                      className="px-3 py-2 rounded-xl bg-gray-900 text-white text-sm font-black hover:bg-gray-700 transition-colors"
+                    >
+                      <Plus size={14} strokeWidth={3} />
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              <button
+                onClick={handleSave}
+                disabled={!editName.trim()}
+                className="w-full py-3.5 rounded-2xl bg-gray-900 text-white font-black text-sm disabled:opacity-40 hover:bg-gray-700 transition-colors active:scale-95"
+              >
+                Guardar Cambios
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -474,16 +660,7 @@ export const AdminPricesTab = () => {
 // ── Sub-componente reutilizable para cada fila de producto ────────────────
 interface ProductRowProps {
   p: any;
-  editingId: string | null;
-  editPrice: number;
-  editIsVariable: boolean;
-  editReferencePrice: number;
-  setEditPrice: (v: number) => void;
-  setEditIsVariable: (v: boolean) => void;
-  setEditReferencePrice: (v: number) => void;
-  handleSave: (id: string) => void;
   openEdit: (p: any) => void;
-  setEditingId: (id: string | null) => void;
   confirmDeleteId: string | null;
   setConfirmDeleteId: (id: string | null) => void;
   handleDelete: (id: string) => void;
@@ -491,13 +668,10 @@ interface ProductRowProps {
 }
 
 const ProductRow = ({
-  p, editingId, editPrice, editIsVariable, editReferencePrice,
-  setEditPrice, setEditIsVariable, setEditReferencePrice,
-  handleSave, openEdit, setEditingId,
+  p, openEdit,
   confirmDeleteId, setConfirmDeleteId, handleDelete,
   updateInventoryItem,
 }: ProductRowProps) => {
-  const isEditing = editingId === p.id;
   const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
 
   return (
@@ -535,118 +709,56 @@ const ProductRow = ({
 
 
       <div className="flex items-center gap-2 flex-shrink-0">
-        {isEditing ? (
-          <>
-            {/* Toggle fijo / variable mientras se edita */}
-            <div className="flex rounded-xl overflow-hidden border border-gray-200 text-[11px] font-black">
+        <>
+          {/* Precio o badge Variable */}
+          {isVariable ? (
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="flex items-center gap-1 bg-amber-100 text-amber-700 font-black text-xs px-3 py-1.5 rounded-full border border-amber-200">
+                <Shuffle size={11} /> Variable
+              </span>
+              {p.referencePrice > 0 && (
+                <span className="text-[10px] font-bold text-amber-500 px-1">≈ {formatMoney(p.referencePrice)}</span>
+              )}
+              {!p.referencePrice && (
+                <span className="text-[9px] font-bold text-red-400 px-1">⚠ Sin precio promedio</span>
+              )}
+            </div>
+          ) : (
+            <span className="font-black text-frita-red text-xl">{formatMoney(p.price)}</span>
+          )}
+
+          <button
+            onClick={() => openEdit(p)}
+            className="bg-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200 p-2.5 rounded-xl transition-colors"
+          >
+            <Edit2 size={18} strokeWidth={3} />
+          </button>
+
+          {confirmDeleteId === p.id ? (
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold text-red-500">¿Eliminar?</span>
               <button
-                onClick={() => { setEditIsVariable(false); }}
-                className={`px-2.5 py-1.5 transition-colors ${!editIsVariable ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                onClick={() => handleDelete(p.id)}
+                className="bg-red-500 text-white text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-red-600 transition-colors"
               >
-                📌 Fijo
+                Sí
               </button>
               <button
-                onClick={() => { setEditIsVariable(true); }}
-                className={`px-2.5 py-1.5 transition-colors ${editIsVariable ? 'bg-amber-500 text-white' : 'bg-gray-50 text-gray-400 hover:bg-gray-100'}`}
+                onClick={() => setConfirmDeleteId(null)}
+                className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-gray-200 transition-colors"
               >
-                💱 Variable
+                No
               </button>
             </div>
-
-            {/* Input de precio (solo si fijo) */}
-            {!editIsVariable && (
-              <div className="flex bg-gray-50 border border-gray-200 rounded-xl overflow-hidden focus-within:border-frita-orange">
-                <span className="px-3 py-2 text-gray-400 font-bold">$</span>
-                <MoneyInput
-                  value={String(editPrice)}
-                  onChange={(v) => setEditPrice(parseFloat(v) || 0)}
-                  className="bg-transparent outline-none font-black w-20 py-2 text-frita-red"
-                  allowDecimal
-                />
-              </div>
-            )}
-
-            {/* Precio promedio (solo si variable) */}
-            {editIsVariable && (
-              <div className="flex flex-col gap-0.5">
-                <span className="text-[9px] font-black text-amber-600 uppercase tracking-widest px-1">Precio Promedio</span>
-                <div className="flex bg-amber-50 border border-amber-300 rounded-xl overflow-hidden focus-within:border-amber-500">
-                  <span className="px-3 py-2 text-amber-400 font-bold">$</span>
-                  <MoneyInput
-                    value={String(editReferencePrice)}
-                    onChange={(v) => setEditReferencePrice(parseFloat(v) || 0)}
-                    className="bg-transparent outline-none font-black w-20 py-2 text-amber-700"
-                    allowDecimal
-                  />
-                </div>
-              </div>
-            )}
-
+          ) : (
             <button
-              onClick={() => handleSave(p.id)}
-              className="bg-green-500 text-white p-2.5 rounded-xl shadow-sm hover:scale-105 transition-transform"
+              onClick={() => setConfirmDeleteId(p.id)}
+              className="bg-gray-100 text-gray-300 hover:text-red-400 hover:bg-red-50 p-2.5 rounded-xl transition-colors"
             >
-              <Check size={18} strokeWidth={3} />
+              <Trash2 size={18} strokeWidth={2.5} />
             </button>
-            <button
-              onClick={() => setEditingId(null)}
-              className="bg-gray-100 text-gray-400 hover:text-gray-700 p-2.5 rounded-xl transition-colors"
-            >
-              <X size={18} strokeWidth={2.5} />
-            </button>
-          </>
-        ) : (
-          <>
-            {/* Precio o badge Variable */}
-            {isVariable ? (
-              <div className="flex flex-col items-end gap-0.5">
-                <span className="flex items-center gap-1 bg-amber-100 text-amber-700 font-black text-xs px-3 py-1.5 rounded-full border border-amber-200">
-                  <Shuffle size={11} /> Variable
-                </span>
-                {p.referencePrice > 0 && (
-                  <span className="text-[10px] font-bold text-amber-500 px-1">≈ {formatMoney(p.referencePrice)}</span>
-                )}
-                {!p.referencePrice && (
-                  <span className="text-[9px] font-bold text-red-400 px-1">⚠ Sin precio promedio</span>
-                )}
-              </div>
-            ) : (
-              <span className="font-black text-frita-red text-xl">{formatMoney(p.price)}</span>
-            )}
-
-            <button
-              onClick={() => openEdit(p)}
-              className="bg-gray-100 text-gray-400 hover:text-gray-700 hover:bg-gray-200 p-2.5 rounded-xl transition-colors"
-            >
-              <Edit2 size={18} strokeWidth={3} />
-            </button>
-
-            {confirmDeleteId === p.id ? (
-              <div className="flex items-center gap-1.5">
-                <span className="text-xs font-bold text-red-500">¿Eliminar?</span>
-                <button
-                  onClick={() => handleDelete(p.id)}
-                  className="bg-red-500 text-white text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-red-600 transition-colors"
-                >
-                  Sí
-                </button>
-                <button
-                  onClick={() => setConfirmDeleteId(null)}
-                  className="bg-gray-100 text-gray-500 text-xs font-black px-2.5 py-1.5 rounded-xl hover:bg-gray-200 transition-colors"
-                >
-                  No
-                </button>
-              </div>
-            ) : (
-              <button
-                onClick={() => setConfirmDeleteId(p.id)}
-                className="bg-gray-100 text-gray-300 hover:text-red-400 hover:bg-red-50 p-2.5 rounded-xl transition-colors"
-              >
-                <Trash2 size={18} strokeWidth={2.5} />
-              </button>
-            )}
-          </>
-        )}
+          )}
+        </>
       </div>
     </div>
   );
