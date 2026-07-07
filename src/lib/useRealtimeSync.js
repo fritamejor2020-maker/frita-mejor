@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { unstable_batchedUpdates } from 'react-dom';
 import { supabase } from './supabase';
 import { pullAll, GLOBAL_KEYS, BRANCH_KEYS, getBranchKey, getBaseKey } from './syncManager';
-import { useInventoryStore } from '../store/useInventoryStore';
+import { useInventoryStore, mergeArrays } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useSupplierStore } from '../store/useSupplierStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -81,27 +81,22 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const deleted = new Set(state.deletedShiftIds || []);
       const localShifts = (state.posShifts || []).filter(s => !deleted.has(s.id));
       const remote = (v || []).filter(s => !deleted.has(s.id));
-      // Merge: nunca eliminar un turno local abierto por una actualización remota
-      // (evita que el POS pierda el turno si Supabase llega con datos viejos)
-      const existingIds = new Set(localShifts.map(s => s?.id).filter(Boolean));
-      const newFromRemote = remote.filter(s => s?.id && !existingIds.has(s.id));
-      // Actualizar turnos locales con datos remotos solo si el remoto cierra el turno
-      const updatedLocal = localShifts.map(local => {
-        if (deleted.has(local.id)) return null;
-        const remoteVersion = remote.find(r => r.id === local.id);
-        // Si el remoto tiene closedAt y el local no, aplicar cierre remoto
-        if (remoteVersion && remoteVersion.closedAt && !local.closedAt) return remoteVersion;
-        return local;
-      }).filter(Boolean);
-      useInventoryStore.setState({ posShifts: [...updatedLocal, ...newFromRemote] });
+      const merged = mergeArrays(localShifts, remote, 'posShifts');
+      useInventoryStore.setState({ posShifts: merged });
     };
-    applicators[`posSales_${bid}`]         = (v) => useInventoryStore.setState({ posSales: v });
+    applicators[`posSales_${bid}`]         = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.posSales || [], v || [], 'posSales');
+      useInventoryStore.setState({ posSales: merged });
+    };
     applicators[`posExpenses_${bid}`]      = (v) => useInventoryStore.setState({ posExpenses: v });
     applicators[`inventory_${bid}`]        = (v) => {
-      // Filtrar tombstones de inventario
-      const deletedInv = new Set(useInventoryStore.getState().deletedInventoryIds || []);
-      const filtered = (v || []).filter(i => !deletedInv.has(i.id));
-      useInventoryStore.setState({ inventory: filtered });
+      const state = useInventoryStore.getState();
+      const deletedInv = new Set(state.deletedInventoryIds || []);
+      const localInv = (state.inventory || []).filter(i => !deletedInv.has(i.id));
+      const remote = (v || []).filter(i => !deletedInv.has(i.id));
+      const merged = mergeArrays(localInv, remote, 'inventory');
+      useInventoryStore.setState({ inventory: merged });
     };
     applicators[`contrataPayments_${bid}`] = (v) => useInventoryStore.setState({ contrataPayments: v });
     applicators[`deletedShiftIds_${bid}`]  = (v) => {

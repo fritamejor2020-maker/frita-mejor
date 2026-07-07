@@ -18,6 +18,60 @@ function syncKey(key, value) {
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 }
 
+// Helper: realiza un merge inteligente de arrays locales y remotos para evitar
+// pérdida de actualizaciones concurrentes (como el cierre de un turno en otro dispositivo)
+export function mergeArrays(localArr, remoteArr, key) {
+  if (!Array.isArray(localArr)) return remoteArr || [];
+  if (!Array.isArray(remoteArr)) return localArr || [];
+  
+  const remoteById = new Map(remoteArr.filter(x => x?.id).map(x => [x.id, x]));
+  const merged = [];
+  const addedIds = new Set();
+
+  localArr.forEach(localItem => {
+    if (localItem?.id) {
+      const remoteVersion = remoteById.get(localItem.id);
+      if (remoteVersion) {
+        // Reglas de fusión específicas por tipo de datos
+        if (key === 'posShifts') {
+          if (remoteVersion.closedAt) {
+            merged.push(remoteVersion);
+          } else if (localItem.closedAt) {
+            merged.push(localItem);
+          } else {
+            merged.push({ ...localItem, ...remoteVersion });
+          }
+        } else if (key === 'posSales') {
+          if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
+            merged.push(remoteVersion);
+          } else if (localItem.status === 'PAID' || localItem.status === 'REJECTED') {
+            merged.push(localItem);
+          } else {
+            merged.push({ ...localItem, ...remoteVersion });
+          }
+        } else {
+          // Por defecto, remoto gana para actualizaciones (inventarios, productos, etc.)
+          merged.push(remoteVersion);
+        }
+      } else {
+        // Solo existe localmente (ej: venta offline)
+        merged.push(localItem);
+      }
+      addedIds.add(localItem.id);
+    } else {
+      merged.push(localItem);
+    }
+  });
+
+  remoteArr.forEach(remoteItem => {
+    if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
+      merged.push(remoteItem);
+    }
+  });
+
+  return merged;
+}
+
 // =============================================================================
 // DATOS INICIALES — BODEGAS Y PUNTOS DE PRODUCCIÓN
 // =============================================================================
@@ -314,23 +368,10 @@ export const useInventoryStore = create(
                 if (isNonEmpty) {
                   let finalVal = val;
 
-                  // Para arrays: smart merge — local gana en IDs existentes
+                  // Para arrays: smart merge con mergeArrays
                   if (Array.isArray(finalVal)) {
                     const localArr = get()[key] || [];
-                    if (localArr.length > 0) {
-                      const localById = new Map(localArr.filter(x => x?.id).map(x => [x.id, x]));
-                      // Empezar con todos los locales (local gana)
-                      const merged = [...localArr];
-                      const mergedIds = new Set(localArr.map(x => x?.id).filter(Boolean));
-                      // Agregar items remotos que no existan localmente
-                      finalVal.forEach(item => {
-                        if (item?.id && !mergedIds.has(item.id)) {
-                          merged.push(item);
-                          mergedIds.add(item.id);
-                        }
-                      });
-                      finalVal = merged;
-                    }
+                    finalVal = mergeArrays(localArr, finalVal, key);
                     // Aplicar tombstones
                     if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
                     if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
@@ -364,28 +405,16 @@ export const useInventoryStore = create(
             for (const key of BRANCH_STORE_KEYS) {
               const localArr = get()[key] || [];
               let merged = Array.isArray(localArr) ? [...localArr] : [];
-              const existingIds = new Set(merged.map(x => x?.id).filter(Boolean));
 
               if (remote[key] && Array.isArray(remote[key])) {
-                remote[key].forEach(item => {
-                  if (item?.id && !existingIds.has(item.id)) {
-                    merged.push(item);
-                    existingIds.add(item.id);
-                  }
-                });
+                merged = mergeArrays(merged, remote[key], key);
               }
 
               for (const bId of allBranchIds) {
                 const branchKeyName = `${key}_${bId}`;
                 const val = remote[branchKeyName];
                 if (Array.isArray(val) && val.length > 0) {
-                  // Merge arrays, avoiding duplicate IDs
-                  val.forEach(item => {
-                    if (item?.id && !existingIds.has(item.id)) {
-                      merged.push(item);
-                      existingIds.add(item.id);
-                    }
-                  });
+                  merged = mergeArrays(merged, val, key);
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
                   // Para objetos (posSettings, etc.): deep merge, local gana
                   const localVal = get()[key];
@@ -411,14 +440,12 @@ export const useInventoryStore = create(
             console.log('[Store] Admin: cargado desde Supabase (todas las sedes):', Object.keys(updates));
           }
 
-          // Smart merge para inventario: local siempre gana en items ya existentes
-          // Filtrar items que fueron eliminados localmente (tombstone)
+          // Smart merge para inventario: fusionar usando mergeArrays (da preferencia a remoto para actualizar stocks/precios, conservando creaciones locales)
           if (updates.inventory) {
             const localInventory = get().inventory;
             const deletedInvIds = get().deletedInventoryIds || [];
-            const localIds = new Set(localInventory.map(i => i.id));
-            const remoteOnlyItems = updates.inventory.filter(i => !localIds.has(i.id) && !deletedInvIds.includes(i.id));
-            updates.inventory = [...localInventory, ...remoteOnlyItems];
+            let mergedInv = mergeArrays(localInventory, updates.inventory, 'inventory');
+            updates.inventory = mergedInv.filter(i => !deletedInvIds.includes(i.id));
           }
           // Sanitizar posSettings: convertir cashDrawerCode viejo si viene de Supabase
           if (updates.posSettings && updates.posSettings.cashDrawerCode) {
