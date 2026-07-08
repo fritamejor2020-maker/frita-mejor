@@ -852,11 +852,11 @@ function InventoryPanel() {
             </div>
           ) : (
             <div key={item.id} className="border border-gray-100 rounded-2xl p-4 flex flex-wrap items-center gap-3 hover:border-gray-200 transition-colors">
-              <span className={`text-xs font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                item.type === 'INSUMO' ? 'bg-blue-50 text-blue-400' : 
-                item.type === 'PRODUCTO' ? 'bg-green-50 text-green-500' :
-                item.type === 'CRUDO' ? 'bg-orange-50 text-orange-500' :
-                item.type === 'FRITO' ? 'bg-yellow-50 text-yellow-600' : 'bg-gray-100 text-gray-500'
+              <span className={`w-[90px] text-center text-[10px] font-black uppercase tracking-wider py-1.5 rounded-full shrink-0 ${
+                item.type === 'INSUMO' ? 'bg-blue-50 text-blue-500 border border-blue-200' : 
+                item.type === 'PRODUCTO' ? 'bg-green-50 text-green-600 border border-green-200' :
+                item.type === 'CRUDO' ? 'bg-orange-50 text-orange-600 border border-orange-200' :
+                item.type === 'FRITO' ? 'bg-yellow-50 text-yellow-600 border border-yellow-200' : 'bg-gray-100 text-gray-500'
               }`}>{item.type}</span>
               <div className="flex-1 min-w-[100px]">
                 <span className="font-black text-chunky-dark block truncate">{item.name}</span>
