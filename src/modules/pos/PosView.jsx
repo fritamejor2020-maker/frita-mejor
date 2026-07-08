@@ -738,7 +738,7 @@ export function PosView() {
 
   // GRID RENDER LOGIC --
   // Todos los productos vendibles del inventario
-  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA' || i.type === 'CRUDO');
   
   // Si estamos dentro de una categoría → mostrar TODOS los productos de esa categoría (sin restricciones)
   // Si estamos en el feed raíz → comportamiento depende de la configuración del admin:
