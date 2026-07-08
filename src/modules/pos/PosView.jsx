@@ -170,6 +170,11 @@ export function PosView() {
 
   const [variablePriceProduct, setVariablePriceProduct] = useState(null);
   const [variablePriceInput, setVariablePriceInput] = useState('');
+  const [currentPage, setCurrentPage] = useState(0);
+
+  useEffect(() => {
+    setCurrentPage(0);
+  }, [currentFolder, searchTerm]);
 
   // Esperar a que la sincronización con Supabase termine antes de mostrar "ABRIR CAJA"
   const [syncReady, setSyncReady] = useState(false);
@@ -1204,9 +1209,9 @@ export function PosView() {
         </div>
 
         {/* Grid Area */}
-        <div className={`flex-1 p-4 bg-gradient-to-br from-[#1e1f26] to-[#16171d] ${posSettings?.layout?.gridRows ? 'overflow-hidden h-full pb-6' : 'overflow-y-auto scrollbar-thin'}`}>
+        <div className={`flex-1 p-4 bg-gradient-to-br from-[#1e1f26] to-[#16171d] flex flex-col ${posSettings?.layout?.gridRows ? 'overflow-hidden h-full pb-2' : 'overflow-y-auto scrollbar-thin'}`}>
           <div 
-            className={`grid gap-3 sm:gap-4 pb-20 ${
+            className={`grid gap-3 sm:gap-4 ${posSettings?.layout?.gridRows ? 'flex-1' : 'pb-20'} ${
               !posSettings?.layout?.gridColumns ? (
                 posSettings?.gridSize === 'small' ? 'grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-7 xl:grid-cols-8' :
                 posSettings?.gridSize === 'large' ? 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5' :
@@ -1223,7 +1228,7 @@ export function PosView() {
             {/* Folders (Removed per user request) */}
 
             {/* Show Products */}
-            {displayedItems.map(item => (
+            {paginatedItems.map(item => (
               <button 
                 key={item.id} 
                 className={`${posSettings?.layout?.gridRows ? 'h-full' : 'aspect-square'} bg-[#21242d] hover:bg-[#2a2d38] border-2 border-transparent hover:border-chunky-main/50 rounded-[32px] flex flex-col justify-between p-4 text-left shadow-xl shadow-black/20 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-300 relative overflow-hidden group`}
@@ -1257,11 +1262,34 @@ export function PosView() {
             ))}
           </div>
 
-          {displayedItems.length === 0 && (!posCategories || posCategories.length === 0 || currentFolder) && (
+          {paginatedItems.length === 0 && (!posCategories || posCategories.length === 0 || currentFolder) && (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4 mt-20">
                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                <p className="font-bold text-lg">No hay productos con precio en esta sección</p>
                <p className="text-sm">Agrega precios en el Panel de Administrador para que aparezcan aquí.</p>
+            </div>
+          )}
+
+          {/* Pagination Controls */}
+          {totalPages > 1 && (
+            <div className="flex justify-center items-center gap-6 py-3 border-t border-gray-800/40 mt-auto shrink-0 z-30">
+              <button 
+                onClick={() => setCurrentPage(prev => Math.max(0, prev - 1))}
+                disabled={currentPage === 0}
+                className="w-12 h-12 rounded-2xl bg-[#21242d] border border-gray-800 flex items-center justify-center text-white hover:bg-chunky-main/20 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95 shadow-md font-black text-sm"
+              >
+                ◀
+              </button>
+              <span className="text-xs font-black text-gray-500 tracking-wider">
+                PÁGINA <span className="text-white font-black">{currentPage + 1}</span> DE <span className="text-white font-black">{totalPages}</span>
+              </span>
+              <button 
+                onClick={() => setCurrentPage(prev => Math.min(totalPages - 1, prev + 1))}
+                disabled={currentPage === totalPages - 1}
+                className="w-12 h-12 rounded-2xl bg-[#21242d] border border-gray-800 flex items-center justify-center text-white hover:bg-chunky-main/20 disabled:opacity-30 disabled:pointer-events-none transition-all active:scale-95 shadow-md font-black text-sm"
+              >
+                ▶
+              </button>
             </div>
           )}
         </div>
