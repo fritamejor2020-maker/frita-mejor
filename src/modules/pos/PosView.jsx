@@ -1264,10 +1264,13 @@ export function PosView() {
               >
                 {/* Background Image if available */}
                 {item.imageUrl && (
-                  <div className="absolute top-0 left-0 right-0 bottom-1/3 overflow-hidden rounded-t-[32px]">
-                    <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#21242d] group-hover:from-[#2a2d38] via-transparent to-transparent transition-all duration-300"></div>
-                  </div>
+                  <>
+                    <div className="absolute top-0 left-0 right-0 bottom-1/3 overflow-hidden rounded-t-[32px]">
+                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
+                    </div>
+                    {/* Gradient Overlay positioned outside to overlap the seam by 2px and avoid subpixel gaps */}
+                    <div className="absolute top-0 left-0 right-0 bottom-[calc(33.333%-2px)] bg-gradient-to-t from-[#21242d] group-hover:from-[#2a2d38] via-transparent to-transparent transition-all duration-300 z-10 rounded-t-[32px]"></div>
+                  </>
                 )}
 
                 <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
