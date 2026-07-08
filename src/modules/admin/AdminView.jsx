@@ -2297,13 +2297,15 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setShowOnlySelected(!showOnlySelected)}
-                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
-                  showOnlySelected ? 'bg-blue-500' : 'bg-gray-200'
+                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
+                  showOnlySelected
+                    ? 'bg-blue-500 border-blue-500'
+                    : 'bg-gray-100 border-gray-300'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
-                    showOnlySelected ? 'translate-x-6' : 'translate-x-0'
+                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
+                    showOnlySelected ? 'left-[24px]' : 'left-[1px]'
                   }`}
                 />
               </button>
@@ -2391,13 +2393,15 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setLinkProduction(!linkProduction)}
-                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
-                  linkProduction ? 'bg-amber-500' : 'bg-gray-200'
+                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
+                  linkProduction
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'bg-gray-100 border-gray-300'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
-                    linkProduction ? 'translate-x-6' : 'translate-x-0'
+                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
+                    linkProduction ? 'left-[24px]' : 'left-[1px]'
                   }`}
                 />
               </button>
@@ -2413,13 +2417,15 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setLinkSalesToInventory(!linkSalesToInventory)}
-                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
-                  linkSalesToInventory ? 'bg-amber-500' : 'bg-gray-200'
+                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
+                  linkSalesToInventory
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'bg-gray-100 border-gray-300'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
-                    linkSalesToInventory ? 'translate-x-6' : 'translate-x-0'
+                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
+                    linkSalesToInventory ? 'left-[24px]' : 'left-[1px]'
                   }`}
                 />
               </button>
@@ -2435,13 +2441,15 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setStrictTricycleStock(!strictTricycleStock)}
-                className={`w-14 h-8 rounded-full transition-all relative p-1 outline-none ${
-                  strictTricycleStock ? 'bg-amber-500' : 'bg-gray-200'
+                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
+                  strictTricycleStock
+                    ? 'bg-amber-500 border-amber-500'
+                    : 'bg-gray-100 border-gray-300'
                 }`}
               >
                 <div
-                  className={`w-6 h-6 bg-white rounded-full transition-all shadow-sm transform ${
-                    strictTricycleStock ? 'translate-x-6' : 'translate-x-0'
+                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
+                    strictTricycleStock ? 'left-[24px]' : 'left-[1px]'
                   }`}
                 />
               </button>
