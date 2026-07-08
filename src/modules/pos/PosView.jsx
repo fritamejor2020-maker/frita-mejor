@@ -1239,10 +1239,10 @@ export function PosView() {
 
                 <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
                 
-                <span className={`relative z-20 text-[10px] sm:text-xs font-black px-3 py-1 rounded-full inline-block w-max self-start shadow-sm border border-white/10 ${
-                  item.type === 'FRITO' ? 'bg-yellow-500/90 text-yellow-950 backdrop-blur-md' :
-                  item.type === 'CRUDO' ? 'bg-orange-500/90 text-orange-950 backdrop-blur-md' :
-                  item.type === 'BEBIDA' ? 'bg-blue-500/90 text-blue-950 backdrop-blur-md' : 'bg-gray-100/20 text-white backdrop-blur-md'
+                <span className={`absolute bottom-4 right-4 z-20 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                  item.type === 'FRITO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                  item.type === 'CRUDO' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                  item.type === 'BEBIDA' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700/50'
                 }`}>
                   {item.type}
                 </span>
