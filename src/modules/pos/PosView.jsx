@@ -743,15 +743,25 @@ export function PosView() {
   
   let displayedItems = [];
   if (currentFolder) {
-    // Dentro de una categoría: todos sus productos, sin filtrar
-    displayedItems = sellableItems.filter(i => i.posCategoryId === currentFolder);
+    // Dentro de una categoría: todos sus productos ordenados alfabéticamente
+    displayedItems = sellableItems
+      .filter(i => i.posCategoryId === currentFolder)
+      .sort((a, b) => a.name.localeCompare(b.name));
   } else if (posSettings?.layout?.showOnlySelected) {
-    // Feed principal personalizado: productos pinneados (pueden tener o no categoría)
-    const pinnedIds = new Set(posSettings.layout.selectedProductIds || []);
-    displayedItems = sellableItems.filter(i => pinnedIds.has(i.id));
+    // Feed principal personalizado: ordenados exactamente según la lista seleccionada por el administrador
+    const pinnedIds = posSettings.layout.selectedProductIds || [];
+    const pinnedSet = new Set(pinnedIds);
+    const filtered = sellableItems.filter(i => pinnedSet.has(i.id));
+    displayedItems = [...filtered].sort((a, b) => {
+      const idxA = pinnedIds.indexOf(a.id);
+      const idxB = pinnedIds.indexOf(b.id);
+      return idxA - idxB;
+    });
   } else {
-    // Feed principal por defecto: productos sin categoría asignada
-    displayedItems = sellableItems.filter(i => !i.posCategoryId);
+    // Feed principal por defecto: productos sin categoría ordenados alfabéticamente
+    displayedItems = sellableItems
+      .filter(i => !i.posCategoryId)
+      .sort((a, b) => a.name.localeCompare(b.name));
   }
 
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;

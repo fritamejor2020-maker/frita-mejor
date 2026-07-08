@@ -2370,6 +2370,55 @@ function PosConfigPanel() {
                     <p className="text-center py-4 text-xs font-bold text-gray-400">No se encontraron productos</p>
                   )}
                 </div>
+
+                {/* 📌 Ordenador de productos del Feed Principal */}
+                {selectedProductIds.length > 0 && (
+                  <div className="border-t border-gray-100 pt-4 space-y-2">
+                    <span className="block font-black text-gray-800 text-xs">📌 Orden de aparición en el POS</span>
+                    <p className="text-[10px] text-gray-400 font-bold">Usa las flechas para ordenar cómo se mostrarán los productos en la pantalla de inicio del POS.</p>
+                    <div className="max-h-56 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1 bg-gray-50/50">
+                      {selectedProductIds.map((id, index) => {
+                        const prod = inventory.find(i => i.id === id);
+                        if (!prod) return null;
+                        return (
+                          <div key={id} className="flex items-center justify-between bg-white px-3 py-1.5 border border-gray-200 rounded-xl shadow-sm">
+                            <span className="text-[11px] font-bold text-gray-700">
+                              <span className="text-gray-400 mr-1.5">{index + 1}.</span> {prod.name}
+                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                disabled={index === 0}
+                                onClick={() => {
+                                  const newIds = [...selectedProductIds];
+                                  [newIds[index - 1], newIds[index]] = [newIds[index], newIds[index - 1]];
+                                  setSelectedProductIds(newIds);
+                                }}
+                                className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
+                                title="Subir"
+                              >
+                                ⬆️
+                              </button>
+                              <button
+                                type="button"
+                                disabled={index === selectedProductIds.length - 1}
+                                onClick={() => {
+                                  const newIds = [...selectedProductIds];
+                                  [newIds[index + 1], newIds[index]] = [newIds[index], newIds[index + 1]];
+                                  setSelectedProductIds(newIds);
+                                }}
+                                className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
+                                title="Bajar"
+                              >
+                                ⬇️
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
