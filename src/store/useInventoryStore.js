@@ -879,9 +879,13 @@ export const useInventoryStore = create(
       // Inventario
       addInventoryItem: (item) => {
         const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
-        const newItem = { ...item, id: `${prefix}-${Date.now()}`, qty: parseFloat(item.qty) || 0 };
+        const newItem = { ...item, id: `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, qty: parseFloat(item.qty) || 0 };
         set((s) => ({ inventory: [...s.inventory, newItem] }));
         syncKey('inventory', useInventoryStore.getState().inventory);
+      },
+      setInventory: (newInventory) => {
+        set({ inventory: newInventory });
+        syncKey('inventory', newInventory);
       },
       updateInventoryItem: (id, data) => { set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) })); syncKey('inventory', useInventoryStore.getState().inventory); },
       deleteInventoryItem: (id) => {

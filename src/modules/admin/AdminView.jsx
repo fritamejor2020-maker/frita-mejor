@@ -503,7 +503,7 @@ const parseCSV = (text) => {
 };
 
 function InventoryPanel() {
-  const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory } = useInventoryStore();
+  const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory, setInventory } = useInventoryStore();
   const [editingId, setEditingId] = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
   const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
@@ -525,11 +525,12 @@ function InventoryPanel() {
           return;
         }
 
+        const newInventory = [...inventory];
         let currentCategories = [...posCategories];
         let updatedCount = 0;
         let createdCount = 0;
 
-        rows.forEach((row) => {
+        rows.forEach((row, idx) => {
           const name = row.Name || row.name;
           if (!name) return;
 
@@ -541,7 +542,7 @@ function InventoryPanel() {
             if (existingCat) {
               catId = existingCat.id;
             } else {
-              const newCatId = `CAT-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+              const newCatId = `CAT-${Date.now()}-${Math.floor(Math.random() * 1000)}-${idx}`;
               const newCat = { id: newCatId, name: trimmedGroup, icon: '📦', color: '#ffb700' };
               addPosCategory(newCat);
               currentCategories.push(newCat);
@@ -564,23 +565,27 @@ function InventoryPanel() {
           const price = parseFloat(row.Price || row.price) || 0;
           const unit = row.MeasurementUnit || 'unidades';
 
-          const existingItem = inventory.find(i => 
+          const existingIndex = newInventory.findIndex(i => 
             (barcode && i.barcode === barcode) || 
             (i.name.toLowerCase().trim() === name.toLowerCase().trim())
           );
 
           const typeVal = buildType(tipo, estado);
-          if (existingItem) {
-            updateInventoryItem(existingItem.id, {
+          if (existingIndex !== -1) {
+            newInventory[existingIndex] = {
+              ...newInventory[existingIndex],
               price,
               barcode,
-              qty: quantity || existingItem.qty,
-              posCategoryId: catId || existingItem.posCategoryId,
+              qty: quantity || newInventory[existingIndex].qty,
+              posCategoryId: catId || newInventory[existingIndex].posCategoryId,
               type: typeVal
-            });
+            };
             updatedCount++;
           } else {
-            addInventoryItem({
+            const prefix = typeVal === 'FRITO' ? 'FR' : typeVal === 'PRODUCTO' ? 'PRD' : 'INS';
+            const newId = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${idx}`;
+            newInventory.push({
+              id: newId,
               name,
               barcode,
               qty: quantity,
@@ -596,6 +601,9 @@ function InventoryPanel() {
             createdCount++;
           }
         });
+
+        // Guardar todos en lote (un solo viaje al store y sync remoto)
+        setInventory(newInventory);
 
         alert(`¡Importación exitosa! Se crearon ${createdCount} productos nuevos y se actualizaron ${updatedCount} existentes.`);
       } catch (err) {
@@ -2092,6 +2100,27 @@ function PosConfigPanel() {
   const [showOnlySelected, setShowOnlySelected] = useState(posSettings?.layout?.showOnlySelected || false);
   const [selectedProductIds, setSelectedProductIds] = useState(posSettings?.layout?.selectedProductIds || []);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Sincronizar estados locales cuando la configuración cargue de Supabase/local
+  useEffect(() => {
+    if (posSettings) {
+      if (posSettings.paymentMethods) setMethods(posSettings.paymentMethods);
+      if (posSettings.cashDrawerCode) setCashDrawerCode(posSettings.cashDrawerCode);
+      if (posSettings.printerName) setPrinterName(posSettings.printerName);
+      if (posSettings.gridSize) setGridSize(posSettings.gridSize);
+      if (posSettings.inventoryControl) {
+        setLinkProduction(posSettings.inventoryControl.linkProduction || false);
+        setLinkSalesToInventory(posSettings.inventoryControl.linkSalesToInventory || false);
+        setStrictTricycleStock(posSettings.inventoryControl.strictTricycleStock || false);
+      }
+      if (posSettings.layout) {
+        setGridColumns(posSettings.layout.gridColumns || 6);
+        setGridRows(posSettings.layout.gridRows || 4);
+        setShowOnlySelected(posSettings.layout.showOnlySelected || false);
+        setSelectedProductIds(posSettings.layout.selectedProductIds || []);
+      }
+    }
+  }, [posSettings]);
 
   const sellableProducts = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
   const filteredProducts = sellableProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
