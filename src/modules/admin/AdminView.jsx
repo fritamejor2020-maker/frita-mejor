@@ -2255,7 +2255,7 @@ function PosConfigPanel() {
         <div className="bg-blue-50/50 border border-blue-200/60 rounded-3xl p-6 my-8">
           <h4 className="font-black text-blue-800 text-base mb-2">🎨 Diseño y Feed del POS</h4>
           <p className="text-xs text-blue-600 font-bold mb-5">
-            Configura el número de filas y columnas del menú del POS, y selecciona exactamente qué productos deseas mostrar en el feed principal de la caja registradora.
+            Configura el número de filas y columnas del menú del POS, y elige qué productos aparecen en el <strong>feed principal</strong> (pantalla de inicio) de la caja. Las categorías siempre mostrarán todos sus productos sin restricción.
           </p>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -2289,9 +2289,9 @@ function PosConfigPanel() {
           <div className="border-t border-blue-100 pt-5 space-y-4">
             <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
               <div>
-                <span className="block font-black text-gray-800 text-sm">👁️ Mostrar solo productos seleccionados en la Caja</span>
+                <span className="block font-black text-gray-800 text-sm">🏠 Personalizar productos del Feed Principal</span>
                 <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                  Si está activo, podrás marcar abajo individualmente los productos que deseas que aparezcan en el POS, ocultando los demás del catálogo general.
+                  Si está activo, los productos que marques abajo serán los que aparecen en la pantalla de inicio del POS (sin ninguna categoría seleccionada). Los productos en categorías siguen siendo accesibles con normalidad.
                 </span>
               </div>
               <button
@@ -2311,10 +2311,13 @@ function PosConfigPanel() {
 
             {showOnlySelected && (
               <div className="bg-white rounded-2xl p-5 border border-gray-100 space-y-4 animate-[fadeIn_0.2s_ease-out]">
+                <p className="text-xs text-blue-700 font-bold bg-blue-50 rounded-xl px-4 py-2">
+                  💡 Marca los productos que quieres ver en el <strong>feed principal</strong>. Las categorías siempre mostrarán todos sus productos.
+                </p>
                 <div className="flex items-center gap-3">
                   <input
                     type="text"
-                    placeholder="🔍 Buscar producto a configurar..."
+                    placeholder="🔍 Buscar producto..."
                     className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-chunky-main"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
@@ -2351,9 +2354,14 @@ function PosConfigPanel() {
                             }
                           }}
                         />
-                        <div className="flex-1 flex justify-between">
+                        <div className="flex-1 flex justify-between items-center">
                           <span>{p.name}</span>
-                          <span className="text-[10px] text-gray-400 font-semibold uppercase">{p.type}</span>
+                          <div className="flex items-center gap-2">
+                            {p.posCategoryId && (
+                              <span className="text-[10px] text-orange-400 font-bold border border-orange-200 rounded px-1">📁 Con categoría</span>
+                            )}
+                            <span className="text-[10px] text-gray-400 font-semibold uppercase">{p.type}</span>
+                          </div>
                         </div>
                       </label>
                     );

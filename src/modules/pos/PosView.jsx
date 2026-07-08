@@ -732,26 +732,26 @@ export function PosView() {
   };
 
   // GRID RENDER LOGIC --
-  // Include all items that are products or fritos, regardless of price (variable price)
+  // Todos los productos vendibles del inventario
   const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
   
-  // If in root, show folders + unassigned items. If in folder, show items assigned to that folder.
+  // Si estamos dentro de una categoría → mostrar TODOS los productos de esa categoría (sin restricciones)
+  // Si estamos en el feed raíz → comportamiento depende de la configuración del admin:
+  //   · showOnlySelected activo: mostrar los productos "pinneados" al feed principal (sin importar su categoría)
+  //   · showOnlySelected inactivo: comportamiento por defecto → solo productos sin categoría asignada
   const displayedFolders = currentFolder ? [] : posCategories;
   
   let displayedItems = [];
   if (currentFolder) {
-    // Si estamos dentro de una categoría, mostrar todos los productos de esa categoría sin filtrar
+    // Dentro de una categoría: todos sus productos, sin filtrar
     displayedItems = sellableItems.filter(i => i.posCategoryId === currentFolder);
+  } else if (posSettings?.layout?.showOnlySelected) {
+    // Feed principal personalizado: productos pinneados (pueden tener o no categoría)
+    const pinnedIds = new Set(posSettings.layout.selectedProductIds || []);
+    displayedItems = sellableItems.filter(i => pinnedIds.has(i.id));
   } else {
-    // Si estamos en la raíz del feed:
-    if (posSettings?.layout?.showOnlySelected) {
-      // Mostrar solo los productos seleccionados en la configuración de visibilidad
-      const allowedIds = new Set(posSettings.layout.selectedProductIds || []);
-      displayedItems = sellableItems.filter(i => allowedIds.has(i.id));
-    } else {
-      // Mostrar solo los productos que no tienen categoría asignada
-      displayedItems = sellableItems.filter(i => !i.posCategoryId);
-    }
+    // Feed principal por defecto: productos sin categoría asignada
+    displayedItems = sellableItems.filter(i => !i.posCategoryId);
   }
 
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
