@@ -769,6 +769,24 @@ export function PosView() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
+  // Filtrar por término de búsqueda si el usuario escribe
+  if (searchTerm.trim()) {
+    const term = searchTerm.toLowerCase().trim();
+    displayedItems = displayedItems.filter(i => 
+      i.name.toLowerCase().includes(term) || 
+      (i.barcode && i.barcode.toLowerCase().includes(term))
+    );
+  }
+
+  // Paginación si hay filas definidas
+  const hasGridRows = !!posSettings?.layout?.gridRows;
+  const gridCols = parseInt(posSettings?.layout?.gridColumns) || 6;
+  const gridRows = parseInt(posSettings?.layout?.gridRows) || 5;
+  const itemsPerPage = hasGridRows ? (gridCols * gridRows) : 999999;
+  
+  const totalPages = Math.ceil(displayedItems.length / itemsPerPage);
+  const paginatedItems = displayedItems.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage);
+
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
 
   return (
