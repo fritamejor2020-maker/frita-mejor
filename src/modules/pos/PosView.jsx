@@ -1273,10 +1273,10 @@ export function PosView() {
                 <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
                 
                 {item.type !== 'PRODUCTO' && (
-                  <span className={`absolute top-3 right-3 z-20 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                    item.type === 'FRITO' ? 'bg-[#16171d]/95 text-yellow-400 border-yellow-500/50' :
-                    item.type === 'CRUDO' ? 'bg-[#16171d]/95 text-orange-400 border-orange-500/50' :
-                    item.type === 'BEBIDA' ? 'bg-[#16171d]/95 text-blue-400 border-blue-500/50' : 'bg-[#16171d]/95 text-gray-400 border-gray-700/50'
+                  <span className={`absolute top-3 right-3 z-20 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md ${
+                    item.type === 'FRITO' ? 'bg-yellow-400 text-yellow-950' :
+                    item.type === 'CRUDO' ? 'bg-orange-500 text-white' :
+                    item.type === 'BEBIDA' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-white'
                   }`}>
                     {item.type}
                   </span>
