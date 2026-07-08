@@ -2297,15 +2297,13 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setShowOnlySelected(!showOnlySelected)}
-                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
-                  showOnlySelected
-                    ? 'bg-blue-500 border-blue-500'
-                    : 'bg-gray-100 border-gray-300'
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                  showOnlySelected ? 'bg-blue-500' : 'bg-gray-300'
                 }`}
               >
                 <div
-                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
-                    showOnlySelected ? 'left-[24px]' : 'left-[1px]'
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                    showOnlySelected ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -2393,15 +2391,13 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setLinkProduction(!linkProduction)}
-                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
-                  linkProduction
-                    ? 'bg-amber-500 border-amber-500'
-                    : 'bg-gray-100 border-gray-300'
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                  linkProduction ? 'bg-amber-500' : 'bg-gray-300'
                 }`}
               >
                 <div
-                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
-                    linkProduction ? 'left-[24px]' : 'left-[1px]'
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                    linkProduction ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -2417,15 +2413,13 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setLinkSalesToInventory(!linkSalesToInventory)}
-                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
-                  linkSalesToInventory
-                    ? 'bg-amber-500 border-amber-500'
-                    : 'bg-gray-100 border-gray-300'
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                  linkSalesToInventory ? 'bg-amber-500' : 'bg-gray-300'
                 }`}
               >
                 <div
-                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
-                    linkSalesToInventory ? 'left-[24px]' : 'left-[1px]'
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                    linkSalesToInventory ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
@@ -2441,15 +2435,13 @@ function PosConfigPanel() {
               <button
                 type="button"
                 onClick={() => setStrictTricycleStock(!strictTricycleStock)}
-                className={`relative w-[52px] h-7 rounded-full transition-all duration-300 outline-none flex-shrink-0 border-2 ${
-                  strictTricycleStock
-                    ? 'bg-amber-500 border-amber-500'
-                    : 'bg-gray-100 border-gray-300'
+                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                  strictTricycleStock ? 'bg-amber-500' : 'bg-gray-300'
                 }`}
               >
                 <div
-                  className={`absolute top-[1px] w-[22px] h-[22px] bg-white rounded-full shadow-md transition-all duration-300 ${
-                    strictTricycleStock ? 'left-[24px]' : 'left-[1px]'
+                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                    strictTricycleStock ? 'translate-x-5' : 'translate-x-0'
                   }`}
                 />
               </button>
