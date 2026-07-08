@@ -1274,9 +1274,9 @@ export function PosView() {
                 
                 {item.type !== 'PRODUCTO' && (
                   <span className={`absolute top-3 right-3 z-20 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                    item.type === 'FRITO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                    item.type === 'CRUDO' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                    item.type === 'BEBIDA' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700/50'
+                    item.type === 'FRITO' ? 'bg-[#16171d]/95 text-yellow-400 border-yellow-500/50' :
+                    item.type === 'CRUDO' ? 'bg-[#16171d]/95 text-orange-400 border-orange-500/50' :
+                    item.type === 'BEBIDA' ? 'bg-[#16171d]/95 text-blue-400 border-blue-500/50' : 'bg-[#16171d]/95 text-gray-400 border-gray-700/50'
                   }`}>
                     {item.type}
                   </span>
