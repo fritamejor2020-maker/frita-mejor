@@ -506,7 +506,7 @@ function InventoryPanel() {
   const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory, setInventory } = useInventoryStore();
   const [editingId, setEditingId] = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
-  const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
+  const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 });
   const [filterWh,  setFilterWh]  = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [filterStock, setFilterStock] = useState('ALL');
@@ -630,6 +630,8 @@ function InventoryPanel() {
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
     { key: 'alert',       label: 'Alerta en',type: 'number' },
     { key: 'price',       label: 'Precio ($)',type: 'number' },
+    { key: 'variablePrice', label: 'Precio Var.', options: [{ value: false, label: 'No' }, { value: true, label: 'Sí' }] },
+    { key: 'referencePrice', label: 'Precio Ref. ($)', type: 'number' },
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
     { key: 'imageUrl',    label: 'Imagen (POS)', type: 'image' },
   ];
@@ -651,8 +653,8 @@ function InventoryPanel() {
   };
 
   const change = (k, v) => {
-    if (editingId) setForm((f) => ({ ...f, [k]: v }));
-    else setForm((f) => ({ ...f, [k]: v }));
+    const val = k === 'variablePrice' ? (v === 'true' || v === true) : v;
+    setForm((f) => ({ ...f, [k]: val }));
   };
 
   // 1. Filtrar los productos
@@ -836,7 +838,7 @@ function InventoryPanel() {
       {showAdd && (
         <div className="mb-4">
           <EditableRow fields={fields} values={form} onChange={change}
-            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price), type: buildType(form.tipo, form.estado) }); setShowAdd(false); } }}
+            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: buildType(form.tipo, form.estado), variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setShowAdd(false); } }}
             onCancel={() => setShowAdd(false)} />
         </div>
       )}
@@ -847,7 +849,7 @@ function InventoryPanel() {
           return editingId === item.id ? (
             <div key={item.id}>
               <EditableRow fields={fields} values={form} onChange={change}
-                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty), alert: parseFloat(form.alert), price: parseFloat(form.price), type: buildType(form.tipo, form.estado) }); setEditingId(null); }}
+                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: buildType(form.tipo, form.estado), variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setEditingId(null); }}
                 onCancel={() => setEditingId(null)} />
             </div>
           ) : (
@@ -866,14 +868,20 @@ function InventoryPanel() {
                     {item.barcode}
                   </span>
                 )}
-                {item.price > 0 && <span className="text-[11px] font-bold text-green-500 mt-0.5 block">Precio: {formatMoney(item.price)}</span>}
+                {item.variablePrice ? (
+                  <span className="text-[11px] font-bold text-orange-500 mt-0.5 block flex items-center gap-1">
+                    ⚙️ Precio Variable {item.referencePrice > 0 && `(Ref: ${formatMoney(item.referencePrice)})`}
+                  </span>
+                ) : (
+                  item.price > 0 && <span className="text-[11px] font-bold text-green-500 mt-0.5 block">Precio: {formatMoney(item.price)}</span>
+                )}
               </div>
               {wh && <span className="text-xs font-bold bg-gray-50 text-gray-400 px-2 py-0.5 rounded-full shrink-0">{wh.name}</span>}
               <span className={`font-black text-lg ${item.qty <= item.alert ? 'text-red-500' : 'text-chunky-dark'}`}>
                 {item.qty}<span className="text-gray-400 font-bold text-xs ml-1">{item.unit}</span>
               </span>
               <div className="flex gap-2 ml-auto">
-                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '' }); setShowAdd(false); }}>
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '', variablePrice: item.variablePrice ?? false, referencePrice: item.referencePrice ?? 0 }); setShowAdd(false); }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
                 <button className="text-gray-300 hover:text-red-400" onClick={() => deleteInventoryItem(item.id)}>
