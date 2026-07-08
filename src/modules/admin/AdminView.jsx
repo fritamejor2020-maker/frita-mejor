@@ -508,6 +508,11 @@ function InventoryPanel() {
   const [showAdd,   setShowAdd]   = useState(false);
   const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' });
   const [filterWh,  setFilterWh]  = useState('ALL');
+  const [filterType, setFilterType] = useState('ALL');
+  const [filterStock, setFilterStock] = useState('ALL');
+  const [filterCat, setFilterCat] = useState('ALL');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState('name_asc');
 
   const handleCsvUpload = (e) => {
     const file = e.target.files?.[0];
@@ -650,17 +655,76 @@ function InventoryPanel() {
     else setForm((f) => ({ ...f, [k]: v }));
   };
 
-  const displayed = filterWh === 'ALL' ? inventory : inventory.filter((i) => i.warehouseId === filterWh);
+  // 1. Filtrar los productos
+  let filtered = inventory || [];
+
+  // Filtro de Bodega
+  if (filterWh !== 'ALL') {
+    filtered = filtered.filter(i => i.warehouseId === filterWh);
+  }
+
+  // Filtro de Búsqueda
+  if (searchQuery.trim()) {
+    const q = searchQuery.toLowerCase().trim();
+    filtered = filtered.filter(i => 
+      i.name.toLowerCase().includes(q) || 
+      (i.barcode && i.barcode.toLowerCase().includes(q))
+    );
+  }
+
+  // Filtro de Tipo
+  if (filterType !== 'ALL') {
+    filtered = filtered.filter(i => i.type === filterType);
+  }
+
+  // Filtro de Nivel de Stock
+  if (filterStock === 'LOW') {
+    filtered = filtered.filter(i => i.qty <= i.alert);
+  } else if (filterStock === 'OUT') {
+    filtered = filtered.filter(i => i.qty === 0);
+  } else if (filterStock === 'IN') {
+    filtered = filtered.filter(i => i.qty > 0);
+  }
+
+  // Filtro de Categoría POS
+  if (filterCat !== 'ALL') {
+    if (filterCat === 'NONE') {
+      filtered = filtered.filter(i => !i.posCategoryId);
+    } else {
+      filtered = filtered.filter(i => i.posCategoryId === filterCat);
+    }
+  }
+
+  // 2. Ordenar los productos
+  const displayed = [...filtered].sort((a, b) => {
+    switch (sortBy) {
+      case 'name_asc':
+        return a.name.localeCompare(b.name);
+      case 'name_desc':
+        return b.name.localeCompare(a.name);
+      case 'qty_desc':
+        return b.qty - a.qty;
+      case 'qty_asc':
+        return a.qty - b.qty;
+      case 'price_desc':
+        return (b.price || 0) - (a.price || 0);
+      case 'price_asc':
+        return (a.price || 0) - (b.price || 0);
+      case 'low_stock':
+        const criticalA = a.qty - a.alert;
+        const criticalB = b.qty - b.alert;
+        return criticalA - criticalB; // Más críticos primero (ratio negativo)
+      default:
+        return 0;
+    }
+  });
 
   return (
     <div>
+      {/* Encabezado Principal */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
         <h3 className="font-black text-chunky-dark text-lg">Inventario ({displayed.length} ítems)</h3>
         <div className="flex gap-2 flex-wrap">
-          <select className="bg-gray-50 border border-gray-100 rounded-full px-4 py-2 text-sm font-bold text-gray-500 outline-none" value={filterWh} onChange={(e) => setFilterWh(e.target.value)}>
-            <option value="ALL">Todas las bodegas</option>
-            {warehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
-          </select>
           <label className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs py-2.5 px-5 rounded-full shadow-sm hover:opacity-90 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95">
             📥 Importar CSV
             <input
@@ -673,6 +737,99 @@ function InventoryPanel() {
           <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
             + Agregar ítem
           </Button>
+        </div>
+      </div>
+
+      {/* Barra de Filtros, Búsqueda y Ordenación */}
+      <div className="bg-gray-50 border border-gray-200 rounded-3xl p-5 mb-6 space-y-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Búsqueda */}
+          <div className="relative">
+            <span className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400">🔍</span>
+            <input 
+              type="text"
+              placeholder="Buscar por nombre o código..."
+              className="w-full bg-white border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm font-bold outline-none focus:border-chunky-main transition-colors"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+
+          {/* Filtrar por Bodega */}
+          <div>
+            <select 
+              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-chunky-main transition-colors"
+              value={filterWh} 
+              onChange={(e) => setFilterWh(e.target.value)}
+            >
+              <option value="ALL">📍 Todas las Bodegas</option>
+              {warehouses.map((w) => <option key={w.id} value={w.id}>📦 {w.name}</option>)}
+            </select>
+          </div>
+
+          {/* Ordenar por */}
+          <div>
+            <select 
+              className="w-full bg-white border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-gray-700 outline-none focus:border-chunky-main transition-colors"
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+            >
+              <option value="name_asc">🔤 Nombre (A-Z)</option>
+              <option value="name_desc">🔤 Nombre (Z-A)</option>
+              <option value="qty_desc">📈 Stock (Mayor a Menor)</option>
+              <option value="qty_asc">📉 Stock (Menor a Mayor)</option>
+              <option value="price_desc">💰 Precio (Mayor a Menor)</option>
+              <option value="price_asc">💰 Precio (Menor a Mayor)</option>
+              <option value="low_stock">⚠️ Mayor Alerta de Stock</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-t border-gray-200/60 pt-4">
+          {/* Filtrar por Tipo */}
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Tipo de Item</label>
+            <select 
+              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-chunky-main transition-colors"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="ALL">Todos los tipos</option>
+              <option value="INSUMO">INSUMO</option>
+              <option value="PRODUCTO">PRODUCTO</option>
+              <option value="CRUDO">CRUDO</option>
+              <option value="FRITO">FRITO</option>
+            </select>
+          </div>
+
+          {/* Filtrar por Estado de Stock */}
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Nivel de Stock</label>
+            <select 
+              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-chunky-main transition-colors"
+              value={filterStock}
+              onChange={(e) => setFilterStock(e.target.value)}
+            >
+              <option value="ALL">Cualquier cantidad</option>
+              <option value="LOW">⚠️ Alerta / Bajo Stock</option>
+              <option value="OUT">🔴 Sin Stock (Agotado)</option>
+              <option value="IN">🟢 Con Stock disponible</option>
+            </select>
+          </div>
+
+          {/* Filtrar por Carpeta POS */}
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-1">Carpeta / Categoría POS</label>
+            <select 
+              className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-chunky-main transition-colors"
+              value={filterCat}
+              onChange={(e) => setFilterCat(e.target.value)}
+            >
+              <option value="ALL">Todas las carpetas</option>
+              <option value="NONE">Sin carpeta asignada</option>
+              {(posCategories || []).map((c) => <option key={c.id} value={c.id}>📁 {c.name}</option>)}
+            </select>
+          </div>
         </div>
       </div>
 
