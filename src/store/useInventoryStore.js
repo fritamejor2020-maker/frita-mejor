@@ -66,6 +66,7 @@ export function mergeArrays(localArr, remoteArr, key) {
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
       merged.push(remoteItem);
+      addedIds.add(remoteItem.id);
     }
   });
 
@@ -1153,7 +1154,7 @@ export const useInventoryStore = create(
         vendorLocations:      state.vendorLocations  || {},
         contrataPayments:     state.contrataPayments || [],
       }),
-      // Al rehidratar desde localStorage, filtrar items borrados
+      // Al rehidratar desde localStorage, filtrar items borrados y duplicados
       onRehydrateStorage: () => (state) => {
         if (!state) return;
         const deletedShifts = state.deletedShiftIds || [];
@@ -1161,8 +1162,27 @@ export const useInventoryStore = create(
           state.posShifts = state.posShifts.filter(s => !deletedShifts.includes(s.id));
         }
         const deletedInv = state.deletedInventoryIds || [];
-        if (deletedInv.length > 0 && state.inventory?.length > 0) {
-          state.inventory = state.inventory.filter(i => !deletedInv.includes(i.id));
+        if (state.inventory?.length > 0) {
+          let inv = state.inventory;
+          if (deletedInv.length > 0) {
+            inv = inv.filter(i => !deletedInv.includes(i.id));
+          }
+          
+          // Eliminar duplicados locales (mismo ID o mismo nombre + código de barras)
+          const seenIds = new Set();
+          const seenNames = new Set();
+          const uniqueInventory = [];
+          
+          inv.forEach(item => {
+            if (!item || !item.id) return;
+            const nameKey = `${item.name.toLowerCase().trim()}_${item.barcode || ''}`;
+            if (!seenIds.has(item.id) && !seenNames.has(nameKey)) {
+              seenIds.add(item.id);
+              seenNames.add(nameKey);
+              uniqueInventory.push(item);
+            }
+          });
+          state.inventory = uniqueInventory;
         }
       },
     }
