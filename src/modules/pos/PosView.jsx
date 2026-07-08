@@ -72,22 +72,32 @@ export function PosView() {
   const [pinPromptConfig, setPinPromptConfig] = useState(null); // { message, expectedPin, onSuccess }
 
   const isClosingLocalRef = useRef(false);
-  const prevActiveShiftRef = useRef(null);
+  const activeShiftIdRef = useRef(null);
 
   useEffect(() => {
-    if (prevActiveShiftRef.current && !activeShift && selectedRegisterId) {
-      if (isClosingLocalRef.current) {
-        setSelectedRegisterId(null);
-        setShowRegisterModal(true);
-        isClosingLocalRef.current = false;
-      } else {
-        setSelectedRegisterId(null);
-        setShowRegisterModal(true);
-        alert("El turno de esta caja ha sido cerrado desde otro dispositivo.");
+    if (activeShift) {
+      activeShiftIdRef.current = activeShift.id;
+    }
+  }, [activeShift]);
+
+  useEffect(() => {
+    if (selectedRegisterId && activeShiftIdRef.current) {
+      const myShift = (posShifts || []).find(s => s.id === activeShiftIdRef.current);
+      if (myShift && myShift.closedAt) {
+        if (isClosingLocalRef.current) {
+          setSelectedRegisterId(null);
+          setShowRegisterModal(true);
+          isClosingLocalRef.current = false;
+          activeShiftIdRef.current = null;
+        } else {
+          setSelectedRegisterId(null);
+          setShowRegisterModal(true);
+          activeShiftIdRef.current = null;
+          alert("El turno de esta caja ha sido cerrado desde otro dispositivo.");
+        }
       }
     }
-    prevActiveShiftRef.current = activeShift;
-  }, [activeShift, selectedRegisterId]);
+  }, [posShifts, selectedRegisterId]);
 
   // ── Reproductor sintetizado de Campana Triunfal (Web Audio API) ──
   const playVictoryChime = () => {

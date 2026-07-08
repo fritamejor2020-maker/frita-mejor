@@ -31,6 +31,61 @@ import { AdminGeofencesTab } from './AdminGeofencesTab';
 
 // ─── Componente de fila editable genérica ─────────────────────────────────────
 // ─── Componente para subida de imagen inline ──────────────────────────────────
+const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) => {
+  return new Promise((resolve) => {
+    if (!file || !file.type.startsWith('image/')) {
+      resolve(file);
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > maxWidth) {
+            height = Math.round((height * maxWidth) / width);
+            width = maxWidth;
+          }
+        } else {
+          if (height > maxHeight) {
+            width = Math.round((width * maxHeight) / height);
+            height = maxHeight;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(file);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+
+        canvas.toBlob((blob) => {
+          if (blob) {
+            const compressedFile = new File([blob], file.name, {
+              type: 'image/jpeg',
+              lastModified: Date.now(),
+            });
+            resolve(compressedFile);
+          } else {
+            resolve(file);
+          }
+        }, 'image/jpeg', quality);
+      };
+      img.onerror = () => resolve(file);
+      img.src = e.target.result;
+    };
+    reader.onerror = () => resolve(file);
+    reader.readAsDataURL(file);
+  });
+};
+
 function ImageUploadField({ value, onChange, label }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
@@ -41,26 +96,26 @@ function ImageUploadField({ value, onChange, label }) {
 
   const handleFile = async (file) => {
     if (!file || !file.type.startsWith('image/')) return;
-    // Show local preview immediately
-    const localUrl = URL.createObjectURL(file);
-    setPreview(localUrl);
     setUploading(true);
     try {
-      const publicUrl = await uploadProductImage(file);
+      const compressedFile = await compressImage(file);
+      const localUrl = URL.createObjectURL(compressedFile);
+      setPreview(localUrl);
+      
+      const publicUrl = await uploadProductImage(compressedFile);
       if (publicUrl) {
         onChange(publicUrl);
         setPreview(publicUrl);
       } else {
-        // Fallback: keep local preview + use data URL for offline support
         const reader = new FileReader();
         reader.onload = (e) => {
           onChange(e.target.result);
           setPreview(e.target.result);
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedFile);
       }
-    } catch {
-      // fallback to dataURL
+    } catch (err) {
+      console.warn('[Upload] Error compressing/uploading image, falling back to original:', err);
       const reader = new FileReader();
       reader.onload = (e) => {
         onChange(e.target.result);
