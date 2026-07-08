@@ -1239,13 +1239,15 @@ export function PosView() {
 
                 <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
                 
-                <span className={`absolute bottom-4 right-4 z-20 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
-                  item.type === 'FRITO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
-                  item.type === 'CRUDO' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
-                  item.type === 'BEBIDA' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700/50'
-                }`}>
-                  {item.type}
-                </span>
+                {item.type !== 'PRODUCTO' && (
+                  <span className={`absolute top-3 right-3 z-20 text-[8px] font-black px-1.5 py-0.5 rounded border uppercase tracking-wider ${
+                    item.type === 'FRITO' ? 'bg-yellow-500/20 text-yellow-400 border-yellow-500/30' :
+                    item.type === 'CRUDO' ? 'bg-orange-500/20 text-orange-400 border-orange-500/30' :
+                    item.type === 'BEBIDA' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 'bg-gray-800/80 text-gray-400 border-gray-700/50'
+                  }`}>
+                    {item.type}
+                  </span>
+                )}
 
                 <div className={`relative z-20 flex flex-col gap-1 w-full mt-auto mix-blend-plus-lighter`}>
                   <span className={`font-black leading-tight line-clamp-2 ${item.imageUrl ? 'text-white drop-shadow-lg' : 'text-gray-100'} ${posSettings?.gridSize === 'small' ? 'text-xs sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-xl' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
