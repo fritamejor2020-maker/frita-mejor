@@ -2757,7 +2757,7 @@ function PosConfigPanel() {
 
 // ─── Panel: Historial POS (Ventas y Cierres Z) ────────────────────────────────
 function PosHistoryPanel() {
-  const { posShifts, posSales, updatePosShift, deletePosShift } = useInventoryStore();
+  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift } = useInventoryStore();
   const [activeSubtab, setActiveSubtab] = useState('SHIFTS'); // SHIFTS | SALES
 
   const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
@@ -2787,61 +2787,83 @@ function PosHistoryPanel() {
           {(posShifts || []).length === 0 ? (
             <p className="text-center text-gray-400 py-10 font-bold">No hay turnos registrados.</p>
           ) : (
-            (posShifts || []).map(shift => (
-              <div key={shift.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 bg-white">
-                <div className="flex justify-between items-start mb-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xl">💰</span>
-                    <div>
-                      <h4 className="font-black text-chunky-dark">Turno {shift.id.slice(-6)}</h4>
-                      <p className="text-xs text-gray-500 font-bold">Cajero: {shift.userName || 'Desconocido'}</p>
+            (posShifts || []).map(shift => {
+              const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
+              const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
+              
+              const cashSales = shiftSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+              const otherSales = shiftSales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+              const retiros = shiftExpenses.filter(e => e.type !== 'deposito').reduce((acc, e) => acc + e.amount, 0);
+              const depositos = shiftExpenses.filter(e => e.type === 'deposito').reduce((acc, e) => acc + e.amount, 0);
+              
+              const expected = (shift.initialAmount || 0) + cashSales - retiros + depositos;
+              const counted = shift.realAmount || 0;
+              const diff = counted - expected;
+
+              return (
+                <div key={shift.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 bg-white">
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xl">💰</span>
+                      <div>
+                        <h4 className="font-black text-chunky-dark">Turno {shift.id.slice(-6)} {shift.registerName ? `[${shift.registerName}]` : ''}</h4>
+                        <p className="text-xs text-gray-500 font-bold">Cajero: {shift.userName || 'Desconocido'}</p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${shift.closedAt ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600 animate-pulse'}`}>
-                      {shift.closedAt ? 'CERRADO (Reporte Z)' : 'EN CURSO'}
-                    </span>
-                    {!shift.closedAt && (
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${shift.closedAt ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600 animate-pulse'}`}>
+                        {shift.closedAt ? 'CERRADO (Reporte Z)' : 'EN CURSO'}
+                      </span>
+                      {!shift.closedAt && (
+                        <button
+                          onClick={() => handleForceClose(shift.id)}
+                          className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
+                          title="Forzar cierre del turno"
+                        >
+                          ⚡ Forzar Cierre
+                        </button>
+                      )}
                       <button
-                        onClick={() => handleForceClose(shift.id)}
-                        className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-                        title="Forzar cierre del turno"
+                        onClick={() => handleDeleteShift(shift.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
+                        title="Eliminar turno"
                       >
-                        ⚡ Forzar Cierre
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
                       </button>
-                    )}
-                    <button
-                      onClick={() => handleDeleteShift(shift.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
-                      title="Eliminar turno"
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
-                    </button>
-                  </div>
-                </div>
-                
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-50">
-                  <div>
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">Apertura</span>
-                    <span className="font-bold text-sm text-gray-700">{new Date(shift.openedAt).toLocaleString('es-CO')}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">Cierre</span>
-                    <span className="font-bold text-sm text-gray-700">{shift.closedAt ? new Date(shift.closedAt).toLocaleString('es-CO') : '—'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] text-gray-400 font-bold uppercase">Base Inicial</span>
-                    <span className="font-black text-sm text-chunky-dark">{formatMoney(shift.initialAmount || 0)}</span>
-                  </div>
-                  {shift.closedAt && (
-                    <div>
-                      <span className="block text-[10px] text-gray-400 font-bold uppercase">Conteo Final de Caja</span>
-                      <span className="font-black text-sm text-blue-600">{formatMoney(shift.realAmount || 0)}</span>
                     </div>
-                  )}
+                  </div>
+                  
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-50 text-xs">
+                    <div>
+                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Tiempos</span>
+                      <span className="block font-bold text-gray-600">Apertura: {new Date(shift.openedAt).toLocaleString('es-CO')}</span>
+                      <span className="block font-bold text-gray-600">Cierre: {shift.closedAt ? new Date(shift.closedAt).toLocaleString('es-CO') : 'En Curso'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Caja (Efectivo)</span>
+                      <span className="block font-bold text-gray-600">Base: {formatMoney(shift.initialAmount || 0)}</span>
+                      <span className="block font-bold text-green-600">Ventas: +{formatMoney(cashSales)}</span>
+                      <span className="block font-bold text-red-500">Retiros: -{formatMoney(retiros)}</span>
+                      {depositos > 0 && <span className="block font-bold text-green-600">Depósitos: +{formatMoney(depositos)}</span>}
+                    </div>
+                    <div>
+                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Otros Canales</span>
+                      <span className="block font-bold text-blue-600">Banco/Tarjeta: +{formatMoney(otherSales)}</span>
+                      <span className="block font-black text-gray-900 mt-1 text-sm">Esperado en Caja: {formatMoney(expected)}</span>
+                    </div>
+                    {shift.closedAt && (
+                      <div>
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Resultado de Cierre</span>
+                        <span className="block font-black text-sm text-gray-900">Contado: {formatMoney(counted)}</span>
+                        <span className={`inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-black ${diff === 0 ? 'bg-green-50 text-green-600 border border-green-200' : diff > 0 ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
+                          {diff === 0 ? '✅ CUADRADO' : diff > 0 ? `🟢 SOBRANTE: +${formatMoney(diff)}` : `🔴 FALTANTE: -${formatMoney(Math.abs(diff))}`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
                 </div>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
       )}
