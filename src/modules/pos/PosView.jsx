@@ -189,6 +189,7 @@ export function PosView() {
 
   // Esperar a que la sincronización con Supabase termine antes de mostrar "ABRIR CAJA"
   const [syncReady, setSyncReady] = useState(false);
+  const [hasInitialCheckDone, setHasInitialCheckDone] = useState(false);
 
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
@@ -256,9 +257,9 @@ export function PosView() {
     };
   }, []);
 
-  // Reset check ref on register change
+  // Reset check when register changes
   useEffect(() => {
-    hasCheckedInitialShiftRef.current = false;
+    setHasInitialCheckDone(false);
   }, [selectedRegisterId]);
 
   useEffect(() => {
@@ -266,7 +267,7 @@ export function PosView() {
     if (activeShift) {
       setSyncReady(true);
       setShowShiftModal(false);
-      hasCheckedInitialShiftRef.current = true;
+      setHasInitialCheckDone(true);
       return;
     }
     // Dar tiempo a loadFromRemote para traer turnos de Supabase (max 3s)
@@ -278,13 +279,14 @@ export function PosView() {
 
   // Auto-open shift modal only ONCE after initial sync/check is ready and there's truly no shift
   useEffect(() => {
-    if (syncReady && selectedRegisterId && !hasCheckedInitialShiftRef.current) {
+    if (syncReady && selectedRegisterId && !hasInitialCheckDone) {
       if (!activeShift) {
         setShowShiftModal(true);
+      } else {
+        setHasInitialCheckDone(true);
       }
-      hasCheckedInitialShiftRef.current = true;
     }
-  }, [syncReady, activeShift, selectedRegisterId]);
+  }, [syncReady, activeShift, selectedRegisterId, hasInitialCheckDone]);
 
   // Detectar si el agente de impresión está corriendo
   useEffect(() => {
@@ -418,6 +420,7 @@ export function PosView() {
       registerName: selectedRegister?.name || 'Caja',
     });
     setShowShiftModal(false);
+    setHasInitialCheckDone(true);
   };
 
   const handleCloseShift = (realCount) => {
