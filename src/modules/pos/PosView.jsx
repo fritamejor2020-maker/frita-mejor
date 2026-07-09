@@ -73,6 +73,7 @@ export function PosView() {
 
   const isClosingLocalRef = useRef(false);
   const activeShiftIdRef = useRef(null);
+  const hasCheckedInitialShiftRef = useRef(false);
 
   useEffect(() => {
     if (activeShift) {
@@ -255,11 +256,17 @@ export function PosView() {
     };
   }, []);
 
+  // Reset check ref on register change
+  useEffect(() => {
+    hasCheckedInitialShiftRef.current = false;
+  }, [selectedRegisterId]);
+
   useEffect(() => {
     // Si ya hay turno activo, la sync ya trajo datos — listo
     if (activeShift) {
       setSyncReady(true);
       setShowShiftModal(false);
+      hasCheckedInitialShiftRef.current = true;
       return;
     }
     // Dar tiempo a loadFromRemote para traer turnos de Supabase (max 3s)
@@ -269,10 +276,13 @@ export function PosView() {
     return () => clearTimeout(timer);
   }, [activeShift]);
 
-  // Auto-open shift modal only AFTER sync is ready and there's truly no shift
+  // Auto-open shift modal only ONCE after initial sync/check is ready and there's truly no shift
   useEffect(() => {
-    if (syncReady && !activeShift && selectedRegisterId) {
-      setShowShiftModal(true);
+    if (syncReady && selectedRegisterId && !hasCheckedInitialShiftRef.current) {
+      if (!activeShift) {
+        setShowShiftModal(true);
+      }
+      hasCheckedInitialShiftRef.current = true;
     }
   }, [syncReady, activeShift, selectedRegisterId]);
 
