@@ -455,9 +455,8 @@ export function PosView() {
       
       const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
       setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
-    } else {
-      alert("Turno cerrado con éxito. El conteo de efectivo ha sido pospuesto.");
     }
+
 
     // Show prompt for logout
     setTimeout(() => {
@@ -1534,7 +1533,6 @@ export function PosView() {
               const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
               setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
               
-              alert("Cierre completado y Reporte Z impreso.");
               setShiftToCompleteCount(null);
             } catch (err) {
               console.error("[CompleteCount Error]:", err);
