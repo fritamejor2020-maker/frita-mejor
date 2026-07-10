@@ -1519,22 +1519,27 @@ export function PosView() {
           expenses={(posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id)}
           onClose={() => setShiftToCompleteCount(null)}
           onConfirm={(realCount) => {
-            const counted = parseFloat(realCount) || 0;
-            const updatedShift = { ...shiftToCompleteCount, realAmount: counted, pendingCount: false };
-            updatePosShift(shiftToCompleteCount.id, {
-              realAmount: counted,
-              pendingCount: false
-            });
-            setShiftToCompleteCount(null);
-            
-            // Print Z Report
-            const shiftSales = (posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID');
-            const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id);
-            const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
-            const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
-            setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
-            
-            alert("Cierre completado y Reporte Z impreso.");
+            try {
+              const counted = parseFloat(realCount) || 0;
+              const updatedShift = { ...shiftToCompleteCount, realAmount: counted, pendingCount: false };
+              updatePosShift(shiftToCompleteCount.id, {
+                realAmount: counted,
+                pendingCount: false
+              });
+              
+              // Print Z Report
+              const shiftSales = (posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID');
+              const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id);
+              const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
+              const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
+              setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
+              
+              alert("Cierre completado y Reporte Z impreso.");
+              setShiftToCompleteCount(null);
+            } catch (err) {
+              console.error("[CompleteCount Error]:", err);
+              alert("Error al completar el cierre: " + err.message);
+            }
           }}
         />
       )}

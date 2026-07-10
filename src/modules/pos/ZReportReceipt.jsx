@@ -96,7 +96,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   // Items sold summary
   const itemsSold = {};
   sales.forEach(sale => {
-      sale.items.forEach(item => {
+      (sale.items || []).forEach(item => {
           if (!itemsSold[item.name]) itemsSold[item.name] = { qty: 0, total: 0 };
           itemsSold[item.name].qty += item.qty;
           itemsSold[item.name].total += (item.price * item.qty);
