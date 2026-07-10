@@ -1456,6 +1456,16 @@ export function PosView() {
           customers={customers}
           onClose={() => setShowHistoryModal(false)}
           onReprint={handleReprintSale}
+          onEditSale={(sale) => {
+            setPinPromptConfig({
+              message: 'Clave de Supervisor',
+              expectedPin: posSettings?.supervisorPin || '1234',
+              onSuccess: () => {
+                setEditingSale(sale);
+                setShowHistoryModal(false);
+              }
+            });
+          }}
         />
       )}
 
@@ -1593,6 +1603,10 @@ export function PosView() {
           onReprint={handleReprintZReport}
           onClose={() => setShowZHistoryModal(false)}
           formatMoney={formatMoney}
+          onCompleteCount={(shift) => {
+            setShiftToCompleteCount(shift);
+            setShowZHistoryModal(false);
+          }}
         />
       )}
 
@@ -2535,11 +2549,19 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
            </div>
         </div>
 
-        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4">
-          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" onClick={() => onConfirm(realCount)}>
-            Cerrar Turno Definitivo
-          </Button>
+        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex flex-col gap-3">
+          <div className="flex gap-4">
+            <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
+            <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" onClick={() => onConfirm(realCount, false)}>
+              Cerrar Turno Definitivo
+            </Button>
+          </div>
+          <button
+            className="w-full text-sm font-bold text-amber-400 hover:text-amber-300 bg-amber-950/30 border border-amber-900/40 rounded-[20px] py-3 transition-colors hover:bg-amber-950/50 active:scale-95"
+            onClick={() => onConfirm(null, true)}
+          >
+            ⏰ Cerrar y Contar Después
+          </button>
         </div>
       </div>
     </div>
@@ -3312,37 +3334,67 @@ function PinPromptModal({ message, expectedPin, onSuccess, onClose }) {
 }
 
 // ─── Z-Report History Modal ───
-function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney }) {
+function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney, onCompleteCount }) {
+  const [filterDate, setFilterDate] = useState('');
+
+  const filteredShifts = filterDate
+    ? shifts.filter(shift => {
+        const d = new Date(shift.closedAt);
+        const localDate = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+        return localDate === filterDate;
+      })
+    : shifts;
+
   return (
     <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-2xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
         <div className="p-6 border-b border-gray-800 flex justify-between items-center">
           <div>
             <h2 className="text-2xl font-black text-white flex items-center gap-2">📊 Historial de Cierres Z</h2>
-            <p className="text-gray-400 text-sm font-bold mt-1">{shifts.length} cierre{shifts.length !== 1 ? 's' : ''} registrado{shifts.length !== 1 ? 's' : ''}</p>
+            <p className="text-gray-400 text-sm font-bold mt-1">{filteredShifts.length} cierre{filteredShifts.length !== 1 ? 's' : ''} registrado{filteredShifts.length !== 1 ? 's' : ''}</p>
           </div>
           <button className="text-gray-400 hover:text-white bg-[#16171d] p-2 rounded-full hover:bg-gray-800 transition-colors" onClick={onClose}>
             <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
           </button>
         </div>
 
+        {/* Date filter bar */}
+        <div className="px-6 py-3 border-b border-gray-800/60 flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">Filtrar por fecha:</span>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={e => setFilterDate(e.target.value)}
+            className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-1.5 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors"
+          />
+          {filterDate && (
+            <button
+              onClick={() => setFilterDate('')}
+              className="text-xs font-bold text-red-400 hover:text-red-300 bg-red-950/40 border border-red-900/40 px-3 py-1.5 rounded-xl transition-colors"
+            >
+              ✕ Limpiar
+            </button>
+          )}
+        </div>
+
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {shifts.length === 0 ? (
+          {filteredShifts.length === 0 ? (
             <div className="text-center py-16 text-gray-500">
               <p className="text-5xl mb-4">📋</p>
               <p className="font-bold text-lg">Sin cierres registrados</p>
-              <p className="text-sm mt-1">Los cierres aparecerán aquí después de cerrar un turno.</p>
+              <p className="text-sm mt-1">{filterDate ? 'No hay cierres en la fecha seleccionada.' : 'Los cierres aparecerán aquí después de cerrar un turno.'}</p>
             </div>
           ) : (
-            shifts.map(shift => {
+            filteredShifts.map(shift => {
               const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
               const totalSales = shiftSales.reduce((acc, s) => acc + s.total, 0);
               const salesCount = shiftSales.length;
               const opened = new Date(shift.openedAt);
               const closed = new Date(shift.closedAt);
+              const isPending = shift.pendingCount === true || shift.realAmount === null;
 
               return (
-                <div key={shift.id} className="bg-[#16171d] border border-gray-800 rounded-[20px] p-5 hover:border-gray-700 transition-colors">
+                <div key={shift.id} className={`bg-[#16171d] border rounded-[20px] p-5 transition-colors ${isPending ? 'border-amber-500/40 hover:border-amber-500/60' : 'border-gray-800 hover:border-gray-700'}`}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
@@ -3352,6 +3404,11 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney }) {
                         {shift.registerName && (
                           <span className="bg-purple-500/20 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-lg">{shift.registerName}</span>
                         )}
+                        {isPending && (
+                          <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-black px-2 py-0.5 rounded-lg">
+                            ⚠️ Conteo Pendiente
+                          </span>
+                        )}
                       </div>
                       <div className="flex items-center gap-4 mt-2 text-xs font-bold text-gray-400">
                         <span>👤 {shift.userName || 'Sin cajero'}</span>
@@ -3360,17 +3417,26 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney }) {
                       <div className="flex items-center gap-4 mt-2">
                         <span className="text-green-400 font-black text-sm">{formatMoney(totalSales)}</span>
                         <span className="text-gray-500 text-xs font-bold">{salesCount} venta{salesCount !== 1 ? 's' : ''}</span>
-                        {shift.realAmount > 0 && (
-                          <span className="text-gray-500 text-xs font-bold">Contado: {formatMoney(shift.realAmount)}</span>
+                        {!isPending && shift.realAmount !== undefined && shift.realAmount !== null && (
+                          <span className="text-gray-400 text-xs font-bold">Contado: {formatMoney(shift.realAmount)}</span>
                         )}
                       </div>
                     </div>
-                    <button
-                      className="shrink-0 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all flex items-center gap-1.5"
-                      onClick={() => onReprint(shift)}
-                    >
-                      🖨️ Reimprimir
-                    </button>
+                    {isPending ? (
+                      <button
+                        className="shrink-0 bg-yellow-500 hover:bg-yellow-400 text-gray-950 font-black text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all flex items-center gap-1.5"
+                        onClick={() => onCompleteCount && onCompleteCount(shift)}
+                      >
+                        🏁 Terminar Cierre
+                      </button>
+                    ) : (
+                      <button
+                        className="shrink-0 bg-teal-600 hover:bg-teal-500 text-white font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all flex items-center gap-1.5"
+                        onClick={() => onReprint(shift)}
+                      >
+                        🖨️ Reimprimir
+                      </button>
+                    )}
                   </div>
                 </div>
               );
