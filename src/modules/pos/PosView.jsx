@@ -670,6 +670,7 @@ export function PosView() {
       timestamp: new Date().toISOString(),
       shiftId: activeShift?.id,
       registerId: selectedRegisterId,
+      userName: activeShift?.userName || user?.name || 'PRINCIPAL',
       // Contrata fields - only credit when explicitly requested
       ...(isCredit && isContrata ? {
         contrataPaymentMethod: 'credit',

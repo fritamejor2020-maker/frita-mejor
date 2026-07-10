@@ -109,7 +109,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
       <div style="margin-bottom: 8px;">
         ${tc.showTicketNumber ? `<p style="margin: 0; font-size: 14px;">Ticket No: ${ticketNo}</p>` : ''}
         ${tc.showDate ? `<p style="margin: 0;">Fecha: ${dateStr}</p>` : ''}
-        ${tc.showCashier ? `<p style="margin: 0;">Cajero: PRINCIPAL</p>` : ''}
+        ${tc.showCashier ? `<p style="margin: 0;">Cajero: ${(sale.userName || 'PRINCIPAL').toUpperCase()}</p>` : ''}
       </div>
 
       <div style="border-bottom: 2px dashed black; margin: 8px 0;"></div>
