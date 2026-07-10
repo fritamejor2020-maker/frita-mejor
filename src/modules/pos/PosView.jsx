@@ -70,6 +70,8 @@ export function PosView() {
   const [showLuckyWinnerModal, setShowLuckyWinnerModal] = useState(false);
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [pinPromptConfig, setPinPromptConfig] = useState(null); // { message, expectedPin, onSuccess }
+  const [editingSale, setEditingSale] = useState(null);
+  const [shiftToCompleteCount, setShiftToCompleteCount] = useState(null);
 
   const isClosingLocalRef = useRef(false);
   const activeShiftIdRef = useRef(null);
@@ -423,26 +425,38 @@ export function PosView() {
     setHasInitialCheckDone(true);
   };
 
-  const handleCloseShift = (realCount) => {
+  const handleCloseShift = (realCount, isPostponed = false) => {
     if (!activeShift) return;
     isClosingLocalRef.current = true;
     const closedDate = new Date().toISOString();
-    const closedShiftData = { ...activeShift, closedAt: closedDate, realAmount: parseFloat(realCount) || 0 };
+    const closedShiftData = { 
+      ...activeShift, 
+      closedAt: closedDate, 
+      realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
+      pendingCount: isPostponed ? true : false
+    };
     updatePosShift(activeShift.id, {
       closedAt: closedDate,
-      realAmount: parseFloat(realCount) || 0,
+      realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
+      pendingCount: isPostponed ? true : false
     });
-    setLastClosedShift(closedShiftData);
+    
     setShowClosingModal(false);
     
-    // Auto print Z report & Open Drawer
-    const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
-    
-    const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
-    const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
-    
-    const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
-    setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
+    if (!isPostponed) {
+      setLastClosedShift(closedShiftData);
+      
+      // Auto print Z report & Open Drawer
+      const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
+      
+      const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
+      const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
+      
+      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
+      setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
+    } else {
+      alert("Turno cerrado con éxito. El conteo de efectivo ha sido pospuesto.");
+    }
 
     // Show prompt for logout
     setTimeout(() => {
@@ -823,7 +837,7 @@ export function PosView() {
       <div className="w-full shrink-0 bg-[#111318] border-b border-gray-800 flex items-center gap-2 px-3 h-14 shadow-lg shadow-black/40">
 
         {/* ── Logo ── */}
-        <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none cursor-pointer hover:bg-yellow-300 active:scale-95 transition-all" onClick={() => activeRegisters.length > 1 && setShowRegisterModal(true)} title={activeRegisters.length > 1 ? 'Cambiar caja' : ''}>🍟 {selectedRegister?.name || 'Caja FM'}</span>
+        <span className="font-black text-sm bg-yellow-400 text-gray-900 px-3 py-2 rounded-xl whitespace-nowrap shrink-0 select-none cursor-pointer hover:bg-yellow-300 active:scale-95 transition-all" onClick={() => activeRegisters.length > 1 && setShowRegisterModal(true)} title={activeRegisters.length > 1 ? 'Cambiar caja' : ''}>🍟 {activeShift ? (activeShift.userName || selectedRegister?.name || 'Caja FM') : (selectedRegister?.name || 'Caja FM')}</span>
 
         {/* ── Separador ── */}
         <div className="w-px h-7 bg-gray-700 shrink-0" />
@@ -1482,6 +1496,49 @@ export function PosView() {
           expenses={(posExpenses || []).filter(e => e.shiftId === activeShift.id)}
           onClose={() => setShowClosingModal(false)}
           onConfirm={handleCloseShift} 
+        />
+      )}
+
+      {shiftToCompleteCount && (
+        <ShiftCompleteCountModal 
+          shift={shiftToCompleteCount}
+          sales={(posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID')}
+          expenses={(posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id)}
+          onClose={() => setShiftToCompleteCount(null)}
+          onConfirm={(realCount) => {
+            const counted = parseFloat(realCount) || 0;
+            const updatedShift = { ...shiftToCompleteCount, realAmount: counted, pendingCount: false };
+            updatePosShift(shiftToCompleteCount.id, {
+              realAmount: counted,
+              pendingCount: false
+            });
+            setShiftToCompleteCount(null);
+            
+            // Print Z Report
+            const shiftSales = (posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID');
+            const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id);
+            const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
+            const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
+            setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
+            
+            alert("Cierre completado y Reporte Z impreso.");
+          }}
+        />
+      )}
+
+      {editingSale && (
+        <EditSaleModal 
+          sale={editingSale}
+          customers={customers}
+          posSettings={posSettings}
+          formatMoney={formatMoney}
+          onClose={() => setEditingSale(null)}
+          onSave={(saleId, updatedData) => {
+            updatePosSale(saleId, updatedData);
+            setEditingSale(null);
+            setShowHistoryModal(true);
+            alert("Venta actualizada con éxito. El inventario ha sido ajustado.");
+          }}
         />
       )}
 
@@ -2828,13 +2885,30 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
 }
 
 // ─── Sales History Modal Component — Full Screen Table ───
-function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
+function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale }) {
   const [filterText, setFilterText] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [expandedId, setExpandedId] = useState(null);
-  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' = más reciente primero, 'asc' = más antiguo primero
+  
+  // Interactive sorting
+  const [sortBy, setSortBy] = useState('timestamp'); // 'timestamp', 'ticket', 'paymentMethod', 'customer', 'items', 'discount', 'total'
+  const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
+
+  const toggleSort = (field) => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc');
+    } else {
+      setSortBy(field);
+      setSortOrder('desc');
+    }
+  };
+
+  const SortIndicator = ({ field }) => {
+    if (sortBy !== field) return <span className="text-gray-600 ml-1">⇅</span>;
+    return <span className="text-chunky-main ml-1">{sortOrder === 'asc' ? '▲' : '▼'}</span>;
+  };
 
   // Unique payment methods and customers for filter dropdowns
   const paymentMethods = [...new Set(sales.map(s => s.paymentMethod).filter(Boolean))];
@@ -2861,11 +2935,35 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
     return true;
   });
 
-  // Sort by time
+  // Sort logic
   const sorted = [...filtered].sort((a, b) => {
-    const ta = new Date(a.timestamp).getTime();
-    const tb = new Date(b.timestamp).getTime();
-    return sortOrder === 'desc' ? tb - ta : ta - tb;
+    let valA, valB;
+    if (sortBy === 'timestamp') {
+      valA = new Date(a.timestamp).getTime();
+      valB = new Date(b.timestamp).getTime();
+    } else if (sortBy === 'ticket') {
+      valA = a.id.toLowerCase();
+      valB = b.id.toLowerCase();
+    } else if (sortBy === 'paymentMethod') {
+      valA = (a.paymentMethod || '').toLowerCase();
+      valB = (b.paymentMethod || '').toLowerCase();
+    } else if (sortBy === 'customer') {
+      valA = (customers?.find(c => c.id === a.customerId)?.name || 'Consumidor Final').toLowerCase();
+      valB = (customers?.find(c => c.id === b.customerId)?.name || 'Consumidor Final').toLowerCase();
+    } else if (sortBy === 'items') {
+      valA = a.items.reduce((sum, item) => sum + item.qty, 0);
+      valB = b.items.reduce((sum, item) => sum + item.qty, 0);
+    } else if (sortBy === 'discount') {
+      valA = a.discountAmount || 0;
+      valB = b.discountAmount || 0;
+    } else if (sortBy === 'total') {
+      valA = a.total || 0;
+      valB = b.total || 0;
+    }
+
+    if (valA < valB) return sortOrder === 'desc' ? 1 : -1;
+    if (valA > valB) return sortOrder === 'desc' ? -1 : 1;
+    return 0;
   });
 
   const totalFiltered = filtered.reduce((s, sale) => s + sale.total, 0);
@@ -2964,29 +3062,51 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
         ) : (
           <table className="w-full text-sm">
             <thead className="sticky top-0 z-10">
-              <tr className="bg-[#1a1b23] border-b border-gray-800">
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left w-8"></th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left"># Ticket</th>
-                <th
-                  className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left cursor-pointer select-none hover:text-gray-300 transition-colors group"
-                  onClick={() => setSortOrder(prev => prev === 'desc' ? 'asc' : 'desc')}
-                  title={sortOrder === 'desc' ? 'Más reciente primero — clic para invertir' : 'Más antiguo primero — clic para invertir'}
+              <tr className="bg-[#1a1b23] border-b border-gray-800 text-gray-400">
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-left w-8"></th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-left cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('ticket')}
                 >
-                  <span className="inline-flex items-center gap-1">
-                    Hora
-                    <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"
-                      className={`transition-transform duration-200 text-chunky-main ${sortOrder === 'asc' ? 'rotate-180' : ''}`}
-                    >
-                      <polyline points="6 9 12 15 18 9"/>
-                    </svg>
-                  </span>
+                  # Ticket <SortIndicator field="ticket" />
                 </th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Método Pago</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-left">Cliente</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Items</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-right">Descuento</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-chunky-main uppercase tracking-widest text-right">Total</th>
-                <th className="py-3 px-4 text-[10px] font-bold text-gray-500 uppercase tracking-widest text-center">Acciones</th>
+                <th
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-left cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('timestamp')}
+                >
+                  Hora <SortIndicator field="timestamp" />
+                </th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-left cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('paymentMethod')}
+                >
+                  Método Pago <SortIndicator field="paymentMethod" />
+                </th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-left cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('customer')}
+                >
+                  Cliente <SortIndicator field="customer" />
+                </th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-center cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('items')}
+                >
+                  Items <SortIndicator field="items" />
+                </th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-right cursor-pointer select-none hover:text-white transition-colors"
+                  onClick={() => toggleSort('discount')}
+                >
+                  Descuento <SortIndicator field="discount" />
+                </th>
+                <th 
+                  className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-right cursor-pointer select-none hover:text-white transition-colors text-chunky-main"
+                  onClick={() => toggleSort('total')}
+                >
+                  Total <SortIndicator field="total" />
+                </th>
+                <th className="py-3 px-4 text-[10px] font-bold uppercase tracking-widest text-center">Acciones</th>
               </tr>
             </thead>
             <tbody>
@@ -3048,12 +3168,21 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint }) {
                       </td>
                       {/* Actions */}
                       <td className="py-3 px-4 text-center" onClick={e => e.stopPropagation()}>
-                        <button
-                          onClick={() => onReprint(sale)}
-                          className="inline-flex items-center gap-1.5 bg-[#2a2d38] hover:bg-[#343846] text-white text-xs font-bold px-3 py-2 rounded-xl border border-gray-700 hover:scale-105 active:scale-95 transition-all"
-                        >
-                          🖨️ Reimprimir
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button
+                            onClick={() => onReprint(sale)}
+                            className="inline-flex items-center gap-1.5 bg-[#2a2d38] hover:bg-[#343846] text-white text-xs font-bold px-2.5 py-2 rounded-xl border border-gray-700 hover:scale-105 active:scale-95 transition-all"
+                            title="Reimprimir Ticket"
+                          >
+                            🖨️
+                          </button>
+                          <button
+                            onClick={() => onEditSale(sale)}
+                            className="inline-flex items-center gap-1.5 bg-orange-950/40 border border-orange-900/40 text-orange-400 hover:bg-orange-900/30 text-xs font-bold px-3 py-2 rounded-xl hover:scale-105 active:scale-95 transition-all"
+                          >
+                            ✏️ Editar
+                          </button>
+                        </div>
                       </td>
                     </tr>
 
@@ -3309,6 +3438,243 @@ function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
           ¡Entendido y Continuar!
         </button>
 
+      </div>
+    </div>
+  );
+}
+
+// ─── Shift Complete Count Modal ───
+function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm }) {
+  const [realCount, setRealCount] = useState('');
+  
+  // Calculate expected
+  const initial = shift.initialAmount || 0;
+  const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
+  const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
+  const retiros = (expenses || []).filter(e => e.type !== 'deposito');
+  const depositos = (expenses || []).filter(e => e.type === 'deposito');
+  const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
+  const totalDepositos = depositos.reduce((acc, e) => acc + e.amount, 0);
+
+  const expectedCashInDrawer = initial + cashSales - totalRetiros + totalDepositos;
+  const counted = parseFloat(realCount || 0);
+  const difference = counted - expectedCashInDrawer;
+
+  return (
+     <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="p-6 border-b border-gray-800">
+          <h2 className="text-2xl font-black text-white flex items-center gap-2">
+            🏁 Completar Conteo de Caja
+          </h2>
+          <p className="text-gray-400 text-xs font-bold mt-1">Registrar efectivo real contado para el turno cerrado.</p>
+        </div>
+        
+        <div className="p-6 overflow-y-auto space-y-6">
+            <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-3 text-sm font-bold text-gray-300 shadow-inner">
+              <div className="flex justify-between"><span>Base Inicial:</span> <span>{formatMoney(initial)}</span></div>
+              <div className="flex justify-between text-green-400"><span>Ventas Efectivo:</span> <span>+{formatMoney(cashSales)}</span></div>
+              <div className="flex justify-between text-blue-400"><span>Ventas Electrónicas:</span> <span>+{formatMoney(otherSales)}</span></div>
+              <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
+              {totalDepositos > 0 && (
+                <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
+              )}
+              <div className="border-t border-gray-700 pt-3 flex justify-between text-xl text-white font-black mt-2">
+                 <span>Efectivo Esperado en Cajón:</span> <span>{formatMoney(expectedCashInDrawer)}</span>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-bold text-gray-400 block mb-2 text-center uppercase tracking-widest">Efectivo Real Contado</label>
+              <div className="relative">
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-gray-500">$</span>
+                <input 
+                  autoFocus type="number" 
+                  className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-5 pl-14 pr-6 text-4xl font-black text-white outline-none text-center shadow-inner transition-colors"
+                  value={realCount}
+                  onChange={(e) => setRealCount(e.target.value)}
+                  onFocus={(e) => e.target.select()}
+                />
+              </div>
+              
+              {realCount !== '' && (
+                 <div className={`mt-4 p-5 rounded-[20px] text-center font-black text-lg border ${difference === 0 ? 'bg-green-500/10 text-green-500 border-green-500/30' : difference > 0 ? 'bg-blue-500/10 text-blue-500 border-blue-500/30' : 'bg-red-500/10 text-red-500 border-red-500/30'}`}>
+                    {difference === 0 ? '¡CAJA CUADRADA EXACTA! ✅' : difference > 0 ? `SOBRANTE DE: ${formatMoney(difference)}` : `FALTANTE DE: ${formatMoney(Math.abs(difference))}`}
+                 </div>
+              )}
+            </div>
+        </div>
+
+        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4">
+          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
+          <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-teal-600 hover:bg-teal-500 text-white shadow-[0_4px_14px_0_rgba(13,148,136,0.39)] hover:scale-105 active:scale-95 transition-all" onClick={() => onConfirm(realCount)} disabled={realCount === ''}>
+            Guardar y Generar Reporte Z
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal de Edición de Ventas (Auditoría Segura) ───
+function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onSave }) {
+  const [items, setItems] = useState(sale.items.map(i => ({ ...i })));
+  const [customerId, setCustomerId] = useState(sale.customerId || null);
+  const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod || 'EFECTIVO');
+  const [discountAmount, setDiscountAmount] = useState(sale.discountAmount || 0);
+
+  const handleQtyChange = (productId, delta) => {
+    setItems(prev => prev.map(item => {
+      if (String(item.productId || item.id) === String(productId)) {
+        const newQty = Math.max(1, item.qty + delta);
+        return { ...item, qty: newQty };
+      }
+      return item;
+    }));
+  };
+
+  const handleRemoveItem = (productId) => {
+    setItems(prev => prev.filter(item => String(item.productId || item.id) !== String(productId)));
+  };
+
+  const subtotal = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
+  const total = Math.max(0, subtotal - discountAmount);
+
+  const handleConfirmSave = () => {
+    if (items.length === 0) {
+      alert("La venta debe contener al menos 1 producto.");
+      return;
+    }
+    onSave(sale.id, {
+      items,
+      customerId,
+      paymentMethod,
+      discountAmount,
+      total
+    });
+  };
+
+  return (
+    <div className="fixed inset-0 z-[80] bg-black/90 backdrop-blur-md flex items-center justify-center p-4">
+      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        
+        {/* Header */}
+        <div className="p-6 border-b border-gray-800 flex justify-between items-center shrink-0">
+          <div>
+            <h2 className="text-2xl font-black text-white flex items-center gap-2">
+              ✏️ Editar Venta #{sale.id.slice(-6)}
+            </h2>
+            <p className="text-gray-400 text-xs font-bold mt-1">Modificar cantidades, cliente, descuento o método de pago.</p>
+          </div>
+          <button className="text-gray-400 hover:text-white bg-[#16171d] p-2 rounded-full hover:bg-gray-800 transition-colors" onClick={onClose}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="p-6 overflow-y-auto space-y-6 flex-1">
+          {/* Items List */}
+          <div className="space-y-3">
+            <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Productos en Ticket</h3>
+            <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+              {items.map(item => {
+                const itemId = item.productId || item.id;
+                return (
+                  <div key={itemId} className="bg-[#16171d] border border-gray-800/80 rounded-2xl p-4 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <span className="block font-bold text-white text-sm truncate">{item.name}</span>
+                      <span className="block text-xs text-gray-500 font-bold">{formatMoney(item.price)} c/u</span>
+                    </div>
+                    
+                    {/* Quantity selectors */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button 
+                        onClick={() => handleQtyChange(itemId, -1)}
+                        className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 font-black text-white text-lg active:scale-90 transition-all flex items-center justify-center border border-gray-700"
+                      >
+                        -
+                      </button>
+                      <span className="w-8 text-center text-sm font-black text-white">{item.qty}</span>
+                      <button 
+                        onClick={() => handleQtyChange(itemId, 1)}
+                        className="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 font-black text-white text-lg active:scale-90 transition-all flex items-center justify-center border border-gray-700"
+                      >
+                        +
+                      </button>
+                      
+                      {/* Delete item button */}
+                      <button 
+                        onClick={() => handleRemoveItem(itemId)}
+                        className="w-8 h-8 rounded-lg bg-red-950/40 border border-red-900/40 hover:bg-red-900/40 font-bold text-red-400 text-xs active:scale-90 transition-all flex items-center justify-center ml-2"
+                        title="Quitar ítem"
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Customer select */}
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-wider">Cliente</label>
+              <select
+                value={customerId || ''}
+                onChange={e => setCustomerId(e.target.value || null)}
+                className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-chunky-main cursor-pointer"
+              >
+                <option value="">Consumidor Final</option>
+                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+            </div>
+
+            {/* Payment method select */}
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-wider">Método de Pago</label>
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2.5 text-xs font-bold text-white outline-none focus:border-chunky-main cursor-pointer"
+              >
+                {(posSettings?.paymentMethods || []).map(m => (
+                  <option key={m.name} value={m.name}>{m.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border-t border-gray-800 pt-4">
+            {/* Discount field */}
+            <div>
+              <label className="text-xs font-bold text-gray-400 block mb-1.5 uppercase tracking-wider">Descuento ($)</label>
+              <input
+                type="number"
+                min="0"
+                value={discountAmount}
+                onChange={e => setDiscountAmount(parseFloat(e.target.value) || 0)}
+                className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-white outline-none focus:border-chunky-main"
+              />
+            </div>
+
+            {/* Totals Summary */}
+            <div className="bg-[#16171d] rounded-2xl p-4 flex flex-col justify-center text-right font-bold text-gray-400 border border-gray-800/80">
+              <span className="text-xs">Subtotal: {formatMoney(subtotal)}</span>
+              {discountAmount > 0 && <span className="text-xs text-red-400">Descuento: -{formatMoney(discountAmount)}</span>}
+              <span className="text-lg text-white font-black mt-1">Total: <span className="text-chunky-main">{formatMoney(total)}</span></span>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4 shrink-0">
+          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
+          <Button className="flex-1 rounded-[20px] py-4 font-black text-lg bg-orange-600 text-white shadow-[0_4px_14px_rgba(249,115,22,0.39)] hover:scale-105 active:scale-95 hover:bg-orange-500 transition-all" onClick={handleConfirmSave}>
+            Guardar Cambios
+          </Button>
+        </div>
       </div>
     </div>
   );

@@ -212,6 +212,7 @@ const INITIAL_CUSTOMER_TYPES = [
 const INITIAL_POS_SETTINGS = {
   printerName: 'POS-58',
   cashDrawerCode: '27,112,48,55,121',
+  supervisorPin: '1234',
   paymentMethods: [
     { id: 'PM-001', name: 'EFECTIVO', openDrawer: true, printReceipt: true },
     { id: 'PM-002', name: 'TARJETA', openDrawer: false, printReceipt: true },
@@ -980,16 +981,39 @@ export const useInventoryStore = create(
           const updatedSales = (s.posSales || []).map((sale) => {
             if (sale.id === id) {
               const wasPaid = sale.status === 'PAID';
-              const isPaid = data.status === 'PAID';
-              if (linkSales && !wasPaid && isPaid && (data.items || sale.items)) {
-                const saleItems = data.items || sale.items || [];
-                newInventory = s.inventory.map(invItem => {
-                  const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
-                  if (soldItem) {
-                    return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
-                  }
-                  return invItem;
-                });
+              const isPaid = (data.status || sale.status) === 'PAID';
+
+              if (linkSales) {
+                // Caso A: De suspendida a pagada (descontar inventario)
+                if (!wasPaid && isPaid) {
+                  const saleItems = data.items || sale.items || [];
+                  newInventory = newInventory.map(invItem => {
+                    const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
+                    if (soldItem) {
+                      return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
+                    }
+                    return invItem;
+                  });
+                } 
+                // Caso B: Venta ya pagada que se edita (revertir cantidades viejas y descontar las nuevas)
+                else if (wasPaid && isPaid && data.items) {
+                  // 1. Devolver items viejos
+                  let tempInv = newInventory.map(invItem => {
+                    const oldSoldItem = sale.items.find(i => String(i.productId || i.id) === String(invItem.id));
+                    if (oldSoldItem) {
+                      return { ...invItem, qty: +(invItem.qty + (oldSoldItem.qty || 0)).toFixed(3) };
+                    }
+                    return invItem;
+                  });
+                  // 2. Restar items nuevos
+                  newInventory = tempInv.map(invItem => {
+                    const newSoldItem = data.items.find(i => String(i.productId || i.id) === String(invItem.id));
+                    if (newSoldItem) {
+                      return { ...invItem, qty: Math.max(0, +(invItem.qty - (newSoldItem.qty || 0)).toFixed(3)) };
+                    }
+                    return invItem;
+                  });
+                }
               }
               return { ...sale, ...data };
             }

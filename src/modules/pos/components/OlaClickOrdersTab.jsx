@@ -474,7 +474,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                       )}
                     </h3>
                     <p className="text-[11px] text-gray-500 font-bold mt-0.5">
-                      Pedido {order.public_id || `#${order.id?.substring(0, 8)}`} • {new Date(order.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                      Pedido {order.public_id || `#${order.id?.substring(0, 8)}`} • {new Date(order.created_at).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} a las {new Date(order.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                     </p>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">

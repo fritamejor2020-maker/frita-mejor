@@ -2307,6 +2307,7 @@ function PosConfigPanel() {
   ]);
   const [cashDrawerCode, setCashDrawerCode] = useState(posSettings?.cashDrawerCode || '\\x1B\\x70\\x00\\x19\\xFA');
   const [printerName, setPrinterName] = useState(posSettings?.printerName || 'POS-58');
+  const [supervisorPin, setSupervisorPin] = useState(posSettings?.supervisorPin || '1234');
   const [gridSize, setGridSize] = useState(posSettings?.gridSize || 'medium');
 
   // Control de inventario modular
@@ -2327,6 +2328,7 @@ function PosConfigPanel() {
       if (posSettings.paymentMethods) setMethods(posSettings.paymentMethods);
       if (posSettings.cashDrawerCode) setCashDrawerCode(posSettings.cashDrawerCode);
       if (posSettings.printerName) setPrinterName(posSettings.printerName);
+      if (posSettings.supervisorPin) setSupervisorPin(posSettings.supervisorPin);
       if (posSettings.gridSize) setGridSize(posSettings.gridSize);
       if (posSettings.inventoryControl) {
         setLinkProduction(posSettings.inventoryControl.linkProduction || false);
@@ -2350,6 +2352,7 @@ function PosConfigPanel() {
       paymentMethods: methods,
       cashDrawerCode,
       printerName,
+      supervisorPin,
       gridSize,
       inventoryControl: {
         linkProduction,
@@ -2484,6 +2487,18 @@ function PosConfigPanel() {
             className="w-full max-w-sm bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
             value={printerName}
             onChange={(e) => setPrinterName(e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="text-sm font-bold text-gray-400 block mb-2">Clave de Seguridad para Editar Ventas (Supervisores)</label>
+          <input 
+            type="password" 
+            maxLength={8}
+            className="w-full max-w-sm bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main font-mono"
+            value={supervisorPin}
+            onChange={(e) => setSupervisorPin(e.target.value)}
+            placeholder="Clave numérica"
           />
         </div>
 
