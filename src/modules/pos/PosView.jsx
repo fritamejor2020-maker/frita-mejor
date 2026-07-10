@@ -71,6 +71,7 @@ export function PosView() {
   const [winnerInfo, setWinnerInfo] = useState(null);
   const [pinPromptConfig, setPinPromptConfig] = useState(null); // { message, expectedPin, onSuccess }
   const [editingSale, setEditingSale] = useState(null);
+  const [editSource, setEditSource] = useState(null); // 'history' | 'contratas'
   const [shiftToCompleteCount, setShiftToCompleteCount] = useState(null);
 
   const isClosingLocalRef = useRef(false);
@@ -1462,6 +1463,7 @@ export function PosView() {
               expectedPin: posSettings?.supervisorPin || '1234',
               onSuccess: () => {
                 setEditingSale(sale);
+                setEditSource('history');
                 setShowHistoryModal(false);
               }
             });
@@ -1542,11 +1544,22 @@ export function PosView() {
           customers={customers}
           posSettings={posSettings}
           formatMoney={formatMoney}
-          onClose={() => setEditingSale(null)}
+          onClose={() => {
+            setEditingSale(null);
+            if (editSource === 'contratas') {
+              setShowContratasPanel(true);
+            } else {
+              setShowHistoryModal(true);
+            }
+          }}
           onSave={(saleId, updatedData) => {
             updatePosSale(saleId, updatedData);
             setEditingSale(null);
-            setShowHistoryModal(true);
+            if (editSource === 'contratas') {
+              setShowContratasPanel(true);
+            } else {
+              setShowHistoryModal(true);
+            }
             alert("Venta actualizada con éxito. El inventario ha sido ajustado.");
           }}
         />
@@ -1590,6 +1603,17 @@ export function PosView() {
           onClose={() => setShowContratasPanel(false)}
           formatMoney={formatMoney}
           updatePosSale={updatePosSale}
+          onEditSale={(sale) => {
+            setPinPromptConfig({
+              message: 'Clave de Supervisor',
+              expectedPin: posSettings?.supervisorPin || '1234',
+              onSuccess: () => {
+                setEditingSale(sale);
+                setEditSource('contratas');
+                setShowContratasPanel(false);
+              }
+            });
+          }}
         />
       )}
 
@@ -1846,7 +1870,7 @@ function NumPadModal({ itemName, currentQty, onConfirm, onClose }) {
 }
 
 // ─── Contratas Full Panel (POS) ───
-function ContratasPanelModal({ customers, customerTypes, posSales, contrataPayments, getContrataBalance, onAddPayment, onClose, formatMoney, updatePosSale }) {
+function ContratasPanelModal({ customers, customerTypes, posSales, contrataPayments, getContrataBalance, onAddPayment, onClose, formatMoney, updatePosSale, onEditSale }) {
   const [selectedClientId, setSelectedClientId] = useState(null);
   const [payAmt, setPayAmt] = useState('');
   const [payMethod, setPayMethod] = useState('cash');
@@ -2021,22 +2045,15 @@ function ContratasPanelModal({ customers, customerTypes, posSales, contrataPayme
                         <div key={s.id} className="p-3 bg-[#1a1b22] rounded-xl border border-gray-800/50">
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
-                              {editingSaleId === s.id ? (
-                                <div className="flex gap-2 items-center">
-                                  <span className="text-gray-500 text-xs">$</span>
-                                  <input type="number" value={editTotal} onChange={e => setEditTotal(e.target.value)}
-                                    className="w-24 bg-[#0c0d11] border border-chunky-main rounded-lg py-1 px-2 text-sm font-bold text-white outline-none"
-                                    autoFocus onKeyDown={e => { if (e.key === 'Enter') handleSaveEditSale(s.id); if (e.key === 'Escape') setEditingSaleId(null); }}
-                                  />
-                                  <button onClick={() => handleSaveEditSale(s.id)} className="text-green-400 text-xs font-bold">✓</button>
-                                  <button onClick={() => setEditingSaleId(null)} className="text-gray-500 text-xs">✕</button>
-                                </div>
-                              ) : (
-                                <p className="font-bold text-white text-sm">
-                                  {formatMoney(s.total)}
-                                  <button className="ml-2 text-[10px] text-gray-500 hover:text-chunky-main" onClick={() => { setEditingSaleId(s.id); setEditTotal(s.total.toString()); }}>✏️</button>
-                                </p>
-                              )}
+                              <p className="font-bold text-white text-sm flex items-center gap-2">
+                                <span>{formatMoney(s.total)}</span>
+                                <button 
+                                  className="text-[10px] text-orange-400 bg-orange-950/30 border border-orange-900/30 hover:bg-orange-900/50 px-2 py-0.5 rounded-lg active:scale-95 transition-all font-black" 
+                                  onClick={() => onEditSale && onEditSale(s)}
+                                >
+                                  ✏️ Editar
+                                </button>
+                              </p>
                               <p className="text-[10px] text-gray-500 mt-0.5">
                                 {new Date(s.timestamp).toLocaleDateString('es-CO')} {new Date(s.timestamp).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})}
                                 {s.items?.slice(0, 4).map(i => ` · ${i.qty}x ${i.name}`).join('')}
@@ -3589,6 +3606,10 @@ function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onS
   const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod || 'EFECTIVO');
   const [discountAmount, setDiscountAmount] = useState(sale.discountAmount || 0);
 
+  const initialCalculatedTotal = sale.items.reduce((sum, item) => sum + (item.price * item.qty), 0) - (sale.discountAmount || 0);
+  const [overrideTotal, setOverrideTotal] = useState(sale.total);
+  const [isTotalOverridden, setIsTotalOverridden] = useState(Math.abs(sale.total - initialCalculatedTotal) > 0.01);
+
   const handleQtyChange = (productId, delta) => {
     setItems(prev => prev.map(item => {
       if (String(item.productId || item.id) === String(productId)) {
@@ -3604,7 +3625,8 @@ function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onS
   };
 
   const subtotal = items.reduce((sum, item) => sum + (item.price * item.qty), 0);
-  const total = Math.max(0, subtotal - discountAmount);
+  const calculatedTotal = Math.max(0, subtotal - discountAmount);
+  const displayTotal = isTotalOverridden ? overrideTotal : calculatedTotal;
 
   const handleConfirmSave = () => {
     if (items.length === 0) {
@@ -3616,7 +3638,7 @@ function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onS
       customerId,
       paymentMethod,
       discountAmount,
-      total
+      total: displayTotal
     });
   };
 
@@ -3729,7 +3751,26 @@ function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onS
             <div className="bg-[#16171d] rounded-2xl p-4 flex flex-col justify-center text-right font-bold text-gray-400 border border-gray-800/80">
               <span className="text-xs">Subtotal: {formatMoney(subtotal)}</span>
               {discountAmount > 0 && <span className="text-xs text-red-400">Descuento: -{formatMoney(discountAmount)}</span>}
-              <span className="text-lg text-white font-black mt-1">Total: <span className="text-chunky-main">{formatMoney(total)}</span></span>
+              <div className="mt-2 flex items-center justify-end gap-2">
+                <label className="text-xs font-bold text-gray-400">Valor Total ($):</label>
+                <input
+                  type="number"
+                  value={displayTotal}
+                  onChange={e => {
+                    setOverrideTotal(parseFloat(e.target.value) || 0);
+                    setIsTotalOverridden(true);
+                  }}
+                  className="bg-[#0c0d11] border border-gray-700 focus:border-chunky-main rounded-xl px-3 py-1.5 w-32 text-right font-black text-white text-sm outline-none"
+                />
+              </div>
+              {isTotalOverridden && (
+                <button
+                  onClick={() => setIsTotalOverridden(false)}
+                  className="text-[10px] text-chunky-main hover:underline mt-1 block text-right font-bold"
+                >
+                  ↩️ Usar total calculado ({formatMoney(calculatedTotal)})
+                </button>
+              )}
             </div>
           </div>
         </div>

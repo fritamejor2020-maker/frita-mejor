@@ -1015,7 +1015,11 @@ export const useInventoryStore = create(
                   });
                 }
               }
-              return { ...sale, ...data };
+              let updatedSale = { ...sale, ...data };
+              if (sale.contrataPaymentMethod === 'credit' && data.total !== undefined && data.creditAmount === undefined) {
+                updatedSale.creditAmount = data.total;
+              }
+              return updatedSale;
             }
             return sale;
           });
