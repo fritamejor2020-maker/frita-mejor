@@ -2879,7 +2879,7 @@ function PosHistoryPanel() {
               // Resumen de Métodos de Pago
               const paymentsSummary = {};
               shiftSales.forEach(sale => {
-                const method = sale.paymentMethod || 'No especificado';
+                const method = (sale.paymentMethod || 'No especificado').toUpperCase();
                 if (!paymentsSummary[method]) {
                   paymentsSummary[method] = 0;
                 }
