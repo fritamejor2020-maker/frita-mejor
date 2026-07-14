@@ -182,6 +182,7 @@ export function PosView() {
 
   const [variablePriceProduct, setVariablePriceProduct] = useState(null);
   const [variablePriceInput, setVariablePriceInput] = useState('');
+  const [isPriceEdited, setIsPriceEdited] = useState(false);
   const [currentPage, setCurrentPage] = useState(0);
 
   useEffect(() => {
@@ -529,6 +530,8 @@ export function PosView() {
     // Si el producto es de precio variable (flag explícito) o precio 0, abrimos modal
     if (overridePrice === null && (item.variablePrice === true || !item.price || item.price <= 0)) {
        setVariablePriceProduct(item);
+       setVariablePriceInput(item.referencePrice ? String(item.referencePrice) : '');
+       setIsPriceEdited(false);
        return;
     }
 
@@ -1403,10 +1406,17 @@ export function PosView() {
                    onClick={() => {
                      if (key === 'C') {
                        setVariablePriceInput('');
+                       setIsPriceEdited(true);
                      } else if (key === '⌫') {
                        setVariablePriceInput(v => v.slice(0, -1));
+                       setIsPriceEdited(true);
                      } else {
-                       setVariablePriceInput(v => (v === '0' ? key : v + key));
+                       if (!isPriceEdited) {
+                         setVariablePriceInput(key);
+                         setIsPriceEdited(true);
+                       } else {
+                         setVariablePriceInput(v => (v === '0' ? key : v + key));
+                       }
                      }
                    }}
                  >

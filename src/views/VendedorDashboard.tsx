@@ -641,6 +641,7 @@ export const VendedorDashboard = () => {
                 onClick={() => {
                   if (p.variablePrice === true || !p.price || p.price <= 0) {
                      setVariablePriceProduct(p);
+                     setVariablePriceInput(p.referencePrice ? String(p.referencePrice) : '');
                   } else {
                      addToCart(p, 1);
                   }
@@ -1533,6 +1534,7 @@ export const VendedorDashboard = () => {
                   type="number"
                   value={variablePriceInput}
                   onChange={e => setVariablePriceInput(e.target.value)}
+                  onFocus={e => e.target.select()}
                   onKeyDown={e => {
                     if (e.key === 'Enter') {
                        const price = parseInt(variablePriceInput);
