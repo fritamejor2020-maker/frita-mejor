@@ -2772,10 +2772,54 @@ function PosConfigPanel() {
 
 // ─── Panel: Historial POS (Ventas y Cierres Z) ────────────────────────────────
 function PosHistoryPanel() {
-  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift } = useInventoryStore();
+  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift, customers = [] } = useInventoryStore();
   const [activeSubtab, setActiveSubtab] = useState('SHIFTS'); // SHIFTS | SALES
+  const [expandedShiftId, setExpandedShiftId] = useState(null);
+  const [shiftSubtabs, setShiftSubtabs] = useState({});
+
+  const getShiftSubtab = (shiftId) => shiftSubtabs[shiftId] || 'SALES_LIST';
+  const setShiftSubtab = (shiftId, tab) => setShiftSubtabs(prev => ({ ...prev, [shiftId]: tab }));
 
   const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+
+  const formatEditHistory = (edit) => {
+    const changes = [];
+    const before = edit.before || {};
+    const after = edit.after || {};
+    
+    if (before.paymentMethod !== after.paymentMethod) {
+      changes.push(`Pago: ${before.paymentMethod} → ${after.paymentMethod}`);
+    }
+    if (before.discountAmount !== after.discountAmount) {
+      changes.push(`Desc: ${formatMoney(before.discountAmount)} → ${formatMoney(after.discountAmount)}`);
+    }
+    if (before.total !== after.total) {
+      changes.push(`Total: ${formatMoney(before.total)} → ${formatMoney(after.total)}`);
+    }
+    if (JSON.stringify(before.items) !== JSON.stringify(after.items)) {
+      const itemLines = [];
+      const bItems = before.items || [];
+      const aItems = after.items || [];
+      bItems.forEach(bi => {
+        const ai = aItems.find(item => item.name === bi.name);
+        if (!ai) {
+          itemLines.push(`Eliminado ${bi.name}`);
+        } else if (bi.qty !== ai.qty) {
+          itemLines.push(`${bi.name}: x${bi.qty} → x${ai.qty}`);
+        }
+      });
+      aItems.forEach(ai => {
+        const bi = bItems.find(item => item.name === ai.name);
+        if (!bi) {
+          itemLines.push(`Agregado ${ai.name} (x${ai.qty})`);
+        }
+      });
+      if (itemLines.length > 0) {
+        changes.push(`Productos: ${itemLines.join(', ')}`);
+      }
+    }
+    return changes.length > 0 ? changes.join(' | ') : 'Sin cambios detectables';
+  };
 
   const handleForceClose = (shiftId) => {
     if (!window.confirm('¿Forzar cierre de este turno? Se registrará como cerrado con $0 de conteo real.')) return;
@@ -2786,6 +2830,8 @@ function PosHistoryPanel() {
     if (!window.confirm('¿Eliminar este turno permanentemente? Esta acción no se puede deshacer.')) return;
     deletePosShift(shiftId);
   };
+
+  const filteredShifts = (posShifts || []).filter(s => !s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'));
 
   return (
     <div>
@@ -2799,10 +2845,10 @@ function PosHistoryPanel() {
 
       {activeSubtab === 'SHIFTS' && (
         <div className="space-y-4">
-          {(posShifts || []).length === 0 ? (
+          {filteredShifts.length === 0 ? (
             <p className="text-center text-gray-400 py-10 font-bold">No hay turnos registrados.</p>
           ) : (
-            (posShifts || []).map(shift => {
+            filteredShifts.map(shift => {
               const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
               const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
               
@@ -2814,6 +2860,32 @@ function PosHistoryPanel() {
               const expected = (shift.initialAmount || 0) + cashSales - retiros + depositos;
               const counted = shift.realAmount || 0;
               const diff = counted - expected;
+
+              // Pre-calcular productos vendidos en este turno
+              const itemsMap = {};
+              shiftSales.forEach(sale => {
+                (sale.items || []).forEach(item => {
+                  if (!itemsMap[item.name]) {
+                    itemsMap[item.name] = { name: item.name, qty: 0, price: item.price };
+                  }
+                  itemsMap[item.name].qty += item.qty;
+                });
+              });
+              const itemsSold = Object.values(itemsMap);
+
+              // Todas las ventas (facturas) del turno (sin filtrar por estado pagado)
+              const allShiftSales = (posSales || []).filter(s => s.shiftId === shift.id);
+
+              // Resumen de Métodos de Pago
+              const paymentsSummary = {};
+              shiftSales.forEach(sale => {
+                const method = sale.paymentMethod || 'No especificado';
+                if (!paymentsSummary[method]) {
+                  paymentsSummary[method] = 0;
+                }
+                paymentsSummary[method] += sale.total;
+              });
+              const paymentsBreakdown = Object.entries(paymentsSummary).map(([method, total]) => ({ method, total }));
 
               return (
                 <div key={shift.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 bg-white">
@@ -2876,6 +2948,209 @@ function PosHistoryPanel() {
                       </div>
                     )}
                   </div>
+
+                  {/* Expandable details button */}
+                  <div className="flex justify-end mt-4 pt-3 border-t border-gray-50/50">
+                    <button
+                      onClick={() => setExpandedShiftId(expandedShiftId === shift.id ? null : shift.id)}
+                      className="text-xs font-bold text-amber-500 hover:text-amber-600 transition-colors flex items-center gap-1"
+                    >
+                      {expandedShiftId === shift.id ? 'Ocultar Detalles' : 'Ver Detalles del Turno'}
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        width="12"
+                        height="12"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2.5"
+                        className={`transition-transform duration-200 ${expandedShiftId === shift.id ? 'rotate-180' : ''}`}
+                      >
+                        <polyline points="6 9 12 15 18 9" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Expanded content */}
+                  {expandedShiftId === shift.id && (
+                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-5 animate-[fadeIn_0.2s_ease-out]">
+                      {/* Resumen de Métodos de Pago */}
+                      <div>
+                        <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Ingresos por Método de Pago</span>
+                        {paymentsBreakdown.length === 0 ? (
+                          <p className="text-xs text-gray-400 italic">No se registraron pagos finalizados en este turno.</p>
+                        ) : (
+                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                            {paymentsBreakdown.map(({ method, total }) => {
+                              const icon = method === 'EFECTIVO' ? '💵' : ['NEQUI', 'DAVIPLATA', 'TRANSFERENCIA'].includes(method.toUpperCase()) ? '📲' : '💳';
+                              return (
+                                <div key={method} className="bg-gray-50 border border-gray-150 rounded-2xl p-3 flex items-center justify-between shadow-sm">
+                                  <div>
+                                    <span className="text-[9px] text-gray-400 font-black block tracking-wider">{method}</span>
+                                    <span className="font-black text-sm text-gray-850">{formatMoney(total)}</span>
+                                  </div>
+                                  <span className="text-xl shrink-0 ml-2">{icon}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      {/* Sub-tab Selector */}
+                      <div className="flex border-b border-gray-100 pb-2 gap-2 text-xs">
+                        <button
+                          onClick={() => setShiftSubtab(shift.id, 'SALES_LIST')}
+                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'SALES_LIST' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          🧾 Facturas y Ventas ({allShiftSales.length})
+                        </button>
+                        <button
+                          onClick={() => setShiftSubtab(shift.id, 'PRODUCTS_SUMMARY')}
+                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'PRODUCTS_SUMMARY' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          📊 Resumen Productos ({itemsSold.length})
+                        </button>
+                        <button
+                          onClick={() => setShiftSubtab(shift.id, 'CASH_MOVEMENTS')}
+                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'CASH_MOVEMENTS' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
+                        >
+                          💸 Retiros y Depósitos ({shiftExpenses.length})
+                        </button>
+                      </div>
+
+                      {/* Tab: Facturas y Ventas */}
+                      {getShiftSubtab(shift.id) === 'SALES_LIST' && (
+                        <div>
+                          {allShiftSales.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic py-4 text-center">No se registraron ventas en este turno.</p>
+                          ) : (
+                            <div className="border border-gray-100 rounded-xl overflow-hidden overflow-x-auto">
+                              <table className="w-full text-left text-xs min-w-[650px]">
+                                <thead className="bg-gray-50 text-gray-500 font-bold">
+                                  <tr>
+                                    <th className="py-2.5 px-3">Ticket</th>
+                                    <th className="py-2.5 px-3">Hora</th>
+                                    <th className="py-2.5 px-3">Cliente</th>
+                                    <th className="py-2.5 px-3">Pago</th>
+                                    <th className="py-2.5 px-3">Items</th>
+                                    <th className="py-2.5 px-3 text-right">Descuento</th>
+                                    <th className="py-2.5 px-3 text-right">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100 text-gray-600 bg-white">
+                                  {allShiftSales.map((sale) => {
+                                    const customer = customers.find(c => c.id === sale.customerId);
+                                    const customerName = customer ? customer.name : 'Cliente General';
+                                    const itemsDesc = (sale.items || []).map(i => `${i.name} x${i.qty}`).join(', ');
+                                    return (
+                                      <React.Fragment key={sale.id}>
+                                        <tr className="hover:bg-gray-50/50 transition-colors">
+                                          <td className="py-2.5 px-3 font-black text-gray-900">
+                                            #{sale.id.slice(-6)}
+                                            {sale.editHistory && sale.editHistory.length > 0 && (
+                                              <span className="ml-1.5 bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-black px-1.5 py-0.5 rounded-full" title="Venta modificada por Supervisor">
+                                                ✏️ Editada
+                                              </span>
+                                            )}
+                                          </td>
+                                          <td className="py-2.5 px-3 font-semibold text-gray-500">{new Date(sale.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</td>
+                                          <td className="py-2.5 px-3 font-bold text-gray-700">{customerName}</td>
+                                          <td className="py-2.5 px-3">
+                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${sale.status === 'PAID' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
+                                              {sale.paymentMethod || '—'}
+                                            </span>
+                                          </td>
+                                          <td className="py-2.5 px-3 max-w-[200px] truncate font-medium text-gray-600" title={itemsDesc}>{itemsDesc}</td>
+                                          <td className="py-2.5 px-3 text-right text-orange-400 font-bold">{sale.discountAmount > 0 ? `-${formatMoney(sale.discountAmount)}` : '—'}</td>
+                                          <td className="py-2.5 px-3 text-right font-black text-chunky-dark">{formatMoney(sale.total)}</td>
+                                        </tr>
+                                        {sale.editHistory && sale.editHistory.map((edit, eIdx) => (
+                                          <tr key={`${sale.id}-edit-${eIdx}`} className="bg-blue-50/20 text-[9px] text-blue-700 font-bold border-l-4 border-blue-400">
+                                            <td colSpan="7" className="py-2 px-4 leading-relaxed">
+                                              <span className="font-black text-blue-800">✏️ Cambio #{eIdx + 1} ({new Date(edit.editedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}):</span>
+                                              <span className="ml-1.5 font-bold text-blue-700">{formatEditHistory(edit)}</span>
+                                            </td>
+                                          </tr>
+                                        ))}
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tab: Resumen Productos */}
+                      {getShiftSubtab(shift.id) === 'PRODUCTS_SUMMARY' && (
+                        <div>
+                          <h5 className="font-black text-gray-800 text-sm mb-2">Consolidado de Ventas</h5>
+                          {itemsSold.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">No se registraron productos vendidos.</p>
+                          ) : (
+                            <div className="border border-gray-50 rounded-xl overflow-hidden">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-gray-50 text-gray-500 font-bold">
+                                  <tr>
+                                    <th className="py-2 px-3">Producto</th>
+                                    <th className="py-2 px-3 text-center">Cant.</th>
+                                    <th className="py-2 px-3 text-right">Precio</th>
+                                    <th className="py-2 px-3 text-right">Total</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 text-gray-600 bg-white">
+                                  {itemsSold.map((item, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50/50">
+                                      <td className="py-2 px-3 font-bold text-gray-700">{item.name}</td>
+                                      <td className="py-2 px-3 text-center font-black text-gray-800">{item.qty}</td>
+                                      <td className="py-2 px-3 text-right text-gray-500">{formatMoney(item.price)}</td>
+                                      <td className="py-2 px-3 text-right font-black text-gray-800">{formatMoney(item.qty * item.price)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Tab: Retiros y Depósitos */}
+                      {getShiftSubtab(shift.id) === 'CASH_MOVEMENTS' && (
+                        <div>
+                          <h5 className="font-black text-gray-800 text-sm mb-2">Movimientos de Caja</h5>
+                          {shiftExpenses.length === 0 ? (
+                            <p className="text-xs text-gray-400 italic">No se registraron movimientos de efectivo.</p>
+                          ) : (
+                            <div className="border border-gray-50 rounded-xl overflow-hidden">
+                              <table className="w-full text-left text-xs">
+                                <thead className="bg-gray-50 text-gray-500 font-bold">
+                                  <tr>
+                                    <th className="py-2 px-3">Tipo</th>
+                                    <th className="py-2 px-3">Razón</th>
+                                    <th className="py-2 px-3 text-right">Monto</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50 text-gray-600 bg-white">
+                                  {shiftExpenses.map((exp, idx) => (
+                                    <tr key={idx} className="hover:bg-gray-50/50">
+                                      <td className="py-2 px-3">
+                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${exp.type === 'deposito' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
+                                          {exp.type === 'deposito' ? 'DEPÓSITO' : 'RETIRO'}
+                                        </span>
+                                      </td>
+                                      <td className="py-2 px-3 font-bold text-gray-700">{exp.reason}</td>
+                                      <td className="py-2 px-3 text-right font-black text-gray-800">{formatMoney(exp.amount)}</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               );
             })
@@ -3268,7 +3543,7 @@ export function AdminView() {
       { id: 'POS_REWARDS',  label: '🎁 Premios & Gamificación' },
       { id: 'POS_CARPETAS', label: '🗂️ Carpetas POS' },
       { id: 'POS_HISTORY',  label: '🧾 Historial POS'},
-
+      { id: 'POS_CIERRES',  label: '💰 Cierres Caja' },
       { id: 'CONTRATAS',    label: '🤝 Contratas' },
       { id: 'TICKET_CONFIG', label: '🧾 Diseño Tickets' },
     ],
@@ -3429,7 +3704,8 @@ export function AdminView() {
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
         { activeTab === 'TICKET_CONFIG' && <AdminTicketConfigTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
-        { activeTab === 'CIERRES' && <AdminFinancesTab /> }
+        { activeTab === 'POS_CIERRES' && <AdminFinancesTab mode="POS" /> }
+        { activeTab === 'CIERRES' && <AdminFinancesTab mode="VENDEDOR" /> }
 
         { activeTab === 'INGRESOS' && <AdminIncomesExpensesTab defaultTab="ingresos" /> }
         { activeTab === 'EGRESOS'  && <AdminIncomesExpensesTab defaultTab="gastos" /> }

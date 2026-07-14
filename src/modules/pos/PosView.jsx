@@ -420,6 +420,7 @@ export function PosView() {
         userName: user?.name,
         registerId: selectedRegisterId,
         registerName: selectedRegister?.name || 'Caja',
+        branchId: selectedRegister?.branchId || userBranchId,
       });
       setShowShiftModal(false);
       setHasInitialCheckDone(true);

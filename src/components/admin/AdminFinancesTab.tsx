@@ -342,7 +342,13 @@ interface ClosingDetail {
 
 
 // ─── Component: Cierres ──────────────────────────────────────────────
-export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean } = {}) => {
+export const AdminFinancesTab = ({ 
+  allowDelete = true,
+  mode = 'VENDEDOR'
+}: { 
+  allowDelete?: boolean;
+  mode?: 'VENDEDOR' | 'POS';
+} = {}) => {
   const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
   const user = useAuthStore((s: any) => s.user);
@@ -460,9 +466,9 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   // Ej: AM cierra a las 14h, MD cierra a las 20h → cada uno solo ve su logística
   const shiftsByVehicleDate: Record<string, any[]> = {};
   (posShifts || [])
-    .filter((s: any) => s.closedAt && s.type === 'VENDEDOR')
+    .filter((s: any) => s.closedAt && (mode === 'POS' ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR')) : s.type === 'VENDEDOR'))
     .forEach((s: any) => {
-      const key = `${s.pointId || ''}__${dateOf(s.closedAt)}`;
+      const key = `${s.pointId || s.registerId || ''}__${dateOf(s.closedAt)}`;
       if (!shiftsByVehicleDate[key]) shiftsByVehicleDate[key] = [];
       shiftsByVehicleDate[key].push(s);
     });
@@ -472,7 +478,9 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   );
 
   // Solo VENDEDOR y POS tienen cierre de finanzas. Los DEJADORES no.
-  const mappedShifts = (posShifts || []).filter((s: any) => s.closedAt && s.type !== 'DEJADOR').map((s: any) => {
+  const mappedShifts = (posShifts || [])
+    .filter((s: any) => s.closedAt && (mode === 'POS' ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR')) : s.type === 'VENDEDOR'))
+    .map((s: any) => {
      let details: ClosingDetail[] = [];
      let theoretical = 0;
      let real = 0;
@@ -656,7 +664,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
      }
      // prioritize the vendor's real name, fall back to pointId
      const vendorName = s.userName || s.responsibleName || s.pointId || 'Caja Frita Mejor';
-     const pointLabel = s.pointId && s.pointId !== vendorName ? s.pointId : null;
+     const pointLabel = s.pointId && s.pointId !== vendorName ? s.pointId : (s.registerName || null);
 
      // Buscar el cierre del DEJADOR de la misma jornada (mismo turno y fecha)
      const matchingDejadorShift = (posShifts || []).find((ds: any) =>
@@ -670,18 +678,13 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
      // (carga, recepcion, o completedRequest surtido)
      const anyEntry = [
        // loadHistory entries (carga / recepcion)
-       ...loadHistory.filter((e: any) => e.vehicleId === s.pointId
-         && new Date(e.timestamp).toISOString().split('T')[0] === shiftDate
-         && (e.anotadorName || e.dejadorName)),
-       // completedRequests (surtidos entregados por el dejador)
-       ...completedRequests.filter((r: any) => r.requester_point_id === s.pointId
-         && new Date(r.completed_at || r.created_at).toISOString().split('T')[0] === shiftDate
-         && (r.anotadorName || r.dejadorName)),
-     ].sort((a: any, b: any) => {
-       const ta = a.timestamp || a.completed_at || a.created_at || '';
-       const tb = b.timestamp || b.completed_at || b.created_at || '';
-       return new Date(ta).getTime() - new Date(tb).getTime();
-     })[0];
+       ...(loadHistory || []),
+       // completedRequest items payload (surtido)
+       ...(completedRequests || [])
+     ].find((e: any) => {
+       const pId = e.vehicleId || e.requester_point_id;
+       return pId === s.pointId && inWindow(e.timestamp || e.completed_at || e.created_at);
+     });
 
      const anotadorName = anyEntry?.anotadorName || matchingDejadorShift?.anotadorName || null;
      const dejadorName  = anyEntry?.dejadorName  || matchingDejadorShift?.dejadorName  || null;
@@ -691,7 +694,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
         _raw: s,
         pointName: vendorName,
         pointLabel,
-        initials: (s.pointId || vendorName || 'CA').substring(0, 2).toUpperCase(),
+        initials: (s.pointId || s.registerName || vendorName || 'CA').substring(0, 2).toUpperCase(),
         shift: s.shift || 'TD',
         date: shiftDate,
         type: s.type || '',
@@ -714,7 +717,7 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
   const deduplicatedClosings = (() => {
     const seen = new Map<string, any>();
     for (const c of mappedShifts) {
-      const key = `${c.date}__${c.shift}__${c._raw?.pointId || c.pointName}`;
+      const key = `${c.date}__${c.shift}__${c._raw?.pointId || c._raw?.registerId || c.pointName}`;
       const existing = seen.get(key);
       if (!existing) {
         seen.set(key, c);
@@ -742,8 +745,9 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
     if (filterShift && c.shift !== filterShift) return false;
 
     // Obtener la sede del cierre actual
+    const register = (useInventoryStore.getState() as any).posRegisters?.find((r: any) => r.id === c._raw?.registerId);
     const vehicle = vehicles?.find((v: any) => v.abbreviation === c._raw?.pointId || v.name === c._raw?.pointId);
-    const shiftBranchId = vehicle?.branchId || c._raw?.branchId;
+    const shiftBranchId = c._raw?.branchId || vehicle?.branchId || register?.branchId;
 
     // Filtrar por sede si es AUDITOR y tiene sede asignada por seguridad
     if (user?.role === 'AUDITOR' && user?.branchId) {
@@ -988,7 +992,9 @@ export const AdminFinancesTab = ({ allowDelete = true }: { allowDelete?: boolean
                     <div className="py-5 px-6 text-center">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
                       <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
-                      <p className="text-[10px] font-bold text-gray-300 mt-1">Calc. por logística</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">
+                        {mode === 'POS' ? 'Calc. por ventas' : 'Calc. por logística'}
+                      </p>
                     </div>
                     <div className="py-5 px-6 text-center">
                       <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>

@@ -1019,6 +1019,41 @@ export const useInventoryStore = create(
               if (sale.contrataPaymentMethod === 'credit' && data.total !== undefined && data.creditAmount === undefined) {
                 updatedSale.creditAmount = data.total;
               }
+
+              // Registrar historial de modificaciones (cambios)
+              const oldItems = sale.items || [];
+              const oldTotal = sale.total || 0;
+              const oldPaymentMethod = sale.paymentMethod || '';
+              const oldDiscount = sale.discountAmount || 0;
+              const oldCustomerId = sale.customerId || null;
+
+              const hasItemsChanged = data.items && JSON.stringify(oldItems) !== JSON.stringify(data.items);
+              const hasTotalChanged = data.total !== undefined && oldTotal !== data.total;
+              const hasPaymentMethodChanged = data.paymentMethod !== undefined && oldPaymentMethod !== data.paymentMethod;
+              const hasDiscountChanged = data.discountAmount !== undefined && oldDiscount !== data.discountAmount;
+              const hasCustomerChanged = data.customerId !== undefined && oldCustomerId !== data.customerId;
+
+              if (hasItemsChanged || hasTotalChanged || hasPaymentMethodChanged || hasDiscountChanged || hasCustomerChanged) {
+                const editRecord = {
+                  editedAt: new Date().toISOString(),
+                  before: {
+                    items: oldItems.map(i => ({ ...i })),
+                    total: oldTotal,
+                    paymentMethod: oldPaymentMethod,
+                    discountAmount: oldDiscount,
+                    customerId: oldCustomerId
+                  },
+                  after: {
+                    items: (data.items || oldItems).map(i => ({ ...i })),
+                    total: data.total !== undefined ? data.total : oldTotal,
+                    paymentMethod: data.paymentMethod || oldPaymentMethod,
+                    discountAmount: data.discountAmount !== undefined ? data.discountAmount : oldDiscount,
+                    customerId: data.customerId !== undefined ? data.customerId : oldCustomerId
+                  }
+                };
+                updatedSale.editHistory = [...(sale.editHistory || []), editRecord];
+              }
+
               return updatedSale;
             }
             return sale;
