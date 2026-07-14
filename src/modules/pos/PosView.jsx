@@ -619,7 +619,9 @@ export function PosView() {
         ${c ? `<div style="border: 2px solid black; padding:8px; margin-bottom:12px;">
           <p style="font-weight:900;margin:0;font-size:14px;">${c.name}</p>
           ${typeName ? `<p style="margin:2px 0 0;font-size:12px;">${typeName}</p>` : ''}
+          ${c.document ? `<p style="margin:2px 0 0;font-size:12px;">NIT/CC: ${c.document}</p>` : ''}
           ${c.phone ? `<p style="margin:2px 0 0;font-size:12px;">Tel: ${c.phone}</p>` : ''}
+          ${c.address ? `<p style="margin:2px 0 0;font-size:12px;">Dir: ${c.address}</p>` : ''}
         </div>` : ''}
         <table style="width:100%;border-collapse:collapse;font-size:13px;">
           <thead><tr style="border-bottom:2px solid black;"><th style="text-align:left;padding:4px 0;">Producto</th><th style="text-align:center;width:40px;">Cant</th><th style="text-align:right;padding:4px 0;">Total</th></tr></thead>
