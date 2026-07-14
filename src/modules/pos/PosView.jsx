@@ -1377,41 +1377,57 @@ export function PosView() {
       {variablePriceProduct && (
         <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
-             <h3 className="font-black text-2xl text-white mb-2 text-center">{variablePriceProduct.name}</h3>
-             <p className="text-gray-400 font-bold mb-6 text-center text-sm">Ingresa el precio de venta (Precio Variable).</p>
+             <h3 className="font-black text-2xl text-white mb-1 text-center">{variablePriceProduct.name}</h3>
+             <p className="text-gray-400 font-bold mb-4 text-center text-xs">Ingresa el precio de venta (Precio Variable).</p>
              
-             <div className="relative mb-6 w-full">
-                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-gray-500">$</span>
-                <input 
-                  autoFocus 
-                  type="number"
-                  value={variablePriceInput}
-                  onChange={e => setVariablePriceInput(e.target.value)}
-                  onKeyDown={e => {
-                    if (e.key === 'Enter') {
-                       const price = parseInt(variablePriceInput);
-                       if (isNaN(price) || price <= 0) return alert('Ingresa un precio válido');
-                       handleItemAdd(variablePriceProduct, price);
-                       setVariablePriceProduct(null);
+             {/* Display of typed value */}
+             <div className="bg-[#0c0d11] border-2 border-gray-700 rounded-[24px] py-4 w-full flex items-center justify-center mb-4">
+                <span className="text-4xl font-black text-chunky-main">
+                  {formatMoney(parseInt(variablePriceInput) || 0)}
+                </span>
+             </div>
+
+             {/* Touch Keypad */}
+             <div className="grid grid-cols-3 gap-1.5 w-full mb-5">
+               {['1','2','3','4','5','6','7','8','9','C','0','⌫'].map(key => (
+                 <button
+                   key={key}
+                   type="button"
+                   className={`h-12 rounded-xl font-black text-xl active:scale-95 transition-all ${
+                     key === 'C' ? 'bg-red-500/20 text-red-400 active:bg-red-500/40' :
+                     key === '⌫' ? 'bg-amber-500/20 text-amber-400 active:bg-amber-500/40' :
+                     'bg-[#2a2d38] text-white hover:bg-[#353845] active:bg-[#434758]'
+                   }`}
+                   onClick={() => {
+                     if (key === 'C') {
                        setVariablePriceInput('');
-                    }
-                  }}
-                  className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-4 pl-14 pr-6 text-4xl font-black text-white outline-none text-center shadow-inner transition-colors"
-                  placeholder="0"
-                />
+                     } else if (key === '⌫') {
+                       setVariablePriceInput(v => v.slice(0, -1));
+                     } else {
+                       setVariablePriceInput(v => (v === '0' ? key : v + key));
+                     }
+                   }}
+                 >
+                   {key}
+                 </button>
+               ))}
              </div>
 
              <div className="flex gap-3 w-full">
                 <button onClick={() => { setVariablePriceProduct(null); setVariablePriceInput(''); }} className="flex-1 py-4 rounded-[20px] bg-gray-800 text-gray-300 font-bold text-lg hover:bg-gray-700 transition-colors active:scale-95">
                   Cancelar
                 </button>
-                <button onClick={() => {
-                  const price = parseInt(variablePriceInput);
-                  if (isNaN(price) || price <= 0) return alert('Ingresa un precio válido');
-                  handleItemAdd(variablePriceProduct, price);
-                  setVariablePriceProduct(null);
-                  setVariablePriceInput('');
-                }} className="flex-1 py-4 rounded-[20px] bg-chunky-main text-chunky-dark font-black text-lg shadow-lg hover:scale-105 transition-all active:scale-95">
+                <button 
+                  disabled={!variablePriceInput || parseInt(variablePriceInput) <= 0}
+                  onClick={() => {
+                    const price = parseInt(variablePriceInput);
+                    if (isNaN(price) || price <= 0) return alert('Ingresa un precio válido');
+                    handleItemAdd(variablePriceProduct, price);
+                    setVariablePriceProduct(null);
+                    setVariablePriceInput('');
+                  }} 
+                  className="flex-1 py-4 rounded-[20px] bg-chunky-main text-chunky-dark font-black text-lg shadow-lg hover:scale-105 transition-all active:scale-95 disabled:opacity-30"
+                >
                   Confirmar
                 </button>
              </div>
