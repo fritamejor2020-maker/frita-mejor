@@ -79,9 +79,7 @@ export function PosView() {
   const hasCheckedInitialShiftRef = useRef(false);
 
   useEffect(() => {
-    if (activeShift) {
-      activeShiftIdRef.current = activeShift.id;
-    }
+    activeShiftIdRef.current = activeShift ? activeShift.id : null;
   }, [activeShift]);
 
   useEffect(() => {
@@ -413,17 +411,22 @@ export function PosView() {
 
   // -- SHIFT ACTIONS --
   const handleOpenShift = (initialAmount) => {
-    addPosShift({
-      openedAt: new Date().toISOString(),
-      closedAt: null,
-      initialAmount: parseFloat(initialAmount) || 0,
-      userId: user?.id,
-      userName: user?.name,
-      registerId: selectedRegisterId,
-      registerName: selectedRegister?.name || 'Caja',
-    });
-    setShowShiftModal(false);
-    setHasInitialCheckDone(true);
+    try {
+      addPosShift({
+        openedAt: new Date().toISOString(),
+        closedAt: null,
+        initialAmount: parseFloat(initialAmount) || 0,
+        userId: user?.id,
+        userName: user?.name,
+        registerId: selectedRegisterId,
+        registerName: selectedRegister?.name || 'Caja',
+      });
+      setShowShiftModal(false);
+      setHasInitialCheckDone(true);
+    } catch (err) {
+      console.error("[OpenShift Error]:", err);
+      alert("Error al abrir turno: " + err.message);
+    }
   };
 
   const handleCloseShift = (realCount, isPostponed = false) => {
