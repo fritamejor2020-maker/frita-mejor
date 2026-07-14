@@ -214,13 +214,15 @@ export function useRealtimeSync() {
   const channelRef = useRef(null);
   const pullDebounceRef = useRef(null);
 
-  // Reactivo: re-suscribir cuando se agregan/eliminan sedes
+  // Reactivo: re-suscribir cuando se agregan/eliminan sedes o cambia el usuario/sede activa
   const branchIdsKey = useBranchStore(s => s.branches.map(b => b.id).join(','));
+  const user = useAuthStore(s => s.user);
+  const userBranchId = user?.branchId ?? null;
+  const userId = user?.id ?? null;
 
   useEffect(() => {
     // Obtener el branchId del usuario activo
-    const user = useAuthStore.getState().user;
-    const branchId = user?.branchId ?? null;
+    const branchId = userBranchId;
     const allBranchIds = branchIdsKey ? branchIdsKey.split(',') : ['BRANCH-001'];
 
     const channel = supabase
@@ -250,6 +252,7 @@ export function useRealtimeSync() {
           clearTimeout(pullDebounceRef.current);
           pullDebounceRef.current = setTimeout(() => {
             refreshAllFromSupabase(branchId, allBranchIds);
+            useInventoryStore.getState().loadFromRemote().catch(e => console.warn('[Sync] loadFromRemote error:', e));
           }, 800);
         }
       });
@@ -261,5 +264,5 @@ export function useRealtimeSync() {
       if (_batchTimer) { clearTimeout(_batchTimer); _batchTimer = null; }
       supabase.removeChannel(channel);
     };
-  }, [branchIdsKey]);
+  }, [branchIdsKey, userBranchId, userId]);
 }
