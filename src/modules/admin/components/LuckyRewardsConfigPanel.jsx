@@ -96,15 +96,15 @@ export function LuckyRewardsConfigPanel() {
   return (
     <div className="space-y-6">
       {/* Selector de Sede y Caja */}
-      <div className="bg-[#181a23] p-5 rounded-3xl border border-gray-800 shadow-xl flex flex-wrap items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm flex flex-wrap items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center text-2xl shadow-inner border border-amber-500/20">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center text-2xl shadow-inner border border-amber-100">
             🎁
           </div>
           <div>
-            <h3 className="text-base font-black text-white flex items-center gap-2">
+            <h3 className="text-base font-black text-gray-800 flex items-center gap-2">
               Campana de la Suerte & Premiación Aleatoria
-              <span className="text-[10px] font-bold bg-amber-500/20 text-amber-300 px-2 py-0.5 rounded-full border border-amber-500/30">
+              <span className="text-[10px] font-bold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full border border-amber-200">
                 PROMO
               </span>
             </h3>
@@ -117,11 +117,11 @@ export function LuckyRewardsConfigPanel() {
         <div className="flex flex-wrap items-center gap-3">
           {/* Seleccionar Sede */}
           <div>
-            <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Sede</label>
+            <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">Sede</label>
             <select
               value={selectedBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
-              className="bg-[#12131a] text-white font-bold text-xs px-3 py-2 rounded-xl border border-gray-800 focus:border-amber-500 outline-none"
+              className="bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl border border-gray-200 focus:border-amber-500 outline-none"
             >
               {activeBranches.map((b) => (
                 <option key={b.id} value={b.id}>{b.name}</option>
@@ -131,11 +131,11 @@ export function LuckyRewardsConfigPanel() {
 
           {/* Seleccionar Caja */}
           <div>
-            <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Caja Registradora</label>
+            <label className="block text-[10px] font-black uppercase text-gray-500 mb-1">Caja Registradora</label>
             <select
               value={selectedRegisterId}
               onChange={(e) => setSelectedRegisterId(e.target.value)}
-              className="bg-[#12131a] text-white font-bold text-xs px-3 py-2 rounded-xl border border-gray-800 focus:border-amber-500 outline-none"
+              className="bg-gray-50 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl border border-gray-200 focus:border-amber-500 outline-none"
             >
               <option value="ALL">Todas las cajas (Por Defecto)</option>
               {branchRegisters.map((r) => (
@@ -147,14 +147,14 @@ export function LuckyRewardsConfigPanel() {
       </div>
 
       {/* Formulario Principal de Configuración */}
-      <div className="bg-[#181a23] p-6 rounded-3xl border border-gray-800 shadow-xl space-y-6">
+      <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6">
         
         {/* Switch Principal Activar */}
-        <div className="flex items-center justify-between p-4 bg-[#12131a] rounded-2xl border border-gray-800">
+        <div className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-200">
           <div className="flex items-center gap-3">
-            <Sparkles className={formData.enabled ? "text-amber-400 animate-pulse" : "text-gray-500"} size={22} />
+            <Sparkles className={formData.enabled ? "text-amber-500 animate-pulse" : "text-gray-400"} size={22} />
             <div>
-              <p className="text-sm font-black text-white">Activar Dinámica en esta Caja</p>
+              <p className="text-sm font-black text-gray-800">Activar Dinámica en esta Caja</p>
               <p className="text-xs text-gray-400">Los clientes calificados participarán aleatoriamente al cobrar en caja</p>
             </div>
           </div>
@@ -165,16 +165,16 @@ export function LuckyRewardsConfigPanel() {
               onChange={(e) => handleChange('enabled', e.target.checked)}
               className="sr-only peer" 
             />
-            <div className="w-11 h-6 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
+            <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-amber-500"></div>
           </label>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
           
           {/* 1. Monto Mínimo de Compra */}
-          <div className="bg-[#12131a] p-4 rounded-2xl border border-gray-800 space-y-2">
-            <label className="text-xs font-black text-gray-300 flex items-center gap-1.5">
-              <DollarSign size={16} className="text-green-400" />
+          <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-200 space-y-2">
+            <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+              <DollarSign size={16} className="text-green-600" />
               Monto Mínimo para Participar ($)
             </label>
             <p className="text-[11px] text-gray-500">Ventas menores a este valor no participan.</p>
@@ -182,15 +182,15 @@ export function LuckyRewardsConfigPanel() {
               type="number"
               value={formData.minPurchaseAmount}
               onChange={(e) => handleChange('minPurchaseAmount', parseInt(e.target.value, 10) || 0)}
-              className="w-full bg-[#181a23] text-white font-black text-sm px-3 py-2.5 rounded-xl border border-gray-800 focus:border-amber-500 outline-none"
+              className="w-full bg-white text-gray-800 font-black text-sm px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-500 outline-none"
               placeholder="15000"
             />
           </div>
 
           {/* 2. Total Premios Diarios */}
-          <div className="bg-[#12131a] p-4 rounded-2xl border border-gray-800 space-y-2">
-            <label className="text-xs font-black text-gray-300 flex items-center gap-1.5">
-              <Award size={16} className="text-amber-400" />
+          <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-200 space-y-2">
+            <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+              <Award size={16} className="text-amber-500" />
               Premios Totales por Día
             </label>
             <p className="text-[11px] text-gray-500">Cuota a repartir a lo largo de la jornada.</p>
@@ -198,22 +198,22 @@ export function LuckyRewardsConfigPanel() {
               type="number"
               value={formData.dailyPrizes}
               onChange={(e) => handleChange('dailyPrizes', parseInt(e.target.value, 10) || 0)}
-              className="w-full bg-[#181a23] text-white font-black text-sm px-3 py-2.5 rounded-xl border border-gray-800 focus:border-amber-500 outline-none"
+              className="w-full bg-white text-gray-800 font-black text-sm px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-500 outline-none"
               placeholder="100"
             />
           </div>
 
           {/* 3. Modalidad de Premio */}
-          <div className="bg-[#12131a] p-4 rounded-2xl border border-gray-800 space-y-2">
-            <label className="text-xs font-black text-gray-300 flex items-center gap-1.5">
-              <Gift size={16} className="text-purple-400" />
+          <div className="bg-gray-50/50 p-4 rounded-2xl border border-gray-200 space-y-2">
+            <label className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+              <Gift size={16} className="text-purple-600" />
               Modalidad de Premio
             </label>
             <p className="text-[11px] text-gray-500">¿Qué obtiene el cliente al ganar?</p>
             <select
               value={formData.prizeType}
               onChange={(e) => handleChange('prizeType', e.target.value)}
-              className="w-full bg-[#181a23] text-white font-black text-xs px-3 py-2.5 rounded-xl border border-gray-800 focus:border-amber-500 outline-none"
+              className="w-full bg-white text-gray-800 font-black text-xs px-3 py-2.5 rounded-xl border border-gray-200 focus:border-amber-500 outline-none"
             >
               <option value="RASPA_Y_GANA">🎟️ Tarjeta Raspa y Gana (Entregar en Físico)</option>
               <option value="DISCOUNT">🏷️ Descuento Inmediato en la Venta</option>
@@ -224,12 +224,12 @@ export function LuckyRewardsConfigPanel() {
 
         {/* Si la modalidad es Descuento Inmediato */}
         {formData.prizeType === 'DISCOUNT' && (
-          <div className="bg-purple-500/10 border border-purple-500/20 p-4 rounded-2xl flex items-center justify-between gap-4">
+          <div className="bg-purple-50 border border-purple-100 p-4 rounded-2xl flex items-center justify-between gap-4">
             <div>
-              <p className="text-xs font-black text-purple-300 flex items-center gap-1">
+              <p className="text-xs font-black text-purple-700 flex items-center gap-1">
                 <Percent size={14} /> Porcentaje de Descuento Ganado
               </p>
-              <p className="text-[11px] text-purple-400/80">Descuento automático que se aplicará al total de la cuenta del ganador.</p>
+              <p className="text-[11px] text-purple-600">Descuento automático que se aplicará al total de la cuenta del ganador.</p>
             </div>
             <div className="flex items-center gap-2">
               <input
@@ -238,24 +238,24 @@ export function LuckyRewardsConfigPanel() {
                 max="100"
                 value={formData.discountPercentage}
                 onChange={(e) => handleChange('discountPercentage', parseInt(e.target.value, 10) || 0)}
-                className="w-20 bg-[#12131a] text-white text-center font-black text-sm px-3 py-2 rounded-xl border border-purple-500/30 outline-none"
+                className="w-20 bg-white text-purple-700 text-center font-black text-sm px-3 py-2 rounded-xl border border-purple-300 outline-none"
               />
-              <span className="text-white font-black text-sm">%</span>
+              <span className="text-purple-700 font-black text-sm">%</span>
             </div>
           </div>
         )}
 
         {/* Distribución Horaria Ponderada */}
-        <div className="bg-[#12131a] p-5 rounded-2xl border border-gray-800 space-y-4">
-          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-800 pb-3">
+        <div className="bg-gray-50/50 p-5 rounded-2xl border border-gray-200 space-y-4">
+          <div className="flex items-center justify-between flex-wrap gap-2 border-b border-gray-200 pb-3">
             <div>
-              <h4 className="text-xs font-black text-white flex items-center gap-1.5">
-                <Clock size={16} className="text-amber-400" />
+              <h4 className="text-xs font-black text-gray-800 flex items-center gap-1.5">
+                <Clock size={16} className="text-amber-500" />
                 Distribución de Premios por Franja Horaria (%)
               </h4>
-              <p className="text-[11px] text-gray-400">Porcentaje de premios asignados a cada bloque del día (debe sumar 100%)</p>
+              <p className="text-[11px] text-gray-500 font-medium">Porcentaje de premios asignados a cada bloque del día (debe sumar 100%)</p>
             </div>
-            <div className={`text-xs font-black px-3 py-1 rounded-full ${totalPercentage === 100 ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-red-500/20 text-red-400 border border-red-500/30'}`}>
+            <div className={`text-xs font-black px-3 py-1 rounded-full ${totalPercentage === 100 ? 'bg-green-50 text-green-700 border border-green-200' : 'bg-red-50 text-red-700 border border-red-200'}`}>
               Suma Total: {totalPercentage}%
             </div>
           </div>
@@ -273,9 +273,9 @@ export function LuckyRewardsConfigPanel() {
               const prizesForSlot = Math.round((formData.dailyPrizes * val) / 100);
 
               return (
-                <div key={slot} className="bg-[#181a23] p-3 rounded-xl border border-gray-800/80 space-y-1.5 text-center">
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">{label}</span>
-                  <p className="text-[9px] text-amber-400/80 font-bold italic">{hint}</p>
+                <div key={slot} className="bg-white p-3 rounded-xl border border-gray-200 space-y-1.5 text-center">
+                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">{label}</span>
+                  <p className="text-[9px] text-amber-600 font-bold italic">{hint}</p>
                   <div className="flex items-center justify-center gap-1">
                     <input
                       type="number"
@@ -283,11 +283,11 @@ export function LuckyRewardsConfigPanel() {
                       max="100"
                       value={val}
                       onChange={(e) => handleHourlyChange(slot, e.target.value)}
-                      className="w-14 bg-[#12131a] text-white text-center font-black text-xs px-2 py-1.5 rounded-lg border border-gray-700 focus:border-amber-500 outline-none"
+                      className="w-14 bg-gray-50 text-gray-800 text-center font-black text-xs px-2 py-1.5 rounded-lg border border-gray-200 focus:border-amber-500 outline-none"
                     />
-                    <span className="text-gray-400 font-bold text-xs">%</span>
+                    <span className="text-gray-500 font-bold text-xs">%</span>
                   </div>
-                  <span className="text-[10px] text-gray-500 font-extrabold block">
+                  <span className="text-[10px] text-gray-400 font-extrabold block">
                     ~{prizesForSlot} premios
                   </span>
                 </div>
@@ -300,7 +300,7 @@ export function LuckyRewardsConfigPanel() {
         <div className="pt-2 flex justify-end">
           <button
             onClick={handleSave}
-            className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 font-black text-xs px-6 py-3 rounded-xl shadow-lg transition-all active:scale-95 flex items-center gap-2"
+            className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-6 py-3 rounded-xl shadow-sm transition-all active:scale-95 flex items-center gap-2"
           >
             <Save size={16} /> Guardar Configuración de Premios
           </button>

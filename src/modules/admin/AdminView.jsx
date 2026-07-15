@@ -2297,11 +2297,10 @@ function CustomersPanel() {
   );
 }
 
-// ─── Panel: Configuración POS General ──────────────────────────────────────────
+// ─── Panel: Configuración POS (Hardware y Métodos de Pago) ──────────────────────
 function PosConfigPanel() {
-  const { posSettings, updatePosSettings, inventory = [] } = useInventoryStore();
+  const { posSettings, updatePosSettings } = useInventoryStore();
   
-  // Local state to handle array edits cleanly before saving
   const [methods, setMethods] = useState(posSettings?.paymentMethods || [
     { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: true }
   ]);
@@ -2310,19 +2309,6 @@ function PosConfigPanel() {
   const [supervisorPin, setSupervisorPin] = useState(posSettings?.supervisorPin || '1234');
   const [gridSize, setGridSize] = useState(posSettings?.gridSize || 'medium');
 
-  // Control de inventario modular
-  const [linkProduction, setLinkProduction] = useState(posSettings?.inventoryControl?.linkProduction || false);
-  const [linkSalesToInventory, setLinkSalesToInventory] = useState(posSettings?.inventoryControl?.linkSalesToInventory || false);
-  const [strictTricycleStock, setStrictTricycleStock] = useState(posSettings?.inventoryControl?.strictTricycleStock || false);
-
-  // Configuración de Diseño y Feed
-  const [gridColumns, setGridColumns] = useState(posSettings?.layout?.gridColumns || 6);
-  const [gridRows, setGridRows] = useState(posSettings?.layout?.gridRows || 4);
-  const [showOnlySelected, setShowOnlySelected] = useState(posSettings?.layout?.showOnlySelected || false);
-  const [selectedProductIds, setSelectedProductIds] = useState(posSettings?.layout?.selectedProductIds || []);
-  const [searchTerm, setSearchTerm] = useState('');
-
-  // Sincronizar estados locales cuando la configuración cargue de Supabase/local
   useEffect(() => {
     if (posSettings) {
       if (posSettings.paymentMethods) setMethods(posSettings.paymentMethods);
@@ -2330,43 +2316,19 @@ function PosConfigPanel() {
       if (posSettings.printerName) setPrinterName(posSettings.printerName);
       if (posSettings.supervisorPin) setSupervisorPin(posSettings.supervisorPin);
       if (posSettings.gridSize) setGridSize(posSettings.gridSize);
-      if (posSettings.inventoryControl) {
-        setLinkProduction(posSettings.inventoryControl.linkProduction || false);
-        setLinkSalesToInventory(posSettings.inventoryControl.linkSalesToInventory || false);
-        setStrictTricycleStock(posSettings.inventoryControl.strictTricycleStock || false);
-      }
-      if (posSettings.layout) {
-        setGridColumns(posSettings.layout.gridColumns || 6);
-        setGridRows(posSettings.layout.gridRows || 4);
-        setShowOnlySelected(posSettings.layout.showOnlySelected || false);
-        setSelectedProductIds(posSettings.layout.selectedProductIds || []);
-      }
     }
   }, [posSettings]);
 
-  const sellableProducts = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
-  const filteredProducts = sellableProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
-
   const handleSave = () => {
     updatePosSettings({
+      ...posSettings,
       paymentMethods: methods,
       cashDrawerCode,
       printerName,
       supervisorPin,
-      gridSize,
-      inventoryControl: {
-        linkProduction,
-        linkSalesToInventory,
-        strictTricycleStock
-      },
-      layout: {
-        gridColumns: parseInt(gridColumns, 10) || 6,
-        gridRows: parseInt(gridRows, 10) || 4,
-        showOnlySelected,
-        selectedProductIds
-      }
+      gridSize
     });
-    alert('Configuración POS guardada correctamente');
+    alert('Configuración de hardware y métodos de pago guardada');
   };
 
   const handleAddMethod = () => {
@@ -2383,7 +2345,7 @@ function PosConfigPanel() {
 
   return (
     <div className="max-w-3xl">
-      <h3 className="font-black text-chunky-dark text-lg mb-6">Configuraciones POS (Caja)</h3>
+      <h3 className="font-black text-chunky-dark text-lg mb-6">⚙️ Hardware y Métodos de Pago</h3>
       
       <div className="space-y-8">
         <div>
@@ -2456,7 +2418,6 @@ function PosConfigPanel() {
                 console.log(`--- PROBANDO APERTURA DE CAJÓN: ${code} ---`);
                 const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
                 const escChars = bytes.map(b => String.fromCharCode(b)).join('');
-                // Usar iframe oculto para enviar comando ESC/POS sin popup
                 const iframe = document.createElement('iframe');
                 iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:none;opacity:0.01;';
                 document.body.appendChild(iframe);
@@ -2514,256 +2475,337 @@ function PosConfigPanel() {
             <option value="large">Módulos Grandes (Ideal para pantallas táctiles)</option>
           </select>
         </div>
+        <Button className="rounded-full text-md py-3 px-8 shadow-sm bg-chunky-secondary hover:opacity-90 mt-6" onClick={handleSave}>
+          Guardar Configuraciones
+        </Button>
+      </div>
+    </div>
+  );
+}
 
-        {/* 🎨 Diseño y Feed del POS */}
-        <div className="bg-blue-50/50 border border-blue-200/60 rounded-3xl p-6 my-8">
-          <h4 className="font-black text-blue-800 text-base mb-2">🎨 Diseño y Feed del POS</h4>
-          <p className="text-xs text-blue-600 font-bold mb-5">
-            Configura el número de filas y columnas del menú del POS, y elige qué productos aparecen en el <strong>feed principal</strong> (pantalla de inicio) de la caja. Las categorías siempre mostrarán todos sus productos sin restricción.
-          </p>
+function PosFeedConfigPanel() {
+  const { posSettings, updatePosSettings, inventory = [] } = useInventoryStore();
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label className="text-sm font-bold text-gray-700 block mb-2">Número de Columnas</label>
-              <input 
-                type="number" 
-                min="3" 
-                max="8"
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
-                value={gridColumns}
-                onChange={(e) => setGridColumns(e.target.value)}
-              />
-              <span className="text-[10px] text-gray-400 font-bold mt-1 block">Columnas de productos mostradas en la rejilla (Recomendado: 6)</span>
-            </div>
+  const [gridColumns, setGridColumns] = useState(posSettings?.layout?.gridColumns || 6);
+  const [gridRows, setGridRows] = useState(posSettings?.layout?.gridRows || 4);
+  const [showOnlySelected, setShowOnlySelected] = useState(posSettings?.layout?.showOnlySelected || false);
+  const [selectedProductIds, setSelectedProductIds] = useState(posSettings?.layout?.selectedProductIds || []);
+  const [searchTerm, setSearchTerm] = useState('');
 
-            <div>
-              <label className="text-sm font-bold text-gray-700 block mb-2">Número de Filas</label>
-              <input 
-                type="number" 
-                min="2" 
-                max="20"
-                className="w-full bg-white border border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
-                value={gridRows}
-                onChange={(e) => setGridRows(e.target.value)}
-              />
-              <span className="text-[10px] text-gray-400 font-bold mt-1 block">Filas máximas visibles (el resto requerirá scroll)</span>
-            </div>
+  useEffect(() => {
+    if (posSettings?.layout) {
+      setGridColumns(posSettings.layout.gridColumns || 6);
+      setGridRows(posSettings.layout.gridRows || 4);
+      setShowOnlySelected(posSettings.layout.showOnlySelected || false);
+      setSelectedProductIds(posSettings.layout.selectedProductIds || []);
+    }
+  }, [posSettings]);
+
+  const sellableProducts = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+  const filteredProducts = sellableProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
+
+  const handleSave = () => {
+    updatePosSettings({
+      ...posSettings,
+      layout: {
+        gridColumns: parseInt(gridColumns, 10) || 6,
+        gridRows: parseInt(gridRows, 10) || 4,
+        showOnlySelected,
+        selectedProductIds
+      }
+    });
+    alert('Configuración de diseño de menú y feed guardada');
+  };
+
+  return (
+    <div className="max-w-3xl">
+      <h3 className="font-black text-chunky-dark text-lg mb-6">🎨 Diseño y Feed del POS</h3>
+      
+      <div className="space-y-6">
+        <p className="text-xs text-gray-500 font-bold mb-4">
+          Configura el número de filas y columnas del menú del POS, y elige qué productos aparecen en el feed principal (pantalla de inicio) de la caja. Las categorías siempre mostrarán todos sus productos sin restricción.
+        </p>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">Número de Columnas</label>
+            <input 
+              type="number" 
+              min="3" 
+              max="8"
+              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
+              value={gridColumns}
+              onChange={(e) => setGridColumns(e.target.value)}
+            />
+            <span className="text-[10px] text-gray-400 font-bold mt-1 block">Columnas de productos mostradas en la rejilla (Recomendado: 6)</span>
           </div>
 
-          <div className="border-t border-blue-100 pt-5 space-y-4">
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-              <div>
-                <span className="block font-black text-gray-800 text-sm">🏠 Personalizar productos del Feed Principal</span>
-                <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                  Si está activo, los productos que marques abajo serán los que aparecen en la pantalla de inicio del POS (sin ninguna categoría seleccionada). Los productos en categorías siguen siendo accesibles con normalidad.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowOnlySelected(!showOnlySelected)}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
-                  showOnlySelected ? 'bg-blue-500' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
-                    showOnlySelected ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
+          <div>
+            <label className="text-sm font-bold text-gray-700 block mb-2">Número de Filas</label>
+            <input 
+              type="number" 
+              min="2" 
+              max="20"
+              className="w-full bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
+              value={gridRows}
+              onChange={(e) => setGridRows(e.target.value)}
+            />
+            <span className="text-[10px] text-gray-400 font-bold mt-1 block">Filas máximas visibles (el resto requerirá scroll)</span>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-100 pt-5 space-y-4">
+          <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div>
+              <span className="block font-black text-gray-800 text-sm">🏠 Personalizar productos del Feed Principal</span>
+              <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                Si está activo, los productos que marques abajo serán los que aparecen en la pantalla de inicio del POS (sin ninguna categoría seleccionada). Los productos en categorías siguen siendo accesibles con normalidad.
+              </span>
             </div>
+            <button
+              type="button"
+              onClick={() => setShowOnlySelected(!showOnlySelected)}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                showOnlySelected ? 'bg-blue-500' : 'bg-gray-300'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                  showOnlySelected ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
 
-            {showOnlySelected && (
-              <div className="bg-white rounded-2xl p-5 border border-gray-100 space-y-4 animate-[fadeIn_0.2s_ease-out]">
-                <p className="text-xs text-blue-700 font-bold bg-blue-50 rounded-xl px-4 py-2">
-                  💡 Marca los productos que quieres ver en el <strong>feed principal</strong>. Las categorías siempre mostrarán todos sus productos.
-                </p>
-                <div className="flex items-center gap-3">
-                  <input
-                    type="text"
-                    placeholder="🔍 Buscar producto..."
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-chunky-main"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                  />
-                  {selectedProductIds.length > 0 && (
-                    <button 
-                      onClick={() => setSelectedProductIds([])}
-                      className="text-xs font-bold text-red-500 hover:underline shrink-0"
-                    >
-                      Desmarcar Todos ({selectedProductIds.length})
-                    </button>
-                  )}
-                </div>
-
-                <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1">
-                  {filteredProducts.map(p => {
-                    const isChecked = selectedProductIds.includes(p.id);
-                    return (
-                      <label 
-                        key={p.id} 
-                        className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-xs font-bold ${
-                          isChecked ? 'bg-blue-50/50 text-blue-800' : 'hover:bg-gray-50 text-gray-600'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          className="w-4 h-4 accent-blue-500 cursor-pointer"
-                          checked={isChecked}
-                          onChange={e => {
-                            if (e.target.checked) {
-                              setSelectedProductIds([...selectedProductIds, p.id]);
-                            } else {
-                              setSelectedProductIds(selectedProductIds.filter(id => id !== p.id));
-                            }
-                          }}
-                        />
-                        <div className="flex-1 flex justify-between items-center">
-                          <span>{p.name}</span>
-                          <div className="flex items-center gap-2">
-                            {p.posCategoryId && (
-                              <span className="text-[10px] text-orange-400 font-bold border border-orange-200 rounded px-1">📁 Con categoría</span>
-                            )}
-                            <span className="text-[10px] text-gray-400 font-semibold uppercase">{p.type}</span>
-                          </div>
-                        </div>
-                      </label>
-                    );
-                  })}
-                  {filteredProducts.length === 0 && (
-                    <p className="text-center py-4 text-xs font-bold text-gray-400">No se encontraron productos</p>
-                  )}
-                </div>
-
-                {/* 📌 Ordenador de productos del Feed Principal */}
+          {showOnlySelected && (
+            <div className="bg-white rounded-2xl p-5 border border-gray-100 space-y-4 animate-[fadeIn_0.2s_ease-out]">
+              <p className="text-xs text-blue-700 font-bold bg-blue-50 rounded-xl px-4 py-2">
+                💡 Marca los productos que quieres ver en el feed principal. Las categorías siempre mostrarán todos sus productos.
+              </p>
+              <div className="flex items-center gap-3">
+                <input
+                  type="text"
+                  placeholder="🔍 Buscar producto..."
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:border-chunky-main"
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                />
                 {selectedProductIds.length > 0 && (
-                  <div className="border-t border-gray-100 pt-4 space-y-2">
-                    <span className="block font-black text-gray-800 text-xs">📌 Orden de aparición en el POS</span>
-                    <p className="text-[10px] text-gray-400 font-bold">Usa las flechas para ordenar cómo se mostrarán los productos en la pantalla de inicio del POS.</p>
-                    <div className="max-h-56 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1 bg-gray-50/50">
-                      {selectedProductIds.map((id, index) => {
-                        const prod = inventory.find(i => i.id === id);
-                        if (!prod) return null;
-                        return (
-                          <div key={id} className="flex items-center justify-between bg-white px-3 py-1.5 border border-gray-200 rounded-xl shadow-sm">
-                            <span className="text-[11px] font-bold text-gray-700">
-                              <span className="text-gray-400 mr-1.5">{index + 1}.</span> {prod.name}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              <button
-                                type="button"
-                                disabled={index === 0}
-                                onClick={() => {
-                                  const newIds = [...selectedProductIds];
-                                  [newIds[index - 1], newIds[index]] = [newIds[index], newIds[index - 1]];
-                                  setSelectedProductIds(newIds);
-                                }}
-                                className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
-                                title="Subir"
-                              >
-                                ⬆️
-                              </button>
-                              <button
-                                type="button"
-                                disabled={index === selectedProductIds.length - 1}
-                                onClick={() => {
-                                  const newIds = [...selectedProductIds];
-                                  [newIds[index + 1], newIds[index]] = [newIds[index], newIds[index + 1]];
-                                  setSelectedProductIds(newIds);
-                                }}
-                                className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
-                                title="Bajar"
-                              >
-                                ⬇️
-                              </button>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  <button 
+                    type="button"
+                    onClick={() => setSelectedProductIds([])}
+                    className="text-xs font-bold text-red-500 hover:underline shrink-0"
+                  >
+                    Desmarcar Todos ({selectedProductIds.length})
+                  </button>
                 )}
               </div>
-            )}
+
+              <div className="max-h-60 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1">
+                {filteredProducts.map(p => {
+                  const isChecked = selectedProductIds.includes(p.id);
+                  return (
+                    <label 
+                      key={p.id} 
+                      className={`flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors text-xs font-bold ${
+                        isChecked ? 'bg-blue-50/50 text-blue-800' : 'hover:bg-gray-50 text-gray-600'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        className="w-4 h-4 accent-blue-500 cursor-pointer"
+                        checked={isChecked}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setSelectedProductIds([...selectedProductIds, p.id]);
+                          } else {
+                            setSelectedProductIds(selectedProductIds.filter(id => id !== p.id));
+                          }
+                        }}
+                      />
+                      <div className="flex-1 flex justify-between items-center">
+                        <span>{p.name}</span>
+                        <div className="flex items-center gap-2">
+                          {p.posCategoryId && (
+                            <span className="text-[10px] text-orange-400 font-bold border border-orange-200 rounded px-1">📁 Con categoría</span>
+                          )}
+                          <span className="text-[10px] text-gray-400 font-semibold uppercase">{p.type}</span>
+                        </div>
+                      </div>
+                    </label>
+                  );
+                })}
+                {filteredProducts.length === 0 && (
+                  <p className="text-center py-4 text-xs font-bold text-gray-400">No se encontraron productos</p>
+                )}
+              </div>
+
+              {/* 📌 Ordenador de productos del Feed Principal */}
+              {selectedProductIds.length > 0 && (
+                <div className="border-t border-gray-100 pt-4 space-y-2">
+                  <span className="block font-black text-gray-800 text-xs">📌 Orden de aparición en el POS</span>
+                  <p className="text-[10px] text-gray-400 font-bold">Usa las flechas para ordenar cómo se mostrarán los productos en la pantalla de inicio del POS.</p>
+                  <div className="max-h-56 overflow-y-auto border border-gray-100 rounded-xl p-2 space-y-1 bg-gray-50/50">
+                    {selectedProductIds.map((id, index) => {
+                      const prod = inventory.find(i => i.id === id);
+                      if (!prod) return null;
+                      return (
+                        <div key={id} className="flex items-center justify-between bg-white px-3 py-1.5 border border-gray-200 rounded-xl shadow-sm">
+                          <span className="text-[11px] font-bold text-gray-700">
+                            <span className="text-gray-400 mr-1.5">{index + 1}.</span> {prod.name}
+                          </span>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <button
+                              type="button"
+                              disabled={index === 0}
+                              onClick={() => {
+                                const newIds = [...selectedProductIds];
+                                [newIds[index - 1], newIds[index]] = [newIds[index], newIds[index - 1]];
+                                setSelectedProductIds(newIds);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
+                              title="Subir"
+                            >
+                              ⬆️
+                            </button>
+                            <button
+                              type="button"
+                              disabled={index === selectedProductIds.length - 1}
+                              onClick={() => {
+                                const newIds = [...selectedProductIds];
+                                [newIds[index + 1], newIds[index]] = [newIds[index], newIds[index + 1]];
+                                setSelectedProductIds(newIds);
+                              }}
+                              className="p-1 hover:bg-gray-100 rounded text-xs disabled:opacity-30 disabled:hover:bg-transparent transition-colors font-bold text-blue-500"
+                              title="Bajar"
+                            >
+                              ⬇️
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <Button className="rounded-full text-md py-3 px-8 shadow-sm bg-chunky-secondary hover:opacity-90 mt-6" onClick={handleSave}>
+          Guardar Diseño de Feed
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function PosInventoryConfigPanel() {
+  const { posSettings, updatePosSettings } = useInventoryStore();
+
+  const [linkProduction, setLinkProduction] = useState(posSettings?.inventoryControl?.linkProduction || false);
+  const [linkSalesToInventory, setLinkSalesToInventory] = useState(posSettings?.inventoryControl?.linkSalesToInventory || false);
+  const [strictTricycleStock, setStrictTricycleStock] = useState(posSettings?.inventoryControl?.strictTricycleStock || false);
+
+  useEffect(() => {
+    if (posSettings?.inventoryControl) {
+      setLinkProduction(posSettings.inventoryControl.linkProduction || false);
+      setLinkSalesToInventory(posSettings.inventoryControl.linkSalesToInventory || false);
+      setStrictTricycleStock(posSettings.inventoryControl.strictTricycleStock || false);
+    }
+  }, [posSettings]);
+
+  const handleSave = () => {
+    updatePosSettings({
+      ...posSettings,
+      inventoryControl: {
+        linkProduction,
+        linkSalesToInventory,
+        strictTricycleStock
+      }
+    });
+    alert('Configuración de inventario modular guardada');
+  };
+
+  return (
+    <div className="max-w-3xl">
+      <h3 className="font-black text-chunky-dark text-lg mb-6">⚙️ Control de Inventario Modular</h3>
+      
+      <div className="space-y-6">
+        <p className="text-xs text-gray-500 font-bold mb-4">
+          Activa o desactiva de forma modular los enlaces automáticos de stock. Esto te permite ir incorporando el control estricto paso a paso.
+        </p>
+
+        <div className="space-y-4">
+          <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div>
+              <span className="block font-black text-gray-800 text-sm">🏭 Ligado de Producción y Fritado (Crudos a Fritos)</span>
+              <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                Si está activo, producir o freír fritos requiere insumos/crudos y los descuenta del inventario. Si está inactivo, se puede producir/freír de forma libre.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLinkProduction(!linkProduction)}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                linkProduction ? 'bg-amber-500' : 'bg-gray-300'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                  linkProduction ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div>
+              <span className="block font-black text-gray-800 text-sm">🛒 Ligado de Caja POS/Ventas a Inventario</span>
+              <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                Si está activo, las ventas registradas en caja POS y los pedidos entregados por triciclo descuentan stock de forma automática.
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setLinkSalesToInventory(!linkSalesToInventory)}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                linkSalesToInventory ? 'bg-amber-500' : 'bg-gray-300'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                  linkSalesToInventory ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <div>
+              <span className="block font-black text-gray-800 text-sm">🛵 Ligado de Stock Físico a Triciclos</span>
+              <span className="block text-xs text-gray-400 font-medium mt-0.5">
+                Si está activo, los clientes que piden por la app solo verán stock disponible si el Dejador ha cargado previamente mercancía en los triciclos. Si está inactivo, el stock se asume siempre disponible (10 unidades por defecto).
+              </span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setStrictTricycleStock(!strictTricycleStock)}
+              className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
+                strictTricycleStock ? 'bg-amber-500' : 'bg-gray-300'
+              }`}
+            >
+              <div
+                className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
+                  strictTricycleStock ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
           </div>
         </div>
 
-        <div className="bg-amber-50/50 border border-amber-200/60 rounded-3xl p-6 my-8">
-          <h4 className="font-black text-amber-800 text-base mb-2">⚙️ Control de Inventario Modular</h4>
-          <p className="text-xs text-amber-600 font-bold mb-5">
-            Activa o desactiva de forma modular los enlaces automáticos de stock. Esto te permite ir incorporando el control estricto paso a paso.
-          </p>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-              <div>
-                <span className="block font-black text-gray-800 text-sm">🏭 Ligado de Producción y Fritado (Crudos a Fritos)</span>
-                <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                  Si está activo, producir o freír fritos requiere insumos/crudos y los descuenta del inventario. Si está inactivo, se puede producir/freír de forma libre.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLinkProduction(!linkProduction)}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
-                  linkProduction ? 'bg-amber-500' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
-                    linkProduction ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-              <div>
-                <span className="block font-black text-gray-800 text-sm">🛒 Ligado de Caja POS/Ventas a Inventario</span>
-                <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                  Si está activo, las ventas registradas en caja POS y los pedidos entregados por triciclo descuentan stock de forma automática.
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setLinkSalesToInventory(!linkSalesToInventory)}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
-                  linkSalesToInventory ? 'bg-amber-500' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
-                    linkSalesToInventory ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-
-            <div className="flex items-center justify-between bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-              <div>
-                <span className="block font-black text-gray-800 text-sm">🛵 Ligado de Stock Físico a Triciclos</span>
-                <span className="block text-xs text-gray-400 font-medium mt-0.5">
-                  Si está activo, los clientes que piden por la app solo verán stock disponible si el Dejador ha cargado previamente mercancía en los triciclos. Si está inactivo, el stock se asume siempre disponible (10 unidades por defecto).
-                </span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStrictTricycleStock(!strictTricycleStock)}
-                className={`relative w-11 h-6 rounded-full transition-colors duration-200 outline-none flex-shrink-0 ${
-                  strictTricycleStock ? 'bg-amber-500' : 'bg-gray-300'
-                }`}
-              >
-                <div
-                  className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform duration-200 transform ${
-                    strictTricycleStock ? 'translate-x-5' : 'translate-x-0'
-                  }`}
-                />
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <Button className="rounded-full text-md py-3 px-8 shadow-sm bg-chunky-secondary hover:opacity-90 mt-4" onClick={handleSave}>
-          Guardar Configuraciones
+        <Button className="rounded-full text-md py-3 px-8 shadow-sm bg-chunky-secondary hover:opacity-90 mt-6" onClick={handleSave}>
+          Guardar Control de Inventario
         </Button>
       </div>
     </div>
@@ -3539,13 +3581,16 @@ export function AdminView() {
       { id: 'REPORTES',   label: '📊 Reportes'    },
     ],
     POS: [
-      { id: 'POS_CONFIG',   label: '⚙️ Config Caja'  },
-      { id: 'POS_REWARDS',  label: '🎁 Premios & Gamificación' },
-      { id: 'POS_CARPETAS', label: '🗂️ Carpetas POS' },
-      { id: 'POS_HISTORY',  label: '🧾 Historial POS'},
-      { id: 'POS_CIERRES',  label: '💰 Cierres Caja' },
-      { id: 'CONTRATAS',    label: '🤝 Contratas' },
-      { id: 'TICKET_CONFIG', label: '🧾 Diseño Tickets' },
+      { id: 'POS_CONFIG',     label: '⚙️ Hardware & Pagos' },
+      { id: 'POS_FEED',       label: '🎨 Menú & Feed POS' },
+      { id: 'POS_INVENTORY',  label: '⚙️ Inventario Modular' },
+      { id: 'POS_OLACLICK',   label: '🔌 Integración OlaClick' },
+      { id: 'POS_REWARDS',    label: '🎁 Premios & Gamificación' },
+      { id: 'POS_CARPETAS',   label: '🗂️ Carpetas POS' },
+      { id: 'POS_HISTORY',    label: '🧾 Historial POS' },
+      { id: 'POS_CIERRES',    label: '💰 Cierres Caja' },
+      { id: 'CONTRATAS',      label: '🤝 Contratas' },
+      { id: 'TICKET_CONFIG',  label: '🧾 Diseño Tickets' },
     ],
     FLOTA: [
       { id: 'INVENTARIO_FLOTA', label: '📊 Inventario en Ruta' },
@@ -3697,7 +3742,10 @@ export function AdminView() {
         {activeTab === 'USUARIOS'      && <AdminUsersTab />}
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
-        { activeTab === 'POS_CONFIG' && <div className="space-y-12"><PosConfigPanel /><OlaClickConfigPanel /><LuckyRewardsConfigPanel /><PosCategoriesPanel /></div> }
+        { activeTab === 'POS_CONFIG' && <PosConfigPanel /> }
+        { activeTab === 'POS_FEED' && <PosFeedConfigPanel /> }
+        { activeTab === 'POS_INVENTORY' && <PosInventoryConfigPanel /> }
+        { activeTab === 'POS_OLACLICK' && <OlaClickConfigPanel /> }
         { activeTab === 'POS_REWARDS' && <LuckyRewardsConfigPanel /> }
         { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
 

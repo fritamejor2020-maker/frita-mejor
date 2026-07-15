@@ -136,21 +136,21 @@ export function OlaClickConfigPanel() {
   return (
     <div className="max-w-4xl space-y-6">
       {/* Header Panel */}
-      <div className="bg-gradient-to-r from-purple-900/40 via-gray-900 to-gray-900 p-6 rounded-[28px] border border-purple-500/20 shadow-xl">
+      <div className="bg-gradient-to-r from-purple-500/10 to-indigo-500/10 p-6 rounded-[28px] border border-purple-200 shadow-sm">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <span className="bg-purple-500/10 text-purple-400 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 mb-2">
+            <span className="bg-purple-100 text-purple-700 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider inline-flex items-center gap-1.5 mb-2">
               <SlidersHorizontal size={14} /> Módulo de Integración OlaClick
             </span>
-            <h3 className="text-xl font-black text-white">Configuración Multi-Sede OlaClick</h3>
-            <p className="text-xs font-bold text-gray-400 mt-1">
+            <h3 className="text-xl font-black text-gray-800">Configuración Multi-Sede OlaClick</h3>
+            <p className="text-xs font-bold text-gray-500 mt-1">
               Administra tus tokens API, webhooks y mapea tu catálogo de OlaClick con el POS para cada sede.
             </p>
           </div>
 
           <button
             onClick={handleSaveConfig}
-            className="bg-purple-600 hover:bg-purple-500 text-white font-black text-sm px-6 py-3 rounded-2xl shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
+            className="bg-purple-600 hover:bg-purple-700 text-white font-black text-sm px-6 py-3 rounded-2xl shadow active:scale-95 transition-all flex items-center justify-center gap-2 shrink-0"
           >
             <Save size={16} /> Guardar Configuración
           </button>
@@ -158,9 +158,9 @@ export function OlaClickConfigPanel() {
       </div>
 
       {/* Selector de Sede */}
-      <div className="bg-[#12131a] p-5 rounded-[24px] border border-gray-800 space-y-3">
-        <label className="text-xs font-black text-gray-400 uppercase tracking-wider flex items-center gap-2">
-          <Store size={14} className="text-purple-400" /> Selecciona la Sede a Configurar
+      <div className="bg-white p-5 rounded-[24px] border border-gray-200 shadow-sm space-y-3">
+        <label className="text-xs font-black text-gray-500 uppercase tracking-wider flex items-center gap-2">
+          <Store size={14} className="text-purple-600" /> Selecciona la Sede a Configurar
         </label>
         
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -174,14 +174,14 @@ export function OlaClickConfigPanel() {
                 onClick={() => setSelectedBranchId(branch.id)}
                 className={`p-4 rounded-2xl border-2 text-left font-black transition-all active:scale-95 flex flex-col justify-between ${
                   isSelected 
-                    ? 'bg-purple-500/10 border-purple-500 text-white shadow-md' 
-                    : 'bg-gray-900/60 border-gray-800 text-gray-400 hover:border-gray-700'
+                    ? 'bg-purple-50 border-purple-600 text-purple-800 shadow-sm' 
+                    : 'bg-gray-50/50 border-gray-200 text-gray-600 hover:border-gray-300'
                 }`}
               >
                 <span className="text-sm">{branch.name}</span>
-                <span className="text-[11px] font-bold mt-2 flex items-center justify-between text-gray-500">
+                <span className="text-[11px] font-bold mt-2 flex items-center justify-between text-gray-400">
                   <span>Status: {branchConfig.enabled !== false ? '🟢 Activo' : '⚪ Inactivo'}</span>
-                  {isSelected && <CheckCircle2 size={14} className="text-purple-400" />}
+                  {isSelected && <CheckCircle2 size={14} className="text-purple-600" />}
                 </span>
               </button>
             );
@@ -190,11 +190,11 @@ export function OlaClickConfigPanel() {
       </div>
 
       {/* Formulario de Parámetros por Sede */}
-      <div className="bg-[#12131a] p-6 rounded-[24px] border border-gray-800 space-y-5">
-        <div className="flex items-center justify-between pb-3 border-b border-gray-800">
-          <h4 className="text-sm font-black text-white flex items-center gap-2">
-            <Key size={16} className="text-purple-400" /> Parámetros de OlaClick para: {' '}
-            <span className="text-purple-300">{activeBranches.find(b => b.id === selectedBranchId)?.name}</span>
+      <div className="bg-white p-6 rounded-[24px] border border-gray-200 shadow-sm space-y-5">
+        <div className="flex items-center justify-between pb-3 border-b border-gray-200">
+          <h4 className="text-sm font-black text-gray-800 flex items-center gap-2">
+            <Key size={16} className="text-purple-600" /> Parámetros de OlaClick para: {' '}
+            <span className="text-purple-700">{activeBranches.find(b => b.id === selectedBranchId)?.name}</span>
           </h4>
 
           <label className="flex items-center gap-2 cursor-pointer">
@@ -202,58 +202,58 @@ export function OlaClickConfigPanel() {
               type="checkbox"
               checked={formData.enabled !== false}
               onChange={e => handleChange('enabled', e.target.checked)}
-              className="w-4 h-4 rounded accent-purple-500 cursor-pointer"
+              className="w-4 h-4 rounded accent-purple-600 cursor-pointer"
             />
-            <span className="text-xs font-bold text-gray-300">Habilitar Sede</span>
+            <span className="text-xs font-bold text-gray-700">Habilitar Sede</span>
           </label>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* API Token */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">Token API OlaClick (`olk_live_...`)</label>
+            <label className="text-xs font-bold text-gray-500">Token API OlaClick (`olk_live_...`)</label>
             <input
               type="password"
               value={formData.apiToken || ''}
               onChange={e => handleChange('apiToken', e.target.value)}
               placeholder="olk_live_..."
-              className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500 transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 transition-all"
             />
           </div>
 
           {/* Merchant ID */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">ID de Comercio OlaClick (`merchant_id`)</label>
+            <label className="text-xs font-bold text-gray-500">ID de Comercio OlaClick (`merchant_id`)</label>
             <input
               type="text"
               value={formData.merchantId || ''}
               onChange={e => handleChange('merchantId', e.target.value)}
               placeholder="frita-mejor"
-              className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500 transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 transition-all"
             />
           </div>
 
           {/* Webhook URL */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">URL del Webhook (Supabase)</label>
+            <label className="text-xs font-bold text-gray-500">URL del Webhook (Supabase)</label>
             <input
               type="text"
               value={formData.webhookUrl || ''}
               onChange={e => handleChange('webhookUrl', e.target.value)}
               placeholder="https://.../functions/v1/olaclick-webhook"
-              className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500 transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 transition-all"
             />
           </div>
 
           {/* Webhook Secret */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-gray-400">Secreto de Encabezado (`x-api-key`)</label>
+            <label className="text-xs font-bold text-gray-500">Secreto de Encabezado (`x-api-key`)</label>
             <input
               type="text"
               value={formData.webhookSecret || ''}
               onChange={e => handleChange('webhookSecret', e.target.value)}
               placeholder="FritaOlaClickSecret2026!"
-              className="w-full bg-gray-900 border border-gray-800 rounded-xl px-4 py-2.5 text-xs font-bold text-white outline-none focus:border-purple-500 transition-all"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 transition-all"
             />
           </div>
         </div>
@@ -263,19 +263,19 @@ export function OlaClickConfigPanel() {
             type="button"
             onClick={handleTestConnection}
             disabled={isTesting}
-            className="bg-gray-800 hover:bg-gray-700 text-purple-300 font-bold text-xs px-5 py-2.5 rounded-xl border border-purple-500/30 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
+            className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs px-5 py-2.5 rounded-xl border border-purple-200 flex items-center gap-2 active:scale-95 transition-all disabled:opacity-50"
           >
             <RefreshCw size={14} className={isTesting ? 'animate-spin' : ''} />
             {isTesting ? 'Verificando...' : '🔗 Probar Conexión & Obtener Productos OlaClick'}
           </button>
 
           {connectionStatus === 'success' && (
-            <span className="text-xs font-bold text-green-400 flex items-center gap-1">
+            <span className="text-xs font-bold text-green-600 flex items-center gap-1">
               <CheckCircle2 size={14} /> Token Válido Conectado
             </span>
           )}
           {connectionStatus === 'error' && (
-            <span className="text-xs font-bold text-red-400 flex items-center gap-1">
+            <span className="text-xs font-bold text-red-600 flex items-center gap-1">
               <AlertCircle size={14} /> Error de Autenticación
             </span>
           )}
@@ -283,13 +283,13 @@ export function OlaClickConfigPanel() {
       </div>
 
       {/* Mapeo de Productos OlaClick <-> POS */}
-      <div className="bg-[#12131a] p-6 rounded-[24px] border border-gray-800 space-y-4">
-        <div className="flex items-center justify-between pb-2 border-b border-gray-800">
+      <div className="bg-white p-6 rounded-[24px] border border-gray-200 shadow-sm space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-gray-200">
           <div>
-            <h4 className="text-sm font-black text-white flex items-center gap-2">
-              <Link2 size={16} className="text-purple-400" /> Mapeo de Catálogo de Productos
+            <h4 className="text-sm font-black text-gray-800 flex items-center gap-2">
+              <Link2 size={16} className="text-purple-600" /> Mapeo de Catálogo de Productos
             </h4>
-            <p className="text-xs text-gray-400 font-medium mt-0.5">
+            <p className="text-xs text-gray-500 font-medium mt-0.5">
               Relaciona cada producto de OlaClick con el correspondiente en el inventario del POS de esta sede.
             </p>
           </div>
@@ -297,40 +297,40 @@ export function OlaClickConfigPanel() {
           <button
             type="button"
             onClick={fetchSampleProducts}
-            className="text-xs font-bold text-purple-400 hover:underline flex items-center gap-1"
+            className="text-xs font-bold text-purple-600 hover:underline flex items-center gap-1"
           >
             <Layers size={12} /> Cargar Menú
           </button>
         </div>
 
         {olaProducts.length === 0 ? (
-          <div className="bg-gray-900/60 rounded-2xl p-6 text-center border border-gray-800 space-y-2">
-            <p className="text-xs font-bold text-gray-400">
+          <div className="bg-gray-50 rounded-2xl p-6 text-center border border-gray-200 space-y-2">
+            <p className="text-xs font-bold text-gray-500">
               Presiona <strong>"Probar Conexión & Obtener Productos OlaClick"</strong> arriba para listar el catálogo y asociarlo a los productos de tu POS.
             </p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
-              <thead className="bg-gray-900 text-gray-400 font-bold border-b border-gray-800">
+              <thead className="bg-gray-50 text-gray-600 font-bold border-b border-gray-200">
                 <tr>
                   <th className="py-3 px-4">Producto en OlaClick</th>
                   <th className="py-3 px-4">Categoría OlaClick</th>
                   <th className="py-3 px-4">Producto Relacionado en Frita POS</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-800/60 font-semibold text-gray-300">
+              <tbody className="divide-y divide-gray-200/60 font-semibold text-gray-700">
                 {olaProducts.map(olaProd => {
                   const mappedPosId = formData.productMappings?.[olaProd.id] || '';
                   return (
-                    <tr key={olaProd.id} className="hover:bg-gray-900/40">
-                      <td className="py-3 px-4 font-black text-white">{olaProd.name}</td>
-                      <td className="py-3 px-4 text-purple-400 font-bold">{olaProd.category}</td>
+                    <tr key={olaProd.id} className="hover:bg-gray-50/50">
+                      <td className="py-3 px-4 font-black text-gray-800">{olaProd.name}</td>
+                      <td className="py-3 px-4 text-purple-700 font-bold">{olaProd.category}</td>
                       <td className="py-3 px-4">
                         <select
                           value={mappedPosId}
                           onChange={e => handleMappingChange(olaProd.id, e.target.value)}
-                          className="bg-gray-900 border border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-white outline-none focus:border-purple-500 w-full max-w-xs"
+                          className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 w-full max-w-xs"
                         >
                           <option value="">-- Autodetección por Nombre --</option>
                           {(inventory || []).filter(i => i.inTricycles === true).map(posProd => (
