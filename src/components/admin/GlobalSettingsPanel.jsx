@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useBranchStore, BRANCH_TYPES } from '../../store/useBranchStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useInventoryStore } from '../../store/useInventoryStore';
 
 // Tipos de traslado configurables por sede
 const TRANSFER_TYPES = [
@@ -338,14 +339,122 @@ function BranchModal({ branch, onSave, onClose }) {
   );
 }
 
+function RegisterCard({ register, branches, onEdit, onToggle, onDelete }) {
+  const branchName = branches.find(b => b.id === register.branchId)?.name || 'Sede No Asignada';
+  return (
+    <div className={`border-2 rounded-2xl p-5 transition-all ${register.active !== false ? 'border-gray-100 bg-white' : 'border-dashed border-gray-200 bg-gray-50 opacity-60'}`}>
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center text-2xl shadow-sm flex-shrink-0">
+            🎰
+          </div>
+          <div>
+            <h3 className="font-black text-gray-900 text-base leading-tight">{register.name}</h3>
+            <span className="text-xs font-bold text-gray-400">Sede: {branchName}</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${register.active !== false ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {register.active !== false ? 'ACTIVA' : 'INACTIVA'}
+          </span>
+        </div>
+      </div>
+
+      {/* Actions */}
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => onEdit(register)}
+          className="flex-1 border border-gray-200 text-gray-600 font-bold text-xs py-2 rounded-xl hover:border-amber-400 hover:text-amber-600 transition-colors"
+        >
+          ✏️ Editar
+        </button>
+        <button
+          onClick={() => onToggle(register)}
+          className={`flex-1 font-bold text-xs py-2 rounded-xl transition-colors ${register.active !== false
+            ? 'border border-orange-100 text-orange-500 hover:bg-orange-50'
+            : 'border border-green-100 text-green-600 hover:bg-green-50'
+          }`}
+        >
+          {register.active !== false ? '⏸ Desactivar' : '▶ Reactivar'}
+        </button>
+        <button
+          onClick={() => onDelete(register)}
+          className="border border-red-100 text-red-400 font-bold text-xs py-2 px-3 rounded-xl hover:bg-red-50 hover:text-red-600 transition-colors"
+          title="Eliminar caja"
+        >
+          🗑️
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RegisterModal({ register, branches, onSave, onClose }) {
+  const isNew = !register.id;
+  const [form, setForm] = useState({
+    name: register.name || '',
+    branchId: register.branchId || (branches[0]?.id || 'BRANCH-001'),
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto" onClick={onClose}>
+      <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl animate-[fadeIn_0.2s_ease-out]" onClick={e => e.stopPropagation()}>
+        <h2 className="text-2xl font-black text-gray-900 mb-1">{isNew ? '🎰 Nueva Caja' : '✏️ Editar Caja'}</h2>
+        <p className="text-sm text-gray-400 font-medium mb-6">Configura el nombre y la sede asignada.</p>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Nombre de la Caja *</label>
+            <input
+              className="w-full border-2 border-gray-200 rounded-xl px-4 py-2.5 font-bold text-gray-900 outline-none focus:border-amber-400"
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              placeholder="Ej: Caja Principal, Caja Barra"
+            />
+          </div>
+
+          <div>
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">Sede / Sucursal *</label>
+            <select
+              value={form.branchId}
+              onChange={e => setForm(f => ({ ...f, branchId: e.target.value }))}
+              className="w-full border-2 border-gray-200 rounded-xl px-3 py-2.5 text-sm font-bold text-gray-800 outline-none focus:border-amber-400 cursor-pointer"
+            >
+              {branches.filter(b => b.active !== false).map(b => (
+                <option key={b.id} value={b.id}>🏢 {b.name}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="flex gap-3 mt-6">
+          <button onClick={onClose} className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-full hover:bg-gray-50 transition-colors">Cancelar</button>
+          <button
+            onClick={() => { if (form.name.trim()) { onSave(form); onClose(); } }}
+            className="flex-1 bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black py-3 rounded-full shadow-md hover:opacity-90 transition-opacity"
+          >
+            {isNew ? 'Crear Caja' : 'Guardar'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function GlobalSettingsPanel() {
   const { branches, addBranch, updateBranch, updateBranchSettings, deactivateBranch, reactivateBranch, deleteBranch } = useBranchStore();
+  const { posRegisters = [], addPosRegister, updatePosRegister, deletePosRegister } = useInventoryStore();
   const user = useAuthStore(s => s.user);
 
+  const [subTab, setSubTab] = useState('sedes'); // 'sedes' | 'cajas'
   const [showModal,     setShowModal]    = useState(false);
   const [editingBranch, setEditingBranch] = useState(null);
   const [confirmBranch, setConfirmBranch] = useState(null);  // sede a desactivar
   const [deletingBranch, setDeletingBranch] = useState(null); // sede a eliminar
+
+  const [showRegModal, setShowRegModal] = useState(false);
+  const [editingReg, setEditingReg] = useState(null);
+  const [deletingReg, setDeletingReg] = useState(null);
 
   // Solo ADMIN puede ver esto
   if (user?.role !== 'ADMIN') {
@@ -368,6 +477,19 @@ export function GlobalSettingsPanel() {
     setEditingBranch(null);
   };
 
+  const handleSaveRegister = (form) => {
+    if (editingReg?.id) {
+      updatePosRegister(editingReg.id, form);
+    } else {
+      addPosRegister(form);
+    }
+    setEditingReg(null);
+  };
+
+  const handleToggleRegister = (reg) => {
+    updatePosRegister(reg.id, { active: reg.active === false });
+  };
+
   const handleToggle = (branch) => {
     if (branch.active !== false) {
       setConfirmBranch(branch); // abrir modal de confirmación
@@ -381,43 +503,49 @@ export function GlobalSettingsPanel() {
 
   return (
     <div>
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900">🏢 Gestión de Sedes</h2>
-          <p className="text-sm text-gray-400 font-medium mt-0.5">
-            {activeBranches.length} sede{activeBranches.length !== 1 ? 's' : ''} activa{activeBranches.length !== 1 ? 's' : ''}
-            {inactiveBranches.length > 0 && ` · ${inactiveBranches.length} inactiva${inactiveBranches.length !== 1 ? 's' : ''}`}
-          </p>
-        </div>
+      {/* Sub-tab Selector */}
+      <div className="flex gap-2 mb-6 border-b border-gray-100 pb-4">
         <button
-          onClick={() => { setEditingBranch({}); setShowModal(true); }}
-          className="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-2.5 px-6 rounded-full shadow-md hover:opacity-90 transition-opacity flex items-center gap-2"
+          onClick={() => setSubTab('sedes')}
+          className={`px-5 py-2.5 rounded-full font-black text-sm transition-all ${
+            subTab === 'sedes' ? 'bg-amber-100 text-amber-700 font-bold' : 'text-gray-400 hover:text-gray-600'
+          }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nueva Sede
+          🏢 Gestionar Sedes
+        </button>
+        <button
+          onClick={() => setSubTab('cajas')}
+          className={`px-5 py-2.5 rounded-full font-black text-sm transition-all ${
+            subTab === 'cajas' ? 'bg-amber-100 text-amber-700 font-bold' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          🎰 Cajas POS
         </button>
       </div>
 
-      {/* Sedes activas */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {activeBranches.map(branch => (
-          <BranchCard
-            key={branch.id}
-            branch={branch}
-            onEdit={(b) => { setEditingBranch(b); setShowModal(true); }}
-            onToggle={handleToggle}
-            onDelete={(b) => setDeletingBranch(b)}
-          />
-        ))}
-      </div>
+      {subTab === 'sedes' ? (
+        <div>
+          {/* Header Sedes */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900">🏢 Gestión de Sedes</h2>
+              <p className="text-sm text-gray-400 font-medium mt-0.5">
+                {activeBranches.length} sede{activeBranches.length !== 1 ? 's' : ''} activa{activeBranches.length !== 1 ? 's' : ''}
+                {inactiveBranches.length > 0 && ` · ${inactiveBranches.length} inactiva${inactiveBranches.length !== 1 ? 's' : ''}`}
+              </p>
+            </div>
+            <button
+              onClick={() => { setEditingBranch({}); setShowModal(true); }}
+              className="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-2.5 px-6 rounded-full shadow-md hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva Sede
+            </button>
+          </div>
 
-      {/* Sedes inactivas */}
-      {inactiveBranches.length > 0 && (
-        <div className="mt-6">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Sedes Inactivas</p>
+          {/* Sedes activas */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {inactiveBranches.map(branch => (
+            {activeBranches.map(branch => (
               <BranchCard
                 key={branch.id}
                 branch={branch}
@@ -427,22 +555,84 @@ export function GlobalSettingsPanel() {
               />
             ))}
           </div>
+
+          {/* Sedes inactivas */}
+          {inactiveBranches.length > 0 && (
+            <div className="mt-6">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">Sedes Inactivas</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {inactiveBranches.map(branch => (
+                  <BranchCard
+                    key={branch.id}
+                    branch={branch}
+                    onEdit={(b) => { setEditingBranch(b); setShowModal(true); }}
+                    onToggle={handleToggle}
+                    onDelete={(b) => setDeletingBranch(b)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Info card Sedes */}
+          <div className="mt-6 bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
+            <span className="text-2xl flex-shrink-0">💡</span>
+            <div>
+              <p className="font-black text-amber-800 text-sm">¿Cómo funciona el multisede?</p>
+              <p className="text-xs text-amber-600 font-medium mt-1">
+                Cada sede tiene su propio inventario, ventas y turnos aislados. Los usuarios se asignan a una sede específica desde <strong>Usuarios del Sistema</strong>. 
+                El Admin ve todo consolidado. Los Gerentes solo ven las sedes que tú les autorices.
+              </p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div>
+          {/* Header Cajas */}
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900">🎰 Cajas Registradoras</h2>
+              <p className="text-sm text-gray-400 font-medium mt-0.5">
+                {posRegisters.length} caja{posRegisters.length !== 1 ? 's' : ''} configurada{posRegisters.length !== 1 ? 's' : ''}
+              </p>
+            </div>
+            <button
+              onClick={() => { setEditingReg({}); setShowRegModal(true); }}
+              className="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-2.5 px-6 rounded-full shadow-md hover:opacity-90 transition-opacity flex items-center gap-2"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+              Nueva Caja
+            </button>
+          </div>
+
+          {/* Lista de cajas */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {posRegisters.map(reg => (
+              <RegisterCard
+                key={reg.id}
+                register={reg}
+                branches={branches}
+                onEdit={(r) => { setEditingReg(r); setShowRegModal(true); }}
+                onToggle={handleToggleRegister}
+                onDelete={(r) => setDeletingReg(r)}
+              />
+            ))}
+          </div>
+
+          {/* Info card Cajas */}
+          <div className="mt-6 bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
+            <span className="text-2xl flex-shrink-0">💡</span>
+            <div>
+              <p className="font-black text-amber-800 text-sm">¿Cómo funcionan las cajas registradoras?</p>
+              <p className="text-xs text-amber-600 font-medium mt-1">
+                Cada caja registradora se asocia a una sede específica. Al abrir el POS en un dispositivo, el cajero seleccionará en cuál caja registrará sus operaciones de venta y cierres de turno.
+              </p>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* Info card */}
-      <div className="mt-6 bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
-        <span className="text-2xl flex-shrink-0">💡</span>
-        <div>
-          <p className="font-black text-amber-800 text-sm">¿Cómo funciona el multisede?</p>
-          <p className="text-xs text-amber-600 font-medium mt-1">
-            Cada sede tiene su propio inventario, ventas y turnos aislados. Los usuarios se asignan a una sede específica desde <strong>Usuarios del Sistema</strong>. 
-            El Admin ve todo consolidado. Los Gerentes solo ven las sedes que tú les autorices.
-          </p>
-        </div>
-      </div>
-
-      {/* Modal de edición */}
+      {/* Modal de edición de Sede */}
       {showModal && editingBranch !== null && (
         <BranchModal
           branch={editingBranch}
@@ -451,10 +641,10 @@ export function GlobalSettingsPanel() {
         />
       )}
 
-      {/* Modal de confirmación de desactivación */}
+      {/* Modal de confirmación de desactivación Sede */}
       {confirmBranch && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center animate-[fadeIn_0.2s_ease-out]">
             <div className="w-16 h-16 rounded-2xl bg-orange-100 flex items-center justify-center text-3xl mx-auto mb-4">⏸</div>
             <h2 className="text-xl font-black text-gray-900 mb-2">¿Desactivar sede?</h2>
             <p className="text-sm text-gray-500 font-medium mb-1">
@@ -480,10 +670,11 @@ export function GlobalSettingsPanel() {
           </div>
         </div>
       )}
-      {/* Modal de confirmación de eliminar */}
+
+      {/* Modal de confirmación de eliminar Sede */}
       {deletingBranch && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center animate-[fadeIn_0.2s_ease-out]">
             <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center text-3xl mx-auto mb-4">🗑️</div>
             <h2 className="text-xl font-black text-gray-900 mb-2">¿Eliminar sede permanentemente?</h2>
             <p className="text-sm text-gray-500 font-medium mb-1">
@@ -501,6 +692,45 @@ export function GlobalSettingsPanel() {
               </button>
               <button
                 onClick={() => { deleteBranch(deletingBranch.id); setDeletingBranch(null); }}
+                className="flex-1 bg-red-500 text-white font-black py-3 rounded-full hover:bg-red-600 transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modales de Cajas Registradoras */}
+      {showRegModal && editingReg !== null && (
+        <RegisterModal
+          register={editingReg}
+          branches={branches}
+          onSave={handleSaveRegister}
+          onClose={() => { setShowRegModal(false); setEditingReg(null); }}
+        />
+      )}
+
+      {deletingReg && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center animate-[fadeIn_0.2s_ease-out]">
+            <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center text-3xl mx-auto mb-4">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">¿Eliminar caja registradora?</h2>
+            <p className="text-sm text-gray-500 font-medium mb-1">
+              <span className="font-black text-gray-800">"{deletingReg.name}"</span>
+            </p>
+            <p className="text-xs text-red-400 font-medium mb-6">
+              ⚠️ Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingReg(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deletePosRegister(deletingReg.id); setDeletingReg(null); }}
                 className="flex-1 bg-red-500 text-white font-black py-3 rounded-full hover:bg-red-600 transition-colors"
               >
                 Sí, eliminar
