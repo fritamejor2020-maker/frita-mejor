@@ -3579,7 +3579,6 @@ export function AdminView() {
       { id: 'INVENTARIO', label: '📋 Inventario'  },
       { id: 'POS_INVENTORY', label: '⚙️ Inventario Modular' },
       { id: 'RECETAS',    label: '🧾 Recetas'     },
-      { id: 'REPORTES',   label: '📊 Reportes'    },
     ],
     POS: [
       { id: 'POS_CONFIG',     label: '⚙️ Hardware & Pagos' },
@@ -3611,6 +3610,7 @@ export function AdminView() {
       { id: 'TAREAS',           label: '📋 Tareas & Supervisión' },
       { id: 'PERMISOS_MANAGER', label: '🔑 Permisos Gerentes' },
       { id: 'USUARIOS',         label: '👥 Usuarios del Sistema' },
+      { id: 'REPORTES',         label: '📊 Reportes' },
       { id: 'RESET_GENERAL',    label: '🗑️ Reset General' },
     ]
   };

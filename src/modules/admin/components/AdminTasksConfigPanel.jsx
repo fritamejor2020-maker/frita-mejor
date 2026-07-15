@@ -112,24 +112,24 @@ export function AdminTasksConfigPanel() {
   };
 
   return (
-    <div className="bg-[#16171d] border border-gray-800 rounded-[28px] p-6 space-y-6">
+    <div className="bg-white border border-gray-200 rounded-[28px] p-6 space-y-6 shadow-sm">
       
       {/* Header del Panel Admin */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-800 pb-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-gray-200 pb-5">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-2xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-2xl">
+          <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 flex items-center justify-center text-2xl text-amber-600">
             📋
           </div>
           <div>
-            <h2 className="text-xl font-black text-white">Configuración & Supervisión de Tareas</h2>
-            <p className="text-xs text-gray-400 font-medium">
+            <h2 className="text-xl font-black text-gray-800">Configuración & Supervisión de Tareas</h2>
+            <p className="text-xs text-gray-500 font-medium">
               Administra asignaciones, plantillas recurrentes, evidencia y bloqueo de cierre
             </p>
           </div>
         </div>
 
         {/* Tabs internas del Panel */}
-        <div className="flex items-center gap-1 bg-[#121318] p-1.5 rounded-2xl border border-gray-800">
+        <div className="flex items-center gap-1 bg-gray-100 p-1.5 rounded-2xl border border-gray-200">
           {[
             { id: 'SUPERVISION', label: '📊 Avance en Vivo' },
             { id: 'PLANTILLAS', label: '📝 Tareas Recurrentes' },
@@ -140,8 +140,8 @@ export function AdminTasksConfigPanel() {
               onClick={() => setActiveTab(t.id)}
               className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all ${
                 activeTab === t.id
-                  ? 'bg-amber-500 text-gray-950 font-black shadow-md'
-                  : 'text-gray-400 hover:text-white hover:bg-gray-800/50'
+                  ? 'bg-amber-500 text-white font-black shadow'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200/50'
               }`}
             >
               {t.label}
@@ -154,35 +154,35 @@ export function AdminTasksConfigPanel() {
       {activeTab === 'SUPERVISION' && (
         <div className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
               <span className="text-3xl">📋</span>
               <div>
-                <span className="text-2xl font-black text-white">{tasks.filter(t => t.dueDate === todayStr).length}</span>
-                <p className="text-xs text-gray-400 font-bold">Tareas de Hoy</p>
+                <span className="text-2xl font-black text-gray-800">{tasks.filter(t => t.dueDate === todayStr).length}</span>
+                <p className="text-xs text-gray-500 font-bold">Tareas de Hoy</p>
               </div>
             </div>
 
-            <div className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
               <span className="text-3xl">✅</span>
               <div>
-                <span className="text-2xl font-black text-emerald-400">{tasks.filter(t => t.dueDate === todayStr && t.completed).length}</span>
-                <p className="text-xs text-gray-400 font-bold">Completadas</p>
+                <span className="text-2xl font-black text-emerald-600">{tasks.filter(t => t.dueDate === todayStr && t.completed).length}</span>
+                <p className="text-xs text-gray-500 font-bold">Completadas</p>
               </div>
             </div>
 
-            <div className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-4 flex items-center gap-3">
+            <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
               <span className="text-3xl">🔴</span>
               <div>
-                <span className="text-2xl font-black text-red-400">{tasks.filter(t => !t.completed && t.dueDate < todayStr).length}</span>
-                <p className="text-xs text-gray-400 font-bold">Atrasadas</p>
+                <span className="text-2xl font-black text-red-650">{tasks.filter(t => !t.completed && t.dueDate < todayStr).length}</span>
+                <p className="text-xs text-gray-500 font-bold">Atrasadas</p>
               </div>
             </div>
           </div>
 
           {/* Avance por Usuario / Rol */}
-          <div className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-5 space-y-4">
-            <h3 className="text-base font-black text-white flex items-center gap-2">
-              <Users className="text-amber-400" size={18} />
+          <div className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
+            <h3 className="text-base font-black text-gray-800 flex items-center gap-2">
+              <Users className="text-amber-600" size={18} />
               Cumplimiento por Empleado / Rol (Hoy)
             </h3>
 
@@ -197,26 +197,26 @@ export function AdminTasksConfigPanel() {
                 if (totalCount === 0) return null;
 
                 return (
-                  <div key={u.id} className="bg-[#16171d] border border-gray-800/80 rounded-xl p-4 space-y-2">
+                  <div key={u.id} className="bg-white border border-gray-200 rounded-xl p-4 space-y-2 shadow-sm">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm">{u.name || u.username}</span>
-                        <span className="bg-gray-800 text-gray-400 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
+                        <span className="font-bold text-gray-800 text-sm">{u.name || u.username}</span>
+                        <span className="bg-gray-100 text-gray-600 border border-gray-200 text-[10px] font-bold px-2 py-0.5 rounded-full uppercase">
                           {u.role}
                         </span>
                         {pendingObligatory > 0 && (
-                          <span className="bg-red-500/20 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-500/30">
+                          <span className="bg-red-50 text-red-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-red-200">
                             🚫 {pendingObligatory} Obligatoria(s) Pendientes
                           </span>
                         )}
                       </div>
-                      <span className="text-xs font-black text-amber-400">{completedCount}/{totalCount} ({percent}%)</span>
+                      <span className="text-xs font-black text-amber-600">{completedCount}/{totalCount} ({percent}%)</span>
                     </div>
 
                     {/* Progress Bar */}
-                    <div className="w-full h-2.5 bg-gray-800 rounded-full overflow-hidden">
+                    <div className="w-full h-2.5 bg-gray-200 rounded-full overflow-hidden">
                       <div 
-                        className={`h-full transition-all duration-500 ${percent === 100 ? 'bg-emerald-400' : 'bg-amber-500'}`}
+                        className={`h-full transition-all duration-500 ${percent === 100 ? 'bg-emerald-500' : 'bg-amber-500'}`}
                         style={{ width: `${percent}%` }}
                       />
                     </div>
@@ -232,10 +232,10 @@ export function AdminTasksConfigPanel() {
       {activeTab === 'PLANTILLAS' && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-black text-white">Plantillas Programadas</h3>
+            <h3 className="text-base font-black text-gray-800">Plantillas Programadas</h3>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-black text-xs px-4 py-2 rounded-xl flex items-center gap-2"
+              className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-2 shadow-sm active:scale-95 transition-all"
             >
               <Plus size={16} /> Programar Tarea Recurrente
             </button>
@@ -243,33 +243,33 @@ export function AdminTasksConfigPanel() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {taskTemplates.map(tpl => (
-              <div key={tpl.id} className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-5 space-y-3 relative group">
+              <div key={tpl.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-3 relative group shadow-sm">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h4 className="font-bold text-white text-base">{tpl.title}</h4>
-                    <p className="text-xs text-gray-400 mt-0.5">{tpl.description}</p>
+                    <h4 className="font-bold text-gray-800 text-base">{tpl.title}</h4>
+                    <p className="text-xs text-gray-500 mt-0.5">{tpl.description}</p>
                   </div>
                   <button
                     onClick={() => deleteTaskTemplate(tpl.id)}
-                    className="text-gray-600 hover:text-red-400 p-1 transition-colors"
+                    className="text-gray-400 hover:text-red-500 p-1 transition-colors"
                   >
                     <Trash2 size={16} />
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-gray-300 pt-2 border-t border-gray-800">
-                  <span className="bg-gray-800 px-2.5 py-1 rounded-lg">
+                <div className="flex items-center gap-2 flex-wrap text-xs font-bold text-gray-600 pt-2 border-t border-gray-200">
+                  <span className="bg-gray-100 border border-gray-200 px-2.5 py-1 rounded-lg">
                     ⏰ {tpl.dueTime || 'Todo el día'}
                   </span>
 
                   <span className={`px-2.5 py-1 rounded-lg border ${
-                    tpl.enforcementLevel === 'OBLIGATORIA' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-amber-500/20 text-amber-300 border-amber-500/30'
+                    tpl.enforcementLevel === 'OBLIGATORIA' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-amber-50 text-amber-700 border-amber-200'
                   }`}>
                     {tpl.enforcementLevel}
                   </span>
 
                   {tpl.requirePhoto && (
-                    <span className="bg-purple-500/20 text-purple-300 border border-purple-500/30 px-2.5 py-1 rounded-lg">
+                    <span className="bg-purple-50 text-purple-700 border border-purple-200 px-2.5 py-1 rounded-lg">
                       📷 Foto Req.
                     </span>
                   )}
@@ -283,47 +283,47 @@ export function AdminTasksConfigPanel() {
       {/* ── TAB 3: PROYECTOS & CATEGORÍAS ── */}
       {activeTab === 'PROYECTOS' && (
         <div className="space-y-6">
-          <form onSubmit={handleCreateProject} className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-5 space-y-4">
-            <h3 className="text-base font-black text-white flex items-center gap-2">
-              <FolderPlus className="text-amber-400" size={18} /> Crear Proyecto o Categoría
+          <form onSubmit={handleCreateProject} className="bg-gray-50 border border-gray-200 rounded-2xl p-5 space-y-4 shadow-sm">
+            <h3 className="text-base font-black text-gray-800 flex items-center gap-2">
+              <FolderPlus className="text-amber-600" size={18} /> Crear Proyecto o Categoría
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Nombre</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Nombre</label>
                 <input
                   type="text"
                   placeholder="Ej: Auditoría de Inventario"
                   value={newProjName}
                   onChange={(e) => setNewProjName(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Ícono Emoji</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Ícono Emoji</label>
                 <input
                   type="text"
                   value={newProjIcon}
                   onChange={(e) => setNewProjIcon(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white text-center focus:outline-none"
+                  className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 text-center focus:border-amber-500 outline-none"
                 />
               </div>
 
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Color</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Color</label>
                 <input
                   type="color"
                   value={newProjColor}
                   onChange={(e) => setNewProjColor(e.target.value)}
-                  className="w-full h-9 bg-transparent border border-gray-700 rounded-xl cursor-pointer"
+                  className="w-full h-9 bg-transparent border border-gray-200 rounded-xl cursor-pointer"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="bg-amber-500 hover:bg-amber-600 text-gray-950 font-black text-xs px-5 py-2.5 rounded-xl active:scale-95 transition-all"
+              className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-5 py-2.5 rounded-xl active:scale-95 transition-all shadow-sm"
             >
               + Guardar Proyecto
             </button>
@@ -331,17 +331,17 @@ export function AdminTasksConfigPanel() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
             {projects.map(p => (
-              <div key={p.id} className="bg-[#1d1e26] border border-gray-800 rounded-2xl p-4 flex items-center justify-between">
+              <div key={p.id} className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between shadow-sm">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{p.icon}</span>
                   <div>
-                    <h4 className="font-bold text-white text-sm" style={{ color: p.color }}>{p.name}</h4>
-                    <span className="text-[10px] text-gray-500 font-bold">Categoría Activa</span>
+                    <h4 className="font-bold text-gray-800 text-sm" style={{ color: p.color }}>{p.name}</h4>
+                    <span className="text-[10px] text-gray-400 font-bold">Categoría Activa</span>
                   </div>
                 </div>
                 <button
                   onClick={() => deleteProject(p.id)}
-                  className="text-gray-600 hover:text-red-400 p-1 transition-colors"
+                  className="text-gray-400 hover:text-red-500 p-1 transition-colors"
                 >
                   <Trash2 size={16} />
                 </button>
@@ -353,40 +353,40 @@ export function AdminTasksConfigPanel() {
 
       {/* MODAL CREAR PLANTILLA RECURRENTE */}
       {showCreateModal && (
-        <div className="fixed inset-0 z-[100] bg-black bg-opacity-80 backdrop-blur-sm flex items-center justify-center p-4">
-          <form onSubmit={handleCreateTemplate} className="bg-[#181920] border border-gray-800 rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-black text-white">Programar Tarea Recurrente</h3>
+        <div className="fixed inset-0 z-[100] bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center p-4">
+          <form onSubmit={handleCreateTemplate} className="bg-white border border-gray-200 rounded-3xl max-w-lg w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto shadow-2xl">
+            <h3 className="text-lg font-black text-gray-800 border-b border-gray-100 pb-2">Programar Tarea Recurrente</h3>
 
             <div>
-              <label className="text-xs text-gray-400 font-bold block mb-1">Título de la Tarea</label>
+              <label className="text-xs text-gray-500 font-bold block mb-1">Título de la Tarea</label>
               <input
                 type="text"
                 placeholder="Ej: Limpieza de freidoras"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="text-xs text-gray-400 font-bold block mb-1">Descripción / Instrucciones</label>
+              <label className="text-xs text-gray-500 font-bold block mb-1">Descripción / Instrucciones</label>
               <textarea
                 placeholder="Detalla lo que debe hacer el empleado..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 rows={2}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Proyecto</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Proyecto</label>
                 <select
                   value={projectId}
                   onChange={(e) => setProjectId(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 >
                   {projects.map(p => (
                     <option key={p.id} value={p.id}>{p.icon} {p.name}</option>
@@ -395,11 +395,11 @@ export function AdminTasksConfigPanel() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Rol Asignado</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Rol Asignado</label>
                 <select
                   value={assignedToRole}
                   onChange={(e) => setAssignedToRole(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 >
                   <option value="pos">Cajero (POS)</option>
                   <option value="dejador">Dejador / Repartidor</option>
@@ -411,11 +411,11 @@ export function AdminTasksConfigPanel() {
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Sede</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Sede</label>
                 <select
                   value={branchId}
                   onChange={(e) => setBranchId(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 >
                   <option value="GLOBAL">Todas las Sedes (Global)</option>
                   {realBranches.map(b => (
@@ -425,23 +425,23 @@ export function AdminTasksConfigPanel() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Hora Programada (Opcional)</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Hora Programada (Opcional)</label>
                 <input
                   type="time"
                   value={dueTime}
                   onChange={(e) => setDueTime(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Exigencia Cierre</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Exigencia Cierre</label>
                 <select
                   value={enforcementLevel}
                   onChange={(e) => setEnforcementLevel(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 >
                   <option value="NORMAL">ℹ️ Normal</option>
                   <option value="IMPORTANTE">🔑 Importante (PIN Admin)</option>
@@ -450,11 +450,11 @@ export function AdminTasksConfigPanel() {
               </div>
 
               <div>
-                <label className="text-xs text-gray-400 font-bold block mb-1">Recurrencia</label>
+                <label className="text-xs text-gray-500 font-bold block mb-1">Recurrencia</label>
                 <select
                   value={recurrenceType}
                   onChange={(e) => setRecurrenceType(e.target.value)}
-                  className="w-full bg-[#121318] border border-gray-700 rounded-xl px-3 py-2 text-xs text-white focus:outline-none"
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-700 focus:border-amber-500 outline-none"
                 >
                   <option value="DAILY">Diaria (Todos los días)</option>
                   <option value="WEEKLY">Semanal (Días laborales)</option>
@@ -464,7 +464,7 @@ export function AdminTasksConfigPanel() {
             </div>
 
             <div className="flex gap-4 pt-2">
-              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-300">
+              <label className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-650">
                 <input
                   type="checkbox"
                   checked={requirePhoto}
@@ -476,8 +476,8 @@ export function AdminTasksConfigPanel() {
             </div>
 
             {/* Subtareas */}
-            <div className="space-y-2 pt-2 border-t border-gray-800">
-              <label className="text-xs text-gray-400 font-bold block">Subtareas Checklist</label>
+            <div className="space-y-2 pt-2 border-t border-gray-200">
+              <label className="text-xs text-gray-500 font-bold block">Subtareas Checklist</label>
               {subtasksInput.map((st, idx) => (
                 <div key={idx} className="flex gap-2">
                   <input
@@ -485,31 +485,31 @@ export function AdminTasksConfigPanel() {
                     placeholder={`Paso #${idx + 1}`}
                     value={st}
                     onChange={(e) => handleSubtaskChange(idx, e.target.value)}
-                    className="flex-1 bg-[#121318] border border-gray-700 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none"
+                    className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-700 focus:border-amber-500 outline-none"
                   />
                   {subtasksInput.length > 1 && (
-                    <button type="button" onClick={() => handleRemoveSubtask(idx)} className="text-gray-500 hover:text-red-400 p-1">
+                    <button type="button" onClick={() => handleRemoveSubtask(idx)} className="text-gray-400 hover:text-red-500 p-1">
                       <X size={14} />
                     </button>
                   )}
                 </div>
               ))}
-              <button type="button" onClick={handleAddSubtask} className="text-amber-400 text-xs font-bold hover:underline">
+              <button type="button" onClick={handleAddSubtask} className="text-amber-600 text-xs font-bold hover:underline">
                 + Agregar paso
               </button>
             </div>
 
-            <div className="flex justify-end gap-3 pt-3 border-t border-gray-800">
+            <div className="flex justify-end gap-3 pt-3 border-t border-gray-200">
               <button
                 type="button"
                 onClick={() => setShowCreateModal(false)}
-                className="bg-gray-800 text-gray-300 font-bold text-xs px-4 py-2.5 rounded-xl"
+                className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs px-4 py-2.5 rounded-xl active:scale-95 transition-all"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
-                className="bg-amber-500 text-gray-950 font-black text-xs px-5 py-2.5 rounded-xl"
+                className="bg-amber-500 hover:bg-amber-600 text-white font-black text-xs px-5 py-2.5 rounded-xl active:scale-95 transition-all shadow"
               >
                 Programar & Desplegar
               </button>
