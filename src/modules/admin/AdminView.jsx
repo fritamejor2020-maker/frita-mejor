@@ -569,109 +569,200 @@ function InventoryPanel() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('name_asc');
 
-  const handleCsvUpload = (e) => {
+  const downloadTemplate = () => {
+    // Columnas de la plantilla en inglés y español para conveniencia del usuario
+    const templateData = [
+      {
+        "Nombre": "Ejemplo Empanada de Carne",
+        "Codigo": "EMP001",
+        "Cantidad": 50,
+        "Precio": 1500,
+        "Unidad": "unidades",
+        "Categoria": "Empanadas"
+      },
+      {
+        "Nombre": "Ejemplo Papa Rellena",
+        "Codigo": "PAP002",
+        "Cantidad": 30,
+        "Precio": 2000,
+        "Unidad": "unidades",
+        "Categoria": "Fritos"
+      },
+      {
+        "Nombre": "Ejemplo Coca-Cola 350ml",
+        "Codigo": "7702090037784",
+        "Cantidad": 100,
+        "Precio": 3500,
+        "Unidad": "unidades",
+        "Categoria": "Bebidas"
+      }
+    ];
+
+    // Crear libro de trabajo y hoja
+    const worksheet = XLSX.utils.json_to_sheet(templateData);
+    
+    // Ajustar anchos de columnas para que se vea premium y limpio
+    const colWidths = [
+      { wch: 30 }, // Nombre
+      { wch: 15 }, // Codigo
+      { wch: 10 }, // Cantidad
+      { wch: 10 }, // Precio
+      { wch: 12 }, // Unidad
+      { wch: 15 }  // Categoria
+    ];
+    worksheet['!cols'] = colWidths;
+
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Inventario");
+
+    // Descargar archivo Excel
+    XLSX.writeFile(workbook, "plantilla_inventario.xlsx");
+  };
+
+  const processImportedRows = (rows) => {
+    const newInventory = [...inventory];
+    let currentCategories = [...posCategories];
+    let updatedCount = 0;
+    let createdCount = 0;
+
+    rows.forEach((row, idx) => {
+      // Soportar campos tanto en español como en inglés
+      const name = row.Nombre || row.nombre || row.Name || row.name;
+      if (!name) return;
+
+      const groupName = row.Categoria || row.categoria || row.Grupo || row.grupo || row.ProductGroup || row.productGroup;
+      let catId = '';
+      if (groupName && groupName.trim() !== '' && groupName.trim() !== 'No Leido') {
+        const trimmedGroup = groupName.trim();
+        const existingCat = currentCategories.find(c => c.name.toLowerCase() === trimmedGroup.toLowerCase());
+        if (existingCat) {
+          catId = existingCat.id;
+        } else {
+          const newCatId = `CAT-${Date.now()}-${Math.floor(Math.random() * 1000)}-${idx}`;
+          const newCat = { id: newCatId, name: trimmedGroup, icon: '📦', color: '#ffb700' };
+          addPosCategory(newCat);
+          currentCategories.push(newCat);
+          catId = newCatId;
+        }
+      }
+
+      let quantity = parseFloat(row.Cantidad || row.cantidad || row.Quantity || row.quantity) || 0;
+      if (quantity < 0) quantity = 0;
+
+      const lowerName = name.toLowerCase();
+      let tipo = 'PRODUCTO';
+      let estado = 'N/A';
+      if (lowerName.includes('empanada') || lowerName.includes('pastel') || lowerName.includes('maduro') || lowerName.includes('chorizo') || lowerName.includes('hamburguesa') || lowerName.includes('bofe') || lowerName.includes('rellena') || lowerName.includes('chicharrón') || lowerName.includes('hueso') || lowerName.includes('arepa de huevo') || lowerName.includes('azadura') || lowerName.includes('chunchulla') || lowerName.includes('picada')) {
+        tipo = 'PRODUCTO';
+        estado = 'FRITO';
+      }
+
+      const barcode = row.Codigo || row.codigo || row.Barcode || row.barcode || row.SKU || row.sku || '';
+      const price = parseFloat(row.Precio || row.precio || row.Price || row.price) || 0;
+      const unit = row.Unidad || row.unidad || row.MeasurementUnit || row.measurementUnit || 'unidades';
+
+      const existingIndex = newInventory.findIndex(i => 
+        (barcode && i.barcode === barcode) || 
+        (i.name.toLowerCase().trim() === name.toLowerCase().trim())
+      );
+
+      const typeVal = buildType(tipo, estado);
+      if (existingIndex !== -1) {
+        newInventory[existingIndex] = {
+          ...newInventory[existingIndex],
+          price,
+          barcode,
+          qty: quantity || newInventory[existingIndex].qty,
+          posCategoryId: catId || newInventory[existingIndex].posCategoryId,
+          type: typeVal
+        };
+        updatedCount++;
+      } else {
+        const prefix = typeVal === 'FRITO' ? 'FR' : typeVal === 'PRODUCTO' ? 'PRD' : 'INS';
+        const newId = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${idx}`;
+        newInventory.push({
+          id: newId,
+          name,
+          barcode,
+          qty: quantity,
+          unit,
+          type: typeVal,
+          estado,
+          alert: 5,
+          warehouseId: 'BOD-001',
+          price,
+          posCategoryId: catId,
+          imageUrl: ''
+        });
+        createdCount++;
+      }
+    });
+
+    // Guardar todos en lote (un solo viaje al store y sync remoto)
+    setInventory(newInventory);
+
+    alert(`¡Importación exitosa! Se crearon ${createdCount} productos nuevos y se actualizaron ${updatedCount} existentes.`);
+  };
+
+  const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    const isExcel = file.name.endsWith('.xlsx') || file.name.endsWith('.xls');
+    const isCsv = file.name.endsWith('.csv');
+
+    if (!isExcel && !isCsv) {
+      alert('Formato de archivo no soportado. Por favor sube un archivo CSV o Excel (.xlsx, .xls).');
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const text = event.target?.result;
-        if (typeof text !== 'string') return;
-        
-        const rows = parseCSV(text);
-        if (rows.length === 0) {
-          alert('El archivo CSV está vacío o no tiene el formato correcto.');
-          return;
+
+    if (isExcel) {
+      reader.onload = (event) => {
+        try {
+          const data = event.target?.result;
+          if (!data) return;
+
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheetName = workbook.SheetNames[0];
+          const worksheet = workbook.Sheets[firstSheetName];
+          const rows = XLSX.utils.sheet_to_json(worksheet);
+          
+          if (rows.length === 0) {
+            alert('El archivo Excel está vacío o no tiene el formato correcto.');
+            return;
+          }
+
+          processImportedRows(rows);
+        } catch (err) {
+          console.error('Error al procesar el archivo Excel:', err);
+          alert('Error al procesar el archivo Excel: ' + err.message);
         }
-
-        const newInventory = [...inventory];
-        let currentCategories = [...posCategories];
-        let updatedCount = 0;
-        let createdCount = 0;
-
-        rows.forEach((row, idx) => {
-          const name = row.Name || row.name;
-          if (!name) return;
-
-          const groupName = row.ProductGroup || row.productGroup;
-          let catId = '';
-          if (groupName && groupName.trim() !== '' && groupName.trim() !== 'No Leido') {
-            const trimmedGroup = groupName.trim();
-            const existingCat = currentCategories.find(c => c.name.toLowerCase() === trimmedGroup.toLowerCase());
-            if (existingCat) {
-              catId = existingCat.id;
-            } else {
-              const newCatId = `CAT-${Date.now()}-${Math.floor(Math.random() * 1000)}-${idx}`;
-              const newCat = { id: newCatId, name: trimmedGroup, icon: '📦', color: '#ffb700' };
-              addPosCategory(newCat);
-              currentCategories.push(newCat);
-              catId = newCatId;
-            }
+      };
+      reader.readAsArrayBuffer(file);
+    } else {
+      // Es CSV
+      reader.onload = (event) => {
+        try {
+          const text = event.target?.result;
+          if (typeof text !== 'string') return;
+          
+          const rows = parseCSV(text);
+          if (rows.length === 0) {
+            alert('El archivo CSV está vacío o no tiene el formato correcto.');
+            return;
           }
 
-          let quantity = parseFloat(row.Quantity || row.quantity) || 0;
-          if (quantity < 0) quantity = 0;
+          processImportedRows(rows);
+        } catch (err) {
+          console.error('Error al procesar el archivo CSV:', err);
+          alert('Error al procesar el archivo CSV: ' + err.message);
+        }
+      };
+      reader.readAsText(file, 'UTF-8');
+    }
 
-          const lowerName = name.toLowerCase();
-          let tipo = 'PRODUCTO';
-          let estado = 'N/A';
-          if (lowerName.includes('empanada') || lowerName.includes('pastel') || lowerName.includes('maduro') || lowerName.includes('chorizo') || lowerName.includes('hamburguesa') || lowerName.includes('bofe') || lowerName.includes('rellena') || lowerName.includes('chicharrón') || lowerName.includes('hueso') || lowerName.includes('arepa de huevo') || lowerName.includes('azadura') || lowerName.includes('chunchulla') || lowerName.includes('picada')) {
-            tipo = 'PRODUCTO';
-            estado = 'FRITO';
-          }
-
-          const barcode = row.Barcode || row.SKU || '';
-          const price = parseFloat(row.Price || row.price) || 0;
-          const unit = row.MeasurementUnit || 'unidades';
-
-          const existingIndex = newInventory.findIndex(i => 
-            (barcode && i.barcode === barcode) || 
-            (i.name.toLowerCase().trim() === name.toLowerCase().trim())
-          );
-
-          const typeVal = buildType(tipo, estado);
-          if (existingIndex !== -1) {
-            newInventory[existingIndex] = {
-              ...newInventory[existingIndex],
-              price,
-              barcode,
-              qty: quantity || newInventory[existingIndex].qty,
-              posCategoryId: catId || newInventory[existingIndex].posCategoryId,
-              type: typeVal
-            };
-            updatedCount++;
-          } else {
-            const prefix = typeVal === 'FRITO' ? 'FR' : typeVal === 'PRODUCTO' ? 'PRD' : 'INS';
-            const newId = `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}-${idx}`;
-            newInventory.push({
-              id: newId,
-              name,
-              barcode,
-              qty: quantity,
-              unit,
-              type: typeVal,
-              estado,
-              alert: 5,
-              warehouseId: 'BOD-001',
-              price,
-              posCategoryId: catId,
-              imageUrl: ''
-            });
-            createdCount++;
-          }
-        });
-
-        // Guardar todos en lote (un solo viaje al store y sync remoto)
-        setInventory(newInventory);
-
-        alert(`¡Importación exitosa! Se crearon ${createdCount} productos nuevos y se actualizaron ${updatedCount} existentes.`);
-      } catch (err) {
-        console.error('Error al procesar el archivo CSV:', err);
-        alert('Error al procesar el archivo CSV: ' + err.message);
-      }
-    };
-    reader.readAsText(file, 'UTF-8');
     e.target.value = '';
   };
 
@@ -782,13 +873,19 @@ function InventoryPanel() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-4">
         <h3 className="font-black text-chunky-dark text-lg">Inventario ({displayed.length} ítems)</h3>
         <div className="flex gap-2 flex-wrap">
+          <button 
+            onClick={downloadTemplate}
+            className="bg-gradient-to-r from-amber-500 to-orange-600 text-white font-black text-xs py-2.5 px-5 rounded-full shadow-sm hover:opacity-90 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+          >
+            📄 Plantilla Excel
+          </button>
           <label className="bg-gradient-to-r from-green-500 to-emerald-600 text-white font-black text-xs py-2.5 px-5 rounded-full shadow-sm hover:opacity-90 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95">
-            📥 Importar CSV
+            📥 Importar Excel / CSV
             <input
               type="file"
-              accept=".csv"
+              accept=".csv,.xlsx,.xls"
               className="hidden"
-              onChange={handleCsvUpload}
+              onChange={handleFileUpload}
             />
           </label>
           <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
