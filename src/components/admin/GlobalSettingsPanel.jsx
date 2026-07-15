@@ -147,6 +147,9 @@ function BranchCard({ branch, onEdit, onToggle, onDelete }) {
 
 function BranchModal({ branch, onSave, onClose }) {
   const isNew = !branch.id;
+  const { posRegisters = [], addPosRegister, updatePosRegister, deletePosRegister } = useInventoryStore();
+  const [modalNewRegName, setModalNewRegName] = useState('');
+
   const [form, setForm] = useState({
     name: branch.name || '',
     type: branch.type || 'pos',
@@ -323,6 +326,77 @@ function BranchModal({ branch, onSave, onClose }) {
               })}
             </div>
           </div>
+
+          {/* Cajas Registradoras de la Sede */}
+          {!isNew && (
+            <div className="border-t border-gray-100 pt-4">
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">🎰 Cajas Registradoras de esta Sede</p>
+              <p className="text-[11px] text-gray-400 font-medium mb-3">
+                Administra las cajas de cobro para esta sucursal. Cada una tendrá sus propios turnos y cierres Z.
+              </p>
+              
+              {/* Lista de cajas existentes */}
+              <div className="space-y-2 mb-3">
+                {posRegisters.filter(r => r.branchId === branch.id).length === 0 ? (
+                  <p className="text-xs text-gray-400 italic">No hay cajas registradoras en esta sede.</p>
+                ) : (
+                  posRegisters.filter(r => r.branchId === branch.id).map(reg => (
+                    <div key={reg.id} className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2">
+                      <span className="text-sm">{reg.active !== false ? '🟢' : '🔴'}</span>
+                      <input
+                        className="flex-1 bg-transparent border-none outline-none font-bold text-xs text-gray-700 focus:bg-white focus:ring-2 focus:ring-amber-400 rounded-lg px-2 py-1 transition-all"
+                        value={reg.name}
+                        onChange={e => updatePosRegister(reg.id, { name: e.target.value })}
+                      />
+                      <button
+                        type="button"
+                        className={`text-[10px] font-black px-2 py-1 rounded-lg transition-all ${reg.active !== false ? 'bg-orange-100 text-orange-600 hover:bg-orange-200' : 'bg-green-100 text-green-600 hover:bg-green-200'}`}
+                        onClick={() => updatePosRegister(reg.id, { active: reg.active === false })}
+                      >
+                        {reg.active !== false ? 'Desactivar' : 'Activar'}
+                      </button>
+                      <button
+                        type="button"
+                        className="text-[10px] font-black px-2 py-1 rounded-lg bg-red-100 text-red-600 hover:bg-red-200 transition-all"
+                        onClick={() => { if (confirm(`¿Eliminar "${reg.name}"?`)) deletePosRegister(reg.id); }}
+                      >
+                        🗑️
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Agregar nueva caja */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Nombre de nueva caja..."
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold focus:ring-amber-400 focus:border-amber-400 outline-none"
+                  value={modalNewRegName}
+                  onChange={e => setModalNewRegName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && modalNewRegName.trim()) {
+                      e.preventDefault();
+                      addPosRegister({ name: modalNewRegName.trim(), branchId: branch.id });
+                      setModalNewRegName('');
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  disabled={!modalNewRegName.trim()}
+                  onClick={() => {
+                    addPosRegister({ name: modalNewRegName.trim(), branchId: branch.id });
+                    setModalNewRegName('');
+                  }}
+                  className="bg-amber-500 hover:bg-amber-600 disabled:opacity-40 disabled:pointer-events-none text-white font-black px-4 py-2 rounded-xl text-xs transition-colors"
+                >
+                  + Agregar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="flex gap-3 mt-6">
