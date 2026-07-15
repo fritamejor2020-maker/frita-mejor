@@ -13,7 +13,7 @@ export const SellerSetupView = () => {
   const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
   const [shift, setShift] = useState('AM');
-  const [responsibleName, setResponsibleName] = useState('');
+  const [responsibleName, setResponsibleName] = useState(user?.name || '');
 
   const allPointTypes = [
     { id: 'variable', label: 'Triciclo', vehicleType: 'Triciclo' },
@@ -40,7 +40,8 @@ export const SellerSetupView = () => {
   const navigate = useNavigate();
 
   const handleStartShift = () => {
-    if (!pointId || !responsibleName) {
+    const finalResponsibleName = responsibleName.trim() || user?.name || '';
+    if (!pointId || !finalResponsibleName) {
       alert("Faltan datos");
       return;
     }
@@ -69,7 +70,7 @@ export const SellerSetupView = () => {
         pointId,
         shift,
         pointType,
-        responsibleName,
+        responsibleName: finalResponsibleName,
         openedAt: existingShift.openedAt,
       });
       navigate('/vendedor');
@@ -78,8 +79,8 @@ export const SellerSetupView = () => {
 
     // Crear nuevo turno (no existe uno para este punto+jornada hoy)
     const openedAt = new Date().toISOString();
-    startShift({ pointId, shift, pointType, responsibleName, openedAt });
-    addPosShift({ openedAt, pointId, shift, responsibleName, type: 'VENDEDOR', closedAt: null });
+    startShift({ pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt });
+    addPosShift({ openedAt, pointId, shift, responsibleName: finalResponsibleName, type: 'VENDEDOR', closedAt: null });
     navigate('/vendedor');
   };
 
@@ -182,7 +183,7 @@ export const SellerSetupView = () => {
            </div>
           <input 
             type="text" 
-            placeholder="Tu nombre completo"
+            placeholder={user?.name ? `${user.name} (Opcional)` : "Tu nombre completo"}
             value={responsibleName}
             onChange={(e) => setResponsibleName(e.target.value)}
             className="w-full bg-white border-2 border-gray-100 rounded-[24px] sm:rounded-[28px] py-4 px-5 sm:py-5 sm:px-6 font-black text-lg sm:text-xl text-gray-800 outline-none focus:border-[#FFB700] shadow-sm transition-colors"
