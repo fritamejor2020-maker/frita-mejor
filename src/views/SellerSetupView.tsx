@@ -6,6 +6,7 @@ import { useVehicleStore } from '../store/useVehicleStore';
 import { useAuthStore } from '../store/useAuthStore';
 
 export const SellerSetupView = () => {
+  const { user } = useAuthStore();
   const startShift = useSellerSessionStore((state) => state.startShift);
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
   const enabledPointTypes = useVehicleStore((s: any) => s.enabledPointTypes ?? { Triciclo: true, Carrito: true, Local: false });
@@ -25,7 +26,6 @@ export const SellerSetupView = () => {
   const pointTypes = allPointTypes.filter(pt => enabledPointTypes[pt.vehicleType] !== false);
 
   const vehicles = useVehicleStore((state: any) => state.vehicles);
-  const { user } = useAuthStore();
   const userBranchId = (user as any)?.branchId ?? null;
   const selectedTypeObj = pointTypes.find(pt => pt.id === pointType) ?? pointTypes[0];
   const allPointIds = vehicles
