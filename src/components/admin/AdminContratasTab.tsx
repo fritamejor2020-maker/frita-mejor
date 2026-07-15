@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { formatMoney } from '../../utils/formatUtils';
 import * as XLSX from 'xlsx';
+import toast from 'react-hot-toast';
 
 // ── Colores disponibles para niveles ──────────────────────────────────────────
 const COLORS = [
@@ -39,8 +40,12 @@ function NivelesTab() {
   const [newDiscValue, setNewDiscValue] = useState('');
 
   const handleAdd = () => {
-    if (!newName.trim()) return;
+    if (!newName.trim()) {
+      toast.error('Por favor escribe el nombre del nivel');
+      return;
+    }
     addCustomerType({ name: newName.trim(), productDiscounts: [], allowCredit: false, globalDiscountPercent: 0, color: newColor });
+    toast.success(`Nivel "${newName}" creado con éxito`);
     setNewName(''); setNewColor('bg-blue-500');
   };
 
@@ -307,8 +312,12 @@ function ClientesTab() {
   };
 
   const handleAddCustomer = () => {
-    if (!nName.trim() || !nType) { alert('Nombre y nivel son obligatorios'); return; }
+    if (!nName.trim() || !nType) {
+      toast.error('Nombre y nivel son obligatorios');
+      return;
+    }
     addCustomer({ name: nName.trim(), document: nDoc.trim(), phone: nPhone.trim(), address: nAddress.trim(), typeId: nType, creditLimit: parseInt(nLimit) || 0, notes: nNotes.trim(), discountPercent: 0 });
+    toast.success(`Cliente "${nName}" registrado con éxito`);
     setNName(''); setNDoc(''); setNPhone(''); setNAddress(''); setNType(''); setNLimit(''); setNNotes('');
     setTab('lista');
   };
