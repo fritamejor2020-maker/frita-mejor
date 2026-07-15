@@ -1083,7 +1083,6 @@ export const VendedorDashboard = () => {
                 ref={transferFileRef}
                 type="file"
                 accept="image/*"
-                capture="environment"
                 className="hidden"
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
@@ -1207,7 +1206,6 @@ export const VendedorDashboard = () => {
                           ref={editFileRef}
                           type="file"
                           accept="image/*"
-                          capture="environment"
                           className="hidden"
                           onChange={(e) => {
                             const file = e.target.files?.[0];

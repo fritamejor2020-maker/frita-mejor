@@ -304,7 +304,6 @@ export function IncomesModal({ onClose }) {
         ref={photoInputRef}
         type="file"
         accept="image/*"
-        capture="environment"
         className="hidden"
         onChange={handlePhotoCapture}
       />

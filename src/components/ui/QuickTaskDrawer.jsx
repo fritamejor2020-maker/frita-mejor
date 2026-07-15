@@ -146,7 +146,6 @@ function QuickTaskCard({ task, userId, todayStr, proj, onToggleTask, toggleSubta
                     <input 
                       type="file" 
                       accept="image/*" 
-                      capture="environment" 
                       className="hidden" 
                       onChange={(e) => handleFileUpload(task.id, e)}
                     />

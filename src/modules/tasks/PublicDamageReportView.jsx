@@ -260,7 +260,6 @@ export function PublicDamageReportView() {
                   <input
                     type="file"
                     accept="image/*,video/*"
-                    capture="environment"
                     className="hidden"
                     onChange={handleFileChange}
                   />
