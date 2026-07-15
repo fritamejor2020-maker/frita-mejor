@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { formatMoney } from '../../utils/formatUtils';
+import * as XLSX from 'xlsx';
 
 // ── Colores disponibles para niveles ──────────────────────────────────────────
 const COLORS = [
@@ -221,7 +222,7 @@ function ClientesTab() {
   const contrataTypes = (customerTypes || []);
   const contrataCustomers = (customers || []).filter((c: any) => c.typeId);
 
-  const [tab, setTab]     = useState<'lista' | 'nuevo'>('lista');
+  const [tab, setTab]     = useState<'lista' | 'nuevo' | 'importar'>('lista');
   const [selected, setSelected] = useState<any>(null);
   const [payAmt, setPayAmt]     = useState('');
   const [payMethod, setPayMethod] = useState<'cash'|'transfer'>('cash');
@@ -236,6 +237,74 @@ function ClientesTab() {
   const [nLimit, setNLimit] = useState('');
   const [nNotes, setNNotes] = useState('');
   const [editClient, setEditClient] = useState<any>(null);
+
+  const downloadContratasTemplate = () => {
+    const data = [
+      { Nombre: "Cliente Ejemplo 1", Documento: "12345678-9", Telefono: "555-1234", Direccion: "Calle Falsa 123", Nivel: "Nivel 1", Limite_Credito: 500000, Notas: "Ejemplo de notas" },
+      { Nombre: "Cliente Ejemplo 2", Documento: "98765432-1", Telefono: "555-4321", Direccion: "Avenida Siempreviva 742", Nivel: "Nivel 2", Limite_Credito: 1000000, Notas: "" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Clientes_Contrata");
+    XLSX.writeFile(wb, "plantilla_contratas.xlsx");
+  };
+
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws) as any[];
+        
+        let importedCount = 0;
+        rawData.forEach((row: any) => {
+          const nombre = row.Nombre || row.nombre || row.NOMBRE;
+          const documento = row.Documento || row.documento || row.DOCUMENTO || '';
+          const telefono = row.Telefono || row.telefono || row.TELEFONO || '';
+          const direccion = row.Direccion || row.direccion || row.DIRECCION || '';
+          const nivelNombre = row.Nivel || row.nivel || row.NIVEL || '';
+          const limiteCredito = parseInt(row.Limite_Credito || row.limite_credito || row.LIMITE_CREDITO) || 0;
+          const notas = row.Notas || row.notas || row.NOTAS || '';
+
+          if (nombre && nombre.trim()) {
+            let resolvedTypeId = '';
+            if (nivelNombre) {
+              const matchedType = contrataTypes.find((t: any) => t.name.toLowerCase().trim() === nivelNombre.toString().toLowerCase().trim());
+              if (matchedType) resolvedTypeId = matchedType.id;
+            }
+            if (!resolvedTypeId && contrataTypes.length > 0) {
+              resolvedTypeId = contrataTypes[0].id;
+            }
+
+            addCustomer({
+              name: nombre.trim(),
+              document: documento.toString().trim(),
+              phone: telefono.toString().trim(),
+              address: direccion.toString().trim(),
+              typeId: resolvedTypeId,
+              creditLimit: limiteCredito,
+              notes: notas.trim(),
+              discountPercent: 0
+            });
+            importedCount++;
+          }
+        });
+        
+        alert(`¡Éxito! Se importaron ${importedCount} clientes contrata.`);
+        setTab('lista');
+        e.target.value = '';
+      } catch (err) {
+        console.error(err);
+        alert('Error al leer el archivo Excel. Asegúrate de usar el formato correcto.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const handleAddCustomer = () => {
     if (!nName.trim() || !nType) { alert('Nombre y nivel son obligatorios'); return; }
@@ -266,15 +335,15 @@ function ClientesTab() {
       <div className="xl:col-span-1 space-y-4">
         {/* Tabs */}
         <div className="flex bg-gray-100 rounded-2xl p-1">
-          {(['lista','nuevo'] as const).map(t => (
-            <button key={t} onClick={() => setTab(t)}
-              className={`flex-1 py-2 rounded-xl font-black text-sm transition-all ${tab===t ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>
-              {t === 'lista' ? '📋 Clientes' : '+ Nuevo'}
+          {([['lista', '📋 Clientes'], ['nuevo', '+ Nuevo'], ['importar', '📥 Importar']] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`flex-1 py-2 rounded-xl font-black text-sm transition-all ${tab===id ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-400'}`}>
+              {label}
             </button>
           ))}
         </div>
 
-        {tab === 'nuevo' ? (
+        {tab === 'nuevo' && (
           <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-3">
             <h3 className="font-black text-gray-800">Nuevo Cliente Contrata</h3>
             {[
@@ -304,7 +373,35 @@ function ClientesTab() {
               Registrar Cliente
             </button>
           </div>
-        ) : (
+        )}
+
+        {tab === 'importar' && (
+          <div className="bg-white rounded-3xl p-5 shadow-sm border border-gray-100 space-y-4">
+            <h3 className="font-black text-gray-800">Importar Clientes Contrata</h3>
+            <p className="text-xs text-gray-400 font-medium">
+              Carga tu base de datos de contratas masivamente desde un archivo de Excel o CSV.
+            </p>
+
+            <button
+              onClick={downloadContratasTemplate}
+              className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-black py-3 rounded-2xl border-2 border-dashed border-gray-200 transition-all flex items-center justify-center gap-2 text-xs active:scale-95 font-bold"
+            >
+              📥 Descargar Plantilla Excel
+            </button>
+
+            <div className="border-t border-gray-100 pt-4 space-y-2">
+              <label className="text-[10px] font-black uppercase text-gray-400 block">Subir Archivo Excel / CSV</label>
+              <input
+                type="file"
+                accept=".xlsx,.xls,.csv"
+                onChange={handleExcelUpload}
+                className="w-full border-2 border-gray-100 rounded-2xl px-3 py-2 font-bold text-gray-800 text-xs bg-gray-50 outline-none focus:border-yellow-400"
+              />
+            </div>
+          </div>
+        )}
+
+        {tab === 'lista' && (
           <div className="space-y-2">
             {contrataCustomers.map((c: any) => {
               const type  = contrataTypes.find((t: any) => t.id === c.typeId);

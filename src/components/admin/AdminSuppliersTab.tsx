@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSupplierStore } from '../../store/useSupplierStore';
 import { Button } from '../ui/Button';
 import { Edit2, Trash2, Check, X, Truck } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
 const TIPOS = [
   { value: 'por_definir', label: '⬜ Por definir', bg: 'bg-gray-100',   text: 'text-gray-500',  border: 'border-gray-300' },
@@ -21,6 +22,55 @@ export function AdminSuppliersTab() {
 
   // Edición de tipo por producto
   const [editingProductTipo, setEditingProductTipo] = useState<string | null>(null); // "supplierId::productName"
+
+  const downloadTemplate = () => {
+    const data = [
+      { Nombre: "Proveedor Ejemplo 1", Productos: "papas, aceite, sal" },
+      { Nombre: "Proveedor Ejemplo 2", Productos: "bebidas, gaseosas" }
+    ];
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Proveedores");
+    XLSX.writeFile(wb, "plantilla_proveedores.xlsx");
+  };
+
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const rawData = XLSX.utils.sheet_to_json(ws) as any[];
+        
+        let importedCount = 0;
+        rawData.forEach((row: any) => {
+          const nombre = row.Nombre || row.nombre || row.NOMBRE;
+          const productosStr = row.Productos || row.productos || row.PRODUCTOS || '';
+          
+          if (nombre && nombre.trim()) {
+            const productsArray = productosStr
+              .split(',')
+              .map((p: string) => p.trim().toLowerCase())
+              .filter((p: string) => p.length > 0);
+              
+            addSupplier({ name: nombre.trim(), commonProducts: productsArray });
+            importedCount++;
+          }
+        });
+        
+        alert(`¡Éxito! Se importaron ${importedCount} proveedores.`);
+        e.target.value = '';
+      } catch (err) {
+        console.error(err);
+        alert('Error al leer el archivo Excel. Asegúrate de usar el formato correcto.');
+      }
+    };
+    reader.readAsBinaryString(file);
+  };
 
   const handleEdit = (supplier: any) => {
     setIsEditing(supplier.id);
@@ -140,11 +190,29 @@ export function AdminSuppliersTab() {
 
       {/* LISTA DE PROVEEDORES */}
       <div>
-        <div className="flex justify-between items-center mb-4 px-2">
-          <h3 className="text-xl font-black text-gray-800">Proveedores Activos</h3>
-          <p className="text-xs font-bold text-gray-400 bg-gray-100 px-3 py-1.5 rounded-lg border border-gray-200 hidden md:block">
-            💡 Configura el tipo de cada producto aquí
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 px-2">
+          <div>
+            <h3 className="text-xl font-black text-gray-800">Proveedores Activos</h3>
+            <p className="text-xs font-bold text-gray-405 mt-1">💡 Configura el tipo de cada producto aquí</p>
+          </div>
+          
+          <div className="flex flex-wrap items-center gap-2">
+            <button 
+              onClick={downloadTemplate}
+              className="px-4 py-2 text-xs font-black rounded-xl bg-gray-100 hover:bg-gray-200 border border-gray-200 text-gray-700 transition-all flex items-center gap-1.5 active:scale-95"
+            >
+              📥 Plantilla Excel
+            </button>
+            <label className="px-4 py-2 text-xs font-black rounded-xl bg-[#FFB700] hover:bg-yellow-500 text-gray-900 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer">
+              📤 Importar Excel
+              <input 
+                type="file" 
+                accept=".xlsx,.xls,.csv" 
+                onChange={handleExcelUpload} 
+                className="hidden" 
+              />
+            </label>
+          </div>
         </div>
           
         <div className="flex flex-col gap-3">
