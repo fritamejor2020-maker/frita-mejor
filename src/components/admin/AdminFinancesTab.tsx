@@ -490,6 +490,30 @@ export const AdminFinancesTab = ({
      // ⚠️ Usar dateOf() (fecha local) y NO toISOString() para evitar desfase UTC-5 Colombia
      const shiftDate = dateOf(s.closedAt);
 
+     // Calcular ventana de tiempo de este turno para separar logística cuando
+     // hay varios turnos en el mismo día (AM + MD, etc.)
+     const windowEnd = new Date(s.closedAt).getTime();
+     let windowStart = 0; // primer turno del día: desde el inicio del día
+     const groupKey = `${s.pointId || s.registerId || ''}__${shiftDate}`;
+     const group = shiftsByVehicleDate[groupKey] || [];
+     const idx = group.findIndex((sh: any) => sh.id === s.id);
+     if (idx > 0) {
+       // Turno posterior: empieza donde cerró el turno anterior
+       windowStart = new Date(group[idx - 1].closedAt).getTime();
+     }
+
+     // Helper: ¿pertenece este timestamp a la ventana de este turno?
+     const inWindow = (ts: string) => {
+       if (!ts) return false;
+       const t = new Date(ts).getTime();
+       if (windowStart > 0) {
+         // Multi-turno: ventana estricta (después del cierre del turno anterior)
+         return t > windowStart && t <= windowEnd;
+       }
+       // Primer turno del día: acepta toda la logística del día
+       return dateOf(ts) === shiftDate;
+     };
+
      if (s.type === 'VENDEDOR') {
          const priceMap: Record<string, { price: number, name: string }> = {};
          (useInventoryStore.getState().getPosItems() || []).forEach((p: any) => {
@@ -499,31 +523,6 @@ export const AdminFinancesTab = ({
 
          const { loadHistory, completedRequests } = useLogisticsStore.getState();
          const vehicleId = s.pointId;
-
-         // Calcular ventana de tiempo de este turno para separar logística cuando
-         // hay varios turnos del mismo vehículo en el mismo día (AM + MD, etc.)
-         const windowEnd = new Date(s.closedAt).getTime();
-         let windowStart = 0; // primer turno del día: desde el inicio del día
-         if (s.type === 'VENDEDOR') {
-           const key = `${s.pointId || ''}__${shiftDate}`;
-           const group = shiftsByVehicleDate[key] || [];
-           const idx = group.findIndex((sh: any) => sh.id === s.id);
-           if (idx > 0) {
-             // Turno posterior: empieza donde cerró el turno anterior
-             windowStart = new Date(group[idx - 1].closedAt).getTime();
-           }
-         }
-         // Helper: ¿pertenece este timestamp a la ventana de este turno?
-         const inWindow = (ts: string) => {
-           if (!ts) return false;
-           const t = new Date(ts).getTime();
-           if (windowStart > 0) {
-             // Multi-turno: ventana estricta (después del cierre del turno anterior)
-             return t > windowStart && t <= windowEnd;
-           }
-           // Primer turno del día: acepta toda la logística del día
-           return dateOf(ts) === shiftDate;
-         };
 
          // Carga inicial por producto — solo del día del cierre, deduplicar por ID
          const seenCargaIds = new Set<string>();
