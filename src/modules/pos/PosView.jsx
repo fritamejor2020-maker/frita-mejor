@@ -1500,6 +1500,18 @@ export function PosView() {
               }
             });
           }}
+          onDeleteSale={(sale) => {
+            setPinPromptConfig({
+              message: 'Clave de Supervisor para Eliminar Venta',
+              expectedPin: posSettings?.supervisorPin || '1234',
+              onSuccess: () => {
+                if (confirm(`¿Estás seguro de eliminar la venta #${sale.id.slice(-6)}? Esta acción no se puede deshacer y ajustará el inventario.`)) {
+                  deletePosSale(sale.id);
+                  alert("Venta eliminada con éxito.");
+                }
+              }
+            });
+          }}
         />
       )}
 
@@ -1597,6 +1609,24 @@ export function PosView() {
               setShowHistoryModal(true);
             }
             alert("Venta actualizada con éxito. El inventario ha sido ajustado.");
+          }}
+          onDelete={(saleId) => {
+            setPinPromptConfig({
+              message: 'Clave de Supervisor para Eliminar Venta',
+              expectedPin: posSettings?.supervisorPin || '1234',
+              onSuccess: () => {
+                if (confirm("¿Estás completamente seguro de eliminar esta venta? Esta acción no se puede deshacer y ajustará el inventario.")) {
+                  deletePosSale(saleId);
+                  setEditingSale(null);
+                  if (editSource === 'contratas') {
+                    setShowContratasPanel(true);
+                  } else {
+                    setShowHistoryModal(true);
+                  }
+                  alert("Venta eliminada con éxito.");
+                }
+              }
+            });
           }}
         />
       )}
@@ -2960,7 +2990,7 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
 }
 
 // ─── Sales History Modal Component — Full Screen Table ───
-function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale }) {
+function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, onDeleteSale }) {
   const [filterText, setFilterText] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
@@ -3257,6 +3287,15 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale })
                           >
                             ✏️ Editar
                           </button>
+                          {onDeleteSale && (
+                            <button
+                              onClick={() => onDeleteSale(sale)}
+                              className="inline-flex items-center gap-1.5 bg-red-950/40 border border-red-900/40 text-red-400 hover:bg-red-900/30 text-xs font-bold px-2.5 py-2 rounded-xl hover:scale-105 active:scale-95 transition-all"
+                              title="Eliminar Venta"
+                            >
+                              🗑️
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -3636,7 +3675,7 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
 }
 
 // ─── Modal de Edición de Ventas (Auditoría Segura) ───
-function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onSave }) {
+function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onSave, onDelete }) {
   const [items, setItems] = useState(sale.items.map(i => ({ ...i })));
   const [customerId, setCustomerId] = useState(sale.customerId || null);
   const [paymentMethod, setPaymentMethod] = useState(sale.paymentMethod || 'EFECTIVO');
@@ -3812,11 +3851,21 @@ function EditSaleModal({ sale, customers, posSettings, formatMoney, onClose, onS
         </div>
 
         {/* Footer */}
-        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex gap-4 shrink-0">
-          <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
-          <Button className="flex-1 rounded-[20px] py-4 font-black text-lg bg-orange-600 text-white shadow-[0_4px_14px_rgba(249,115,22,0.39)] hover:scale-105 active:scale-95 hover:bg-orange-500 transition-all" onClick={handleConfirmSave}>
-            Guardar Cambios
-          </Button>
+        <div className="p-6 bg-[#16171d] border-t border-gray-800 flex justify-between gap-4 shrink-0">
+          {onDelete && (
+            <button
+              onClick={() => onDelete(sale.id)}
+              className="px-5 py-4 rounded-[20px] font-black text-sm bg-red-950/60 border border-red-900/60 text-red-400 hover:bg-red-900/40 active:scale-95 transition-all flex items-center gap-1.5"
+            >
+              🗑️ Eliminar Venta
+            </button>
+          )}
+          <div className="flex gap-3 flex-1 justify-end">
+            <Button variant="outline" className="rounded-[20px] px-6 py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
+            <Button className="rounded-[20px] px-8 py-4 font-black text-lg bg-orange-600 text-white shadow-[0_4px_14px_rgba(249,115,22,0.39)] hover:scale-105 active:scale-95 hover:bg-orange-500 transition-all" onClick={handleConfirmSave}>
+              Guardar Cambios
+            </Button>
+          </div>
         </div>
       </div>
     </div>

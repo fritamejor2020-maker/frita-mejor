@@ -1063,7 +1063,26 @@ export const useInventoryStore = create(
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
       },
-      deletePosSale: (id) => { set((s) => ({ posSales: (s.posSales || []).filter((sale) => sale.id !== id) })); syncKey('posSales', useInventoryStore.getState().posSales); },
+      deletePosSale: (id) => {
+        set((s) => {
+          const saleToDelete = (s.posSales || []).find((sale) => sale.id === id);
+          let newInventory = s.inventory;
+          const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
+          if (linkSales && saleToDelete && saleToDelete.status === 'PAID' && saleToDelete.items) {
+            newInventory = s.inventory.map(invItem => {
+              const oldSoldItem = saleToDelete.items.find(i => String(i.productId || i.id) === String(invItem.id));
+              if (oldSoldItem) {
+                return { ...invItem, qty: +(invItem.qty + (oldSoldItem.qty || 0)).toFixed(3) };
+              }
+              return invItem;
+            });
+          }
+          const updatedSales = (s.posSales || []).filter((sale) => sale.id !== id);
+          return { posSales: updatedSales, inventory: newInventory };
+        });
+        syncKey('posSales', useInventoryStore.getState().posSales);
+        syncKey('inventory', useInventoryStore.getState().inventory);
+      },
 
       addPosShift: (shift) => {
         // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) ──
