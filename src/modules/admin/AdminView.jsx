@@ -692,7 +692,8 @@ function InventoryPanel() {
           warehouseId: 'BOD-001',
           price,
           posCategoryId: catId,
-          imageUrl: ''
+          imageUrl: '',
+          inTricycles: typeVal !== 'INSUMO'
         });
         createdCount++;
       }

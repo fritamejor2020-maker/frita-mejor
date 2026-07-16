@@ -43,7 +43,7 @@ export const AdminPricesTab = () => {
 
   // Products SHOWN in the Precios Maestros list = any item that is marked inTricycles === true
   const products = inventory.filter(
-    (i: any) => (i.type === 'PRODUCTO' || i.type === 'FRITO') && i.inTricycles === true
+    (i: any) => (i.type === 'PRODUCTO' || i.type === 'FRITO') && i.inTricycles !== false
   );
 
   // ALL inventory items NOT already in the priced list (any type)

@@ -333,7 +333,7 @@ export function OlaClickConfigPanel() {
                           className="bg-white border border-gray-200 rounded-xl px-3 py-2 text-xs font-bold text-gray-700 outline-none focus:border-purple-500 w-full max-w-xs"
                         >
                           <option value="">-- Autodetección por Nombre --</option>
-                          {(inventory || []).filter(i => i.inTricycles === true).map(posProd => (
+                          {(inventory || []).filter(i => i.inTricycles !== false).map(posProd => (
                             <option key={posProd.id} value={posProd.id}>
                               {posProd.name} (${posProd.price?.toLocaleString('es-CO')})
                             </option>

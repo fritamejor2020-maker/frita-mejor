@@ -492,7 +492,7 @@ export const useInventoryStore = create(
        */
       getPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false
         ),
 
       /**
@@ -502,7 +502,7 @@ export const useInventoryStore = create(
        */
       getDeliveryItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true && !i.showInTricicloPos
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false && !i.showInTricicloPos
         ),
 
       /**
@@ -512,7 +512,7 @@ export const useInventoryStore = create(
        */
       getVendedorPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles === true && i.showInPos !== false
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false && i.showInPos !== false
         ),
 
 
