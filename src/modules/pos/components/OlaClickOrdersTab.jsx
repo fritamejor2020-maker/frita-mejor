@@ -53,9 +53,17 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     async function fetchOrders() {
       try {
         setLoading(true);
+        const merchantId = posSettings?.olaclickMerchantId || '';
+        if (!merchantId) {
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
+
         const { data, error } = await supabase
           .from('olaclick_orders')
           .select('*')
+          .eq('store_id', merchantId)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
@@ -69,10 +77,12 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     }
 
     fetchOrders();
-  }, []);
+  }, [posSettings?.olaclickMerchantId]);
 
   // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)
   useEffect(() => {
+    const merchantId = posSettings?.olaclickMerchantId || '';
+    
     const channel = supabase
       .channel('olaclick_realtime')
       .on(
@@ -81,6 +91,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         (payload) => {
           const { eventType, new: newRecord, old: oldRecord } = payload;
           console.log('[OlaClickTab] Realtime update:', eventType, newRecord);
+
+          // Si es un evento de creación o actualización, validar comercio/sede
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord && newRecord.store_id !== merchantId) {
+            return;
+          }
 
           setOrders((prev) => {
             if (eventType === 'INSERT') {
@@ -114,7 +129,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled]);
+  }, [soundEnabled, posSettings?.olaclickMerchantId]);
 
   // 3. Aceptar e importar pedido a Ventas en Espera
   const handleAcceptOrder = async (order) => {

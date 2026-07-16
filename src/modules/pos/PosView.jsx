@@ -227,10 +227,16 @@ export function PosView() {
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const loadPendingCount = async () => {
     try {
+      const merchantId = posSettings?.olaclickMerchantId || '';
+      if (!merchantId) {
+        setPendingOrdersCount(0);
+        return;
+      }
       const { data, count, error } = await supabase
         .from('olaclick_orders')
         .select('id', { count: 'exact' })
-        .eq('status', 'PENDING');
+        .eq('status', 'PENDING')
+        .eq('store_id', merchantId);
       
       if (!error) {
         setPendingOrdersCount(count ?? (data ? data.length : 0));
@@ -257,7 +263,7 @@ export function PosView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [posSettings?.olaclickMerchantId]);
 
   // Reset check when register changes
   useEffect(() => {
