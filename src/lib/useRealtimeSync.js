@@ -62,6 +62,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['payrollRecords']    = (v) => usePayrollStore.setState({ payrollRecords: v });
   applicators['branches']          = (v) => useBranchStore.getState().loadFromRemote(v);
   applicators['vendorLocations']   = (v) => useInventoryStore.setState({ vendorLocations: v });
+  applicators['posRegisters']      = (v) => useInventoryStore.setState({ posRegisters: v });
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
 
@@ -75,7 +76,6 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   for (const bid of effectiveBranches) {
     // ── POS ──
     applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: v });
-    applicators[`posRegisters_${bid}`]     = (v) => useInventoryStore.setState({ posRegisters: v });
     applicators[`posShifts_${bid}`]        = (v) => {
       const state = useInventoryStore.getState();
       const deleted = new Set(state.deletedShiftIds || []);

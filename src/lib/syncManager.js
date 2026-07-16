@@ -23,7 +23,7 @@ export const GLOBAL_KEYS = [
   // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories',
   // Administración global del sistema
-  'users', 'branches', 'suppliers',
+  'users', 'branches', 'suppliers', 'posRegisters',
   // Traslados (son cross-sede por diseño)
   'transfers',
 ];
@@ -36,7 +36,7 @@ export const BRANCH_KEYS = [
   // Inventario y bodega
   'inventory', 'movements', 'warehouses',
   // POS
-  'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
+  'posShifts', 'posSales', 'posExpenses', 'posSettings',
   'contrataPayments', 'deletedShiftIds',
   // Logística (Dejador / Vendedor) — por sede
   'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
