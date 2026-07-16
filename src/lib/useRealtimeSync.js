@@ -89,7 +89,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(state.posSales || [], v || [], 'posSales');
       useInventoryStore.setState({ posSales: merged });
     };
-    applicators[`posExpenses_${bid}`]      = (v) => useInventoryStore.setState({ posExpenses: v });
+    applicators[`posExpenses_${bid}`]      = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.posExpenses || [], v || [], 'posExpenses');
+      useInventoryStore.setState({ posExpenses: merged });
+    };
     applicators[`inventory_${bid}`]        = (v) => {
       const state = useInventoryStore.getState();
       const deletedInv = new Set(state.deletedInventoryIds || []);
@@ -98,11 +102,20 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(localInv, remote, 'inventory');
       useInventoryStore.setState({ inventory: merged });
     };
-    applicators[`contrataPayments_${bid}`] = (v) => useInventoryStore.setState({ contrataPayments: v });
+    applicators[`contrataPayments_${bid}`] = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.contrataPayments || [], v || [], 'contrataPayments');
+      useInventoryStore.setState({ contrataPayments: merged });
+    };
     applicators[`deletedShiftIds_${bid}`]  = (v) => {
       // MERGE: no perder tombstones locales al recibir los de otra sede
       const local = useInventoryStore.getState().deletedShiftIds || [];
       useInventoryStore.setState({ deletedShiftIds: [...new Set([...local, ...(v || [])])] });
+    };
+    applicators[`deletedInventoryIds_${bid}`] = (v) => {
+      // MERGE: no perder tombstones locales al recibir los de otra sede
+      const local = useInventoryStore.getState().deletedInventoryIds || [];
+      useInventoryStore.setState({ deletedInventoryIds: [...new Set([...local, ...(v || [])])] });
     };
 
     // ── Logística (Dejador / Vendedor) ──
