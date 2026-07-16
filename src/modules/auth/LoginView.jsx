@@ -53,18 +53,11 @@ export function LoginView() {
   const activeBranches = allBranches.filter(b => b.active !== false);
   const options = [...activeBranches, GLOBAL_OPTION];
 
-  // Sede seleccionada por defecto: la primera activa
-  const [selectedBranch, setSelectedBranch] = useState(options[0] || GLOBAL_OPTION);
+  // Sede seleccionada por defecto: Acceso Global
+  const [selectedBranch, setSelectedBranch] = useState(GLOBAL_OPTION);
   const [password, setPassword]             = useState('');
   const [loading,  setLoading]              = useState(false);
   const [open,     setOpen]                 = useState(false);   // dropdown abierto
-
-  // Si las sedes cargan después, actualizar selección
-  useEffect(() => {
-    if (activeBranches.length > 0 && selectedBranch?.id === '__global__') {
-      setSelectedBranch(activeBranches[0]);
-    }
-  }, [activeBranches.length]);
 
   useEffect(() => { clearError?.(); }, []);
 
