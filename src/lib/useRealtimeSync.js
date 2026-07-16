@@ -131,15 +131,37 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
 
     // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
-    applicators[`vehicles_${bid}`]          = (v) => useVehicleStore.setState({ vehicles: v });
-    applicators[`loadTemplates_${bid}`]     = (v) => useInventoryStore.setState({ loadTemplates: v });
+    applicators[`vehicles_${bid}`]          = (v) => {
+      const state = useVehicleStore.getState();
+      const merged = mergeArrays(state.vehicles || [], v || [], 'vehicles');
+      useVehicleStore.setState({ vehicles: merged });
+    };
+    applicators[`loadTemplates_${bid}`]     = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.loadTemplates || [], v || [], 'loadTemplates');
+      useInventoryStore.setState({ loadTemplates: merged });
+    };
     applicators[`vendorLocations_${bid}`]   = (v) => useInventoryStore.setState({ vendorLocations: v });
-    applicators[`customers_${bid}`]         = (v) => useInventoryStore.setState({ customers: v });
-    applicators[`customerTypes_${bid}`]     = (v) => useInventoryStore.setState({ customerTypes: v });
-    applicators[`payrollEmployees_${bid}`]  = (v) => usePayrollStore.setState({ payrollEmployees: v });
-    applicators[`payrollRecords_${bid}`]    = (v) => usePayrollStore.setState({ payrollRecords: v });
-    applicators[`movements_${bid}`]         = (v) => useInventoryStore.setState({ movements: v });
-    applicators[`warehouses_${bid}`]        = (v) => useInventoryStore.setState({ warehouses: v });
+    applicators[`payrollEmployees_${bid}`]  = (v) => {
+      const state = usePayrollStore.getState();
+      const merged = mergeArrays(state.payrollEmployees || [], v || [], 'payrollEmployees');
+      usePayrollStore.setState({ payrollEmployees: merged });
+    };
+    applicators[`payrollRecords_${bid}`]    = (v) => {
+      const state = usePayrollStore.getState();
+      const merged = mergeArrays(state.payrollRecords || [], v || [], 'payrollRecords');
+      usePayrollStore.setState({ payrollRecords: merged });
+    };
+    applicators[`movements_${bid}`]         = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.movements || [], v || [], 'movements');
+      useInventoryStore.setState({ movements: merged });
+    };
+    applicators[`warehouses_${bid}`]        = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.warehouses || [], v || [], 'warehouses');
+      useInventoryStore.setState({ warehouses: merged });
+    };
     applicators[`vendorTransfers_${bid}`]   = (v) => useVendorTransferStore.getState().loadFromRemote(v);
 
     // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
