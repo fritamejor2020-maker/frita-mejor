@@ -18,18 +18,22 @@ import { BarChart3, Map, DollarSign, Settings, LogOut } from 'lucide-react';
 
 export const ManagerDashboard = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, activeBranchId, setActiveBranchId } = useAuthStore() as any;
   const allBranches = useBranchStore((s: any) => s.branches);
   const posShifts = useInventoryStore((s: any) => s.posShifts) || [];
+
+  const isAdmin = user?.role === 'ADMIN';
 
   // Sedes permitidas para este gerente
   const allowedBranches: string[] = (user as any)?.allowedBranches || [];
   const userBranchId: string | null = (user as any)?.branchId || null;
   
-  // Las sedes que puede ver: allowedBranches si tiene, sino su branchId
-  const effectiveBranches = allowedBranches.length > 0
-    ? allowedBranches
-    : userBranchId ? [userBranchId] : [];
+  // Las sedes que puede ver: Admin ve todas; gerente ve las permitidas o la asignada
+  const effectiveBranches = isAdmin
+    ? allBranches.filter((b: any) => b.active !== false).map((b: any) => b.id)
+    : (allowedBranches.length > 0
+        ? allowedBranches
+        : userBranchId ? [userBranchId] : []);
 
   const branchOptions = allBranches.filter((b: any) =>
     b.active !== false && effectiveBranches.includes(b.id)
@@ -37,16 +41,26 @@ export const ManagerDashboard = () => {
 
   // Sede seleccionada actualmente
   const [selectedBranch, setSelectedBranch] = useState<string>(
-    effectiveBranches[0] || ''
+    isAdmin && activeBranchId ? activeBranchId : (effectiveBranches[0] || '')
   );
 
-  // Forzar el branchId del dashboard global al de la sede seleccionada
+  // Sincronizar el branch de visualización y el de Zustand cuando cambia la selección
   const setBranchId = useDashboardFilters((s) => s.setBranchId);
   useEffect(() => {
     if (selectedBranch) {
       setBranchId(selectedBranch);
+      if (isAdmin) {
+        setActiveBranchId(selectedBranch);
+      }
     }
-  }, [selectedBranch, setBranchId]);
+  }, [selectedBranch, setBranchId, isAdmin, setActiveBranchId]);
+
+  // Si el activeBranchId cambia externamente, actualizar el select interno del dashboard
+  useEffect(() => {
+    if (isAdmin && activeBranchId && activeBranchId !== selectedBranch) {
+      setSelectedBranch(activeBranchId);
+    }
+  }, [activeBranchId, isAdmin]);
 
   // Permisos del gerente (configurados por el Admin)
   const permissions: string[] = (user as any)?.permissions || [];
