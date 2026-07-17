@@ -557,11 +557,38 @@ const parseCSV = (text) => {
   return result;
 };
 
-function InventoryPanel() {
+export function InventoryPanel({ branchId }) {
   const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory, setInventory } = useInventoryStore();
+  
+  // Filtrar bodegas de esta sede
+  const activeWhs = warehouses.filter(w => !branchId || w.branchId === branchId);
+  const activeWhsIds = activeWhs.map(w => w.id);
+
   const [editingId, setEditingId] = useState(null);
   const [showAdd,   setShowAdd]   = useState(false);
-  const [form,      setForm]      = useState({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 });
+  const [form,      setForm]      = useState({ 
+    name: '', 
+    qty: 0, 
+    unit: 'kg', 
+    tipo: 'INSUMO', 
+    estado: 'N/A', 
+    alert: 5, 
+    warehouseId: activeWhs[0]?.id || '', 
+    barcode: '', 
+    price: 0, 
+    posCategoryId: '', 
+    imageUrl: '', 
+    variablePrice: false, 
+    referencePrice: 0 
+  });
+
+  // Auto-ajustar warehouseId seleccionado si cambia el branchId
+  useEffect(() => {
+    if (activeWhs.length > 0 && !activeWhsIds.includes(form.warehouseId)) {
+      setForm(f => ({ ...f, warehouseId: activeWhs[0].id }));
+    }
+  }, [branchId, warehouses]);
+
   const [filterWh,  setFilterWh]  = useState('ALL');
   const [filterType, setFilterType] = useState('ALL');
   const [filterStock, setFilterStock] = useState('ALL');
@@ -689,7 +716,7 @@ function InventoryPanel() {
           type: typeVal,
           estado,
           alert: 5,
-          warehouseId: 'BOD-001',
+          warehouseId: activeWhs[0]?.id || 'BOD-001',
           price,
           posCategoryId: catId,
           imageUrl: '',
@@ -770,7 +797,7 @@ function InventoryPanel() {
   const fields = [
     { key: 'name',        label: 'Nombre',          wide: true },
     { key: 'barcode',     label: 'Cód. de Barras',   wide: false },
-    { key: 'warehouseId', label: 'Bodega',   options: [{ value: '', label: 'General' }, ...warehouses.map((w) => ({ value: w.id, label: w.name }))] },
+    { key: 'warehouseId', label: 'Bodega',   options: activeWhs.map((w) => ({ value: w.id, label: w.name })) },
     { key: 'tipo',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO'] },
     { key: 'estado',      label: 'Estado',   options: ['N/A', 'CRUDO', 'FRITO'] },
     { key: 'qty',         label: 'Cantidad', type: 'number' },
@@ -806,6 +833,9 @@ function InventoryPanel() {
 
   // 1. Filtrar los productos
   let filtered = inventory || [];
+  if (branchId) {
+    filtered = filtered.filter(i => activeWhsIds.includes(i.warehouseId));
+  }
 
   // Filtro de Bodega
   if (filterWh !== 'ALL') {
@@ -889,7 +919,7 @@ function InventoryPanel() {
               onChange={handleFileUpload}
             />
           </label>
-          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: '', barcode: '', price: 0, posCategoryId: '', imageUrl: '' }); }}>
+          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: activeWhs[0]?.id || '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 }); }}>
             + Agregar ítem
           </Button>
         </div>
@@ -918,7 +948,7 @@ function InventoryPanel() {
               onChange={(e) => setFilterWh(e.target.value)}
             >
               <option value="ALL">📍 Todas las Bodegas</option>
-              {warehouses.map((w) => <option key={w.id} value={w.id}>📦 {w.name}</option>)}
+              {activeWhs.map((w) => <option key={w.id} value={w.id}>📦 {w.name}</option>)}
             </select>
           </div>
 

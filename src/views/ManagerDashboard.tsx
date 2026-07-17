@@ -12,6 +12,7 @@ import { AdminPricesTab } from '../components/admin/AdminPricesTab';
 import { AdminUsersTab } from '../components/admin/AdminUsersTab';
 import { AdminContratasTab } from '../components/admin/AdminContratasTab';
 import { GlobalSettingsPanel } from '../components/admin/GlobalSettingsPanel';
+import { InventoryPanel } from '../modules/admin/AdminView';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ManagerDashboard — Módulo dedicado para Gerentes de Sede
@@ -215,7 +216,7 @@ export const ManagerDashboard = () => {
                   {activePanel === 'users' && <AdminUsersTab />}
                   {activePanel === 'contratas' && <AdminContratasTab />}
                   {activePanel === 'settings' && <GlobalSettingsPanel />}
-                  {activePanel === 'inventory' && <ManagerInventoryPanel branchId={selectedBranch} />}
+                  {activePanel === 'inventory' && <InventoryPanel branchId={selectedBranch} />}
                   {activePanel === 'close_shifts' && <ManagerShiftsPanel branchId={selectedBranch} />}
                 </div>
               </div>
@@ -298,76 +299,7 @@ export const ManagerDashboard = () => {
   );
 };
 
-function ManagerInventoryPanel({ branchId }: { branchId: string }) {
-  const { inventory = [], updateInventoryItem } = useInventoryStore() as any;
-  const [search, setSearch] = useState('');
 
-  // Filter items that belong to the active branch's warehouses (or match by prefix)
-  const filteredItems = inventory.filter((item: any) => {
-    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-    const matchesType = ['PRODUCTO', 'FRITO', 'BEBIDA', 'CRUDO', 'INSUMO'].includes(item.type);
-    return matchesSearch && matchesType;
-  });
-
-  const handleAdjust = (id: string, currentQty: number) => {
-    const val = prompt(`Ingresa la nueva cantidad para este artículo (actual: ${currentQty}):`, String(currentQty));
-    if (val === null) return;
-    const newQty = parseFloat(val);
-    if (isNaN(newQty) || newQty < 0) {
-      alert("Por favor ingresa una cantidad válida mayor o igual a 0");
-      return;
-    }
-    updateInventoryItem(id, { qty: newQty });
-  };
-
-  return (
-    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 max-w-4xl mx-auto animate-[scaleIn_0.2s_ease-out]">
-      <h3 className="text-lg font-black text-gray-900 mb-2">📦 Ajuste Manual de Inventario</h3>
-      <p className="text-xs text-gray-400 font-bold mb-4">Modifica las existencias físicas de los artículos de tu sede.</p>
-      
-      <input
-        type="text"
-        placeholder="Buscar por nombre..."
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-        className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 outline-none mb-4"
-      />
-
-      <div className="overflow-x-auto">
-        <table className="w-full text-left border-collapse">
-          <thead>
-            <tr className="border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
-              <th className="pb-3">Nombre</th>
-              <th className="pb-3">Tipo</th>
-              <th className="pb-3 text-center">Stock Actual</th>
-              <th className="pb-3 text-right">Acción</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {filteredItems.map((item: any) => (
-              <tr key={item.id} className="text-sm font-bold text-gray-700">
-                <td className="py-3.5 pr-3">{item.name}</td>
-                <td className="py-3.5"><span className="text-[10px] bg-gray-100 text-gray-500 py-0.5 px-2 rounded font-black">{item.type}</span></td>
-                <td className="py-3.5 text-center font-black text-gray-900">{item.qty} {item.unit}</td>
-                <td className="py-3.5 text-right">
-                  <button
-                    onClick={() => handleAdjust(item.id, item.qty)}
-                    className="text-xs bg-violet-50 text-violet-600 border border-violet-100 rounded-full px-4 py-1.5 hover:bg-violet-500 hover:text-white transition-colors"
-                  >
-                    ✏️ Ajustar
-                  </button>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {filteredItems.length === 0 && (
-          <div className="text-center py-8 text-gray-400 text-xs font-bold">No se encontraron artículos</div>
-        )}
-      </div>
-    </div>
-  );
-}
 
 function ManagerShiftsPanel({ branchId }: { branchId: string }) {
   const { posShifts = [], updatePosShift } = useInventoryStore() as any;
