@@ -8,6 +8,10 @@ import { DashboardView } from '../modules/dashboard/DashboardView';
 import { MapTrackingView } from './MapTrackingView';
 import { AdminFinancesTab } from '../components/admin/AdminFinancesTab';
 import { BarChart3, Map, DollarSign, Settings, LogOut } from 'lucide-react';
+import { AdminPricesTab } from '../components/admin/AdminPricesTab';
+import { AdminUsersTab } from '../components/admin/AdminUsersTab';
+import { AdminContratasTab } from '../components/admin/AdminContratasTab';
+import { GlobalSettingsPanel } from '../components/admin/GlobalSettingsPanel';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ManagerDashboard — Módulo dedicado para Gerentes de Sede
@@ -68,6 +72,12 @@ export const ManagerDashboard = () => {
 
   // Tabs
   const [activeTab, setActiveTab] = useState<'dashboard' | 'map' | 'finance' | 'config'>('dashboard');
+  const [activePanel, setActivePanel] = useState<string | null>(null);
+
+  // Reset active sub-panel when tab changes
+  useEffect(() => {
+    setActivePanel(null);
+  }, [activeTab]);
 
   const selectedBranchName = branchOptions.find((b: any) => b.id === selectedBranch)?.name || 'Mi Sede';
 
@@ -191,74 +201,208 @@ export const ManagerDashboard = () => {
 
         {/* TAB: Configuración */}
         {activeTab === 'config' && (
-          <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+          <div className="max-w-7xl mx-auto px-4 py-6">
+            {activePanel ? (
+              <div className="w-full">
+                <button
+                  onClick={() => setActivePanel(null)}
+                  className="flex items-center gap-1.5 bg-violet-50 border border-violet-100 text-violet-600 font-bold text-xs px-4 py-2.5 rounded-full hover:bg-violet-500 hover:text-white transition-all active:scale-95 mb-6 animate-[scaleIn_0.15s_ease-out]"
+                >
+                  ← Volver a Configuración de Sede
+                </button>
+                <div className="animate-[scaleIn_0.2s_ease-out]">
+                  {activePanel === 'prices' && <AdminPricesTab />}
+                  {activePanel === 'users' && <AdminUsersTab />}
+                  {activePanel === 'contratas' && <AdminContratasTab />}
+                  {activePanel === 'settings' && <GlobalSettingsPanel />}
+                  {activePanel === 'inventory' && <ManagerInventoryPanel branchId={selectedBranch} />}
+                  {activePanel === 'close_shifts' && <ManagerShiftsPanel branchId={selectedBranch} />}
+                </div>
+              </div>
+            ) : (
+              <div className="max-w-2xl mx-auto space-y-4">
+                <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                  <h2 className="text-lg font-black text-gray-900 mb-1">⚙️ Configuración de Sede</h2>
+                  <p className="text-xs font-bold text-gray-400 mb-5">
+                    Funciones habilitadas por el Administrador (Haz clic en una función activa para usarla)
+                  </p>
 
-            <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
-              <h2 className="text-lg font-black text-gray-900 mb-1">⚙️ Configuración de Sede</h2>
-              <p className="text-xs font-bold text-gray-400 mb-5">
-                Funciones habilitadas por el Administrador
-              </p>
-
-              {/* Listar permisos disponibles */}
-              <div className="space-y-3">
-                {MANAGER_PERMISSIONS.map((perm) => {
-                  const enabled = hasPermission(perm.id);
-                  return (
-                    <div
-                      key={perm.id}
-                      className={`flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
-                        enabled
-                          ? 'border-violet-200 bg-violet-50 cursor-pointer hover:border-violet-300'
-                          : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
-                      }`}
-                      onClick={() => {
-                        if (!enabled) return;
-                        // Aquí navegaría a la sub-sección según el permiso
-                        // Por ahora solo feedback visual
-                      }}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
-                          enabled ? 'bg-violet-500 text-white' : 'bg-gray-200 text-gray-400'
-                        }`}>
-                          {perm.id === 'edit_prices' && '💲'}
-                          {perm.id === 'manage_users' && '👥'}
-                          {perm.id === 'view_all_finance' && '📊'}
-                          {perm.id === 'close_shifts' && '🔒'}
-                          {perm.id === 'edit_inventory' && '📦'}
-                          {perm.id === 'manage_customers' && '🤝'}
-                          {perm.id === 'edit_settings' && '⚙️'}
+                  {/* Listar permisos disponibles */}
+                  <div className="space-y-3">
+                    {MANAGER_PERMISSIONS.map((perm) => {
+                      const enabled = hasPermission(perm.id);
+                      return (
+                        <div
+                          key={perm.id}
+                          className={`flex items-center justify-between px-4 py-3.5 rounded-2xl border-2 transition-all ${
+                            enabled
+                              ? 'border-violet-200 bg-violet-50 cursor-pointer hover:border-violet-300 hover:scale-[1.01] active:scale-[0.99]'
+                              : 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                          }`}
+                          onClick={() => {
+                            if (!enabled) return;
+                            if (perm.id === 'edit_prices') setActivePanel('prices');
+                            if (perm.id === 'manage_users') setActivePanel('users');
+                            if (perm.id === 'view_all_finance') setActiveTab('finance');
+                            if (perm.id === 'close_shifts') setActivePanel('close_shifts');
+                            if (perm.id === 'edit_inventory') setActivePanel('inventory');
+                            if (perm.id === 'manage_customers') setActivePanel('contratas');
+                            if (perm.id === 'edit_settings') setActivePanel('settings');
+                          }}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm ${
+                              enabled ? 'bg-violet-500 text-white' : 'bg-gray-200 text-gray-400'
+                            }`}>
+                              {perm.id === 'edit_prices' && '💲'}
+                              {perm.id === 'manage_users' && '👥'}
+                              {perm.id === 'view_all_finance' && '📊'}
+                              {perm.id === 'close_shifts' && '🔒'}
+                              {perm.id === 'edit_inventory' && '📦'}
+                              {perm.id === 'manage_customers' && '🤝'}
+                              {perm.id === 'edit_settings' && '⚙️'}
+                            </div>
+                            <span className={`text-sm font-bold ${enabled ? 'text-violet-800' : 'text-gray-400'}`}>
+                              {perm.label}
+                            </span>
+                          </div>
+                          <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
+                            enabled
+                              ? 'bg-green-100 text-green-600'
+                              : 'bg-gray-100 text-gray-400'
+                          }`}>
+                            {enabled ? '✓ Activo' : 'Bloqueado'}
+                          </span>
                         </div>
-                        <span className={`text-sm font-bold ${enabled ? 'text-violet-800' : 'text-gray-400'}`}>
-                          {perm.label}
-                        </span>
-                      </div>
-                      <span className={`text-xs font-black px-2.5 py-1 rounded-full ${
-                        enabled
-                          ? 'bg-green-100 text-green-600'
-                          : 'bg-gray-100 text-gray-400'
-                      }`}>
-                        {enabled ? '✓ Activo' : 'Bloqueado'}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* Info */}
-            <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 flex gap-3">
-              <span className="text-2xl flex-shrink-0">💡</span>
-              <div>
-                <p className="font-black text-violet-800 text-sm">¿Necesitas más acceso?</p>
-                <p className="text-xs text-violet-600 font-medium mt-1">
-                  Contacta al Administrador Principal para que habilite las funciones que necesitas.
-                </p>
+                {/* Info */}
+                <div className="bg-violet-50 border border-violet-100 rounded-2xl p-4 flex gap-3">
+                  <span className="text-2xl flex-shrink-0">💡</span>
+                  <div>
+                    <p className="font-black text-violet-800 text-sm">¿Necesitas más acceso?</p>
+                    <p className="text-xs text-violet-600 font-medium mt-1">
+                      Contacta al Administrador Principal para que habilite las funciones que necesitas.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
       </div>
     </div>
   );
 };
+
+function ManagerInventoryPanel({ branchId }: { branchId: string }) {
+  const { inventory = [], updateInventoryItem } = useInventoryStore() as any;
+  const [search, setSearch] = useState('');
+
+  // Filter items that belong to the active branch's warehouses (or match by prefix)
+  const filteredItems = inventory.filter((item: any) => {
+    const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
+    const matchesType = ['PRODUCTO', 'FRITO', 'BEBIDA', 'CRUDO', 'INSUMO'].includes(item.type);
+    return matchesSearch && matchesType;
+  });
+
+  const handleAdjust = (id: string, currentQty: number) => {
+    const val = prompt(`Ingresa la nueva cantidad para este artículo (actual: ${currentQty}):`, String(currentQty));
+    if (val === null) return;
+    const newQty = parseFloat(val);
+    if (isNaN(newQty) || newQty < 0) {
+      alert("Por favor ingresa una cantidad válida mayor o igual a 0");
+      return;
+    }
+    updateInventoryItem(id, { qty: newQty });
+  };
+
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 max-w-4xl mx-auto animate-[scaleIn_0.2s_ease-out]">
+      <h3 className="text-lg font-black text-gray-900 mb-2">📦 Ajuste Manual de Inventario</h3>
+      <p className="text-xs text-gray-400 font-bold mb-4">Modifica las existencias físicas de los artículos de tu sede.</p>
+      
+      <input
+        type="text"
+        placeholder="Buscar por nombre..."
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+        className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 outline-none mb-4"
+      />
+
+      <div className="overflow-x-auto">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+              <th className="pb-3">Nombre</th>
+              <th className="pb-3">Tipo</th>
+              <th className="pb-3 text-center">Stock Actual</th>
+              <th className="pb-3 text-right">Acción</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {filteredItems.map((item: any) => (
+              <tr key={item.id} className="text-sm font-bold text-gray-700">
+                <td className="py-3.5 pr-3">{item.name}</td>
+                <td className="py-3.5"><span className="text-[10px] bg-gray-100 text-gray-500 py-0.5 px-2 rounded font-black">{item.type}</span></td>
+                <td className="py-3.5 text-center font-black text-gray-900">{item.qty} {item.unit}</td>
+                <td className="py-3.5 text-right">
+                  <button
+                    onClick={() => handleAdjust(item.id, item.qty)}
+                    className="text-xs bg-violet-50 text-violet-600 border border-violet-100 rounded-full px-4 py-1.5 hover:bg-violet-500 hover:text-white transition-colors"
+                  >
+                    ✏️ Ajustar
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {filteredItems.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-xs font-bold">No se encontraron artículos</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ManagerShiftsPanel({ branchId }: { branchId: string }) {
+  const { posShifts = [], updatePosShift } = useInventoryStore() as any;
+  const activeShifts = posShifts.filter((s: any) => !s.closedAt && s.branchId === branchId);
+
+  const handleForceClose = (id: string, cashierName: string) => {
+    if (!confirm(`¿Estás seguro de que deseas forzar el cierre del turno de ${cashierName}?`)) return;
+    updatePosShift(id, { closedAt: new Date().toISOString() });
+  };
+
+  return (
+    <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 max-w-xl mx-auto animate-[scaleIn_0.2s_ease-out]">
+      <h3 className="text-lg font-black text-gray-900 mb-2">🔒 Turnos Abiertos de Caja</h3>
+      <p className="text-xs text-gray-400 font-bold mb-4">Fuerza el cierre de turnos abiertos de otros cajeros en esta sede.</p>
+
+      <div className="space-y-3">
+        {activeShifts.map((s: any) => (
+          <div key={s.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-gray-100">
+            <div>
+              <h4 className="font-black text-gray-800 text-sm">{s.userName || 'Cajero'}</h4>
+              <p className="text-xs text-gray-400 font-bold mt-0.5">Caja: {s.registerName || s.registerId}</p>
+              <p className="text-[10px] text-violet-500 font-black mt-1 uppercase tracking-wider">Inició: {new Date(s.openedAt).toLocaleString()}</p>
+            </div>
+            <button
+              onClick={() => handleForceClose(s.id, s.userName)}
+              className="text-xs bg-red-50 text-red-500 border border-red-100 rounded-full px-4 py-2 hover:bg-red-500 hover:text-white transition-colors font-black"
+            >
+              🔴 Forzar Cierre
+            </button>
+          </div>
+        ))}
+        {activeShifts.length === 0 && (
+          <div className="text-center py-8 text-gray-400 text-xs font-bold">No hay turnos abiertos en esta sede</div>
+        )}
+      </div>
+    </div>
+  );
+}
