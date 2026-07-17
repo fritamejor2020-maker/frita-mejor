@@ -148,12 +148,22 @@ export const useAuthStore = create(
     (set, get) => ({
       // ─── Estado ─────────────────────────────────────────────────
       user:    null, // usuario autenticado actual
+      activeBranchId: null, // Sede activa actual (para operación)
       loading: false,
       error:   null,
       users:   DEFAULT_USERS, // todos los usuarios del sistema
 
+      getActiveBranchId: () => {
+        const s = get();
+        return s.activeBranchId || s.user?.branchId || 'BRANCH-001';
+      },
+
+      setActiveBranchId: (branchId) => {
+        set({ activeBranchId: branchId });
+      },
+
       // ─── Login solo por contraseña ────────────────────────────────
-      signIn: (password) => {
+      signIn: (password, selectedBranchId = null) => {
         set({ loading: true, error: null });
 
         const users = get().users;
@@ -169,14 +179,15 @@ export const useAuthStore = create(
           return { ok: false };
         }
 
-        set({ user: found, loading: false, error: null });
+        const activeBranchId = found.branchId || selectedBranchId || 'BRANCH-001';
+        set({ user: found, activeBranchId, loading: false, error: null });
         return { ok: true, user: found };
       },
 
 
       // ─── Cerrar sesión ───────────────────────────────────────────
       signOut: () => {
-        set({ user: null, error: null });
+        set({ user: null, activeBranchId: null, error: null });
       },
 
       // ─── Limpiar error ───────────────────────────────────────────

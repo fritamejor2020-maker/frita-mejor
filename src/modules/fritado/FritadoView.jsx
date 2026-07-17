@@ -16,8 +16,8 @@ function useScreenSize() {
 // ─── Selección de Punto ────────────────────────────────────────────────────────
 function SelectFryKitchen({ onSelect, signOut }) {
   const { fryKitchens = [] } = useInventoryStore();
-  const { user } = useAuthStore();
-  const userBranchId = user?.branchId ?? null;
+  const { user, getActiveBranchId } = useAuthStore();
+  const userBranchId = getActiveBranchId();
 
   // Admin ve todas; usuario de sede ve solo las de su sede (o sin sede asignada)
   const active = fryKitchens.filter((p) => {

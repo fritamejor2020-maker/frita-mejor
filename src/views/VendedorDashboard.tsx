@@ -14,6 +14,7 @@ import { Navigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { useVendorTracking } from '../lib/useVendorTracking';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
+import { usePayrollStore } from '../store/usePayrollStore';
 import { supabase } from '../lib/supabase';
 
 export const VendedorDashboard = () => {
@@ -21,7 +22,8 @@ export const VendedorDashboard = () => {
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
-  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts } = useInventoryStore();
+  const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts, salesGoals = [] } = useInventoryStore();
+  const { payrollEmployees = [] } = usePayrollStore();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const { transfers: allVendorTransfers, addTransfer: addVendorTransfer, deleteTransfer: deleteVendorTransfer, updateTransfer: updateVendorTransfer, getShiftTransfers, getShiftTransferTotal } = useVendorTransferStore();
   
@@ -401,6 +403,34 @@ export const VendedorDashboard = () => {
     const difference = theorySalesVal - realTotal;
     const status = difference === 0 ? 'CUADRADO' : difference > 0 ? 'FALTANTE' : 'SOBRANTE';
 
+    // Calculate goals and bonuses
+    const totalSales = cashVal + transferVal;
+    const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+    const dayOfWeek = new Date().getDay();
+
+    const activeGoal = salesGoals.find((g: any) => 
+      g.branchId === activeBranchId && 
+      g.targetType === 'VEHICLE' && 
+      g.targetId === pointId && 
+      g.shift === shift &&
+      g.daysOfWeek.includes(dayOfWeek)
+    );
+
+    const goalMet = activeGoal && totalSales >= activeGoal.minAmount;
+    const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
+    const totalBonus = goalMet ? (excess * (activeGoal.bonusPercent / 100)) : 0;
+
+    const bonusRecipients = [];
+    if (goalMet) {
+      const currentEmp = payrollEmployees.find((e: any) => e.name === responsibleName);
+      bonusRecipients.push({
+        employeeId: currentEmp?.id || 'TEMP-' + Date.now(),
+        name: responsibleName || 'Vendedor',
+        documentId: currentEmp?.documentId || '',
+        bonusAmount: Math.round(totalBonus)
+      });
+    }
+
     // Construir details[] vacío (sección de productos vendidos eliminada)
     const details: any[] = [];
 
@@ -425,6 +455,10 @@ export const VendedorDashboard = () => {
           type: 'VENDEDOR',
           soldItems,
           details,
+          earnedBonus: Math.round(totalBonus),
+          bonusGoalAmount: activeGoal?.minAmount || 0,
+          bonusPercent: activeGoal?.bonusPercent || 0,
+          bonusRecipients
       };
       // Buscar el turno abierto de este vehículo/jornada hoy.
       // Búsqueda amplia: mismo pointId + tipo VENDEDOR + sin cerrar + mismo día.
@@ -1354,6 +1388,21 @@ export const VendedorDashboard = () => {
           const realTotal = cashVal + transferVal + expensesVal;
           const diff = realTotal - logTheoretical;
 
+          const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+          const dayOfWeek = new Date().getDay();
+          const activeGoal = salesGoals.find((g: any) => 
+            g.branchId === activeBranchId && 
+            g.targetType === 'VEHICLE' && 
+            g.targetId === pointId && 
+            g.shift === shift &&
+            g.daysOfWeek.includes(dayOfWeek)
+          );
+
+          const totalSales = cashVal + transferVal;
+          const goalMet = activeGoal && totalSales >= activeGoal.minAmount;
+          const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
+          const totalBonus = goalMet ? (excess * (activeGoal.bonusPercent / 100)) : 0;
+
           return (
           <div className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
             
@@ -1366,6 +1415,31 @@ export const VendedorDashboard = () => {
               </div>
             </div>
 
+            {/* GOAL STATUS */}
+            {activeGoal && (
+              <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-sm space-y-3">
+                <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                  <span className="font-black text-gray-800 text-sm flex items-center gap-1.5">🎯 Meta de Turno: <span className="text-gray-500 font-bold">{activeGoal.targetId}</span></span>
+                  <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${goalMet ? 'bg-green-100 text-green-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {goalMet ? '¡META SUPERADA! 🥳' : 'Meta en curso'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 text-xs font-bold text-gray-500">
+                  <div>Ventas Totales: <span className="text-gray-900 block font-black text-base">{formatMoney(totalSales)}</span></div>
+                  <div>Meta Asignada: <span className="text-gray-900 block font-black text-base">{formatMoney(activeGoal.minAmount)}</span></div>
+                  {goalMet ? (
+                    <>
+                      <div>Excedente: <span className="text-green-600 block font-black text-base">+{formatMoney(excess)}</span></div>
+                      <div>Tu Bonificación ({activeGoal.bonusPercent}%): <span className="text-violet-600 block font-black text-base">{formatMoney(totalBonus)}</span></div>
+                    </>
+                  ) : (
+                    <div className="col-span-2 bg-amber-50 text-amber-800 p-3 rounded-xl text-center text-xs font-bold mt-1">
+                      ⚠️ Estás a <span className="font-black text-amber-950">{formatMoney(activeGoal.minAmount - totalSales)}</span> de alcanzar la meta y ganar bonificación.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* FORMULARIO FINANCIERO */}
 

@@ -26,27 +26,63 @@ export const usePayrollStore = create(
     (set, get) => ({
 
       // ── Lista de empleados fijos ──────────────────────────────────────────────
-      // [{ id: string, name: string }]
+      // [{ id: string, name: string, documentId: string, department: string, hourlyRate: number, baseSalary: number, biometricUserId: string, active: boolean, branchId: string }]
       payrollEmployees: [],
 
-      addEmployee: (name) => {
-        const trimmed = name.trim();
-        if (!trimmed) return;
-        const already = get().payrollEmployees.find(
-          e => e.name.toLowerCase() === trimmed.toLowerCase()
-        );
-        if (already) return;
-        const branchId = useAuthStore.getState().user?.branchId ?? null;
-        const updated = [
-          ...get().payrollEmployees,
-          { id: `EMP-${Date.now()}`, name: trimmed, branchId },
-        ];
+      addEmployee: (empData) => {
+        const nameTrimmed = typeof empData === 'string' ? empData.trim() : empData.name?.trim();
+        if (!nameTrimmed) return;
+        const branchId = typeof empData === 'string' 
+          ? (useAuthStore.getState().user?.branchId ?? null)
+          : (empData.branchId || useAuthStore.getState().user?.branchId || null);
+
+        const newEmp = typeof empData === 'string' 
+          ? {
+              id: `EMP-${Date.now()}`,
+              name: nameTrimmed,
+              documentId: '',
+              department: 'Otros',
+              hourlyRate: 0,
+              baseSalary: 0,
+              biometricUserId: '',
+              active: true,
+              branchId
+            }
+          : {
+              id: `EMP-${Date.now()}`,
+              name: nameTrimmed,
+              documentId: empData.documentId?.trim() || '',
+              department: empData.department || 'Otros',
+              hourlyRate: Number(empData.hourlyRate) || 0,
+              baseSalary: Number(empData.baseSalary) || 0,
+              biometricUserId: empData.biometricUserId?.trim() || '',
+              active: empData.active !== false,
+              branchId
+            };
+
+        const updated = [...(get().payrollEmployees || []), newEmp];
+        set({ payrollEmployees: updated });
+        syncKey('payrollEmployees', updated);
+      },
+
+      updateEmployee: (id, updates) => {
+        const updated = (get().payrollEmployees || []).map(e => {
+          if (e.id !== id) return e;
+          return {
+            ...e,
+            ...updates,
+            name: updates.name ? updates.name.trim() : e.name,
+            documentId: updates.documentId !== undefined ? updates.documentId.trim() : e.documentId,
+            hourlyRate: updates.hourlyRate !== undefined ? Number(updates.hourlyRate) : e.hourlyRate,
+            baseSalary: updates.baseSalary !== undefined ? Number(updates.baseSalary) : e.baseSalary,
+          };
+        });
         set({ payrollEmployees: updated });
         syncKey('payrollEmployees', updated);
       },
 
       removeEmployee: (id) => {
-        const updated = get().payrollEmployees.filter(e => e.id !== id);
+        const updated = (get().payrollEmployees || []).filter(e => e.id !== id);
         set({ payrollEmployees: updated });
         syncKey('payrollEmployees', updated);
       },
@@ -54,11 +90,7 @@ export const usePayrollStore = create(
       renameEmployee: (id, newName) => {
         const trimmed = newName.trim();
         if (!trimmed) return;
-        const updated = get().payrollEmployees.map(e =>
-          e.id === id ? { ...e, name: trimmed } : e
-        );
-        set({ payrollEmployees: updated });
-        syncKey('payrollEmployees', updated);
+        get().updateEmployee(id, { name: trimmed });
       },
 
       // ── Registros de nómina ───────────────────────────────────────────────────

@@ -10,9 +10,8 @@ import { markLocalWrite } from '../lib/useRealtimeSync';
 // usa BRANCH-001 como fallback en lugar de escribir en la llave global.
 // Esto previene que el Admin contamine la partición global con datos de sede.
 function syncKey(key, value) {
-  const user = useAuthStore.getState().user;
-  const userBranchId = user?.branchId ?? null;
-  const effectiveBranchId = BRANCH_KEYS.includes(key) ? (userBranchId || 'BRANCH-001') : null;
+  const activeBranchId = useAuthStore.getState().getActiveBranchId();
+  const effectiveBranchId = BRANCH_KEYS.includes(key) ? activeBranchId : null;
   const resolvedKey = getBranchKey(key, effectiveBranchId);
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
@@ -272,6 +271,7 @@ export const useInventoryStore = create(
       posSettings:        INITIAL_POS_SETTINGS,
       posRegisters:       INITIAL_POS_REGISTERS,
       fritadoRecipes:     INITIAL_FRITADO_RECIPES,
+      salesGoals:         [],
       movements:          [],
       posShifts:          [],
       posSales:           [],
@@ -308,7 +308,7 @@ export const useInventoryStore = create(
 
           // Llaves globales — se aplican directamente al store
           const GLOBAL_STORE_KEYS = [
-            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'customers', 'customerTypes',
+            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'customers', 'customerTypes', 'salesGoals',
           ];
 
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
@@ -914,6 +914,11 @@ export const useInventoryStore = create(
       updatePosCategory: (id, data) => { set((s) => ({ posCategories: (s.posCategories || []).map((c) => c.id === id ? { ...c, ...data } : c) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
       deletePosCategory: (id) => { set((s) => ({ posCategories: (s.posCategories || []).filter((c) => c.id !== id) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
 
+      // Metas de Venta
+      addSalesGoal: (g) => { set((s) => ({ salesGoals: [...(s.salesGoals || []), { ...g, id: `GOAL-${Date.now()}` }] })); syncKey('salesGoals', useInventoryStore.getState().salesGoals); },
+      updateSalesGoal: (id, data) => { set((s) => ({ salesGoals: (s.salesGoals || []).map((g) => g.id === id ? { ...g, ...data } : g) })); syncKey('salesGoals', useInventoryStore.getState().salesGoals); },
+      deleteSalesGoal: (id) => { set((s) => ({ salesGoals: (s.salesGoals || []).filter((g) => g.id !== id) })); syncKey('salesGoals', useInventoryStore.getState().salesGoals); },
+
       // Clientes
       addCustomer: (c) => { set((s) => ({
         customers: [...(s.customers || []), { ...c, id: `CUST-${Date.now()}`, active: true, typeId: c.typeId || null }],
@@ -1231,6 +1236,7 @@ export const useInventoryStore = create(
         posSales:           state.posSales,
         posExpenses:        state.posExpenses,
         loadTemplates:      state.loadTemplates,
+        salesGoals:         state.salesGoals || [],
         deletedShiftIds:      state.deletedShiftIds || [],
         deletedInventoryIds:  state.deletedInventoryIds || [],
         vendorLocations:      state.vendorLocations  || {},

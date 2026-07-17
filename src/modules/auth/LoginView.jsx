@@ -73,7 +73,7 @@ export function LoginView() {
 
     clearError?.();
     setLoading(true);
-    const result = signIn(password);
+    const result = signIn(password, selectedBranch?.id === '__global__' ? 'BRANCH-001' : selectedBranch?.id);
     setLoading(false);
 
     if (!result.ok) return;

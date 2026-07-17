@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useAuthStore }      from '../../store/useAuthStore';
+import { useBranchStore }    from '../../store/useBranchStore';
 import { Button }            from '../../components/ui/Button';
 import { generateReceiptHTML } from './PosReceipt';
 import { generateZReportHTML }   from './ZReportReceipt';
@@ -24,7 +25,8 @@ export function PosView() {
   const [showContratasPanel, setShowContratasPanel] = useState(false);
   const [numPadTarget, setNumPadTarget] = useState(null); // { itemId, itemName, currentQty }
   const [printerAgentOk, setPrinterAgentOk] = useState(false);
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, activeBranchId, setActiveBranchId } = useAuthStore();
+  const { branches = [] } = useBranchStore();
   const { 
     inventory = [], 
     posCategories = [], 
@@ -46,14 +48,21 @@ export function PosView() {
   const [selectedRegisterId, setSelectedRegisterId] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(true); // Siempre mostrar al inicio
   // Filtrar cajas por sede:
-  // - Admin (branchId=null): ve TODAS las cajas
+  // - Admin (branchId=null): usa la sede activa seleccionada
   // - Usuario de sede: ve solo cajas asignadas a su sede (branchId coincide)
-  const userBranchId = user?.branchId ?? null;
+  const isGlobal = user?.role === 'ADMIN' || !user?.branchId;
+  const userBranchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
   const activeRegisters = (posRegisters || []).filter(r =>
     r.active !== false &&
-    (userBranchId === null || r.branchId === userBranchId)
+    (r.branchId === userBranchId)
   );
   const selectedRegister = activeRegisters.find(r => r.id === selectedRegisterId);
+
+  // Resetear la caja seleccionada si cambia la sede activa
+  useEffect(() => {
+    setSelectedRegisterId(null);
+    setShowRegisterModal(true);
+  }, [activeBranchId]);
 
   const handleSelectRegister = (regId) => {
     setSelectedRegisterId(regId);
@@ -437,20 +446,24 @@ export function PosView() {
     }
   };
 
-  const handleCloseShift = (realCount, isPostponed = false) => {
+  const handleCloseShift = (realCount, isPostponed = false, bonusData = null) => {
     if (!activeShift) return;
     isClosingLocalRef.current = true;
     const closedDate = new Date().toISOString();
+    const bonusFields = bonusData || {};
+    
     const closedShiftData = { 
       ...activeShift, 
       closedAt: closedDate, 
       realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
-      pendingCount: isPostponed ? true : false
+      pendingCount: isPostponed ? true : false,
+      ...bonusFields
     };
     updatePosShift(activeShift.id, {
       closedAt: closedDate,
       realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
-      pendingCount: isPostponed ? true : false
+      pendingCount: isPostponed ? true : false,
+      ...bonusFields
     });
     
     setShowClosingModal(false);
@@ -1022,6 +1035,23 @@ export function PosView() {
               </button>
 
               <div className="h-px bg-gray-800" />
+              {!user.branchId && (
+                <>
+                  <div className="px-4 py-2 flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Sede Activa</span>
+                    <select
+                      value={activeBranchId || 'BRANCH-001'}
+                      onChange={(e) => { setActiveBranchId(e.target.value); setShowHamburgerMenu(false); }}
+                      className="w-full bg-[#1e1f26] border border-purple-500/30 rounded-xl py-2 px-3 text-xs font-black text-purple-300 outline-none cursor-pointer hover:border-purple-500/50 transition-all"
+                    >
+                      {branches.map(b => (
+                        <option key={b.id} value={b.id}>{b.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="h-px bg-gray-800" />
+                </>
+              )}
               {activeRegisters.length > 1 && (
                 <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-purple-300 hover:bg-purple-950/40 transition-colors" onClick={() => { setShowRegisterModal(true); setShowHamburgerMenu(false); }}>
                   <span className="text-base">💻</span> Cambiar Caja
@@ -2636,12 +2666,88 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
                 </div>
              )}
            </div>
+
+           {/* Metas y Bonificaciones de Turno */}
+           {activeGoal && (
+             <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-4 shadow-inner">
+               <div className="flex justify-between items-center border-b border-gray-850 pb-2">
+                 <span className="font-black text-white text-base">🎯 Meta de Turno</span>
+                 <span className={`text-xs font-black px-2.5 py-1 rounded-full ${goalMet ? 'bg-green-500/20 text-green-400' : 'bg-amber-500/20 text-amber-400'}`}>
+                   {goalMet ? '¡META SUPERADA! 🎉' : 'Meta no alcanzada'}
+                 </span>
+               </div>
+               <div className="grid grid-cols-2 gap-3 text-xs text-gray-400 font-bold">
+                 <div>Ventas Totales: <span className="text-white block font-black text-sm">{formatMoney(totalSales)}</span></div>
+                 <div>Meta Asignada: <span className="text-white block font-black text-sm">{formatMoney(activeGoal.minAmount)}</span></div>
+                 {goalMet && (
+                   <>
+                     <div>Excedente Extra: <span className="text-green-400 block font-black text-sm">+{formatMoney(excess)}</span></div>
+                     <div>Bono del Turno ({activeGoal.bonusPercent}%): <span className="text-violet-400 block font-black text-sm">{formatMoney(totalBonus)}</span></div>
+                   </>
+                 )}
+               </div>
+
+               {/* Seleccionar Colaboradores si la meta se superó */}
+               {goalMet && activeBranchEmployees.length > 0 && (
+                 <div className="border-t border-gray-800 pt-3 space-y-2">
+                   <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Colaboradores en el Turno (Reparto de Bono)</label>
+                   <div className="grid grid-cols-2 gap-2 max-h-[140px] overflow-y-auto pr-1">
+                     {activeBranchEmployees.map(emp => {
+                       const checked = selectedEmployees.includes(emp.id);
+                       return (
+                         <button
+                           key={emp.id}
+                           type="button"
+                           onClick={() => toggleEmployee(emp.id)}
+                           className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-left transition-colors font-bold text-xs ${checked ? 'bg-violet-600/20 border-violet-500/50 text-white' : 'bg-[#0f1015] border-gray-800 text-gray-500'}`}
+                         >
+                           <span className={`w-3.5 h-3.5 rounded-md flex items-center justify-center text-[9px] border ${checked ? 'bg-violet-600 border-violet-500 text-white' : 'border-gray-700'}`}>
+                             {checked && '✓'}
+                           </span>
+                           <span className="truncate">{emp.name}</span>
+                         </button>
+                       );
+                     })}
+                   </div>
+                 </div>
+               )}
+             </div>
+           )}
         </div>
 
         <div className="p-6 bg-[#16171d] border-t border-gray-800 flex flex-col gap-3">
           <div className="flex gap-4">
             <Button variant="outline" className="flex-1 rounded-[20px] py-4 font-bold border-gray-700 text-gray-400 hover:bg-gray-800" onClick={onClose}>Cancelar</Button>
-            <Button className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" onClick={() => onConfirm(realCount, false)}>
+            <Button 
+              className="flex-[2] rounded-[20px] py-4 font-black text-lg bg-red-600 text-white shadow-[0_4px_14px_0_rgba(220,38,38,0.39)] hover:scale-105 active:scale-95 hover:bg-red-500 transition-all" 
+              onClick={() => {
+                if (goalMet && selectedEmployees.length === 0 && activeBranchEmployees.length > 0) {
+                  alert("¡Meta superada! Por favor selecciona al menos un colaborador que haya trabajado en el turno para dividir el bono.");
+                  return;
+                }
+                const bonusRecipients = [];
+                if (goalMet && selectedEmployees.length > 0) {
+                  const splitAmount = Math.round(totalBonus / selectedEmployees.length);
+                  selectedEmployees.forEach(empId => {
+                     const emp = payrollEmployees.find(e => e.id === empId);
+                     if (emp) {
+                       bonusRecipients.push({
+                         employeeId: emp.id,
+                         name: emp.name,
+                         documentId: emp.documentId || '',
+                         bonusAmount: splitAmount
+                       });
+                     }
+                  });
+                }
+                onConfirm(realCount, false, {
+                  earnedBonus: totalBonus,
+                  bonusGoalAmount: activeGoal?.minAmount || 0,
+                  bonusPercent: activeGoal?.bonusPercent || 0,
+                  bonusRecipients
+                });
+              }}
+            >
               Cerrar Turno Definitivo
             </Button>
           </div>

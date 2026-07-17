@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuthStore, ROLE_ACCESS } from '../store/useAuthStore';
+import { useBranchStore } from '../store/useBranchStore';
 
 // ── Mapa de módulos: cómo se ve cada uno en la pantalla ───────────────────────
 const MODULE_CARDS: Record<string, { label: string; icon: string; route: string; color: string; bg: string }> = {
@@ -24,7 +25,8 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
 
 export const ModuleSelectorView = () => {
   const navigate  = useNavigate();
-  const { user, signOut } = useAuthStore();
+  const { user, signOut, activeBranchId, setActiveBranchId } = useAuthStore() as any;
+  const { branches = [] } = useBranchStore();
 
   if (!user) return <Navigate to="/login" replace />;
 
@@ -101,6 +103,20 @@ export const ModuleSelectorView = () => {
             <div>
               <p className="text-xs font-bold text-amber-500 uppercase tracking-widest">Bienvenido</p>
               <h1 className="text-2xl sm:text-3xl font-black text-gray-900 mt-0.5 leading-tight">{user.name}</h1>
+              {!user.branchId && (
+                <div className="mt-2.5 flex items-center gap-2">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Sede Activa:</span>
+                  <select
+                    value={activeBranchId || 'BRANCH-001'}
+                    onChange={(e) => setActiveBranchId(e.target.value)}
+                    className="border-2 border-amber-100 rounded-full py-1 px-3 text-xs font-black text-amber-950 bg-amber-50 outline-none cursor-pointer"
+                  >
+                    {branches.map((b: any) => (
+                      <option key={b.id} value={b.id}>{b.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
             <button
               onClick={() => { signOut(); navigate('/login', { replace: true }); }}

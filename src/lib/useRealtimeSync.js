@@ -65,6 +65,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['posRegisters']      = (v) => useInventoryStore.setState({ posRegisters: v });
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
+  applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });
 
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.
@@ -155,11 +156,6 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ loadTemplates: merged });
     };
     applicators[`vendorLocations_${bid}`]   = (v) => useInventoryStore.setState({ vendorLocations: v });
-    applicators[`payrollEmployees_${bid}`]  = (v) => {
-      const state = usePayrollStore.getState();
-      const merged = mergeArrays(state.payrollEmployees || [], v || [], 'payrollEmployees');
-      usePayrollStore.setState({ payrollEmployees: merged });
-    };
     applicators[`payrollRecords_${bid}`]    = (v) => {
       const state = usePayrollStore.getState();
       const merged = mergeArrays(state.payrollRecords || [], v || [], 'payrollRecords');
@@ -252,12 +248,13 @@ export function useRealtimeSync() {
   // Reactivo: re-suscribir cuando se agregan/eliminan sedes o cambia el usuario/sede activa
   const branchIdsKey = useBranchStore(s => s.branches.map(b => b.id).join(','));
   const user = useAuthStore(s => s.user);
-  const userBranchId = user?.branchId ?? null;
+  const activeBranchId = useAuthStore(s => s.activeBranchId);
   const userId = user?.id ?? null;
 
   useEffect(() => {
-    // Obtener el branchId del usuario activo
-    const branchId = userBranchId;
+    // Si es ADMIN o usuario global (sin branchId), usa activeBranchId; si no, su sucursal fija
+    const isGlobal = user?.role === 'ADMIN' || !user?.branchId;
+    const branchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
     const allBranchIds = branchIdsKey ? branchIdsKey.split(',') : ['BRANCH-001'];
 
     const channel = supabase
@@ -299,5 +296,5 @@ export function useRealtimeSync() {
       if (_batchTimer) { clearTimeout(_batchTimer); _batchTimer = null; }
       supabase.removeChannel(channel);
     };
-  }, [branchIdsKey, userBranchId, userId]);
+  }, [branchIdsKey, user?.branchId, activeBranchId, userId]);
 }

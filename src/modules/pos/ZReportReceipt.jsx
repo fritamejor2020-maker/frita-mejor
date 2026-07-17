@@ -216,6 +216,37 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
       ` : ''}
 
+      ${(shift.earnedBonus && shift.earnedBonus > 0) ? `
+      <!-- Metas y Bonos -->
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Metas y Bonos</h3>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+          <span>Meta Turno:</span>
+          <span>${formatMoney(shift.bonusGoalAmount || 0)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+          <span>Comisión:</span>
+          <span>${shift.bonusPercent || 0}%</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 13px; border-top: 1px solid black; padding-top: 4px; margin-top: 4px;">
+          <span>Bono Total Ganado:</span>
+          <span>${formatMoney(shift.earnedBonus)}</span>
+        </div>
+        ${shift.bonusRecipients && shift.bonusRecipients.length > 0 ? `
+          <div style="margin-top: 6px; font-size: 11px; border-top: 1px dashed black; padding-top: 4px;">
+            <span style="font-weight: 900; display: block; margin-bottom: 3px;">Beneficiarios:</span>
+            ${shift.bonusRecipients.map(r => `
+              <div style="display: flex; justify-content: space-between; padding-left: 6px; margin-bottom: 2px;">
+                <span>· ${r.name}:</span>
+                <span>${formatMoney(r.bonusAmount)}</span>
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      ` : ''}
+
       ${tc.zShowContratasBreakdown !== false && contrataByClient.length > 0 ? `
       <!-- Contratas Breakdown -->
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">

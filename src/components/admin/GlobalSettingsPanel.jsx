@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useBranchStore, BRANCH_TYPES } from '../../store/useBranchStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
+import { useVehicleStore } from '../../store/useVehicleStore';
 
 // Tipos de traslado configurables por sede
 const TRANSFER_TYPES = [
@@ -595,16 +596,24 @@ export function GlobalSettingsPanel() {
         >
           🎰 Cajas POS
         </button>
+        <button
+          onClick={() => setSubTab('metas')}
+          className={`px-5 py-2.5 rounded-full font-black text-sm transition-all ${
+            subTab === 'metas' ? 'bg-amber-100 text-amber-700 font-bold' : 'text-gray-400 hover:text-gray-600'
+          }`}
+        >
+          🎯 Metas y Comisiones
+        </button>
       </div>
 
-      {subTab === 'sedes' ? (
+      {subTab === 'sedes' && (
         <div>
           {/* Header Sedes */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h2 className="text-2xl font-black text-gray-900">🏢 Gestión de Sedes</h2>
               <p className="text-sm text-gray-400 font-medium mt-0.5">
-                {activeBranches.length} sede{activeBranches.length !== 1 ? 's' : ''} activa{activeBranches.length !== 1 ? 's' : ''}
+                {activeBranches.length} Sede{activeBranches.length !== 1 ? 's' : ''} activa{activeBranches.length !== 1 ? 's' : ''}
                 {inactiveBranches.length > 0 && ` · ${inactiveBranches.length} inactiva${inactiveBranches.length !== 1 ? 's' : ''}`}
               </p>
             </div>
@@ -660,7 +669,9 @@ export function GlobalSettingsPanel() {
             </div>
           </div>
         </div>
-      ) : (
+      )}
+
+      {subTab === 'cajas' && (
         <div>
           {/* Header Cajas */}
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -704,6 +715,13 @@ export function GlobalSettingsPanel() {
             </div>
           </div>
         </div>
+      )}
+
+      {subTab === 'metas' && (
+        <MetasTabPanel
+          branches={activeBranches}
+          registers={posRegisters}
+        />
       )}
 
       {/* Modal de edición de Sede */}
@@ -813,6 +831,389 @@ export function GlobalSettingsPanel() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function MetasTabPanel({ branches = [], registers = [] }) {
+  const { salesGoals = [], addSalesGoal, updateSalesGoal, deleteSalesGoal } = useInventoryStore();
+  const { vehicles = [] } = useVehicleStore();
+  
+  const [selectedBranchId, setSelectedBranchId] = useState(branches[0]?.id || 'BRANCH-001');
+  const [showGoalModal, setShowGoalModal] = useState(false);
+  const [editingGoal, setEditingGoal] = useState(null);
+  const [deletingGoal, setDeletingGoal] = useState(null);
+
+  const activeGoals = (salesGoals || []).filter(g => g.branchId === selectedBranchId);
+
+  const getTargetName = (goal) => {
+    if (goal.targetType === 'VEHICLE') {
+      const v = vehicles.find(x => x.abbreviation === goal.targetId || x.name === goal.targetId);
+      return v ? `🚙 Triciclo: ${v.abbreviation || v.name}` : `🚙 Vehículo: ${goal.targetId}`;
+    } else {
+      const r = registers.find(x => x.id === goal.targetId);
+      return r ? `🎰 Local / Caja: ${r.name}` : `🎰 Caja: ${goal.targetId}`;
+    }
+  };
+
+  const DAYS_LABELS = ['D', 'L', 'M', 'M', 'J', 'V', 'S'];
+  const formatDays = (days = []) => {
+    if (days.length === 7) return 'Todos los días';
+    if (days.length === 4 && [1, 2, 3, 4].every(d => days.includes(d))) return 'Lun a Jue';
+    if (days.length === 3 && [0, 5, 6].every(d => days.includes(d))) return 'Vie a Dom';
+    return days.map(d => DAYS_LABELS[d]).join(', ');
+  };
+
+  return (
+    <div>
+      {/* Header & Branch Filter */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+        <div>
+          <h2 className="text-2xl font-black text-gray-900">🎯 Metas y Comisiones</h2>
+          <p className="text-sm text-gray-400 font-medium mt-0.5">
+            Configura metas de venta por turnos y comisiones sobre el excedente.
+          </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <select
+            value={selectedBranchId}
+            onChange={(e) => setSelectedBranchId(e.target.value)}
+            className="border-2 border-gray-200 rounded-full py-2 px-4 text-sm font-black text-gray-700 bg-white outline-none cursor-pointer"
+          >
+            {branches.map(b => (
+              <option key={b.id} value={b.id}>{b.name}</option>
+            ))}
+          </select>
+          <button
+            onClick={() => { setEditingGoal({}); setShowGoalModal(true); }}
+            className="bg-gradient-to-r from-amber-400 to-orange-500 text-white font-black text-sm py-2.5 px-6 rounded-full shadow-md hover:opacity-90 transition-opacity flex items-center gap-2"
+          >
+            Nueva Meta
+          </button>
+        </div>
+      </div>
+
+      {/* Goals List */}
+      {activeGoals.length === 0 ? (
+        <div className="text-center py-16 bg-white border border-gray-100 rounded-3xl">
+          <span className="text-5xl block mb-3">🎯</span>
+          <p className="font-black text-gray-400 text-lg">No hay metas configuradas para esta sede</p>
+          <p className="text-xs text-gray-300 font-medium mt-1">Crea una meta para incentivar las ventas en los turnos.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {activeGoals.map(goal => (
+            <div key={goal.id} className="bg-white border border-gray-100 rounded-[28px] p-6 shadow-sm flex flex-col justify-between hover:shadow-md transition-shadow">
+              <div>
+                <div className="flex justify-between items-start gap-3">
+                  <div>
+                    <h3 className="font-black text-gray-800 text-base">{getTargetName(goal)}</h3>
+                    <p className="text-xs text-amber-600 font-black mt-1 bg-amber-50 px-2.5 py-1 rounded-full inline-block">
+                      ⏰ Turno {goal.shift}
+                    </p>
+                  </div>
+                  <div className="flex gap-1.5">
+                    <button
+                      onClick={() => { setEditingGoal(goal); setShowGoalModal(true); }}
+                      className="w-8 h-8 rounded-full bg-gray-50 hover:bg-amber-50 text-gray-400 hover:text-amber-600 flex items-center justify-center transition-colors text-sm"
+                    >✏️</button>
+                    <button
+                      onClick={() => setDeletingGoal(goal)}
+                      className="w-8 h-8 rounded-full bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-600 flex items-center justify-center transition-colors text-sm"
+                    >🗑️</button>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 mt-5 pt-4 border-t border-gray-50">
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Meta Base</p>
+                    <p className="text-lg font-black text-gray-800">${(goal.minAmount || 0).toLocaleString('es-CO')}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Comisión Extra</p>
+                    <p className="text-lg font-black text-amber-500">{goal.bonusPercent || 0}%</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="mt-4 pt-3 border-t border-gray-50 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-gray-400 uppercase">Días activos</span>
+                <span className="text-xs font-black text-gray-600">{formatDays(goal.daysOfWeek)}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Goal Modal */}
+      {showGoalModal && (
+        <GoalModal
+          goal={editingGoal}
+          branchId={selectedBranchId}
+          vehicles={vehicles}
+          registers={registers}
+          onClose={() => { setShowGoalModal(false); setEditingGoal(null); }}
+          onSave={(data) => {
+            if (editingGoal?.id) {
+              updateSalesGoal(editingGoal.id, data);
+            } else {
+              addSalesGoal({ ...data, branchId: selectedBranchId });
+            }
+            setShowGoalModal(false);
+            setEditingGoal(null);
+          }}
+        />
+      )}
+
+      {/* Deleting Goal Confirmation */}
+      {deletingGoal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[28px] p-7 w-full max-w-sm shadow-2xl text-center">
+            <div className="w-16 h-16 rounded-2xl bg-red-100 flex items-center justify-center text-3xl mx-auto mb-4">🗑️</div>
+            <h2 className="text-xl font-black text-gray-900 mb-2">¿Eliminar esta meta?</h2>
+            <p className="text-xs text-gray-500 font-medium mb-6">
+              ⚠️ Esta acción removerá el incentivo de ventas para este punto en los turnos aplicados.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setDeletingGoal(null)}
+                className="flex-1 border-2 border-gray-200 text-gray-500 font-bold py-3 rounded-full hover:bg-gray-50 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { deleteSalesGoal(deletingGoal.id); setDeletingGoal(null); }}
+                className="flex-1 bg-red-500 text-white font-black py-3 rounded-full hover:bg-red-600 transition-colors"
+              >
+                Sí, eliminar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function GoalModal({ goal = {}, branchId, vehicles = [], registers = [], onClose, onSave }) {
+  const [targetType, setTargetType] = useState(goal.targetType || 'VEHICLE');
+  const [targetId, setTargetId] = useState(goal.targetId || '');
+  const [shift, setShift] = useState(goal.shift || 'AM');
+  const [minAmount, setMinAmount] = useState(goal.minAmount || '');
+  const [bonusPercent, setBonusPercent] = useState(goal.bonusPercent || '');
+  const [daysOfWeek, setDaysOfWeek] = useState(goal.daysOfWeek || [1, 2, 3, 4, 5, 6, 0]);
+
+  // Filter items by branch
+  const activeVehicles = vehicles.filter(v => v.active && (!v.branchId || v.branchId === branchId));
+  const activeRegisters = registers.filter(r => r.active !== false && r.branchId === branchId);
+
+  // Set default target if empty
+  React.useEffect(() => {
+    if (!targetId) {
+      if (targetType === 'VEHICLE' && activeVehicles.length > 0) {
+        setTargetId(activeVehicles[0].abbreviation || activeVehicles[0].name);
+      } else if (targetType === 'REGISTER' && activeRegisters.length > 0) {
+        setTargetId(activeRegisters[0].id);
+      }
+    }
+  }, [targetType, branchId]);
+
+  const toggleDay = (day) => {
+    setDaysOfWeek(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day]);
+  };
+
+  const handleSave = () => {
+    if (!targetId) {
+      alert("Selecciona un destino (Vehículo o Caja)");
+      return;
+    }
+    if (!minAmount || Number(minAmount) <= 0) {
+      alert("Ingresa un monto de meta base válido");
+      return;
+    }
+    if (!bonusPercent || Number(bonusPercent) < 0 || Number(bonusPercent) > 100) {
+      alert("Ingresa un porcentaje de comisión entre 0 y 100");
+      return;
+    }
+    if (daysOfWeek.length === 0) {
+      alert("Selecciona al menos un día de la semana");
+      return;
+    }
+
+    onSave({
+      targetType,
+      targetId,
+      shift,
+      minAmount: Number(minAmount),
+      bonusPercent: Number(bonusPercent),
+      daysOfWeek
+    });
+  };
+
+  const DAYS = [
+    { value: 1, label: 'L' },
+    { value: 2, label: 'M' },
+    { value: 3, label: 'M' },
+    { value: 4, label: 'J' },
+    { value: 5, label: 'V' },
+    { value: 6, label: 'S' },
+    { value: 0, label: 'D' }
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+      <div className="bg-white rounded-[32px] p-8 w-full max-w-md shadow-2xl animate-[scaleIn_0.2s_ease-out] flex flex-col gap-6">
+        <div>
+          <h2 className="text-2xl font-black text-gray-900">{goal.id ? '🎯 Editar Meta' : '🎯 Nueva Meta'}</h2>
+          <p className="text-xs text-gray-400 font-bold mt-1">Configura el objetivo de ventas para el turno.</p>
+        </div>
+
+        {/* Target Type */}
+        <div>
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">Destino de la Meta</label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => { setTargetType('VEHICLE'); setTargetId(''); }}
+              className={`py-3 rounded-2xl font-black text-sm border-2 transition-all ${targetType === 'VEHICLE' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-gray-100 text-gray-500 hover:bg-gray-50'}`}
+            >
+              🚙 Triciclo / Carro
+            </button>
+            <button
+              onClick={() => { setTargetType('REGISTER'); setTargetId(''); }}
+              className={`py-3 rounded-2xl font-black text-sm border-2 transition-all ${targetType === 'REGISTER' ? 'border-amber-400 bg-amber-50 text-amber-700' : 'border-gray-100 text-gray-500 hover:bg-gray-50'}`}
+            >
+              🎰 Caja / Local
+            </button>
+          </div>
+        </div>
+
+        {/* Target Selector */}
+        <div>
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">Punto / Caja Específica</label>
+          {targetType === 'VEHICLE' ? (
+            <select
+              value={targetId}
+              onChange={e => setTargetId(e.target.value)}
+              className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 bg-white outline-none"
+            >
+              <option value="">Seleccionar vehículo...</option>
+              {activeVehicles.map(v => (
+                <option key={v.id} value={v.abbreviation || v.name}>{v.abbreviation || v.name} - {v.name}</option>
+              ))}
+            </select>
+          ) : (
+            <select
+              value={targetId}
+              onChange={e => setTargetId(e.target.value)}
+              className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 bg-white outline-none"
+            >
+              <option value="">Seleccionar caja local...</option>
+              {activeRegisters.map(r => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        {/* Shift */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">Turno / Jornada</label>
+            <select
+              value={shift}
+              onChange={e => setShift(e.target.value)}
+              className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 bg-white outline-none"
+            >
+              <option value="AM">AM</option>
+              <option value="MD">MD</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">% Comisión Extra</label>
+            <div className="relative">
+              <input
+                type="number"
+                value={bonusPercent}
+                onChange={e => setBonusPercent(e.target.value)}
+                placeholder="10"
+                className="w-full border-2 border-gray-100 rounded-2xl p-4 pr-10 text-sm font-black text-gray-700 outline-none"
+              />
+              <span className="absolute right-4 top-1/2 -translate-y-1/2 font-black text-gray-400">%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Goals Amount */}
+        <div>
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">Monto Meta ($ COP)</label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 font-black text-gray-400 text-lg">$</span>
+            <input
+              type="number"
+              value={minAmount}
+              onChange={e => setMinAmount(e.target.value)}
+              placeholder="150,000"
+              className="w-full border-2 border-gray-100 rounded-2xl p-4 pl-8 text-sm font-black text-gray-700 outline-none"
+            />
+          </div>
+        </div>
+
+        {/* Days of Week */}
+        <div>
+          <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider block mb-2">Días Aplicables</label>
+          <div className="flex gap-2 justify-between mt-1">
+            {DAYS.map(d => {
+              const active = daysOfWeek.includes(d.value);
+              return (
+                <button
+                  key={d.value}
+                  onClick={() => toggleDay(d.value)}
+                  className={`w-9 h-9 rounded-full font-black text-xs transition-colors flex items-center justify-center ${active ? 'bg-amber-400 text-amber-950 font-black' : 'bg-gray-100 text-gray-400'}`}
+                >
+                  {d.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex gap-2 mt-3">
+            <button
+              onClick={() => setDaysOfWeek([1, 2, 3, 4])}
+              className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full"
+            >
+              Lun a Jue
+            </button>
+            <button
+              onClick={() => setDaysOfWeek([0, 5, 6])}
+              className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full"
+            >
+              Vie a Dom
+            </button>
+            <button
+              onClick={() => setDaysOfWeek([1, 2, 3, 4, 5, 6, 0])}
+              className="text-[10px] font-black text-amber-700 bg-amber-50 px-3 py-1 rounded-full"
+            >
+              Todos
+            </button>
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-3 mt-4">
+          <button
+            onClick={onClose}
+            className="flex-1 border-2 border-gray-100 text-gray-500 font-bold py-3.5 rounded-full hover:bg-gray-50 transition-colors"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            className="flex-1 bg-amber-400 text-amber-950 font-black py-3.5 rounded-full hover:bg-amber-500 transition-colors shadow-md shadow-amber-200"
+          >
+            Guardar
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
