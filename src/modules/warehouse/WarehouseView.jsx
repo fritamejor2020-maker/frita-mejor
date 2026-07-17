@@ -1,11 +1,16 @@
 import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { BarcodeScanner } from '../../components/ui/BarcodeScanner';
 import { Toast } from '../../components/ui/Toast';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useBranchStore } from '../../store/useBranchStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 
 // ─── Pantalla de Selección de Bodega ──────────────────────────────────────────
 function SelectWarehouse({ onSelect, signOut }) {
+  const navigate = useNavigate();
+  const { user, activeBranchId, setActiveBranchId } = useAuthStore();
+  const { branches = [] } = useBranchStore();
   const { warehouses, inventory } = useInventoryStore();
   const active = warehouses.filter((w) => w.active);
 
@@ -22,6 +27,23 @@ function SelectWarehouse({ onSelect, signOut }) {
           <div className="text-center mb-5 sm:mb-8">
             <img src="/logo.png" alt="Frita Mejor" className="w-28 sm:w-40 mx-auto object-contain mb-4" />
             <h1 className="text-2xl sm:text-3xl font-black text-chunky-dark">Selecciona Bodega</h1>
+            
+            {/* Selector de Sede para Administradores */}
+            {!user?.branchId && (
+              <div className="mt-3 mb-4 flex items-center justify-center gap-2">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Sede Activa:</span>
+                <select
+                  value={activeBranchId || 'BRANCH-001'}
+                  onChange={(e) => setActiveBranchId(e.target.value)}
+                  className="border-2 border-amber-100 rounded-full py-1 px-3 text-xs font-black text-amber-950 bg-amber-50 outline-none cursor-pointer"
+                >
+                  {branches.map((b) => (
+                    <option key={b.id} value={b.id}>{b.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+            
             <p className="text-gray-400 font-bold mt-2 text-sm">¿Desde dónde vas a trabajar?</p>
           </div>
 
@@ -50,9 +72,14 @@ function SelectWarehouse({ onSelect, signOut }) {
             })}
           </div>
         </div>
-        <button className="w-full text-center text-gray-400 font-bold text-sm hover:text-gray-600 py-2" onClick={signOut}>
-          ← Cambiar de rol
-        </button>
+        <div className="flex flex-col gap-2">
+          <button className="w-full text-center text-gray-400 font-bold text-sm hover:text-gray-600 py-2" onClick={() => navigate('/selector')}>
+            ← Volver al Menú Principal
+          </button>
+          <button className="w-full text-center text-gray-400/60 font-bold text-xs hover:text-gray-600/80 py-1" onClick={signOut}>
+            Cambiar de rol / Cerrar sesión
+          </button>
+        </div>
       </div>
     </div>
   );
