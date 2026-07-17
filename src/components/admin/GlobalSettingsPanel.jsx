@@ -1016,6 +1016,16 @@ function GoalModal({ goal = {}, branchId, vehicles = [], registers = [], onClose
         setTargetId(activeRegisters[0].id);
       }
     }
+    // Validar shift según targetType
+    if (targetType === 'REGISTER') {
+      if (!['6-10 am', '10-12 pm', '12-2 pm', '2-4 pm', '4-7 pm', '7-9 pm'].includes(shift)) {
+        setShift('6-10 am');
+      }
+    } else {
+      if (!['AM', 'MD', 'PM'].includes(shift)) {
+        setShift('AM');
+      }
+    }
   }, [targetType, branchId]);
 
   const toggleDay = (day) => {
@@ -1124,9 +1134,22 @@ function GoalModal({ goal = {}, branchId, vehicles = [], registers = [], onClose
               onChange={e => setShift(e.target.value)}
               className="w-full border-2 border-gray-100 rounded-2xl p-4 text-sm font-black text-gray-700 bg-white outline-none"
             >
-              <option value="AM">AM</option>
-              <option value="MD">MD</option>
-              <option value="PM">PM</option>
+              {targetType === 'REGISTER' ? (
+                <>
+                  <option value="6-10 am">6-10 am</option>
+                  <option value="10-12 pm">10-12 pm</option>
+                  <option value="12-2 pm">12-2 pm</option>
+                  <option value="2-4 pm">2-4 pm</option>
+                  <option value="4-7 pm">4-7 pm</option>
+                  <option value="7-9 pm">7-9 pm</option>
+                </>
+              ) : (
+                <>
+                  <option value="AM">AM</option>
+                  <option value="MD">MD</option>
+                  <option value="PM">PM</option>
+                </>
+              )}
             </select>
           </div>
           <div>

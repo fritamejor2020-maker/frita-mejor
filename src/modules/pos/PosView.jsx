@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useAuthStore }      from '../../store/useAuthStore';
 import { useBranchStore }    from '../../store/useBranchStore';
+import { usePayrollStore }   from '../../store/usePayrollStore';
 import { Button }            from '../../components/ui/Button';
 import { generateReceiptHTML } from './PosReceipt';
 import { generateZReportHTML }   from './ZReportReceipt';
@@ -426,12 +427,13 @@ export function PosView() {
   };
 
   // -- SHIFT ACTIONS --
-  const handleOpenShift = (initialAmount) => {
+  const handleOpenShift = (initialAmount, jornada = '6-10 am') => {
     try {
       addPosShift({
         openedAt: new Date().toISOString(),
         closedAt: null,
         initialAmount: parseFloat(initialAmount) || 0,
+        jornada,
         userId: user?.id,
         userName: user?.name,
         registerId: selectedRegisterId,
@@ -2579,27 +2581,46 @@ function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose,
 // ─── Shift Modals Component ───
 function ShiftOpenModal({ onConfirm, registerName }) {
   const [initialAmount, setInitialAmount] = useState('0');
+  const [jornada, setJornada] = useState('6-10 am');
   
   return (
     <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
         <h2 className="text-2xl font-black text-white mb-1">Apertura de Caja</h2>
         {registerName && <p className="text-chunky-main text-sm font-black mb-1">{registerName}</p>}
-        <p className="text-gray-400 text-sm font-bold mb-6 text-center">Ingresa el dinero base con el que empiezas el turno.</p>
+        <p className="text-gray-400 text-sm font-bold mb-6 text-center">Configura el dinero inicial y el turno.</p>
         
-        <div className="w-full relative mb-6">
-          <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-gray-500">$</span>
-          <input 
-            autoFocus type="number" 
-            className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-5 pl-14 pr-6 text-4xl font-black text-white outline-none text-center shadow-inner transition-colors"
-            value={initialAmount}
-            onChange={(e) => setInitialAmount(e.target.value)}
-            onFocus={(e) => e.target.select()}
-            onKeyDown={(e) => e.key === 'Enter' && onConfirm(initialAmount)}
-          />
+        <div className="w-full relative mb-4">
+          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider block mb-2">Efectivo Base Inicial</label>
+          <div className="relative">
+            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-3xl font-black text-gray-500">$</span>
+            <input 
+              autoFocus type="number" 
+              className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-4 pl-14 pr-6 text-2xl font-black text-white outline-none text-center shadow-inner transition-colors"
+              value={initialAmount}
+              onChange={(e) => setInitialAmount(e.target.value)}
+              onFocus={(e) => e.target.select()}
+            />
+          </div>
         </div>
 
-        <Button className="w-full rounded-[20px] py-4 font-black text-lg bg-chunky-main text-chunky-dark shadow-[0_4px_14px_0_rgba(255,200,50,0.39)] hover:scale-105 active:scale-95 transition-all" onClick={() => onConfirm(initialAmount)}>
+        <div className="w-full mb-6">
+          <label className="text-[10px] font-black text-gray-500 uppercase tracking-wider block mb-2">Turno / Jornada</label>
+          <select
+            value={jornada}
+            onChange={(e) => setJornada(e.target.value)}
+            className="w-full bg-[#0c0d11] border-2 border-gray-700 focus:border-chunky-main rounded-[24px] py-4 px-6 text-base font-black text-white outline-none cursor-pointer transition-colors"
+          >
+            <option value="6-10 am">6-10 am</option>
+            <option value="10-12 pm">10-12 pm</option>
+            <option value="12-2 pm">12-2 pm</option>
+            <option value="2-4 pm">2-4 pm</option>
+            <option value="4-7 pm">4-7 pm</option>
+            <option value="7-9 pm">7-9 pm</option>
+          </select>
+        </div>
+
+        <Button className="w-full rounded-[20px] py-4 font-black text-lg bg-chunky-main text-chunky-dark shadow-[0_4px_14px_0_rgba(255,200,50,0.39)] hover:scale-105 active:scale-95 transition-all" onClick={() => onConfirm(initialAmount, jornada)}>
           Abrir Turno
         </Button>
       </div>
@@ -2609,12 +2630,52 @@ function ShiftOpenModal({ onConfirm, registerName }) {
 
 function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   const [realCount, setRealCount] = useState('');
+  const [selectedEmployees, setSelectedEmployees] = useState([]);
+
+  const { salesGoals = [] } = useInventoryStore();
+  const { payrollEmployees = [] } = usePayrollStore();
+
+  const toggleEmployee = (empId) => {
+    setSelectedEmployees(prev =>
+      prev.includes(empId) ? prev.filter(id => id !== empId) : [...prev, empId]
+    );
+  };
+
+  const activeBranchEmployees = payrollEmployees.filter(e => e.active && e.branchId === shift.branchId);
+
+  // Determinar meta activa del turno
+  const openedDate = new Date(shift.openedAt);
+  const dayOfWeek = openedDate.getDay(); // 0 = Domingo, 1 = Lunes, etc.
   
+  let shiftJornada = shift.jornada;
+  if (!shiftJornada) {
+    const hour = openedDate.getHours();
+    if (hour >= 6 && hour < 10) shiftJornada = '6-10 am';
+    else if (hour >= 10 && hour < 12) shiftJornada = '10-12 pm';
+    else if (hour >= 12 && hour < 14) shiftJornada = '12-2 pm';
+    else if (hour >= 14 && hour < 16) shiftJornada = '2-4 pm';
+    else if (hour >= 16 && hour < 19) shiftJornada = '4-7 pm';
+    else if (hour >= 19 && hour < 21) shiftJornada = '7-9 pm';
+    else shiftJornada = '6-10 am';
+  }
+
+  const activeGoal = salesGoals.find(g =>
+    g.active !== false &&
+    g.targetType === 'REGISTER' &&
+    g.targetId === shift.registerId &&
+    g.shift === shiftJornada &&
+    (g.daysOfWeek || []).includes(dayOfWeek)
+  );
+
+  const totalSales = sales.reduce((acc, s) => acc + s.total, 0);
+  const goalMet = activeGoal && totalSales >= activeGoal.minAmount;
+  const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
+  const totalBonus = goalMet ? Math.round(excess * (activeGoal.bonusPercent / 100)) : 0;
+
   // Calculate expected
   const initial = shift.initialAmount || 0;
-  // Solo sumar efectivo para el cuadre (tarjetas y transferencias van a banco)
-  const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
-  const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
+  const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+  const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
   const retiros = (expenses || []).filter(e => e.type !== 'deposito');
   const depositos = (expenses || []).filter(e => e.type === 'deposito');
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
