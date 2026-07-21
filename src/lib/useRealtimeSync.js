@@ -182,7 +182,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     if (!applicators['posExpenses'])      applicators['posExpenses']      = (v) => useInventoryStore.setState({ posExpenses: v });
     if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => useInventoryStore.setState({ posRegisters: v });
     if (!applicators['posSettings'])      applicators['posSettings']      = (v) => useInventoryStore.setState({ posSettings: v });
-    if (!applicators['inventory'])        applicators['inventory']        = (v) => useInventoryStore.setState({ inventory: v });
+    if (!applicators['inventory'])        applicators['inventory']        = (v) => {
+      const state = useInventoryStore.getState();
+      const deletedInv = new Set(state.deletedInventoryIds || []);
+      const localInv = (state.inventory || []).filter(i => !deletedInv.has(i.id));
+      const remote = (v || []).filter(i => !deletedInv.has(i.id));
+      const merged = mergeArrays(localInv, remote, 'inventory');
+      useInventoryStore.setState({ inventory: merged });
+    };
     if (!applicators['contrataPayments']) applicators['contrataPayments'] = (v) => useInventoryStore.setState({ contrataPayments: v });
   }
 
@@ -252,9 +259,9 @@ export function useRealtimeSync() {
   const userId = user?.id ?? null;
 
   useEffect(() => {
-    // Si es ADMIN o usuario global (sin branchId), usa activeBranchId; si no, su sucursal fija
-    const isGlobal = user?.role === 'ADMIN' || !user?.branchId;
-    const branchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
+    // Si es ADMIN, pasamos syncBranchId = null a pullAll y getApplicators para que descargue TODAS las sedes y llaves legacy.
+    const isAdmin = user?.role === 'ADMIN';
+    const syncBranchId = isAdmin ? null : (user?.branchId || activeBranchId || 'BRANCH-001');
     const allBranchIds = branchIdsKey ? branchIdsKey.split(',') : ['BRANCH-001'];
 
     const channel = supabase
@@ -271,10 +278,10 @@ export function useRealtimeSync() {
           if (_ignoreRemoteKeys.has(key)) return;
 
           // Solo procesar llaves que le corresponden a este dispositivo
-          const currentApplicators = getApplicators(branchId, allBranchIds);
+          const currentApplicators = getApplicators(syncBranchId, allBranchIds);
           if (currentApplicators[key]) {
             console.log(`[Realtime] Actualización remota recibida: "${key}"`);
-            scheduleBatch(key, value, branchId, allBranchIds);
+            scheduleBatch(key, value, syncBranchId, allBranchIds);
           }
         }
       )
@@ -283,7 +290,7 @@ export function useRealtimeSync() {
         if (status === 'SUBSCRIBED') {
           clearTimeout(pullDebounceRef.current);
           pullDebounceRef.current = setTimeout(() => {
-            refreshAllFromSupabase(branchId, allBranchIds);
+            refreshAllFromSupabase(syncBranchId, allBranchIds);
             useInventoryStore.getState().loadFromRemote().catch(e => console.warn('[Sync] loadFromRemote error:', e));
           }, 800);
         }
