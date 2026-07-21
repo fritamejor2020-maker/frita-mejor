@@ -426,10 +426,17 @@ export const useInventoryStore = create(
                 if (Array.isArray(val) && val.length > 0) {
                   merged = mergeArrays(merged, val, key);
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-                  // Para objetos (posSettings, etc.): deep merge, local gana
+                  // Para objetos (posSettings, etc.): el más reciente gana por _updatedAt
                   const localVal = get()[key];
                   if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
-                    updates[key] = { ...val, ...localVal };
+                    const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
+                    const remoteTime = val._updatedAt ? new Date(val._updatedAt).getTime() : 0;
+                    if (remoteTime >= localTime) {
+                      // Remoto más reciente: deep merge, remoto gana en propiedades que existen
+                      updates[key] = { ...localVal, ...val };
+                    } else {
+                      updates[key] = { ...val, ...localVal };
+                    }
                   } else if (bId === 'BRANCH-001' || !updates[key]) {
                     updates[key] = val;
                   }
