@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
 import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
 
 // Helper: sincroniza una sección del store con Supabase.
 // Para BRANCH_KEYS: si el usuario no tiene sede (Admin, branchId=null),
@@ -451,10 +452,13 @@ export const useInventoryStore = create(
 
           // Smart merge para inventario: fusionar usando mergeArrays (da preferencia a remoto para actualizar stocks/precios, conservando creaciones locales)
           if (updates.inventory) {
-            const localInventory = get().inventory;
+            const localInventory = get().inventory || [];
             const deletedInvIds = get().deletedInventoryIds || [];
             let mergedInv = mergeArrays(localInventory, updates.inventory, 'inventory');
-            updates.inventory = mergedInv.filter(i => !deletedInvIds.includes(i.id));
+            mergedInv = mergedInv.filter(i => !deletedInvIds.includes(i.id));
+            updates.inventory = mergedInv.length > 0 ? mergedInv : (localInventory.length > 0 ? localInventory : inventoryBackupSeed);
+          } else if (!get().inventory || get().inventory.length === 0) {
+            updates.inventory = inventoryBackupSeed;
           }
           // Sanitizar posSettings: convertir cashDrawerCode viejo si viene de Supabase
           if (updates.posSettings && updates.posSettings.cashDrawerCode) {
@@ -1251,7 +1255,9 @@ export const useInventoryStore = create(
           state.posShifts = state.posShifts.filter(s => !deletedShifts.includes(s.id));
         }
         const deletedInv = state.deletedInventoryIds || [];
-        if (state.inventory?.length > 0) {
+        if (!state.inventory || state.inventory.length === 0) {
+          state.inventory = inventoryBackupSeed;
+        } else {
           let inv = state.inventory;
           if (deletedInv.length > 0) {
             inv = inv.filter(i => !deletedInv.includes(i.id));
@@ -1271,7 +1277,7 @@ export const useInventoryStore = create(
               uniqueInventory.push(item);
             }
           });
-          state.inventory = uniqueInventory;
+          state.inventory = uniqueInventory.length > 0 ? uniqueInventory : inventoryBackupSeed;
         }
       },
     }
