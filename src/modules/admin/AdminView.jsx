@@ -2629,7 +2629,7 @@ function PosFeedConfigPanel() {
     }
   }, [posSettings]);
 
-  const sellableProducts = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA');
+  const sellableProducts = inventory.filter(i => !i.type || i.type !== 'INSUMO');
   const filteredProducts = sellableProducts.filter(p => p.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   const handleSave = () => {
