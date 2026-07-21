@@ -805,13 +805,13 @@ export function PosView() {
   };
 
   // GRID RENDER LOGIC --
-  // Todos los productos vendibles del inventario
-  const sellableItems = inventory.filter(i => i.type === 'PRODUCTO' || i.type === 'FRITO' || i.type === 'BEBIDA' || i.type === 'CRUDO');
+  // Todos los productos vendibles del inventario (excluyendo insumos de cocina/materia prima)
+  const sellableItems = inventory.filter(i => !i.type || i.type !== 'INSUMO');
   
-  // Si estamos dentro de una categoría → mostrar TODOS los productos de esa categoría (sin restricciones)
-  // Si estamos en el feed raíz → comportamiento depende de la configuración del admin:
-  //   · showOnlySelected activo: mostrar los productos "pinneados" al feed principal (sin importar su categoría)
-  //   · showOnlySelected inactivo: comportamiento por defecto → solo productos sin categoría asignada
+  // Si estamos dentro de una categoría → mostrar TODOS los productos de esa categoría
+  // Si estamos en la raíz (sin categoría seleccionada):
+  //   · Si showOnlySelected está activo y hay productos pineados → mostrar los pineados
+  //   · Si no → mostrar productos sin categoría, o TODOS los productos vendibles si todos tienen categoría
   const displayedFolders = currentFolder ? [] : posCategories;
   
   let displayedItems = [];
@@ -820,8 +820,8 @@ export function PosView() {
     displayedItems = sellableItems
       .filter(i => i.posCategoryId === currentFolder)
       .sort((a, b) => a.name.localeCompare(b.name));
-  } else if (posSettings?.layout?.showOnlySelected) {
-    // Feed principal personalizado: ordenados exactamente según la lista seleccionada por el administrador
+  } else if (posSettings?.layout?.showOnlySelected && (posSettings?.layout?.selectedProductIds || []).length > 0) {
+    // Feed principal personalizado: ordenados exactamente según la lista seleccionada
     const pinnedIds = posSettings.layout.selectedProductIds || [];
     const pinnedSet = new Set(pinnedIds);
     const filtered = sellableItems.filter(i => pinnedSet.has(i.id));
@@ -831,9 +831,9 @@ export function PosView() {
       return idxA - idxB;
     });
   } else {
-    // Feed principal por defecto: productos sin categoría ordenados alfabéticamente
-    displayedItems = sellableItems
-      .filter(i => !i.posCategoryId)
+    // Feed principal por defecto: si hay productos sin categoría los muestra, de lo contrario muestra todos los vendibles
+    const unassigned = sellableItems.filter(i => !i.posCategoryId);
+    displayedItems = (unassigned.length > 0 ? unassigned : sellableItems)
       .sort((a, b) => a.name.localeCompare(b.name));
   }
 
@@ -1368,11 +1368,11 @@ export function PosView() {
             ))}
           </div>
 
-          {paginatedItems.length === 0 && (!posCategories || posCategories.length === 0 || currentFolder) && (
+          {paginatedItems.length === 0 && (
             <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4 mt-20">
                <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-               <p className="font-bold text-lg">No hay productos con precio en esta sección</p>
-               <p className="text-sm">Agrega precios en el Panel de Administrador para que aparezcan aquí.</p>
+               <p className="font-bold text-lg">No hay productos en esta sección</p>
+               <p className="text-sm">Selecciona una categoría arriba o revisa el inventario en Administración.</p>
             </div>
           )}
 
