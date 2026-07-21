@@ -426,19 +426,22 @@ export const useInventoryStore = create(
                 if (Array.isArray(val) && val.length > 0) {
                   merged = mergeArrays(merged, val, key);
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-                  // Para objetos (posSettings, etc.): el más reciente gana por _updatedAt
-                  const localVal = get()[key];
-                  if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
-                    const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
-                    const remoteTime = val._updatedAt ? new Date(val._updatedAt).getTime() : 0;
-                    if (remoteTime >= localTime) {
-                      // Remoto más reciente: deep merge, remoto gana en propiedades que existen
-                      updates[key] = { ...localVal, ...val };
+                  // Para objetos (posSettings, etc.): usar solo la sede activa del Admin (BRANCH-001)
+                  // No sobreescribir si ya fue establecido por una sede anterior
+                  const activeBranch = useAuthStore.getState().getActiveBranchId() || 'BRANCH-001';
+                  if (bId === activeBranch || !updates[key]) {
+                    const localVal = get()[key];
+                    if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
+                      const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
+                      const remoteTime = val._updatedAt ? new Date(val._updatedAt).getTime() : 0;
+                      if (remoteTime >= localTime) {
+                        updates[key] = { ...localVal, ...val };
+                      } else {
+                        updates[key] = { ...val, ...localVal };
+                      }
                     } else {
-                      updates[key] = { ...val, ...localVal };
+                      updates[key] = val;
                     }
-                  } else if (bId === 'BRANCH-001' || !updates[key]) {
-                    updates[key] = val;
                   }
                 }
               }
