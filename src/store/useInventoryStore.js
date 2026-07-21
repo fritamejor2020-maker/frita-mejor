@@ -460,16 +460,7 @@ export const useInventoryStore = create(
           } else if (!get().inventory || get().inventory.length === 0) {
             updates.inventory = inventoryBackupSeed;
           }
-          // Sanitizar posSettings: convertir cashDrawerCode viejo si viene de Supabase
-          if (updates.posSettings && updates.posSettings.cashDrawerCode) {
-            const code = updates.posSettings.cashDrawerCode;
-            if (!code.match(/^\d+(,\s*\d+)*$/)) {
-              updates.posSettings = {
-                ...updates.posSettings,
-                cashDrawerCode: '27,112,48,55,121',
-              };
-            }
-          }
+          // cashDrawerCode: respetar el formato del usuario (hex o decimal)
           if (Object.keys(updates).length > 0) {
             set(updates);
           }
