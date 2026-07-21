@@ -296,7 +296,8 @@ export const useInventoryStore = create(
         }
         try {
           const user = useAuthStore.getState().user;
-          const branchId = user?.branchId ?? null;
+          const isAdmin = user?.role === 'ADMIN';
+          const branchId = isAdmin ? null : (user?.branchId ?? null);
 
           // Obtener IDs de todas las sedes para el Admin
           let allBranchIds = ['BRANCH-001'];
@@ -409,7 +410,7 @@ export const useInventoryStore = create(
           } else {
             // BUG-04 FIX: Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
-            const mergedArrayKeys = ['posShifts','posSales','posExpenses','movements','contrataPayments','deletedShiftIds','deletedInventoryIds'];
+            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds'];
             for (const key of BRANCH_STORE_KEYS) {
               const localArr = get()[key] || [];
               let merged = Array.isArray(localArr) ? [...localArr] : [];
