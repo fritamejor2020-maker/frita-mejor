@@ -816,25 +816,29 @@ export function PosView() {
   
   let displayedItems = [];
   if (currentFolder) {
-    // Dentro de una categoría: todos sus productos ordenados alfabéticamente
+    // Dentro de una categoría: todos sus productos ordenados por sortOrder o alfabéticamente
     displayedItems = sellableItems
       .filter(i => i.posCategoryId === currentFolder)
-      .sort((a, b) => a.name.localeCompare(b.name));
+      .sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
   } else if (posSettings?.layout?.showOnlySelected && (posSettings?.layout?.selectedProductIds || []).length > 0) {
     // Feed principal personalizado: ordenados exactamente según la lista seleccionada
     const pinnedIds = posSettings.layout.selectedProductIds || [];
     const pinnedSet = new Set(pinnedIds);
     const filtered = sellableItems.filter(i => pinnedSet.has(i.id));
-    displayedItems = [...filtered].sort((a, b) => {
-      const idxA = pinnedIds.indexOf(a.id);
-      const idxB = pinnedIds.indexOf(b.id);
-      return idxA - idxB;
-    });
+    if (filtered.length > 0) {
+      displayedItems = [...filtered].sort((a, b) => {
+        const idxA = pinnedIds.indexOf(a.id);
+        const idxB = pinnedIds.indexOf(b.id);
+        return idxA - idxB;
+      });
+    } else {
+      displayedItems = [...sellableItems].sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
+    }
   } else {
-    // Feed principal por defecto: si hay productos sin categoría los muestra, de lo contrario muestra todos los vendibles
+    // Feed principal por defecto: muestra todos los vendibles ordenados por sortOrder
     const unassigned = sellableItems.filter(i => !i.posCategoryId);
-    displayedItems = (unassigned.length > 0 ? unassigned : sellableItems)
-      .sort((a, b) => a.name.localeCompare(b.name));
+    const listToDisplay = unassigned.length > 0 ? unassigned : sellableItems;
+    displayedItems = [...listToDisplay].sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
   }
 
   // Filtrar por término de búsqueda si el usuario escribe
