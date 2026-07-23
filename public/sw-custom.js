@@ -5,13 +5,16 @@
 
 const APP_VERSION = 'v1';
 
-// ── Activación inmediata sin esperar que se cierren otras tabs ──
+// ── NO usar skipWaiting ni clients.claim ──────────────────────
+// Esto evita que un deploy forzado interrumpa la sesión activa del usuario
+// y cause pérdida de datos no sincronizados.
+// La actualización se aplicará naturalmente cuando el usuario cierre y reabra la app.
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  console.log('[SW] Nuevo Service Worker instalado. Se activará en la próxima recarga.');
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
+  console.log('[SW] Service Worker activado.');
 });
 
 // ── Recibir push del servidor ────────────────────────────────

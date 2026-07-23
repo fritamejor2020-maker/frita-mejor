@@ -170,14 +170,17 @@ export async function flushQueue() {
   }
 }
 
-// ─── API pública de escritura ─────────────────────────────────────────────────
+// ─── Gate centralizado de protección ──────────────────────────────────────────
+// Bloquea TODAS las escrituras a Supabase hasta que la app haya descargado
+// los datos reales de la nube. Esto previene que datos de plantilla/demo o
+// estado obsoleto de localStorage sobreescriba la base de datos de producción.
+let _appReady = false;
+export function markAppReady() {
+  _appReady = true;
+  console.log('[SyncManager] ✅ App marcada como lista — escrituras a Supabase habilitadas.');
+}
+export function isAppReady() { return _appReady; }
 
-/**
- * Escribe un valor al store de Supabase.
- * @param {string} key — nombre BASE de la llave (ej: 'posSales', no 'posSales_BRANCH-001')
- * @param {any} value — valor (array u objeto)
- * @param {string|null} branchId — ID de la sede. null = llave global o Admin.
- */
 export async function push(key, value, branchId = null) {
   // Protección 1: Modo Seguro manual (para pruebas de Antigravity)
   if (typeof window !== 'undefined' && window.__FRITA_SAFE_MODE__) {
@@ -188,12 +191,18 @@ export async function push(key, value, branchId = null) {
   // Protección 2: Bloquear escrituras desde entornos de desarrollo (localhost, preview, etc.)
   if (typeof window !== 'undefined') {
     const hostname = window.location?.hostname || '';
-    const isProduction = hostname.includes('vercel.app') || hostname.includes('fritamejor');
     const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168');
     if (isLocalhost && !window.__FRITA_FORCE_SYNC__) {
       console.warn(`[SyncManager] Push de "${key}" bloqueado: entorno localhost detectado.`);
       return;
     }
+  }
+
+  // Protección 3: Bloquear TODAS las escrituras hasta que loadFromRemote() complete.
+  // Esto protege los 9 stores que llaman push() (no solo useInventoryStore).
+  if (!_appReady) {
+    console.warn(`[SyncManager] Push de "${key}" bloqueado: la app aún no terminó de cargar datos remotos.`);
+    return;
   }
 
   const supabaseKey = getBranchKey(key, branchId);

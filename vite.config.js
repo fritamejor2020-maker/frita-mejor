@@ -13,13 +13,13 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['favicon.ico', 'apple-touch-icon.png', 'mask-icon.svg'],
       workbox: {
         importScripts: ['/sw-custom.js'],
         maximumFileSizeToCacheInBytes: 4 * 1024 * 1024, // 4 MiB (recharts añade ~400KB)
-        skipWaiting: true,
-        clientsClaim: true,
+        // NO usar skipWaiting ni clientsClaim: evita recargas forzadas durante deploys
+        // que interrumpen al usuario y pueden causar pérdida de datos no sincronizados
         cleanupOutdatedCaches: true,
         navigateFallback: 'index.html',
         runtimeCaching: [

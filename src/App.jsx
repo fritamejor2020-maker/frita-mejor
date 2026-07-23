@@ -209,8 +209,16 @@ function App() {
     // El persist de Zustand carga síncronamente desde localStorage,
     // pero lo hace en el mismo tick. Usamos un microtask (Promise.resolve)
     // para asegurarnos de que ya está cargado antes de llamar loadFromRemote.
-    Promise.resolve().then(() => {
-      useInventoryStore.getState().loadFromRemote();
+    Promise.resolve().then(async () => {
+      // CRÍTICO: Primero cargar datos remotos, LUEGO vaciar la cola.
+      // Si flushQueue() corre ANTES de loadFromRemote(), datos obsoletos
+      // de localStorage sobreescriben los datos reales en Supabase.
+      try {
+        await useInventoryStore.getState().loadFromRemote();
+      } catch (err) {
+        console.warn('[App] Error en loadFromRemote:', err.message);
+      }
+      // Solo vaciar la cola DESPUÉS de tener datos frescos
       flushQueue();
     });
 

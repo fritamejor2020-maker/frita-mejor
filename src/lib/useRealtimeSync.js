@@ -288,11 +288,13 @@ export function useRealtimeSync() {
       .subscribe((status) => {
         console.log('[Realtime] Canal status:', status);
         if (status === 'SUBSCRIBED') {
+          // Solo ejecutar loadFromRemote (que tiene todas las protecciones).
+          // NO llamar refreshAllFromSupabase porque bypassa las protecciones de syncKey
+          // y puede causar que los datos se reviertan a un estado anterior.
           clearTimeout(pullDebounceRef.current);
           pullDebounceRef.current = setTimeout(() => {
-            refreshAllFromSupabase(syncBranchId, allBranchIds);
             useInventoryStore.getState().loadFromRemote().catch(e => console.warn('[Sync] loadFromRemote error:', e));
-          }, 800);
+          }, 1500);
         }
       });
 
