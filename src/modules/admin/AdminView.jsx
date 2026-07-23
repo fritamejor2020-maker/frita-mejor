@@ -3459,10 +3459,10 @@ function FritadoConfigPanel() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRecipe, setNewRecipe] = useState({ crudoId: '', fritoId: '', presets: [10, 20, 50, 100, 200], productionPointIds: [] });
 
-  const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO', 'BEBIDA'].includes(i.type));
+  const allProducts = (inventory || []).filter(i => i.type !== 'INSUMO');
   // Helper: etiqueta un item con su tipo para que sea distinguible en dropdowns
   const itemLabel = (p) => {
-    const badge = p.type === 'CRUDO' ? '🧊 CRUDO' : p.type === 'FRITO' ? '🔥 FRITO' : p.type === 'BEBIDA' ? '🥤 BEBIDA' : p.type === 'PRODUCTO' ? '📦 PRODUCTO' : p.type;
+    const badge = p.type === 'CRUDO' ? '🧊 CRUDO' : p.type === 'FRITO' ? '🔥 FRITO' : p.type === 'BEBIDA' ? '🥤 BEBIDA' : p.type === 'PRODUCTO' ? '📦 PRODUCTO' : `🏷️ ${p.type}`;
     return `${p.name}  [${badge}]  (${p.qty ?? 0} ${p.unit || 'ud'})`;
   };
 
