@@ -356,42 +356,67 @@ export const useInventoryStore = create(
 
           const updates = {};
 
-          // Procesar llaves globales — smart merge: local gana
+          // ════════════════════════════════════════════════════════════════════
+          // REGLA DE ORO: Si Supabase tiene datos para una llave, esos datos
+          // REEMPLAZAN completamente el estado local (que viene de INITIAL_*).
+          // NO se mezclan. Esto previene que datos de demo/plantilla del código
+          // contaminen las configuraciones reales del usuario.
+          //
+          // Excepción: datos creados offline (que no están en Supabase porque
+          // no se han sincronizado aún). Estos se preservan SOLO si no tienen
+          // un ID que coincida con los INITIAL_* del código fuente.
+          // ════════════════════════════════════════════════════════════════════
+
+          // IDs conocidos de datos de plantilla/demo del código fuente
+          // Si un ítem local tiene uno de estos IDs, es de DEMO y debe descartarse
+          const DEMO_IDS = new Set([
+            // Bodegas demo
+            'BOD-001', 'BOD-002', 'BOD-003',
+            // Puntos de producción demo
+            'PP-001', 'PP-002', 'PP-003',
+            // Cocinas demo
+            'FK-001', 'FK-002',
+            // Inventario demo
+            'INS-001','INS-002','INS-003','INS-004','INS-005','INS-006','INS-007','INS-008',
+            'PRD-001','PRD-002','PRD-003','PRD-004','PRD-005','PRD-006','PRD-RAW-005','PRD-RAW-006',
+            // Productos demo
+            'P-001','P-002','P-003','P-004',
+            // Recetas demo
+            'R-001','R-002','R-003','R-004',
+            // Fritado demo
+            'FR-001','FR-002',
+            // Categorías POS demo
+            'CAT-001','CAT-002','CAT-003',
+            // Tipos de Ítem demo
+            'IT-001','IT-002','IT-003','IT-004','IT-005',
+            // Clientes demo
+            'CUST-002',
+            // Tipos de cliente demo
+            'CTYPE-001','CTYPE-002',
+            // Registros de caja demo
+            'REG-001',
+          ]);
+
+          // Procesar llaves globales — REMOTO REEMPLAZA LOCAL
           for (const key of GLOBAL_STORE_KEYS) {
             const val = remote[key];
             if (val !== undefined && val !== null) {
               const isNonEmpty = Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0;
               if (isNonEmpty) {
-                let finalVal = val;
-                // Arrays: smart merge por ID, local gana
-                if (Array.isArray(finalVal)) {
+                if (Array.isArray(val)) {
+                  // Tomar los datos remotos como base
+                  const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
+                  // Preservar SOLO ítems locales creados por el usuario que NO están en remoto
+                  // y que NO son datos de demo del código fuente
                   const localArr = get()[key] || [];
-                  if (localArr.length > 0) {
-                    const merged = [...localArr];
-                    const mergedIds = new Set(localArr.map(x => x?.id).filter(Boolean));
-                    finalVal.forEach(item => {
-                      if (item?.id && !mergedIds.has(item.id)) {
-                        merged.push(item);
-                        mergedIds.add(item.id);
-                      }
-                    });
-                    finalVal = merged;
-                  }
+                  const userCreatedOffline = localArr.filter(item =>
+                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id)
+                  );
+                  updates[key] = [...val, ...userCreatedOffline];
+                } else {
+                  // Objetos (no aplica a GLOBAL_STORE_KEYS actuales, pero por seguridad)
+                  updates[key] = val;
                 }
-                // Objetos: el más reciente gana
-                if (finalVal && typeof finalVal === 'object' && !Array.isArray(finalVal)) {
-                  const localVal = get()[key];
-                  if (localVal && typeof localVal === 'object' && !Array.isArray(localVal) && Object.keys(localVal).length > 0) {
-                    const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
-                    const remoteTime = finalVal._updatedAt ? new Date(finalVal._updatedAt).getTime() : 0;
-                    if (localTime > remoteTime) {
-                      finalVal = { ...finalVal, ...localVal };
-                    } else {
-                      finalVal = { ...localVal, ...finalVal };
-                    }
-                  }
-                }
-                updates[key] = finalVal;
               }
             }
           }
@@ -409,78 +434,60 @@ export const useInventoryStore = create(
               if (val !== undefined && val !== null) {
                 const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
                 if (isNonEmpty) {
-                  let finalVal = val;
-
-                  // Para arrays: smart merge con mergeArrays
-                  if (Array.isArray(finalVal)) {
+                  if (Array.isArray(val)) {
+                    // Remoto reemplaza local; preservar solo offline genuinos
+                    const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
                     const localArr = get()[key] || [];
-                    finalVal = mergeArrays(localArr, finalVal, key);
+                    const userCreatedOffline = localArr.filter(item =>
+                      item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id)
+                    );
+                    let finalVal = [...val, ...userCreatedOffline];
                     // Aplicar tombstones
                     if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
                     if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
+                    updates[key] = finalVal;
+                  } else {
+                    // Objetos (posSettings, etc.): remoto GANA siempre
+                    updates[key] = val;
                   }
-
-                  // Para objetos (posSettings, etc.): el más reciente gana
-                  if (finalVal && typeof finalVal === 'object' && !Array.isArray(finalVal)) {
-                    const localVal = get()[key];
-                    if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
-                      const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
-                      const remoteTime = finalVal._updatedAt ? new Date(finalVal._updatedAt).getTime() : 0;
-                      // Si local fue modificado por el usuario más recientemente, local gana
-                      // Si remote es más reciente (correcciones), remote gana
-                      // Si ninguno tiene timestamp, remote gana (para que fixes se propaguen)
-                      if (localTime > remoteTime) {
-                        finalVal = { ...finalVal, ...localVal };
-                      } else {
-                        finalVal = { ...localVal, ...finalVal };
-                      }
-                    }
-                  }
-                  updates[key] = finalVal;
                 }
               }
             }
             console.log('[Store] Cargado desde Supabase (sede:', effectiveBranch, '):', Object.keys(updates));
           } else {
-            // BUG-04 FIX: Admin carga y fusiona datos de TODAS las sedes
+            // Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
             const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds'];
             for (const key of BRANCH_STORE_KEYS) {
-              const localArr = get()[key] || [];
-              let merged = Array.isArray(localArr) ? [...localArr] : [];
+              // Empezar VACÍO en vez de con datos locales (que pueden ser de demo)
+              let merged = [];
 
               if (remote[key] && Array.isArray(remote[key])) {
-                merged = mergeArrays(merged, remote[key], key);
+                merged = [...remote[key]];
               }
 
               for (const bId of allBranchIds) {
                 const branchKeyName = `${key}_${bId}`;
                 const val = remote[branchKeyName];
                 if (Array.isArray(val) && val.length > 0) {
-                  merged = mergeArrays(merged, val, key);
+                  // Fusionar arrays de diferentes sedes (sin duplicados por ID)
+                  const existingIds = new Set(merged.filter(x => x?.id).map(x => x.id));
+                  val.forEach(item => {
+                    if (item?.id && !existingIds.has(item.id)) {
+                      merged.push(item);
+                      existingIds.add(item.id);
+                    }
+                  });
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
-                  // Para objetos (posSettings, etc.): usar solo la sede activa del Admin (BRANCH-001)
-                  // No sobreescribir si ya fue establecido por una sede anterior
+                  // Objetos (posSettings, etc.): usar solo la sede activa
                   const activeBranch = useAuthStore.getState().getActiveBranchId() || 'BRANCH-001';
                   if (bId === activeBranch || !updates[key]) {
-                    const localVal = get()[key];
-                    if (localVal && typeof localVal === 'object' && !Array.isArray(localVal)) {
-                      const localTime = localVal._updatedAt ? new Date(localVal._updatedAt).getTime() : 0;
-                      const remoteTime = val._updatedAt ? new Date(val._updatedAt).getTime() : 0;
-                      if (remoteTime >= localTime) {
-                        updates[key] = { ...localVal, ...val };
-                      } else {
-                        updates[key] = { ...val, ...localVal };
-                      }
-                    } else {
-                      updates[key] = val;
-                    }
+                    updates[key] = val;
                   }
                 }
               }
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') merged = merged.filter(s => !deleted.includes(s.id));
-                // Para deletedInventoryIds: fusionar con los locales
                 if (key === 'deletedInventoryIds') {
                   const localDeleted = get().deletedInventoryIds || [];
                   merged = [...new Set([...merged, ...localDeleted])];
@@ -494,12 +501,15 @@ export const useInventoryStore = create(
           }
 
           // Carga estricta de inventario desde Supabase: el inventario remoto en la nube SIEMPRE tiene la máxima prioridad.
-          // NUNCA mezclar semillas de prueba ni ítems demostrativos antiguos del cliente local.
           if (updates.inventory && Array.isArray(updates.inventory) && updates.inventory.length > 0) {
             const deletedInvIds = get().deletedInventoryIds || [];
             updates.inventory = updates.inventory.filter(i => !deletedInvIds.includes(i.id));
           } else if (get().inventory && get().inventory.length > 0) {
-            delete updates.inventory;
+            // Si no vino inventario de Supabase pero hay local, preservar solo lo que NO es demo
+            const localInv = get().inventory.filter(i => i?.id && !DEMO_IDS.has(i.id));
+            if (localInv.length > 0) {
+              updates.inventory = localInv;
+            }
           }
           // cashDrawerCode: respetar el formato del usuario (hex o decimal)
           if (Object.keys(updates).length > 0) {
