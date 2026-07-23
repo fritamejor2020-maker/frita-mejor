@@ -10,7 +10,27 @@ import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
 // Para BRANCH_KEYS: si el usuario no tiene sede (Admin, branchId=null),
 // usa BRANCH-001 como fallback en lugar de escribir en la llave global.
 // Esto previene que el Admin contamine la partición global con datos de sede.
+//
+// PROTECCIÓN CRÍTICA: Solo permite push si:
+//   1. Hay un usuario autenticado con sesión activa (no una rehidratación de localStorage)
+//   2. La app está corriendo en el dominio de producción (no localhost ni preview)
+//   3. El flag _hasLoadedRemote está activo (ya descargó datos reales de Supabase)
 function syncKey(key, value) {
+  // Bloqueo 1: Si no hay usuario autenticado, no sincronizar
+  const user = useAuthStore.getState().user;
+  if (!user || !user.role) {
+    console.warn(`[SyncGuard] Push de "${key}" bloqueado: no hay sesión de usuario activa.`);
+    return;
+  }
+
+  // Bloqueo 2: Si la app no ha terminado de cargar datos remotos, no sincronizar
+  // Esto evita que los valores INITIAL_* del código sobreescriban Supabase al arrancar
+  const store = useInventoryStore.getState();
+  if (!store._hasLoadedRemote) {
+    console.warn(`[SyncGuard] Push de "${key}" bloqueado: aún no se ha cargado el estado remoto.`);
+    return;
+  }
+
   const activeBranchId = useAuthStore.getState().getActiveBranchId();
   const effectiveBranchId = BRANCH_KEYS.includes(key) ? activeBranchId : null;
   const resolvedKey = getBranchKey(key, effectiveBranchId);
@@ -293,6 +313,10 @@ export const useInventoryStore = create(
       // { id, customerId, customerName, amount, method, note, shiftId, date }
       contrataPayments:   [],
 
+      // Flag de protección: indica que ya se cargaron datos reales de Supabase.
+      // Mientras sea false, syncKey() rechaza todas las escrituras a la nube.
+      _hasLoadedRemote: false,
+
       // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
       // Descarga el estado de Supabase y lo aplica encima del caché local.
       // Multisede: descarga solo las llaves de la sede del usuario activo
@@ -481,8 +505,15 @@ export const useInventoryStore = create(
           if (Object.keys(updates).length > 0) {
             set(updates);
           }
+
+          // Activar el flag de protección: a partir de aquí syncKey() permite escrituras
+          set({ _hasLoadedRemote: true });
+          console.log('[SyncGuard] ✅ Carga remota completada — escrituras a Supabase habilitadas.');
         } catch (err) {
           console.warn('[Store] No se pudo cargar estado remoto:', err.message);
+          // Incluso si falla la carga remota, activar el flag para no bloquear la operación
+          // del usuario para siempre. El usuario puede seguir trabajando offline.
+          set({ _hasLoadedRemote: true });
         }
       },
 
@@ -1280,7 +1311,8 @@ export const useInventoryStore = create(
         }
         const deletedInv = state.deletedInventoryIds || [];
         if (!state.inventory || state.inventory.length === 0) {
-          state.inventory = inventoryBackupSeed;
+          // NO usar inventoryBackupSeed aquí — esperar a que loadFromRemote traiga los datos reales
+          state.inventory = [];
         } else {
           let inv = state.inventory;
           if (deletedInv.length > 0) {
@@ -1301,7 +1333,7 @@ export const useInventoryStore = create(
               uniqueInventory.push(item);
             }
           });
-          state.inventory = uniqueInventory.length > 0 ? uniqueInventory : inventoryBackupSeed;
+          state.inventory = uniqueInventory;
         }
       },
     }

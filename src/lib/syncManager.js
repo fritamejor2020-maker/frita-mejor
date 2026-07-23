@@ -179,10 +179,21 @@ export async function flushQueue() {
  * @param {string|null} branchId — ID de la sede. null = llave global o Admin.
  */
 export async function push(key, value, branchId = null) {
-  // Protección de seguridad: previene sobreescrituras accidentales de la base de datos de producción durante pruebas o sesiones locales de desarrollo
+  // Protección 1: Modo Seguro manual (para pruebas de Antigravity)
   if (typeof window !== 'undefined' && window.__FRITA_SAFE_MODE__) {
     console.warn(`[SyncManager] Push de "${key}" omitido por Modo Seguro activo.`);
     return;
+  }
+
+  // Protección 2: Bloquear escrituras desde entornos de desarrollo (localhost, preview, etc.)
+  if (typeof window !== 'undefined') {
+    const hostname = window.location?.hostname || '';
+    const isProduction = hostname.includes('vercel.app') || hostname.includes('fritamejor');
+    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168');
+    if (isLocalhost && !window.__FRITA_FORCE_SYNC__) {
+      console.warn(`[SyncManager] Push de "${key}" bloqueado: entorno localhost detectado.`);
+      return;
+    }
   }
 
   const supabaseKey = getBranchKey(key, branchId);
