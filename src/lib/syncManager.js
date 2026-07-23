@@ -179,6 +179,12 @@ export async function flushQueue() {
  * @param {string|null} branchId — ID de la sede. null = llave global o Admin.
  */
 export async function push(key, value, branchId = null) {
+  // Protección de seguridad: previene sobreescrituras accidentales de la base de datos de producción durante pruebas o sesiones locales de desarrollo
+  if (typeof window !== 'undefined' && window.__FRITA_SAFE_MODE__) {
+    console.warn(`[SyncManager] Push de "${key}" omitido por Modo Seguro activo.`);
+    return;
+  }
+
   const supabaseKey = getBranchKey(key, branchId);
 
   if (!isOnline) {

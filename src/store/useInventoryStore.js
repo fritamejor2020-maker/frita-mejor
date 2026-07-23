@@ -469,15 +469,13 @@ export const useInventoryStore = create(
             console.log('[Store] Admin: cargado desde Supabase (todas las sedes):', Object.keys(updates));
           }
 
-          // Smart merge para inventario: fusionar usando mergeArrays (da preferencia a remoto para actualizar stocks/precios, conservando creaciones locales)
-          if (updates.inventory) {
-            const localInventory = get().inventory || [];
+          // Carga estricta de inventario desde Supabase: el inventario remoto en la nube SIEMPRE tiene la máxima prioridad.
+          // NUNCA mezclar semillas de prueba ni ítems demostrativos antiguos del cliente local.
+          if (updates.inventory && Array.isArray(updates.inventory) && updates.inventory.length > 0) {
             const deletedInvIds = get().deletedInventoryIds || [];
-            let mergedInv = mergeArrays(localInventory, updates.inventory, 'inventory');
-            mergedInv = mergedInv.filter(i => !deletedInvIds.includes(i.id));
-            updates.inventory = mergedInv.length > 0 ? mergedInv : (localInventory.length > 0 ? localInventory : inventoryBackupSeed);
-          } else if (!get().inventory || get().inventory.length === 0) {
-            updates.inventory = inventoryBackupSeed;
+            updates.inventory = updates.inventory.filter(i => !deletedInvIds.includes(i.id));
+          } else if (get().inventory && get().inventory.length > 0) {
+            delete updates.inventory;
           }
           // cashDrawerCode: respetar el formato del usuario (hex o decimal)
           if (Object.keys(updates).length > 0) {
