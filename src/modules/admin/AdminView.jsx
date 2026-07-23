@@ -5,7 +5,7 @@ import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { uploadProductImage } from '../../lib/storageUtils';
-import { useInventoryStore } from '../../store/useInventoryStore';
+import { useInventoryStore, INITIAL_ITEM_TYPES } from '../../store/useInventoryStore';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { usePayrollStore } from '../../store/usePayrollStore';
@@ -557,9 +557,12 @@ const parseCSV = (text) => {
   return result;
 };
 
-export function InventoryPanel({ branchId }) {
-  const { inventory, warehouses, posCategories, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory, setInventory } = useInventoryStore();
+export function InventoryPanel({ branchId, onOpenItemTypes }) {
+  const { inventory, warehouses, posCategories, itemTypes, addInventoryItem, updateInventoryItem, deleteInventoryItem, addPosCategory, setInventory } = useInventoryStore();
   
+  const typeList = itemTypes && itemTypes.length > 0 ? itemTypes : INITIAL_ITEM_TYPES;
+  const availableTypes = typeList.map(t => t.name);
+
   // Filtrar bodegas de esta sede
   const activeWhs = warehouses.filter(w => !branchId || w.branchId === branchId);
   const activeWhsIds = activeWhs.map(w => w.id);
@@ -798,7 +801,7 @@ export function InventoryPanel({ branchId }) {
     { key: 'name',        label: 'Nombre',          wide: true },
     { key: 'barcode',     label: 'Cód. de Barras',   wide: false },
     { key: 'warehouseId', label: 'Bodega',   options: activeWhs.map((w) => ({ value: w.id, label: w.name })) },
-    { key: 'tipo',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO', 'BEBIDA'] },
+    { key: 'tipo',        label: 'Tipo',     options: availableTypes },
     { key: 'estado',      label: 'Estado',   options: ['N/A', 'CRUDO', 'FRITO'] },
     { key: 'qty',         label: 'Cantidad', type: 'number' },
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
@@ -812,20 +815,16 @@ export function InventoryPanel({ branchId }) {
 
   // Convierte los dos campos vizuales en el campo 'type' real del item
   const buildType = (tipo, estado) => {
-    if (tipo === 'INSUMO') return 'INSUMO';
-    if (tipo === 'BEBIDA') return 'BEBIDA';
     if (estado === 'CRUDO') return 'CRUDO';
     if (estado === 'FRITO') return 'FRITO';
-    return 'PRODUCTO'; // PRODUCTO + N/A
+    return tipo || 'PRODUCTO';
   };
 
   // Descompone un 'type' existente en los dos campos visuales
   const decomposeType = (type) => {
-    if (type === 'INSUMO')   return { tipo: 'INSUMO',   estado: 'N/A' };
-    if (type === 'BEBIDA')   return { tipo: 'BEBIDA',   estado: 'N/A' };
     if (type === 'CRUDO')    return { tipo: 'PRODUCTO', estado: 'CRUDO' };
     if (type === 'FRITO')    return { tipo: 'PRODUCTO', estado: 'FRITO' };
-    return                          { tipo: 'PRODUCTO', estado: 'N/A' };  // 'PRODUCTO'
+    return                          { tipo: type || 'PRODUCTO', estado: 'N/A' };
   };
 
   const change = (k, v) => {
@@ -921,6 +920,14 @@ export function InventoryPanel({ branchId }) {
               onChange={handleFileUpload}
             />
           </label>
+          {onOpenItemTypes && (
+            <button 
+              onClick={onOpenItemTypes}
+              className="bg-purple-50 hover:bg-purple-100 text-purple-700 font-black text-xs py-2.5 px-5 rounded-full border border-purple-200 transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+            >
+              🏷️ Tipos de Ítem
+            </button>
+          )}
           <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: activeWhs[0]?.id || '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 }); }}>
             + Agregar ítem
           </Button>
@@ -982,11 +989,9 @@ export function InventoryPanel({ branchId }) {
               onChange={(e) => setFilterType(e.target.value)}
             >
               <option value="ALL">Todos los tipos</option>
-              <option value="INSUMO">INSUMO</option>
-              <option value="PRODUCTO">PRODUCTO</option>
-              <option value="BEBIDA">BEBIDA</option>
-              <option value="CRUDO">CRUDO</option>
-              <option value="FRITO">FRITO</option>
+              {typeList.map((t) => (
+                <option key={t.id || t.name} value={t.name}>{t.name}</option>
+              ))}
             </select>
           </div>
 
@@ -1032,6 +1037,8 @@ export function InventoryPanel({ branchId }) {
       <div className="space-y-2">
         {displayed.map((item) => {
           const wh = warehouses.find((w) => w.id === item.warehouseId);
+          const itemTypeObj = typeList.find((t) => t.name === item.type);
+          const badgeStyle = itemTypeObj?.color || 'bg-gray-100 text-gray-600 border border-gray-200';
           return editingId === item.id ? (
             <div key={item.id}>
               <EditableRow fields={fields} values={form} onChange={change}
@@ -1040,13 +1047,7 @@ export function InventoryPanel({ branchId }) {
             </div>
           ) : (
             <div key={item.id} className="border border-gray-100 rounded-2xl p-4 flex flex-wrap items-center gap-3 hover:border-gray-200 transition-colors">
-              <span className={`w-[90px] text-center text-[10px] font-black uppercase tracking-wider py-1.5 rounded-full shrink-0 ${
-                item.type === 'INSUMO' ? 'bg-blue-50 text-blue-500 border border-blue-200' : 
-                item.type === 'PRODUCTO' ? 'bg-green-50 text-green-600 border border-green-200' :
-                item.type === 'BEBIDA' ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' :
-                item.type === 'CRUDO' ? 'bg-orange-50 text-orange-600 border border-orange-200' :
-                item.type === 'FRITO' ? 'bg-yellow-50 text-yellow-600 border border-yellow-200' : 'bg-gray-100 text-gray-500'
-              }`}>{item.type}</span>
+              <span className={`w-[90px] text-center text-[10px] font-black uppercase tracking-wider py-1.5 rounded-full shrink-0 ${badgeStyle}`}>{item.type}</span>
               <div className="flex-1 min-w-[100px]">
                 <span className="font-black text-chunky-dark block truncate">{item.name}</span>
                 {item.barcode && (
@@ -2297,6 +2298,96 @@ function ProductsPresetsPanel() {
 }
 
 // ─── Panel: Configuración de POS (Carpetas) ──────────────────────────────────
+// ─── Panel: Tipos de Ítem Personalizados ───────────────────────────────────────
+function ItemTypesPanel() {
+  const { itemTypes, addItemType, updateItemType, deleteItemType } = useInventoryStore();
+  const [editingId, setEditingId] = useState(null);
+  const [showAdd,   setShowAdd]   = useState(false);
+  const [form,      setForm]      = useState({ name: '', description: '', color: 'bg-purple-50 text-purple-600 border border-purple-200' });
+
+  const typesList = itemTypes && itemTypes.length > 0 ? itemTypes : INITIAL_ITEM_TYPES;
+
+  const fields = [
+    { key: 'name',        label: 'Nombre del Tipo (ej. POSTRE, COMBO, EMPAQUE)' },
+    { key: 'description', label: 'Descripción' },
+    { key: 'color',       label: 'Estilo / Color', options: [
+      { value: 'bg-cyan-50 text-cyan-600 border border-cyan-200',        label: 'Cyan (Bebida / Frío)' },
+      { value: 'bg-purple-50 text-purple-600 border border-purple-200',    label: 'Morado (Combo / Especial)' },
+      { value: 'bg-pink-50 text-pink-600 border border-pink-200',          label: 'Rosado (Dulce / Postre)' },
+      { value: 'bg-emerald-50 text-emerald-600 border border-emerald-200',label: 'Esmeralda (Verde)' },
+      { value: 'bg-amber-50 text-amber-600 border border-amber-200',       label: 'Ámbar (Dorado / Especial)' },
+      { value: 'bg-indigo-50 text-indigo-600 border border-indigo-200',   label: 'Índigo (Azul Oscuro)' },
+      { value: 'bg-blue-50 text-blue-500 border border-blue-200',          label: 'Azul Insumo' },
+      { value: 'bg-green-50 text-green-600 border border-green-200',       label: 'Verde Producto' },
+      { value: 'bg-orange-50 text-orange-600 border border-orange-200',    label: 'Naranja Crudo' },
+      { value: 'bg-yellow-50 text-yellow-600 border border-yellow-200',    label: 'Amarillo Frito' },
+      { value: 'bg-gray-100 text-gray-600 border border-gray-200',        label: 'Gris Neutro' },
+    ] },
+  ];
+
+  const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  return (
+    <div>
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-5">
+        <div>
+          <h3 className="font-black text-chunky-dark text-lg">🏷️ Tipos de Ítem del Sistema ({typesList.length})</h3>
+          <p className="text-xs font-bold text-gray-400 mt-0.5">Crea tus propios tipos personalizados para clasificar tu inventario.</p>
+        </div>
+        <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm shrink-0" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', description: '', color: 'bg-purple-50 text-purple-600 border border-purple-200' }); }}>
+          + Crear Nuevo Tipo
+        </Button>
+      </div>
+
+      {showAdd && (
+        <div className="mb-4">
+          <EditableRow fields={fields} values={form} onChange={change}
+            onSave={() => { if (form.name.trim()) { addItemType(form); setShowAdd(false); } }}
+            onCancel={() => setShowAdd(false)} />
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {typesList.map((type) => (
+          editingId === type.id ? (
+            <div key={type.id}>
+              <EditableRow fields={fields} values={form} onChange={change}
+                onSave={() => { updateItemType(type.id, form); setEditingId(null); }}
+                onCancel={() => setEditingId(null)} />
+            </div>
+          ) : (
+            <div key={type.id} className="border border-gray-100 rounded-2xl p-4 flex items-center justify-between hover:border-gray-200 transition-colors">
+              <div className="flex items-center gap-3">
+                <span className={`px-3 py-1 text-xs font-black uppercase tracking-wider rounded-full shrink-0 ${type.color || 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+                  {type.name}
+                </span>
+                <div>
+                  <span className="font-bold text-xs text-gray-600 block">{type.description || 'Sin descripción'}</span>
+                  {type.isSystem ? (
+                    <span className="text-[10px] font-bold text-blue-500 bg-blue-50 px-2 py-0.5 rounded-full inline-block mt-0.5">🔒 Tipo Base del Sistema</span>
+                  ) : (
+                    <span className="text-[10px] font-bold text-purple-500 bg-purple-50 px-2 py-0.5 rounded-full inline-block mt-0.5">⭐ Tipo Personalizado</span>
+                  )}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(type.id); setForm({ name: type.name, description: type.description || '', color: type.color || 'bg-purple-50 text-purple-600 border border-purple-200' }); setShowAdd(false); }}>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                </button>
+                {!type.isSystem && (
+                  <button className="text-gray-300 hover:text-red-400" onClick={() => deleteItemType(type.id)}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                  </button>
+                )}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function PosCategoriesPanel() {
   const { posCategories, addPosCategory, updatePosCategory, deletePosCategory } = useInventoryStore();
   const [editingId, setEditingId] = useState(null);
@@ -3709,6 +3800,7 @@ export function AdminView() {
       { id: 'PRODUCTOS',  label: '🔢 Botones Prod.' },
       { id: 'FRITADO',    label: '🍳 Recetas Fritado' },
       { id: 'INVENTARIO', label: '📋 Inventario'  },
+      { id: 'ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
       { id: 'POS_INVENTORY', label: '⚙️ Inventario Modular' },
       { id: 'RECETAS',    label: '🧾 Recetas'     },
     ],
@@ -3718,6 +3810,7 @@ export function AdminView() {
       { id: 'POS_OLACLICK',   label: '🔌 Integración OlaClick' },
       { id: 'POS_REWARDS',    label: '🎁 Premios & Gamificación' },
       { id: 'POS_CARPETAS',   label: '🗂️ Carpetas POS' },
+      { id: 'POS_ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
       { id: 'POS_HISTORY',    label: '🧾 Historial POS' },
       { id: 'POS_CIERRES',    label: '💰 Cierres Caja' },
       { id: 'CONTRATAS',      label: '🤝 Contratas' },

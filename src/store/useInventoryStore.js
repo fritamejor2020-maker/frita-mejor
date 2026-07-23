@@ -200,6 +200,14 @@ const INITIAL_POS_CATEGORIES = [
   { id: 'CAT-003', name: 'Crudos / Paquetes', color: 'bg-green-500' },
 ];
 
+export const INITIAL_ITEM_TYPES = [
+  { id: 'IT-001', name: 'INSUMO', description: 'Materias primas e ingredientes para recetas', isSystem: true, color: 'bg-blue-50 text-blue-500 border border-blue-200' },
+  { id: 'IT-002', name: 'PRODUCTO', description: 'Productos terminados o mercancía general', isSystem: true, color: 'bg-green-50 text-green-600 border border-green-200' },
+  { id: 'IT-003', name: 'BEBIDA', description: 'Gaseosas, jugos y bebidas', isSystem: true, color: 'bg-cyan-50 text-cyan-600 border border-cyan-200' },
+  { id: 'IT-004', name: 'CRUDO', description: 'Masas o preparados congelados pendientes por freír', isSystem: true, color: 'bg-orange-50 text-orange-600 border border-orange-200' },
+  { id: 'IT-005', name: 'FRITO', description: 'Productos fritos calientes listos para venta rápida', isSystem: true, color: 'bg-yellow-50 text-yellow-600 border border-yellow-200' },
+];
+
 const INITIAL_CUSTOMERS = [
   { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001', phone: '', creditLimit: 500000, notes: '', address: '' },
 ];
@@ -267,6 +275,7 @@ export const useInventoryStore = create(
       products:           INITIAL_PRODUCTS,
       recipes:            INITIAL_RECIPES,
       posCategories:      INITIAL_POS_CATEGORIES,
+      itemTypes:          INITIAL_ITEM_TYPES,
       customers:          INITIAL_CUSTOMERS,
       customerTypes:      INITIAL_CUSTOMER_TYPES,
       posSettings:        INITIAL_POS_SETTINGS,
@@ -310,7 +319,7 @@ export const useInventoryStore = create(
 
           // Llaves globales — se aplican directamente al store
           const GLOBAL_STORE_KEYS = [
-            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'customers', 'customerTypes', 'salesGoals',
+            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes', 'customers', 'customerTypes', 'salesGoals',
           ];
 
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
@@ -919,6 +928,22 @@ export const useInventoryStore = create(
       addPosCategory: (c) => { set((s) => ({ posCategories: [...(s.posCategories || []), { ...c, id: `CAT-${Date.now()}` }] })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
       updatePosCategory: (id, data) => { set((s) => ({ posCategories: (s.posCategories || []).map((c) => c.id === id ? { ...c, ...data } : c) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
       deletePosCategory: (id) => { set((s) => ({ posCategories: (s.posCategories || []).filter((c) => c.id !== id) })); syncKey('posCategories', useInventoryStore.getState().posCategories); },
+
+      // Tipos de Ítem Personalizados
+      addItemType: (typeData) => {
+        const name = typeData.name ? typeData.name.toUpperCase().trim() : '';
+        if (!name) return;
+        set((s) => ({ itemTypes: [...(s.itemTypes || INITIAL_ITEM_TYPES), { ...typeData, id: `IT-${Date.now()}`, name, isSystem: false }] }));
+        syncKey('itemTypes', useInventoryStore.getState().itemTypes);
+      },
+      updateItemType: (id, data) => {
+        set((s) => ({ itemTypes: (s.itemTypes || INITIAL_ITEM_TYPES).map((t) => t.id === id ? { ...t, ...data } : t) }));
+        syncKey('itemTypes', useInventoryStore.getState().itemTypes);
+      },
+      deleteItemType: (id) => {
+        set((s) => ({ itemTypes: (s.itemTypes || INITIAL_ITEM_TYPES).filter((t) => t.id !== id || t.isSystem) }));
+        syncKey('itemTypes', useInventoryStore.getState().itemTypes);
+      },
 
       // Metas de Venta
       addSalesGoal: (g) => { set((s) => ({ salesGoals: [...(s.salesGoals || []), { ...g, id: `GOAL-${Date.now()}` }] })); syncKey('salesGoals', useInventoryStore.getState().salesGoals); },
