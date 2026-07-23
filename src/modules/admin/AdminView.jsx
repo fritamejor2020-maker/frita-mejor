@@ -3962,7 +3962,8 @@ export function AdminView() {
         {activeTab === 'COCINAS_FRITADO' && <FryKitchensPanel />}
         {activeTab === 'PRODUCTOS'  && <ProductsPresetsPanel />}
         {activeTab === 'FRITADO'    && <FritadoConfigPanel />}
-        {activeTab === 'INVENTARIO' && <InventoryPanel />}
+        {activeTab === 'INVENTARIO' && <InventoryPanel branchId={null} onOpenItemTypes={() => setActiveTab('ITEM_TYPES')} />}
+        {(activeTab === 'ITEM_TYPES' || activeTab === 'POS_ITEM_TYPES') && <ItemTypesPanel />}
         {activeTab === 'RECETAS'    && <RecipesPanel />}
         {activeTab === 'USUARIOS'      && <AdminUsersTab />}
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
