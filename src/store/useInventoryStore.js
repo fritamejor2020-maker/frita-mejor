@@ -36,6 +36,11 @@ function syncKey(key, value) {
   const resolvedKey = getBranchKey(key, effectiveBranchId);
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
+
+  // Para BRANCH_KEYS: también actualizar la llave legacy sin sufijo para mantener ambas en 100% sincronía
+  if (BRANCH_KEYS.includes(key)) {
+    push(key, value, null).catch(() => {});
+  }
 }
 
 // Helper: realiza un merge inteligente de arrays locales y remotos para evitar
@@ -459,23 +464,18 @@ export const useInventoryStore = create(
             const deleted = get().deletedShiftIds || [];
             const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds'];
             for (const key of BRANCH_STORE_KEYS) {
-              // Empezar VACÍO en vez de con datos locales (que pueden ser de demo)
               let merged = [];
+              const addedIds = new Set();
 
-              if (remote[key] && Array.isArray(remote[key])) {
-                merged = [...remote[key]];
-              }
-
+              // 1. PRIMERO cargar llaves específicas de sede (tienen máxima prioridad sobre llaves legacy)
               for (const bId of allBranchIds) {
                 const branchKeyName = `${key}_${bId}`;
                 const val = remote[branchKeyName];
                 if (Array.isArray(val) && val.length > 0) {
-                  // Fusionar arrays de diferentes sedes (sin duplicados por ID)
-                  const existingIds = new Set(merged.filter(x => x?.id).map(x => x.id));
                   val.forEach(item => {
-                    if (item?.id && !existingIds.has(item.id)) {
+                    if (item?.id && !addedIds.has(item.id)) {
                       merged.push(item);
-                      existingIds.add(item.id);
+                      addedIds.add(item.id);
                     }
                   });
                 } else if (val && typeof val === 'object' && !Array.isArray(val)) {
@@ -486,6 +486,17 @@ export const useInventoryStore = create(
                   }
                 }
               }
+
+              // 2. LUEGO incluir ítems de la llave legacy (sin sufijo) SOLO si no estaban ya en la llave de sede
+              if (remote[key] && Array.isArray(remote[key])) {
+                remote[key].forEach(item => {
+                  if (item?.id && !addedIds.has(item.id)) {
+                    merged.push(item);
+                    addedIds.add(item.id);
+                  }
+                });
+              }
+
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') merged = merged.filter(s => !deleted.includes(s.id));
                 if (key === 'deletedInventoryIds') {
