@@ -14,7 +14,7 @@ import { useAuthStore } from './useAuthStore';
 export const TRANSFER_ITEM_TYPES = {
   insumos:   { label: 'Insumos / Materias primas', icon: '🧂', types: ['INSUMO'] },
   crudos:    { label: 'Productos Crudos',           icon: '🥩', types: ['PRODUCTO'], raw: true },
-  productos: { label: 'Productos Terminados',       icon: '📦', types: ['PRODUCTO'] },
+  productos: { label: 'Productos Terminados',       icon: '📦', types: ['PRODUCTO', 'BEBIDA'] },
   fritos:    { label: 'Fritos / Listos para venta', icon: '🍟', types: ['FRITO'] },
 };
 

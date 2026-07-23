@@ -498,7 +498,7 @@ export const useInventoryStore = create(
        */
       getPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO', 'BEBIDA'].includes(i.type) && i.inTricycles !== false
         ),
 
       /**
@@ -508,7 +508,7 @@ export const useInventoryStore = create(
        */
       getDeliveryItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false && !i.showInTricicloPos
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO', 'BEBIDA'].includes(i.type) && i.inTricycles !== false && !i.showInTricicloPos
         ),
 
       /**
@@ -518,7 +518,7 @@ export const useInventoryStore = create(
        */
       getVendedorPosItems: () =>
         get().inventory.filter(
-          (i) => ['FRITO', 'PRODUCTO', 'CRUDO'].includes(i.type) && i.inTricycles !== false && i.showInPos !== false
+          (i) => ['FRITO', 'PRODUCTO', 'CRUDO', 'BEBIDA'].includes(i.type) && i.inTricycles !== false && i.showInPos !== false
         ),
 
 
@@ -886,7 +886,7 @@ export const useInventoryStore = create(
 
       // Inventario
       addInventoryItem: (item) => {
-        const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
+        const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'BEBIDA' ? 'BEB' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
         const newItem = { ...item, id: `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, qty: parseFloat(item.qty) || 0 };
         set((s) => ({ inventory: [...s.inventory, newItem] }));
         syncKey('inventory', useInventoryStore.getState().inventory);

@@ -798,7 +798,7 @@ export function InventoryPanel({ branchId }) {
     { key: 'name',        label: 'Nombre',          wide: true },
     { key: 'barcode',     label: 'Cód. de Barras',   wide: false },
     { key: 'warehouseId', label: 'Bodega',   options: activeWhs.map((w) => ({ value: w.id, label: w.name })) },
-    { key: 'tipo',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO'] },
+    { key: 'tipo',        label: 'Tipo',     options: ['INSUMO', 'PRODUCTO', 'BEBIDA'] },
     { key: 'estado',      label: 'Estado',   options: ['N/A', 'CRUDO', 'FRITO'] },
     { key: 'qty',         label: 'Cantidad', type: 'number' },
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
@@ -813,6 +813,7 @@ export function InventoryPanel({ branchId }) {
   // Convierte los dos campos vizuales en el campo 'type' real del item
   const buildType = (tipo, estado) => {
     if (tipo === 'INSUMO') return 'INSUMO';
+    if (tipo === 'BEBIDA') return 'BEBIDA';
     if (estado === 'CRUDO') return 'CRUDO';
     if (estado === 'FRITO') return 'FRITO';
     return 'PRODUCTO'; // PRODUCTO + N/A
@@ -821,6 +822,7 @@ export function InventoryPanel({ branchId }) {
   // Descompone un 'type' existente en los dos campos visuales
   const decomposeType = (type) => {
     if (type === 'INSUMO')   return { tipo: 'INSUMO',   estado: 'N/A' };
+    if (type === 'BEBIDA')   return { tipo: 'BEBIDA',   estado: 'N/A' };
     if (type === 'CRUDO')    return { tipo: 'PRODUCTO', estado: 'CRUDO' };
     if (type === 'FRITO')    return { tipo: 'PRODUCTO', estado: 'FRITO' };
     return                          { tipo: 'PRODUCTO', estado: 'N/A' };  // 'PRODUCTO'
@@ -982,6 +984,7 @@ export function InventoryPanel({ branchId }) {
               <option value="ALL">Todos los tipos</option>
               <option value="INSUMO">INSUMO</option>
               <option value="PRODUCTO">PRODUCTO</option>
+              <option value="BEBIDA">BEBIDA</option>
               <option value="CRUDO">CRUDO</option>
               <option value="FRITO">FRITO</option>
             </select>
@@ -1040,6 +1043,7 @@ export function InventoryPanel({ branchId }) {
               <span className={`w-[90px] text-center text-[10px] font-black uppercase tracking-wider py-1.5 rounded-full shrink-0 ${
                 item.type === 'INSUMO' ? 'bg-blue-50 text-blue-500 border border-blue-200' : 
                 item.type === 'PRODUCTO' ? 'bg-green-50 text-green-600 border border-green-200' :
+                item.type === 'BEBIDA' ? 'bg-cyan-50 text-cyan-600 border border-cyan-200' :
                 item.type === 'CRUDO' ? 'bg-orange-50 text-orange-600 border border-orange-200' :
                 item.type === 'FRITO' ? 'bg-yellow-50 text-yellow-600 border border-yellow-200' : 'bg-gray-100 text-gray-500'
               }`}>{item.type}</span>
@@ -1863,7 +1867,7 @@ function ReportsPanel() {
       {activeReport === 'SNAPSHOT' && (() => {
         const lowStock = inventory.filter(i => i.qty <= i.alert);
         const totalValue = inventory.reduce((s, i) => s + ((i.price || 0) * i.qty), 0);
-        const byType = { INSUMO: 0, PRODUCTO: 0, CRUDO: 0, FRITO: 0 };
+        const byType = { INSUMO: 0, PRODUCTO: 0, BEBIDA: 0, CRUDO: 0, FRITO: 0 };
         inventory.forEach(i => { if (byType[i.type] !== undefined) byType[i.type]++; });
         return (
           <div>
@@ -1895,8 +1899,8 @@ function ReportsPanel() {
                   {inventory.map((item) => {
                     const wh = warehouses.find(w => w.id === item.warehouseId);
                     const isLow = item.qty <= item.alert;
-                    const typeColorMap = { INSUMO: 'bg-blue-50 text-blue-500', PRODUCTO: 'bg-green-50 text-green-500', CRUDO: 'bg-sky-50 text-sky-600', FRITO: 'bg-orange-50 text-orange-500' };
-                    const typeIcon = { INSUMO: '📋', PRODUCTO: '📦', CRUDO: '🧊', FRITO: '🔥' };
+                    const typeColorMap = { INSUMO: 'bg-blue-50 text-blue-500', PRODUCTO: 'bg-green-50 text-green-500', BEBIDA: 'bg-cyan-50 text-cyan-600', CRUDO: 'bg-sky-50 text-sky-600', FRITO: 'bg-orange-50 text-orange-500' };
+                    const typeIcon = { INSUMO: '📋', PRODUCTO: '📦', BEBIDA: '🥤', CRUDO: '🧊', FRITO: '🔥' };
                     return (
                       <tr key={item.id} className={`hover:bg-gray-50/50 ${isLow ? 'bg-red-50/30' : ''}`}>
                         <td className="py-3 px-4 font-black text-chunky-dark">{item.name}</td>
@@ -3378,10 +3382,10 @@ function FritadoConfigPanel() {
   const [showAdd, setShowAdd] = useState(false);
   const [newRecipe, setNewRecipe] = useState({ crudoId: '', fritoId: '', presets: [10, 20, 50, 100, 200], productionPointIds: [] });
 
-  const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO'].includes(i.type));
+  const allProducts = (inventory || []).filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO', 'BEBIDA'].includes(i.type));
   // Helper: etiqueta un item con su tipo para que sea distinguible en dropdowns
   const itemLabel = (p) => {
-    const badge = p.type === 'CRUDO' ? '🧊 CRUDO' : p.type === 'FRITO' ? '🔥 FRITO' : p.type === 'PRODUCTO' ? '📦 PRODUCTO' : p.type;
+    const badge = p.type === 'CRUDO' ? '🧊 CRUDO' : p.type === 'FRITO' ? '🔥 FRITO' : p.type === 'BEBIDA' ? '🥤 BEBIDA' : p.type === 'PRODUCTO' ? '📦 PRODUCTO' : p.type;
     return `${p.name}  [${badge}]  (${p.qty ?? 0} ${p.unit || 'ud'})`;
   };
 
