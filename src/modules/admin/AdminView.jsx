@@ -201,8 +201,16 @@ function EditableRow({ fields, values, onChange, onSave, onCancel }) {
           <div key={f.key} className={`${f.wide ? 'flex-1 min-w-[180px]' : 'w-28'}`}>
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider block mb-1">{f.label}</label>
             {f.options ? (
-              <select className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main" value={values[f.key] ?? ''} onChange={(e) => onChange(f.key, e.target.value)}>
-                {f.options.map((o) => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
+              <select 
+                className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main" 
+                value={values[f.key] !== undefined && values[f.key] !== null ? String(values[f.key]) : ''} 
+                onChange={(e) => onChange(f.key, e.target.value)}
+              >
+                {f.options.map((o) => {
+                  const optVal = typeof o === 'object' && o !== null ? String(o.value) : String(o);
+                  const optLbl = typeof o === 'object' && o !== null ? o.label : o;
+                  return <option key={optVal} value={optVal}>{optLbl}</option>;
+                })}
               </select>
             ) : (
               <input type={f.type ?? 'text'} className="w-full bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold outline-none focus:border-chunky-main" value={values[f.key] ?? ''} onChange={(e) => onChange(f.key, e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') onSave(); }} />
@@ -807,7 +815,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
     { key: 'alert',       label: 'Alerta en',type: 'number' },
     { key: 'price',       label: 'Precio ($)',type: 'number' },
-    { key: 'variablePrice', label: 'Precio Var.', options: [{ value: false, label: 'No' }, { value: true, label: 'Sí' }] },
+    { key: 'variablePrice', label: 'Precio Var.', options: [{ value: 'false', label: 'No' }, { value: 'true', label: 'Sí' }] },
     { key: 'referencePrice', label: 'Precio Ref. ($)', type: 'number' },
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
     { key: 'imageUrl',    label: 'Imagen (POS)', type: 'image' },
