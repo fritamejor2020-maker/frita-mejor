@@ -573,8 +573,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     name: '', 
     qty: 0, 
     unit: 'kg', 
-    tipo: 'INSUMO', 
-    estado: 'N/A', 
+    type: 'PRODUCTO', 
     alert: 5, 
     warehouseId: activeWhs[0]?.id || '', 
     barcode: '', 
@@ -679,12 +678,15 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
       let quantity = parseFloat(row.Cantidad || row.cantidad || row.Quantity || row.quantity) || 0;
       if (quantity < 0) quantity = 0;
 
-      const lowerName = name.toLowerCase();
-      let tipo = 'PRODUCTO';
-      let estado = 'N/A';
-      if (lowerName.includes('empanada') || lowerName.includes('pastel') || lowerName.includes('maduro') || lowerName.includes('chorizo') || lowerName.includes('hamburguesa') || lowerName.includes('bofe') || lowerName.includes('rellena') || lowerName.includes('chicharrón') || lowerName.includes('hueso') || lowerName.includes('arepa de huevo') || lowerName.includes('azadura') || lowerName.includes('chunchulla') || lowerName.includes('picada')) {
-        tipo = 'PRODUCTO';
-        estado = 'FRITO';
+      const rawType = row.Tipo || row.tipo || row.Type || row.type;
+      let typeVal = rawType ? rawType.toUpperCase().trim() : '';
+      if (!typeVal) {
+        const lowerName = name.toLowerCase();
+        if (lowerName.includes('empanada') || lowerName.includes('pastel') || lowerName.includes('maduro') || lowerName.includes('chorizo') || lowerName.includes('hamburguesa') || lowerName.includes('bofe') || lowerName.includes('rellena') || lowerName.includes('chicharrón') || lowerName.includes('hueso') || lowerName.includes('arepa de huevo') || lowerName.includes('azadura') || lowerName.includes('chunchulla') || lowerName.includes('picada')) {
+          typeVal = 'FRITO';
+        } else {
+          typeVal = 'PRODUCTO';
+        }
       }
 
       const barcode = row.Codigo || row.codigo || row.Barcode || row.barcode || row.SKU || row.sku || '';
@@ -696,7 +698,6 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
         (i.name.toLowerCase().trim() === name.toLowerCase().trim())
       );
 
-      const typeVal = buildType(tipo, estado);
       if (existingIndex !== -1) {
         newInventory[existingIndex] = {
           ...newInventory[existingIndex],
@@ -704,7 +705,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
           barcode,
           qty: quantity || newInventory[existingIndex].qty,
           posCategoryId: catId || newInventory[existingIndex].posCategoryId,
-          type: typeVal
+          type: rawType ? typeVal : (newInventory[existingIndex].type || 'PRODUCTO')
         };
         updatedCount++;
       } else {
@@ -801,8 +802,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     { key: 'name',        label: 'Nombre',          wide: true },
     { key: 'barcode',     label: 'Cód. de Barras',   wide: false },
     { key: 'warehouseId', label: 'Bodega',   options: activeWhs.map((w) => ({ value: w.id, label: w.name })) },
-    { key: 'tipo',        label: 'Tipo',     options: availableTypes },
-    { key: 'estado',      label: 'Estado',   options: ['N/A', 'CRUDO', 'FRITO'] },
+    { key: 'type',       label: 'Tipo de Ítem', options: availableTypes },
     { key: 'qty',         label: 'Cantidad', type: 'number' },
     { key: 'unit',        label: 'Unidad',   options: ['kg', 'g', 'L', 'mL', 'm', 'unidades', 'piezas'] },
     { key: 'alert',       label: 'Alerta en',type: 'number' },
@@ -812,20 +812,6 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
     { key: 'imageUrl',    label: 'Imagen (POS)', type: 'image' },
   ];
-
-  // Convierte los dos campos vizuales en el campo 'type' real del item
-  const buildType = (tipo, estado) => {
-    if (estado === 'CRUDO') return 'CRUDO';
-    if (estado === 'FRITO') return 'FRITO';
-    return tipo || 'PRODUCTO';
-  };
-
-  // Descompone un 'type' existente en los dos campos visuales
-  const decomposeType = (type) => {
-    if (type === 'CRUDO')    return { tipo: 'PRODUCTO', estado: 'CRUDO' };
-    if (type === 'FRITO')    return { tipo: 'PRODUCTO', estado: 'FRITO' };
-    return                          { tipo: type || 'PRODUCTO', estado: 'N/A' };
-  };
 
   const change = (k, v) => {
     const val = k === 'variablePrice' ? (v === 'true' || v === true) : v;
@@ -928,7 +914,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
               🏷️ Tipos de Ítem
             </button>
           )}
-          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', tipo: 'INSUMO', estado: 'N/A', alert: 5, warehouseId: activeWhs[0]?.id || '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 }); }}>
+          <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditingId(null); setForm({ name: '', qty: 0, unit: 'kg', type: 'PRODUCTO', alert: 5, warehouseId: activeWhs[0]?.id || '', barcode: '', price: 0, posCategoryId: '', imageUrl: '', variablePrice: false, referencePrice: 0 }); }}>
             + Agregar ítem
           </Button>
         </div>
@@ -1029,7 +1015,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
       {showAdd && (
         <div className="mb-4">
           <EditableRow fields={fields} values={form} onChange={change}
-            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: buildType(form.tipo, form.estado), variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setShowAdd(false); } }}
+            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setShowAdd(false); } }}
             onCancel={() => setShowAdd(false)} />
         </div>
       )}
@@ -1042,7 +1028,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
           return editingId === item.id ? (
             <div key={item.id}>
               <EditableRow fields={fields} values={form} onChange={change}
-                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: buildType(form.tipo, form.estado), variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setEditingId(null); }}
+                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setEditingId(null); }}
                 onCancel={() => setEditingId(null)} />
             </div>
           ) : (
@@ -1069,7 +1055,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
                 {item.qty}<span className="text-gray-400 font-bold text-xs ml-1">{item.unit}</span>
               </span>
               <div className="flex gap-2 ml-auto">
-                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, ...decomposeType(item.type), alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '', variablePrice: item.variablePrice ?? false, referencePrice: item.referencePrice ?? 0 }); setShowAdd(false); }}>
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, type: item.type || 'PRODUCTO', alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '', variablePrice: item.variablePrice ?? false, referencePrice: item.referencePrice ?? 0 }); setShowAdd(false); }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
                 <button className="text-gray-300 hover:text-red-400" onClick={() => deleteInventoryItem(item.id)}>
