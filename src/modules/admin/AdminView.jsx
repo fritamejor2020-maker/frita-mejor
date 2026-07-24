@@ -2460,7 +2460,7 @@ function CustomersPanel() {
     { key: 'name',            label: 'Nombre / Tipo', wide: true },
     { key: 'document',        label: 'NIT / CC',      type: 'text' },
     { key: 'discountPercent', label: '% Descuento',   type: 'number' },
-    { key: 'active',          label: 'Activo',        options: [{ value: true, label: 'Sí' }, { value: false, label: 'No' }] },
+    { key: 'active',          label: 'Activo',        options: [{ value: 'true', label: 'Sí' }, { value: 'false', label: 'No' }] },
   ];
 
   const change = (k, v) => setForm((f) => ({ ...f, [k]: k === 'active' ? v === 'true' || v === true : v }));
