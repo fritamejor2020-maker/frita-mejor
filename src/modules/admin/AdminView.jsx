@@ -86,7 +86,7 @@ const compressImage = (file, maxWidth = 800, maxHeight = 800, quality = 0.75) =>
   });
 };
 
-function ImageUploadField({ value, onChange, label }) {
+function ImageUploadField({ value, onChange, onAutoSave, label }) {
   const fileRef = useRef(null);
   const [uploading, setUploading] = useState(false);
   const [preview, setPreview] = useState(value || '');
@@ -103,23 +103,18 @@ function ImageUploadField({ value, onChange, label }) {
       setPreview(localUrl);
       
       const publicUrl = await uploadProductImage(compressedFile);
-      if (publicUrl) {
-        onChange(publicUrl);
-        setPreview(publicUrl);
-      } else {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          onChange(e.target.result);
-          setPreview(e.target.result);
-        };
-        reader.readAsDataURL(compressedFile);
-      }
+      const finalUrl = publicUrl || localUrl;
+      onChange(finalUrl);
+      setPreview(finalUrl);
+      if (onAutoSave) onAutoSave(finalUrl);
     } catch (err) {
       console.warn('[Upload] Error compressing/uploading image, falling back to original:', err);
       const reader = new FileReader();
       reader.onload = (e) => {
-        onChange(e.target.result);
-        setPreview(e.target.result);
+        const dataUrl = e.target.result;
+        onChange(dataUrl);
+        setPreview(dataUrl);
+        if (onAutoSave) onAutoSave(dataUrl);
       };
       reader.readAsDataURL(file);
     } finally {
@@ -220,11 +215,20 @@ function EditableRow({ fields, values, onChange, onSave, onCancel }) {
       </div>
       <div className="flex items-end gap-3">
         {imageFields.map((f) => (
-          <ImageUploadField key={f.key} value={values[f.key] ?? ''} onChange={(v) => onChange(f.key, v)} label={f.label} />
+          <ImageUploadField 
+            key={f.key} 
+            value={values[f.key] ?? ''} 
+            onChange={(v) => onChange(f.key, v)} 
+            onAutoSave={(v) => {
+              onChange(f.key, v);
+              setTimeout(() => onSave(), 50);
+            }}
+            label={f.label} 
+          />
         ))}
         <div className="flex gap-2 ml-auto">
-          <Button variant="secondary" className="rounded-full text-sm py-2 px-6" onClick={onSave}>Guardar</Button>
-          <Button variant="outline" className="rounded-full text-sm py-2 px-4 border-gray-200 text-gray-500" onClick={onCancel}>Cancelar</Button>
+          <Button variant="secondary" className="rounded-full text-sm py-2 px-6 shadow-md font-black" onClick={onSave}>💾 Guardar Cambios</Button>
+          <Button variant="outline" className="rounded-full text-sm py-2 px-4 border-gray-200 text-gray-500 font-bold" onClick={onCancel}>Cancelar</Button>
         </div>
       </div>
     </div>
