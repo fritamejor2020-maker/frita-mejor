@@ -185,7 +185,7 @@ function ImageUploadField({ value, onChange, onAutoSave, label }) {
   );
 }
 
-function EditableRow({ fields, values, onChange, onSave, onCancel }) {
+function EditableRow({ fields, values, onChange, onSave, onCancel, onImageAutoSave }) {
   const regularFields = fields.filter((f) => f.type !== 'image');
   const imageFields = fields.filter((f) => f.type === 'image');
 
@@ -221,7 +221,7 @@ function EditableRow({ fields, values, onChange, onSave, onCancel }) {
             onChange={(v) => onChange(f.key, v)} 
             onAutoSave={(v) => {
               onChange(f.key, v);
-              setTimeout(() => onSave(), 50);
+              if (onImageAutoSave) onImageAutoSave(v);
             }}
             label={f.label} 
           />
@@ -1040,6 +1040,18 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
           return editingId === item.id ? (
             <div key={item.id}>
               <EditableRow fields={fields} values={form} onChange={change}
+                onImageAutoSave={(imgUrl) => {
+                  updateInventoryItem(item.id, {
+                    ...form,
+                    imageUrl: imgUrl,
+                    qty: parseFloat(form.qty) || 0,
+                    alert: parseFloat(form.alert) || 0,
+                    price: parseFloat(form.price) || 0,
+                    type: form.type || 'PRODUCTO',
+                    variablePrice: form.variablePrice === 'true' || form.variablePrice === true,
+                    referencePrice: parseFloat(form.referencePrice) || 0
+                  });
+                }}
                 onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setEditingId(null); }}
                 onCancel={() => setEditingId(null)} />
             </div>
