@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
-import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS } from '../lib/syncManager';
+import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
 
@@ -529,12 +529,14 @@ export const useInventoryStore = create(
 
           // Activar el flag de protección: a partir de aquí syncKey() permite escrituras
           set({ _hasLoadedRemote: true });
+          markAppReady();
           console.log('[SyncGuard] ✅ Carga remota completada — escrituras a Supabase habilitadas.');
         } catch (err) {
           console.warn('[Store] No se pudo cargar estado remoto:', err.message);
           // Incluso si falla la carga remota, activar el flag para no bloquear la operación
           // del usuario para siempre. El usuario puede seguir trabajando offline.
           set({ _hasLoadedRemote: true });
+          markAppReady();
         }
       },
 

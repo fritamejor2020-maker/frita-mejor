@@ -188,21 +188,13 @@ export async function push(key, value, branchId = null) {
     return;
   }
 
-  // Protección 2: Bloquear escrituras desde entornos de desarrollo (localhost, preview, etc.)
-  if (typeof window !== 'undefined') {
-    const hostname = window.location?.hostname || '';
-    const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1' || hostname.startsWith('192.168');
-    if (isLocalhost && !window.__FRITA_FORCE_SYNC__) {
-      console.warn(`[SyncManager] Push de "${key}" bloqueado: entorno localhost detectado.`);
+  // Protección 2: Bloquear TODAS las escrituras hasta que la app descargue los datos remotos
+  if (!_appReady) {
+    console.warn(`[SyncManager] Push de "${key}" encolado/omitido: la app aún no terminó de cargar datos remotos.`);
+    // Permitir si se ha forzado explicitamente
+    if (typeof window === 'undefined' || !window.__FRITA_FORCE_SYNC__) {
       return;
     }
-  }
-
-  // Protección 3: Bloquear TODAS las escrituras hasta que loadFromRemote() complete.
-  // Esto protege los 9 stores que llaman push() (no solo useInventoryStore).
-  if (!_appReady) {
-    console.warn(`[SyncManager] Push de "${key}" bloqueado: la app aún no terminó de cargar datos remotos.`);
-    return;
   }
 
   const supabaseKey = getBranchKey(key, branchId);
