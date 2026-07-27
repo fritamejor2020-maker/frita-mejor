@@ -255,23 +255,25 @@ export const useFinanceStore = create(
 
       addExpense: async (expenseData) => {
         const branchId = getActiveBranchId();
+        const numMonto = Number(expenseData.valor ?? expenseData.monto ?? 0);
+        const tempId = `local-${Date.now()}`;
         const newExpense = {
-          id: `local-${Date.now()}`,
+          id: tempId,
           created_at: new Date().toISOString(),
           branch_id: branchId || 'BRANCH-001',
           ...expenseData,
-          monto: expenseData.valor ?? expenseData.monto ?? 0,
-          valor: expenseData.valor ?? expenseData.monto ?? 0,
+          monto: numMonto,
+          valor: numMonto,
         };
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
           const expenseForDB = {
             fecha: expenseData.fecha || new Date().toISOString().slice(0, 10),
-            descripcion: expenseData.descripcion || '',
-            proveedor: expenseData.proveedor || null,
+            descripcion: (expenseData.descripcion || '').trim(),
+            proveedor: (expenseData.proveedor || '').trim() || null,
             supplierId: expenseData.supplierId || null,
-            monto: expenseData.valor ?? expenseData.monto ?? 0,
+            monto: numMonto,
             categoria: expenseData.tipoGasto || expenseData.categoria || null,
             facturaUrl: expenseData.facturaUrl || null,
             creado_por: expenseData.creado_por || expenseData.createdBy || 'Desconocido',
@@ -282,13 +284,27 @@ export const useFinanceStore = create(
           if (error) {
             console.warn('[FinanceStore] addExpense error Supabase:', error.message, error.details, error.hint);
           } else if (data?.[0]) {
-            set((state) => ({
-              expenses: state.expenses.map((e) =>
-                e.id === newExpense.id
-                  ? { ...e, ...data[0], valor: data[0].monto, monto: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null }
-                  : e
-              ),
-            }));
+            const savedRow = {
+              ...data[0],
+              valor: Number(data[0].monto),
+              monto: Number(data[0].monto),
+              facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null,
+            };
+            set((state) => {
+              const hasLocal = state.expenses.some((e) => e.id === tempId);
+              if (hasLocal) {
+                return {
+                  expenses: state.expenses.map((e) =>
+                    e.id === tempId ? { ...newExpense, ...savedRow } : e
+                  ),
+                };
+              }
+              const exists = state.expenses.some((e) => e.id === savedRow.id);
+              if (!exists) {
+                return { expenses: [savedRow, ...state.expenses] };
+              }
+              return state;
+            });
           }
         } catch (e) {
           console.warn('[FinanceStore] addExpense Supabase falló — guardado localmente.', e.message);
@@ -303,7 +319,8 @@ export const useFinanceStore = create(
 
         const normalizeExpenseRow = (raw) => ({
           ...raw,
-          valor: raw.monto,
+          monto: Number(raw.monto ?? raw.valor ?? 0),
+          valor: Number(raw.monto ?? raw.valor ?? 0),
           facturaUrl: raw.facturaUrl || raw.factura_url || null,
         });
 
@@ -315,11 +332,18 @@ export const useFinanceStore = create(
           const row = normalizeExpenseRow(payload.new);
           set((state) => {
             const exists = state.expenses.some((e) => e.id === row.id);
-            if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? row : e) };
-            const withoutLocal = state.expenses.filter(
-              (e) => !String(e.id).startsWith('local-') || e.descripcion !== row.descripcion
-            );
-            return { expenses: [row, ...withoutLocal] };
+            if (exists) return { expenses: state.expenses.map((e) => e.id === row.id ? { ...e, ...row } : e) };
+            
+            let replaced = false;
+            const updated = state.expenses.map((e) => {
+              if (!replaced && String(e.id).startsWith('local-') && (e.descripcion || '').trim() === (row.descripcion || '').trim()) {
+                replaced = true;
+                return { ...e, ...row };
+              }
+              return e;
+            });
+            if (replaced) return { expenses: updated };
+            return { expenses: [row, ...state.expenses] };
           });
         });
 
