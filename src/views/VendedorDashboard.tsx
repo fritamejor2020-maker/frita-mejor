@@ -1388,14 +1388,48 @@ export const VendedorDashboard = () => {
                           >
                             <Pencil size={14} />
                           </button>
-                          {/* Compartir WhatsApp */}
+                          {/* Compartir WhatsApp (con foto adjunta si existe) */}
                           <button
-                            onClick={() => {
-                              const msg = `*Transferencia ${pointId}*%0A💰 ${formatMoney(t.amount)}%0A📝 ${t.note || 'Sin nota'}%0A🕐 ${time}%0A👤 ${t.vendorName}`;
-                              window.open(`https://wa.me/?text=${msg}`, '_blank');
+                            onClick={async () => {
+                              const textMsg = `*📲 Transferencia Bancaria (${pointId || 'Punto'})*\n` +
+                                              `💰 *Monto:* ${formatMoney(t.amount)}\n` +
+                                              (t.note ? `📝 *Nota:* ${t.note}\n` : '') +
+                                              `🕐 *Hora:* ${time}\n` +
+                                              `👤 *Vendedor:* ${t.vendorName || responsibleName || 'Vendedor'}`;
+
+                              const photoSrc = t.photoBase64 || (t as any).photoUrl;
+
+                              if (photoSrc && typeof navigator !== 'undefined' && (navigator as any).canShare) {
+                                try {
+                                  const res = await fetch(photoSrc);
+                                  const blob = await res.blob();
+                                  const ext = blob.type.includes('png') ? 'png' : 'jpg';
+                                  const file = new File([blob], `comprobante_${Date.now()}.${ext}`, { type: blob.type || 'image/jpeg' });
+
+                                  if ((navigator as any).canShare({ files: [file] })) {
+                                    await (navigator as any).share({
+                                      title: 'Comprobante Transferencia',
+                                      text: textMsg,
+                                      files: [file],
+                                    });
+                                    return;
+                                  }
+                                } catch (err) {
+                                  console.warn('Error al compartir foto, intentando fallback de texto:', err);
+                                }
+                              }
+
+                              if (typeof navigator !== 'undefined' && navigator.share) {
+                                try {
+                                  await navigator.share({ title: 'Comprobante Transferencia', text: textMsg });
+                                  return;
+                                } catch (err) {}
+                              }
+
+                              window.open(`https://wa.me/?text=${encodeURIComponent(textMsg)}`, '_blank');
                             }}
                             className="w-8 h-8 rounded-lg bg-green-50 text-green-600 flex items-center justify-center active:scale-90"
-                            title="Compartir por WhatsApp"
+                            title="Compartir por WhatsApp con foto"
                           >
                             <Share2 size={14} />
                           </button>
