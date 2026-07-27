@@ -161,14 +161,26 @@ export function ExpensesChatView({ onClose }) {
   const subscribeToExpenses = useFinanceStore((s) => s.subscribeToExpenses);
   const bottomRef = useRef(null);
 
+  const scrollToBottom = () => {
+    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setTimeout(() => {
+      bottomRef.current?.scrollIntoView({ behavior: 'auto' });
+    }, 150);
+  };
+
   useEffect(() => {
     fetchFinances();
     const unsub = subscribeToExpenses();
-    return () => unsub?.();
+    scrollToBottom();
+    const t = setTimeout(scrollToBottom, 400);
+    return () => {
+      unsub?.();
+      clearTimeout(t);
+    };
   }, []);
 
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    scrollToBottom();
   }, [expenses.length]);
 
   const total = expenses.reduce((s, e) => s + (e.monto ?? e.valor ?? 0), 0);

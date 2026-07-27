@@ -59,16 +59,30 @@ export const useFinanceStore = create(
           const [incomesRes, expensesRes] = await Promise.all([incomesQuery, expensesQuery]);
 
           if (!incomesRes.error) {
-            set({ incomes: incomesRes.data || [] });
+            set((state) => {
+              const remote = incomesRes.data || [];
+              const localUnsynced = state.incomes.filter((i) => String(i.id).startsWith('local-'));
+              const remoteIds = new Set(remote.map((r) => r.id));
+              const filteredLocal = localUnsynced.filter((l) => !remoteIds.has(l.id));
+              return { incomes: [...filteredLocal, ...remote] };
+            });
           }
+
           const normalizeExpense = (e) => ({
             ...e,
             facturaUrl: e.facturaUrl || e.factura_url || null,
             monto: e.monto ?? e.valor ?? 0,
             valor: e.monto ?? e.valor ?? 0,
           });
+
           if (!expensesRes.error) {
-            set({ expenses: (expensesRes.data || []).map(normalizeExpense) });
+            set((state) => {
+              const remote = (expensesRes.data || []).map(normalizeExpense);
+              const localUnsynced = state.expenses.filter((e) => String(e.id).startsWith('local-'));
+              const remoteIds = new Set(remote.map((r) => r.id));
+              const filteredLocal = localUnsynced.filter((l) => !remoteIds.has(l.id));
+              return { expenses: [...filteredLocal, ...remote] };
+            });
           }
         } catch (error) {
           console.warn('[FinanceStore] fetchFinances falló — usando datos locales:', error.message);
