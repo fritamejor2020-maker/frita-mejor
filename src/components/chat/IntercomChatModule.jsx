@@ -129,12 +129,48 @@ export const IntercomChatModule = ({
     setPhotoPreview(null);
   };
 
-  // Manejar selección de foto
+  const [isCompressingPhoto, setIsCompressingPhoto] = useState(false);
+
+  // Manejar selección y compresión de foto (canvas a ~50KB max)
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    setIsCompressingPhoto(true);
     const reader = new FileReader();
-    reader.onload = (ev) => setPhotoPreview(ev.target?.result);
+    reader.onload = (ev) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        const MAX_WIDTH = 800;
+        const MAX_HEIGHT = 800;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > height) {
+          if (width > MAX_WIDTH) {
+            height *= MAX_WIDTH / width;
+            width = MAX_WIDTH;
+          }
+        } else {
+          if (height > MAX_HEIGHT) {
+            width *= MAX_HEIGHT / height;
+            height = MAX_HEIGHT;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Compresión ultra ligera a JPEG 0.6 (~50KB)
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        setPhotoPreview(compressedBase64);
+        setIsCompressingPhoto(false);
+      };
+      img.src = ev.target?.result;
+    };
     reader.readAsDataURL(file);
     e.target.value = '';
   };
@@ -337,14 +373,26 @@ export const IntercomChatModule = ({
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
         <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
 
-        {/* Cámara / Fotos */}
+        {/* Cámara */}
         <button
           type="button"
           onClick={() => cameraInputRef.current?.click()}
-          className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95"
-          title="Tomar Foto"
+          disabled={isCompressingPhoto}
+          className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
+          title="📸 Tomar Foto Cámara"
         >
           <Camera size={18} />
+        </button>
+
+        {/* Galería */}
+        <button
+          type="button"
+          onClick={() => galleryInputRef.current?.click()}
+          disabled={isCompressingPhoto}
+          className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
+          title="📁 Subir de Galería"
+        >
+          <ImageIcon size={18} />
         </button>
 
         {/* Campo de Texto */}
