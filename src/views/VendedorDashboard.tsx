@@ -1160,14 +1160,14 @@ export const VendedorDashboard = () => {
                     onClick={() => cameraFileRef.current?.click()}
                     className="flex items-center justify-center gap-2 py-3 px-3 bg-[#FFB700] hover:bg-yellow-400 text-gray-900 rounded-2xl font-black text-xs shadow-sm active:scale-95 transition-all"
                   >
-                    <Camera size={16} /> 📸 Tomar Foto
+                    <Camera size={18} /> Tomar Foto
                   </button>
                   <button
                     type="button"
                     onClick={() => galleryFileRef.current?.click()}
                     className="flex items-center justify-center gap-2 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-2xl font-bold text-xs active:scale-95 transition-all"
                   >
-                    📁 Subir Galería
+                    <Image size={18} /> Subir Galería
                   </button>
                 </div>
               ) : (
@@ -1308,14 +1308,14 @@ export const VendedorDashboard = () => {
                             onClick={() => editCameraFileRef.current?.click()}
                             className="flex items-center justify-center gap-1.5 py-2 px-3 bg-[#FFB700] text-gray-900 rounded-xl font-bold text-xs active:scale-95 transition-all"
                           >
-                            <Camera size={14} /> 📸 Tomar
+                            <Camera size={14} /> Tomar
                           </button>
                           <button
                             type="button"
                             onClick={() => editGalleryFileRef.current?.click()}
                             className="flex items-center justify-center gap-1.5 py-2 px-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-xs active:scale-95 transition-all"
                           >
-                            📁 Galería
+                            <Image size={14} /> Galería
                           </button>
                         </div>
                         {editPhoto && (
