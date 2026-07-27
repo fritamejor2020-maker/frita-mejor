@@ -630,12 +630,21 @@ function FryKitchensPanel() {
               {assignedRecipes.length > 0 ? (
                 <div className="space-y-2.5 mb-3">
                   {assignedRecipes.map((recipe) => {
-                    const crudo = inventory.find(i => i.id === recipe.crudoId);
-                    const frito = inventory.find(i => i.id === recipe.fritoId);
-                    const name = frito?.name || 'Receta sin nombre';
-                    const crudoName = crudo?.name || 'Masa cruda';
+                    const crudo = inventory.find(i => i.id === recipe.crudoId || i.name === recipe.crudoId) || products.find(p => p.id === recipe.crudoId || p.name === recipe.crudoId);
+                    const frito = inventory.find(i => i.id === recipe.fritoId || i.name === recipe.fritoId) || products.find(p => p.id === recipe.fritoId || p.name === recipe.fritoId);
+                    const name = frito?.name || recipe.name || recipe.id || 'Receta sin nombre';
+                    const crudoName = crudo?.name || recipe.crudoName || 'Masa cruda';
                     const isEditingPresets = editingPresetsKey === `${recipe.id}_${fk.id}`;
                     const presets = recipe.linePresets?.[fk.id] ?? recipe.presets ?? [10, 20, 50, 100, 200];
+
+                    const handleUnlink = () => {
+                      const allKitchenIds = fryKitchens.map(k => k.id);
+                      const current = (recipe.fryKitchenIds && recipe.fryKitchenIds.length > 0)
+                        ? recipe.fryKitchenIds
+                        : allKitchenIds;
+                      const updated = current.filter(id => id !== fk.id);
+                      updateFritadoRecipe(recipe.id, { fryKitchenIds: updated });
+                    };
 
                     return (
                       <div key={recipe.id} className="bg-orange-50/40 border border-orange-100 rounded-xl p-3 flex flex-col gap-2">
@@ -662,12 +671,22 @@ function FryKitchensPanel() {
                                 <button className="text-xs font-bold text-gray-500 bg-white border border-gray-200 px-2.5 py-0.5 rounded-full" onClick={() => setEditingPresetsKey(null)}>Cancelar</button>
                               </div>
                             )}
-                            {recipe.fryKitchenIds?.length > 0 && (
-                              <button className="text-gray-300 hover:text-red-500 text-xs font-bold ml-1" onClick={() => {
-                                const updated = (recipe.fryKitchenIds || []).filter(id => id !== fk.id);
-                                updateFritadoRecipe(recipe.id, { fryKitchenIds: updated });
-                              }}>✕ Desvincular</button>
-                            )}
+
+                            <button
+                              className="text-xs font-bold text-orange-700 hover:text-red-600 bg-white border border-orange-200 hover:border-red-300 px-2.5 py-0.5 rounded-full transition-colors"
+                              onClick={handleUnlink}
+                              title="Quitar de esta cocina"
+                            >
+                              ✕ Quitar de cocina
+                            </button>
+
+                            <button
+                              className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-0.5 rounded-full transition-colors"
+                              onClick={() => deleteFritadoRecipe(recipe.id)}
+                              title="Eliminar receta por completo"
+                            >
+                              🗑️ Eliminar
+                            </button>
                           </div>
                         </div>
 
