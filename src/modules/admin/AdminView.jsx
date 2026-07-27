@@ -821,12 +821,16 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     { key: 'price',       label: 'Precio ($)',type: 'number' },
     { key: 'variablePrice', label: 'Precio Var.', options: [{ value: 'false', label: 'No' }, { value: 'true', label: 'Sí' }] },
     { key: 'referencePrice', label: 'Precio Ref. ($)', type: 'number' },
+    { key: 'inTricycles', label: 'Triciclos/Dejador', options: [{ value: 'true', label: 'Sí' }, { value: 'false', label: 'No' }] },
     { key: 'posCategoryId', label: 'Carpetas POS', options: [{ value: '', label: 'Ninguna' }, ...(posCategories || []).map((c) => ({ value: c.id, label: c.name }))] },
     { key: 'imageUrl',    label: 'Imagen (POS)', type: 'image' },
   ];
 
   const change = (k, v) => {
-    const val = k === 'variablePrice' ? (v === 'true' || v === true) : v;
+    let val = v;
+    if (k === 'variablePrice' || k === 'inTricycles') {
+      val = v === 'true' || v === true;
+    }
     setForm((f) => ({ ...f, [k]: val }));
   };
 
@@ -1027,7 +1031,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
       {showAdd && (
         <div className="mb-4">
           <EditableRow fields={fields} values={form} onChange={change}
-            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setShowAdd(false); } }}
+            onSave={() => { if (form.name.trim()) { addInventoryItem({ ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0, inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined }); setShowAdd(false); } }}
             onCancel={() => setShowAdd(false)} />
         </div>
       )}
@@ -1049,10 +1053,11 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
                     price: parseFloat(form.price) || 0,
                     type: form.type || 'PRODUCTO',
                     variablePrice: form.variablePrice === 'true' || form.variablePrice === true,
-                    referencePrice: parseFloat(form.referencePrice) || 0
+                    referencePrice: parseFloat(form.referencePrice) || 0,
+                    inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined
                   });
                 }}
-                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0 }); setEditingId(null); }}
+                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0, inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined }); setEditingId(null); }}
                 onCancel={() => setEditingId(null)} />
             </div>
           ) : (
@@ -1079,7 +1084,7 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
                 {item.qty}<span className="text-gray-400 font-bold text-xs ml-1">{item.unit}</span>
               </span>
               <div className="flex gap-2 ml-auto">
-                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, type: item.type || 'PRODUCTO', alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '', variablePrice: item.variablePrice ?? false, referencePrice: item.referencePrice ?? 0 }); setShowAdd(false); }}>
+                <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditingId(item.id); setForm({ name: item.name, qty: item.qty, unit: item.unit, type: item.type || 'PRODUCTO', alert: item.alert, warehouseId: item.warehouseId ?? '', barcode: item.barcode ?? '', price: item.price ?? 0, posCategoryId: item.posCategoryId ?? '', imageUrl: item.imageUrl ?? '', variablePrice: item.variablePrice ?? false, referencePrice: item.referencePrice ?? 0, inTricycles: item.inTricycles !== false }); setShowAdd(false); }}>
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
                 </button>
                 <button className="text-gray-300 hover:text-red-400" onClick={() => deleteInventoryItem(item.id)}>

@@ -564,22 +564,20 @@ export const useInventoryStore = create(
 
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir).
-       * Excluye productos marcados como showInTricicloPos:true
-       * (esos son solo para el POS del vendedor, no necesitan ser cargados en triciclo).
+       * Incluye todos los productos vendibles habilitados para triciclos.
        */
       getDeliveryItems: () =>
         get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles !== false && !i.showInTricicloPos
+          (i) => i.type !== 'INSUMO' && i.inTricycles !== false
         ),
 
       /**
        * Productos del POS del Vendedor de triciclo.
-       * Incluye TODOS los productos con precio, incluyendo los showInTricicloPos.
-       * Excluye los marcados showInPos:false.
+       * Incluye todos los productos vendibles habilitados para triciclos.
        */
       getVendedorPosItems: () =>
         get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles !== false && i.showInPos !== false
+          (i) => i.type !== 'INSUMO' && i.inTricycles !== false
         ),
 
 
@@ -948,7 +946,12 @@ export const useInventoryStore = create(
       // Inventario
       addInventoryItem: (item) => {
         const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'BEBIDA' ? 'BEB' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
-        const newItem = { ...item, id: `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`, qty: parseFloat(item.qty) || 0 };
+        const newItem = {
+          inTricycles: item.type !== 'INSUMO',
+          ...item,
+          id: `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+          qty: parseFloat(item.qty) || 0
+        };
         set((s) => ({ inventory: [...s.inventory, newItem] }));
         syncKey('inventory', useInventoryStore.getState().inventory);
       },
