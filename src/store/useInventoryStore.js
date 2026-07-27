@@ -572,12 +572,12 @@ export const useInventoryStore = create(
         ),
 
       /**
-       * Productos del POS del Vendedor de triciclo.
-       * Incluye todos los productos vendibles habilitados para triciclos.
+       * Productos del POS del Vendedor de triciclo (Venta Rápida).
+       * Incluye exactamente los productos marcados con inTricycles === true.
        */
       getVendedorPosItems: () =>
         get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles !== false
+          (i) => i.inTricycles === true && i.showInPos !== false
         ),
 
 
@@ -947,7 +947,7 @@ export const useInventoryStore = create(
       addInventoryItem: (item) => {
         const prefix = item.type === 'FRITO' ? 'FR' : item.type === 'BEBIDA' ? 'BEB' : item.type === 'PRODUCTO' ? 'PRD' : 'INS';
         const newItem = {
-          inTricycles: item.type !== 'INSUMO',
+          inTricycles: item.inTricycles === true,
           ...item,
           id: `${prefix}-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
           qty: parseFloat(item.qty) || 0
