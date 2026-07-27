@@ -23,160 +23,213 @@ function syncChatMessages(messages, branchId) {
   );
 }
 
+// Canal Global Supabase Realtime para recibir broadcasts instantáneos entre dispositivos
+let realtimeChannel = null;
+
+function setupChatRealtime(set, get) {
+  if (typeof window === 'undefined' || realtimeChannel) return;
+  try {
+    realtimeChannel = supabase.channel('public_chat_channel');
+    
+    realtimeChannel
+      .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
+        if (!payload || !payload.id) return;
+        const currentMsgs = get().messages;
+        if (!currentMsgs.some(m => m.id === payload.id)) {
+          set({ messages: [payload, ...currentMsgs] });
+        }
+      })
+      .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
+        if (payload) {
+          set({ activeCall: payload });
+        }
+      })
+      .subscribe();
+  } catch (err) {
+    console.warn('[ChatStore] Realtime setup error:', err);
+  }
+}
+
 export const useChatStore = create(
   persist(
-    (set, get) => ({
-      messages: [],
-      activeCall: null, // { callerId, callerName, callerRole, receiverId, status: 'ringing'|'connected'|'ended', startedAt }
+    (set, get) => {
+      // Iniciar escucha en tiempo real inmediatamente
+      setTimeout(() => setupChatRealtime(set, get), 100);
 
-      /**
-       * Envía un nuevo mensaje o nota de voz
-       */
-      sendMessage: ({ shiftId, branchId, senderId, senderName, senderRole, receiverId, receiverName, type, text, mediaUrl, durationSeconds }) => {
-        const user = useAuthStore.getState().user;
-        const effectiveBranch = branchId || user?.branchId || 'BRANCH-001';
-        
-        const newMessage = {
-          id: `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
-          shiftId: shiftId || 'shift-active',
-          branchId: effectiveBranch,
-          senderId: senderId || user?.id || 'unknown',
-          senderName: senderName || user?.name || 'Usuario',
-          senderRole: senderRole || user?.role || 'OPERARIO',
-          receiverId: receiverId || 'ALL',
-          receiverName: receiverName || 'Todos',
-          type: type || 'text', // 'text' | 'audio' | 'photo' | 'call_log'
-          text: text?.trim() || '',
-          mediaUrl: mediaUrl || null,
-          durationSeconds: durationSeconds || 0,
-          read: false,
-          createdAt: new Date().toISOString(),
-        };
+      return {
+        messages: [],
+        activeCall: null,
 
-        const updated = [newMessage, ...get().messages];
-        set({ messages: updated });
-        syncChatMessages(updated, effectiveBranch);
-
-        // Notificar por Broadcast de Supabase en tiempo real
-        try {
-          supabase.channel('public_chat_channel').send({
-            type: 'broadcast',
-            event: 'new_chat_message',
-            payload: newMessage,
-          }).catch(() => {});
-        } catch (_) {}
-
-        return newMessage;
-      },
-
-      /**
-       * Marca mensajes entre dos participantes como leídos
-       */
-      markAsRead: (senderId, receiverId) => {
-        let changed = false;
-        const updated = get().messages.map(m => {
-          if (m.senderId === senderId && (m.receiverId === receiverId || m.receiverId === 'ALL') && !m.read) {
-            changed = true;
-            return { ...m, read: true };
-          }
-          return m;
-        });
-
-        if (changed) {
-          set({ messages: updated });
+        /**
+         * Envía un nuevo mensaje o nota de voz
+         */
+        sendMessage: ({ shiftId, branchId, senderId, senderName, senderRole, receiverId, receiverName, pointId, type, text, mediaUrl, durationSeconds }) => {
           const user = useAuthStore.getState().user;
-          syncChatMessages(updated, user?.branchId || 'BRANCH-001');
-        }
-      },
+          const effectiveBranch = branchId || user?.branchId || 'BRANCH-001';
+          
+          const newMessage = {
+            id: `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
+            shiftId: shiftId || 'shift-active',
+            branchId: effectiveBranch,
+            senderId: senderId || user?.id || 'unknown',
+            senderName: senderName || user?.name || 'Usuario',
+            senderRole: senderRole || user?.role || 'OPERARIO',
+            receiverId: receiverId || 'ALL',
+            receiverName: receiverName || 'Todos',
+            pointId: pointId || senderId || null,
+            type: type || 'text',
+            text: text?.trim() || '',
+            mediaUrl: mediaUrl || null,
+            durationSeconds: durationSeconds || 0,
+            read: false,
+            createdAt: new Date().toISOString(),
+          };
 
-      /**
-       * Retorna la cantidad de mensajes no leídos para un usuario
-       */
-      getUnreadCount: (myUserId, fromUserId = null) => {
-        return get().messages.filter(m => {
-          if (m.read) return false;
-          if (m.senderId === myUserId) return false;
-          if (fromUserId && m.senderId !== fromUserId) return false;
-          return m.receiverId === myUserId || m.receiverId === 'ALL';
-        }).length;
-      },
+          const updated = [newMessage, ...get().messages];
+          set({ messages: updated });
+          syncChatMessages(updated, effectiveBranch);
 
-      /**
-       * Retorna los mensajes de una conversación entre dos usuarios (o para una sede/turno)
-       */
-      getConversation: (userAId, userBId) => {
-        return get().messages.filter(m => {
-          if (!userBId || userBId === 'ALL') {
-            return m.receiverId === 'ALL' || m.senderId === userAId || m.receiverId === userAId;
-          }
-          return (m.senderId === userAId && m.receiverId === userBId) ||
-                 (m.senderId === userBId && m.receiverId === userAId) ||
-                 m.receiverId === 'ALL';
-        }).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
-      },
+          // Transmitir por Supabase Broadcast en milisegundos a todos los conectados
+          try {
+            if (realtimeChannel) {
+              realtimeChannel.send({
+                type: 'broadcast',
+                event: 'new_chat_message',
+                payload: newMessage,
+              }).catch(() => {});
+            }
+          } catch (_) {}
 
-      /**
-       * Inicia una llamada de voz
-       */
-      startCall: ({ callerId, callerName, callerRole, receiverId, receiverName }) => {
-        const callData = {
-          id: `CALL-${Date.now()}`,
-          callerId,
-          callerName,
-          callerRole,
-          receiverId,
-          receiverName,
-          status: 'ringing',
-          startedAt: new Date().toISOString(),
-        };
-        set({ activeCall: callData });
+          return newMessage;
+        },
 
-        try {
-          supabase.channel('public_chat_channel').send({
-            type: 'broadcast',
-            event: 'voice_call_signal',
-            payload: callData,
-          }).catch(() => {});
-        } catch (_) {}
-      },
-
-      /**
-       * Responde o finaliza una llamada
-       */
-      updateCallStatus: (status) => {
-        const currentCall = get().activeCall;
-        if (!currentCall) return;
-
-        const updatedCall = { ...currentCall, status };
-
-        if (status === 'ended') {
-          // Registrar log de llamada
-          get().sendMessage({
-            shiftId: 'shift-active',
-            branchId: 'BRANCH-001',
-            senderId: currentCall.callerId,
-            senderName: currentCall.callerName,
-            senderRole: currentCall.callerRole,
-            receiverId: currentCall.receiverId,
-            receiverName: currentCall.receiverName,
-            type: 'call_log',
-            text: `📞 Llamada de voz (${status === 'connected' ? 'Finalizada' : 'Cancelada'})`,
-            durationSeconds: Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000),
+        /**
+         * Marca mensajes entre dos participantes como leídos
+         */
+        markAsRead: (senderId, receiverId) => {
+          let changed = false;
+          const updated = get().messages.map(m => {
+            if ((m.senderId === senderId || m.pointId === senderId) && !m.read) {
+              changed = true;
+              return { ...m, read: true };
+            }
+            return m;
           });
-          set({ activeCall: null });
-        } else {
-          set({ activeCall: updatedCall });
-        }
 
-        try {
-          supabase.channel('public_chat_channel').send({
-            type: 'broadcast',
-            event: 'voice_call_signal',
-            payload: updatedCall,
-          }).catch(() => {});
-        } catch (_) {}
-      },
-    }),
+          if (changed) {
+            set({ messages: updated });
+            const user = useAuthStore.getState().user;
+            syncChatMessages(updated, user?.branchId || 'BRANCH-001');
+          }
+        },
+
+        /**
+         * Retorna la cantidad de mensajes no leídos para un usuario
+         */
+        getUnreadCount: (myUserId, fromUserId = null) => {
+          return get().messages.filter(m => {
+            if (m.read) return false;
+            if (m.senderId === myUserId) return false;
+            if (fromUserId && m.senderId !== fromUserId && m.pointId !== fromUserId) return false;
+            return m.receiverId === myUserId || m.receiverId === 'ALL' || m.receiverId === 'DEJADOR';
+          }).length;
+        },
+
+        /**
+         * Retorna los mensajes de una conversación entre dos usuarios (o para una sede/turno)
+         */
+        getConversation: (userAId, userBId) => {
+          return get().messages.filter(m => {
+            // Si la conversación seleccionada es 'ALL' (Canal General)
+            if (!userBId || userBId === 'ALL') {
+              return true; // Muestra todo el canal de radio del turno
+            }
+
+            // Para canal individual (ej: T1, T2, etc.)
+            const targetId = String(userBId).toLowerCase();
+            const sender = String(m.senderId || '').toLowerCase();
+            const receiver = String(m.receiverId || '').toLowerCase();
+            const point = String(m.pointId || '').toLowerCase();
+
+            const isDirectMatch =
+              (sender === String(userAId).toLowerCase() && (receiver === targetId || receiver === 'dejador')) ||
+              (sender === targetId && (receiver === String(userAId).toLowerCase() || receiver === 'dejador')) ||
+              point === targetId ||
+              receiver === targetId ||
+              sender === targetId;
+
+            const isBroadcast = m.receiverId === 'ALL';
+
+            return isDirectMatch || isBroadcast;
+          }).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+        },
+
+        /**
+         * Inicia una llamada de voz
+         */
+        startCall: ({ callerId, callerName, callerRole, receiverId, receiverName }) => {
+          const callData = {
+            id: `CALL-${Date.now()}`,
+            callerId,
+            callerName,
+            callerRole,
+            receiverId,
+            receiverName,
+            status: 'ringing',
+            startedAt: new Date().toISOString(),
+          };
+          set({ activeCall: callData });
+
+          try {
+            if (realtimeChannel) {
+              realtimeChannel.send({
+                type: 'broadcast',
+                event: 'voice_call_signal',
+                payload: callData,
+              }).catch(() => {});
+            }
+          } catch (_) {}
+        },
+
+        /**
+         * Responde o finaliza una llamada
+         */
+        updateCallStatus: (status) => {
+          const currentCall = get().activeCall;
+          if (!currentCall) return;
+
+          const updatedCall = { ...currentCall, status };
+
+          if (status === 'ended') {
+            get().sendMessage({
+              shiftId: 'shift-active',
+              branchId: 'BRANCH-001',
+              senderId: currentCall.callerId,
+              senderName: currentCall.callerName,
+              senderRole: currentCall.callerRole,
+              receiverId: currentCall.receiverId,
+              receiverName: currentCall.receiverName,
+              type: 'call_log',
+              text: `📞 Llamada de voz (${status === 'connected' ? 'Finalizada' : 'Cancelada'})`,
+              durationSeconds: Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000),
+            });
+            set({ activeCall: null });
+          } else {
+            set({ activeCall: updatedCall });
+          }
+
+          try {
+            if (realtimeChannel) {
+              realtimeChannel.send({
+                type: 'broadcast',
+                event: 'voice_call_signal',
+                payload: updatedCall,
+              }).catch(() => {});
+            }
+          } catch (_) {}
+        },
+      };
+    },
     {
       name: 'frita_chat_store_v1',
     }

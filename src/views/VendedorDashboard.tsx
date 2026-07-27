@@ -1474,13 +1474,14 @@ export const VendedorDashboard = () => {
         {activeTab === 'chat' && (
           <div className="max-w-2xl mx-auto h-[600px] pb-16">
             <IntercomChatModule
-              currentUserId={trackingId}
-              currentUserName={trackingName}
+              currentUserId={pointId || trackingId}
+              currentUserName={`${pointId ? pointId + ' (' : ''}${responsibleName || trackingName}${pointId ? ')' : ''}`}
               currentUserRole="VENDEDOR"
               targetUserId="DEJADOR"
               targetUserName="Dejador / Logística"
               branchId={(user as any)?.branchId || 'BRANCH-001'}
               shiftId={openedAt || 'shift-active'}
+              pointId={pointId}
             />
           </div>
         )}

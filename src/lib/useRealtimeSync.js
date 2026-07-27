@@ -12,6 +12,7 @@ import { useBranchStore } from '../store/useBranchStore';
 import { useTaskStore } from '../store/useTaskStore';
 import { useTransferStore } from '../store/useTransferStore';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
+import { useChatStore } from '../store/useChatStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -66,6 +67,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });
+  applicators['chatMessages']      = (v) => useChatStore.setState({ messages: v });
 
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.
