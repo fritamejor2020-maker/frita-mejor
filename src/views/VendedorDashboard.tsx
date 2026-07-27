@@ -254,8 +254,10 @@ export const VendedorDashboard = () => {
   const [editAmount, setEditAmount] = useState('');
   const [editNote, setEditNote] = useState('');
   const [editPhoto, setEditPhoto] = useState<string | null>(null);
-  const transferFileRef = useRef<HTMLInputElement>(null);
-  const editFileRef = useRef<HTMLInputElement>(null);
+  const cameraFileRef = useRef<HTMLInputElement>(null);
+  const galleryFileRef = useRef<HTMLInputElement>(null);
+  const editCameraFileRef = useRef<HTMLInputElement>(null);
+  const editGalleryFileRef = useRef<HTMLInputElement>(null);
 
   // Transferencias del turno actual
   const shiftTransfers = getShiftTransfers(pointId, openedAt);
@@ -1112,9 +1114,28 @@ export const VendedorDashboard = () => {
                 className="w-full bg-gray-50 rounded-2xl py-3 px-5 font-bold text-gray-500 text-sm outline-none shadow-sm border-none focus:ring-2 ring-[#FFB700] mb-4"
               />
 
-              {/* Foto del comprobante */}
+              {/* Inputs de foto: Cámara Directa y Galería */}
               <input
-                ref={transferFileRef}
+                ref={cameraFileRef}
+                type="file"
+                accept="image/*"
+                capture="environment"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0];
+                  if (!file) return;
+                  try {
+                    const compressedBase64 = await compressImage(file, 800, 0.7);
+                    setTransferPhoto(compressedBase64);
+                  } catch (err) {
+                    console.error('Error comprimiendo foto:', err);
+                    toast.error('No se pudo procesar la foto');
+                  }
+                  e.target.value = '';
+                }}
+              />
+              <input
+                ref={galleryFileRef}
                 type="file"
                 accept="image/*"
                 className="hidden"
@@ -1132,30 +1153,46 @@ export const VendedorDashboard = () => {
                 }}
               />
 
-              <div className="flex gap-3 mb-4">
-                <button
-                  onClick={() => transferFileRef.current?.click()}
-                  className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl font-black text-sm transition-all active:scale-95 ${
-                    transferPhoto
-                      ? 'bg-green-50 border-2 border-green-200 text-green-700'
-                      : 'bg-gray-50 border-2 border-dashed border-gray-200 text-gray-400 hover:border-gray-300'
-                  }`}
-                >
-                  {transferPhoto ? (
-                    <><CheckCircle size={16} /> Foto lista ✔</>
-                  ) : (
-                    <><Camera size={16} /> Tomar / Subir Foto</>
-                  )}
-                </button>
-                {transferPhoto && (
+              {!transferPhoto ? (
+                <div className="grid grid-cols-2 gap-2 mb-4">
                   <button
-                    onClick={() => setTransferPhoto(null)}
-                    className="w-12 flex items-center justify-center rounded-2xl bg-red-50 border-2 border-red-100 text-red-400 active:scale-95"
+                    type="button"
+                    onClick={() => cameraFileRef.current?.click()}
+                    className="flex items-center justify-center gap-2 py-3 px-3 bg-[#FFB700] hover:bg-yellow-400 text-gray-900 rounded-2xl font-black text-xs shadow-sm active:scale-95 transition-all"
                   >
-                    <X size={16} />
+                    <Camera size={16} /> 📸 Tomar Foto
                   </button>
-                )}
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => galleryFileRef.current?.click()}
+                    className="flex items-center justify-center gap-2 py-3 px-3 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-2xl font-bold text-xs active:scale-95 transition-all"
+                  >
+                    📁 Subir Galería
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center justify-between bg-green-50 border-2 border-green-200 rounded-2xl p-3 mb-4">
+                  <span className="font-black text-xs text-green-700 flex items-center gap-1.5">
+                    <CheckCircle size={16} /> Foto Comprobante Lista ✔
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => cameraFileRef.current?.click()}
+                      className="text-[11px] font-bold text-green-800 bg-green-200/60 hover:bg-green-300 px-2.5 py-1 rounded-xl transition-colors"
+                    >
+                      📷 Cambiar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setTransferPhoto(null)}
+                      className="w-8 h-8 flex items-center justify-center rounded-xl bg-white border border-red-200 text-red-400 hover:text-red-600 transition-colors"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Preview de la foto */}
               {transferPhoto && (
@@ -1237,7 +1274,22 @@ export const VendedorDashboard = () => {
                         />
                         {/* Foto */}
                         <input
-                          ref={editFileRef}
+                          ref={editCameraFileRef}
+                          type="file"
+                          accept="image/*"
+                          capture="environment"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            const reader = new FileReader();
+                            reader.onload = (ev) => setEditPhoto(ev.target?.result as string);
+                            reader.readAsDataURL(file);
+                            e.target.value = '';
+                          }}
+                        />
+                        <input
+                          ref={editGalleryFileRef}
                           type="file"
                           accept="image/*"
                           className="hidden"
@@ -1250,21 +1302,21 @@ export const VendedorDashboard = () => {
                             e.target.value = '';
                           }}
                         />
-                        <div className="flex gap-2">
+                        <div className="grid grid-cols-2 gap-2">
                           <button
-                            onClick={() => editFileRef.current?.click()}
-                            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl font-bold text-xs transition-all active:scale-95 ${
-                              editPhoto ? 'bg-green-50 border border-green-200 text-green-700' : 'bg-gray-50 border border-dashed border-gray-200 text-gray-400'
-                            }`}
+                            type="button"
+                            onClick={() => editCameraFileRef.current?.click()}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-[#FFB700] text-gray-900 rounded-xl font-bold text-xs active:scale-95 transition-all"
                           >
-                            {editPhoto ? <><CheckCircle size={14} /> Foto lista</> : <><Camera size={14} /> Cambiar Foto</>}
+                            <Camera size={14} /> 📸 Tomar
                           </button>
-                          {editPhoto && (
-                            <button onClick={() => setEditPhoto(null)}
-                              className="w-10 flex items-center justify-center rounded-xl bg-red-50 border border-red-100 text-red-400 active:scale-95">
-                              <X size={14} />
-                            </button>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => editGalleryFileRef.current?.click()}
+                            className="flex items-center justify-center gap-1.5 py-2 px-3 bg-gray-100 text-gray-600 rounded-xl font-bold text-xs active:scale-95 transition-all"
+                          >
+                            📁 Galería
+                          </button>
                         </div>
                         {editPhoto && (
                           <img src={editPhoto} alt="Preview" className="w-full h-24 object-cover rounded-xl border border-gray-100" />

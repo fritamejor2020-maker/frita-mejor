@@ -42,6 +42,7 @@ export function IncomesModal({ onClose }) {
   const [photoRotation, setPhotoRotation] = useState(0);   // grados: 0, 90, 180, 270
   const [photoConfirmed, setPhotoConfirmed] = useState(false);
   const photoInputRef = useRef(null);
+  const photoCameraInputRef = useRef(null);
 
   const handlePhotoCapture = (e) => {
     const file = e.target.files?.[0];
@@ -301,6 +302,14 @@ export function IncomesModal({ onClose }) {
   const PhotoSection = () => (
     <div className="space-y-3">
       <input
+        ref={photoCameraInputRef}
+        type="file"
+        accept="image/*"
+        capture="environment"
+        className="hidden"
+        onChange={handlePhotoCapture}
+      />
+      <input
         ref={photoInputRef}
         type="file"
         accept="image/*"
@@ -367,10 +376,17 @@ export function IncomesModal({ onClose }) {
           <div className="flex gap-2">
             <button
               type="button"
+              onClick={() => photoCameraInputRef.current?.click()}
+              className="flex-1 bg-[#2a2d38] hover:bg-[#343846] text-gray-300 text-xs font-bold py-2 rounded-xl border border-gray-700 hover:border-gray-500 transition-all"
+            >
+              📸 Retomar Foto
+            </button>
+            <button
+              type="button"
               onClick={() => photoInputRef.current?.click()}
               className="flex-1 bg-[#2a2d38] hover:bg-[#343846] text-gray-300 text-xs font-bold py-2 rounded-xl border border-gray-700 hover:border-gray-500 transition-all"
             >
-              📷 Cambiar foto
+              📁 Galería
             </button>
             <button
               type="button"
@@ -382,14 +398,24 @@ export function IncomesModal({ onClose }) {
           </div>
         </div>
       ) : (
-        <button
-          type="button"
-          onClick={() => photoInputRef.current?.click()}
-          className="w-full border-2 border-dashed border-green-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-green-500 hover:bg-green-950/20 transition-all group"
-        >
-          <span className="text-3xl group-hover:scale-110 transition-transform">📷</span>
-          <span className="text-sm font-bold text-gray-500 group-hover:text-green-400">Tomar foto del sobre</span>
-        </button>
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => photoCameraInputRef.current?.click()}
+            className="border-2 border-dashed border-green-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-green-500 hover:bg-green-950/20 transition-all group"
+          >
+            <span className="text-3xl group-hover:scale-110 transition-transform">📸</span>
+            <span className="text-sm font-bold text-gray-300 group-hover:text-green-400">Tomar Foto</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => photoInputRef.current?.click()}
+            className="border-2 border-dashed border-gray-800/60 rounded-2xl py-5 flex flex-col items-center justify-center gap-2 hover:border-gray-500 hover:bg-gray-900/40 transition-all group"
+          >
+            <span className="text-3xl group-hover:scale-110 transition-transform">📁</span>
+            <span className="text-sm font-bold text-gray-400 group-hover:text-gray-200">Subir Galería</span>
+          </button>
+        </div>
       )}
     </div>
   );
