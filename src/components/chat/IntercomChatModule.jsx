@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   Send, Mic, Square, Camera, Image as ImageIcon, Phone, PhoneOff,
   PhoneCall, Volume2, Play, Pause, CheckCheck, User, Clock, AlertCircle, X
@@ -9,41 +9,117 @@ import { supabase } from '../../lib/supabase';
 /**
  * Módulo de Chat / Radio Intercomunicador Integrado
  * Rediseñado con la línea gráfica cálida, limpia y moderna de Frita Mejor.
+ *
+ * Sonido: Usa un AudioContext compartido (se resume con gesto de usuario)
+ * para garantizar compatibilidad con iOS/Android mobile.
+ * Llamadas: Señalización vía Supabase Broadcast, tono de llamada continuo,
+ * y limpieza correcta del estado en ambos extremos.
  */
-// Reproduce un bip/tono de radio intercomunicador al recibir mensaje
-const playRadioChime = () => {
-  try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    
-    // Tono 1 (880Hz)
-    const osc1 = ctx.createOscillator();
-    const gain1 = ctx.createGain();
-    osc1.type = 'sine';
-    osc1.frequency.setValueAtTime(880, ctx.currentTime);
-    gain1.gain.setValueAtTime(0.3, ctx.currentTime);
-    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
-    osc1.connect(gain1);
-    gain1.connect(ctx.destination);
-    osc1.start(ctx.currentTime);
-    osc1.stop(ctx.currentTime + 0.15);
 
-    // Tono 2 (1200Hz - Bip radio)
+// ─── Singleton AudioContext (móviles exigen gesto de usuario) ────────────────
+let _audioCtx = null;
+function getAudioCtx() {
+  if (!_audioCtx) {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return null;
+    _audioCtx = new AC();
+  }
+  // iOS Safari suspende el contexto hasta un gesto — reanudar siempre
+  if (_audioCtx.state === 'suspended') {
+    _audioCtx.resume().catch(() => {});
+  }
+  return _audioCtx;
+}
+
+// ─── Sonido de Notificación Radio (doble bip corto + fuerte) ─────────────────
+function playRadioChime() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+
+    // Primer bip — 880 Hz, 120 ms
+    const osc1 = ctx.createOscillator();
+    const g1 = ctx.createGain();
+    osc1.type = 'square';
+    osc1.frequency.value = 880;
+    g1.gain.setValueAtTime(0.6, now);
+    g1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+    osc1.connect(g1).connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.12);
+
+    // Segundo bip — 1320 Hz, 150 ms (después de una pausa de 80 ms)
     const osc2 = ctx.createOscillator();
-    const gain2 = ctx.createGain();
-    osc2.type = 'triangle';
-    osc2.frequency.setValueAtTime(1200, ctx.currentTime + 0.12);
-    gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.12);
-    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
-    osc2.connect(gain2);
-    gain2.connect(ctx.destination);
-    osc2.start(ctx.currentTime + 0.12);
-    osc2.stop(ctx.currentTime + 0.3);
+    const g2 = ctx.createGain();
+    osc2.type = 'square';
+    osc2.frequency.value = 1320;
+    g2.gain.setValueAtTime(0.7, now + 0.20);
+    g2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    osc2.connect(g2).connect(ctx.destination);
+    osc2.start(now + 0.20);
+    osc2.stop(now + 0.35);
   } catch (e) {
     console.warn('Audio chime error:', e);
   }
-};
+}
+
+// ─── Tono de Llamada Entrante (ringtone continuo) ────────────────────────────
+// Devuelve una función stop() que apaga el ringtone
+function startRingtone() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return () => {};
+
+    let stopped = false;
+    const masterGain = ctx.createGain();
+    masterGain.gain.value = 0.5;
+    masterGain.connect(ctx.destination);
+
+    // Patrón: ring ring … pausa … ring ring (cada 2.5s)
+    let intervalId = null;
+
+    function playRingBurst() {
+      if (stopped) return;
+      const now = ctx.currentTime;
+
+      // Ring 1
+      const o1 = ctx.createOscillator();
+      const g1 = ctx.createGain();
+      o1.type = 'sine';
+      o1.frequency.value = 440;
+      g1.gain.setValueAtTime(0.5, now);
+      g1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
+      o1.connect(g1).connect(masterGain);
+      o1.start(now);
+      o1.stop(now + 0.4);
+
+      // Ring 2 (más agudo)
+      const o2 = ctx.createOscillator();
+      const g2 = ctx.createGain();
+      o2.type = 'sine';
+      o2.frequency.value = 560;
+      g2.gain.setValueAtTime(0.5, now + 0.5);
+      g2.gain.exponentialRampToValueAtTime(0.01, now + 0.9);
+      o2.connect(g2).connect(masterGain);
+      o2.start(now + 0.5);
+      o2.stop(now + 0.9);
+    }
+
+    // Primera ráfaga inmediata
+    playRingBurst();
+    intervalId = setInterval(playRingBurst, 2500);
+
+    return function stop() {
+      stopped = true;
+      if (intervalId) clearInterval(intervalId);
+      try { masterGain.disconnect(); } catch (_) {}
+    };
+  } catch (e) {
+    console.warn('Ringtone error:', e);
+    return () => {};
+  }
+}
 
 export const IntercomChatModule = ({
   currentUserId,
@@ -68,6 +144,7 @@ export const IntercomChatModule = ({
   const [recordingTime, setRecordingTime] = useState(0);
   const [playingAudioId, setPlayingAudioId] = useState(null);
   const [photoPreview, setPhotoPreview] = useState(null);
+  const [callDuration, setCallDuration] = useState(0);
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -76,8 +153,55 @@ export const IntercomChatModule = ({
   const messagesEndRef = useRef(null);
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
+  const ringtoneStopRef = useRef(null);
+  const callTimerRef = useRef(null);
 
-  // Escucha activa de eventos Broadcast en vivo + Sonido de Radio
+  // ─── Llamada: Ringtone y Timer ──────────────────────────────────────────────
+  useEffect(() => {
+    // Si hay una llamada activa en estado 'ringing' y SOMOS el receptor → ringtone
+    if (
+      activeCall &&
+      activeCall.status === 'ringing' &&
+      activeCall.receiverId === currentUserId
+    ) {
+      if (!ringtoneStopRef.current) {
+        ringtoneStopRef.current = startRingtone();
+      }
+    } else {
+      // Apagar ringtone si ya no estamos en ringing
+      if (ringtoneStopRef.current) {
+        ringtoneStopRef.current();
+        ringtoneStopRef.current = null;
+      }
+    }
+
+    // Timer de duración de llamada conectada
+    if (activeCall && activeCall.status === 'connected') {
+      setCallDuration(0);
+      callTimerRef.current = setInterval(() => {
+        setCallDuration(prev => prev + 1);
+      }, 1000);
+    } else {
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+      setCallDuration(0);
+    }
+
+    return () => {
+      if (ringtoneStopRef.current) {
+        ringtoneStopRef.current();
+        ringtoneStopRef.current = null;
+      }
+      if (callTimerRef.current) {
+        clearInterval(callTimerRef.current);
+        callTimerRef.current = null;
+      }
+    };
+  }, [activeCall?.status, activeCall?.id, currentUserId]);
+
+  // ─── Escucha activa de Broadcast en vivo + Sonido Radio ─────────────────────
   useEffect(() => {
     const channel = supabase
       .channel('chat_intercom_live')
@@ -94,7 +218,13 @@ export const IntercomChatModule = ({
       })
       .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
         if (payload) {
-          useChatStore.setState({ activeCall: payload });
+          // Si la señal dice "ended" → limpiar llamada activa localmente
+          if (payload.status === 'ended') {
+            useChatStore.setState({ activeCall: null });
+          } else {
+            useChatStore.setState({ activeCall: payload });
+          }
+          // Sonido al recibir señal de llamada entrante
           if (payload.receiverId === currentUserId && payload.status === 'ringing') {
             playRadioChime();
           }
@@ -106,6 +236,11 @@ export const IntercomChatModule = ({
       supabase.removeChannel(channel);
     };
   }, [currentUserId]);
+
+  // Despertar AudioContext con el primer toque del usuario en el componente
+  const handleUserGesture = useCallback(() => {
+    getAudioCtx(); // resume si está suspended
+  }, []);
 
   const conversation = getConversation(currentUserId, targetUserId, shiftId);
 
@@ -253,8 +388,19 @@ export const IntercomChatModule = ({
     }
   };
 
+  // Formatear duración de llamada
+  const formatCallTime = (s) => {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, '0')}`;
+  };
+
   return (
-    <div className={`flex flex-col h-full bg-white rounded-[32px] border-2 border-amber-100 overflow-hidden shadow-xl ${compactMode ? 'max-h-[500px]' : ''}`}>
+    <div
+      className={`flex flex-col h-full bg-white rounded-[32px] border-2 border-amber-100 overflow-hidden shadow-xl ${compactMode ? 'max-h-[500px]' : ''}`}
+      onTouchStart={handleUserGesture}
+      onClick={handleUserGesture}
+    >
 
       {/* Header Estilo Frita Mejor */}
       <div className="p-4 bg-gradient-to-r from-amber-500/10 to-amber-400/5 border-b border-amber-100 flex items-center justify-between">
@@ -273,14 +419,22 @@ export const IntercomChatModule = ({
 
         {/* Botón de Llamada de Voz */}
         <button
-          onClick={() => startCall({
-            callerId: currentUserId,
-            callerName: currentUserName,
-            callerRole: currentUserRole,
-            receiverId: targetUserId,
-            receiverName: targetUserName,
-          })}
-          className="flex items-center gap-1.5 px-4 py-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full font-black text-xs shadow-sm active:scale-95 transition-all"
+          onClick={() => {
+            getAudioCtx(); // Garantizar que el AudioContext esté activo con gesto
+            startCall({
+              callerId: currentUserId,
+              callerName: currentUserName,
+              callerRole: currentUserRole,
+              receiverId: targetUserId,
+              receiverName: targetUserName,
+            });
+          }}
+          disabled={!!activeCall}
+          className={`flex items-center gap-1.5 px-4 py-2 rounded-full font-black text-xs shadow-sm active:scale-95 transition-all ${
+            activeCall
+              ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+              : 'bg-emerald-500 hover:bg-emerald-600 text-white'
+          }`}
         >
           <Phone size={14} /> <span>Llamar</span>
         </button>
@@ -288,34 +442,51 @@ export const IntercomChatModule = ({
 
       {/* Banner de Llamada Activa */}
       {activeCall && (
-        <div className="bg-amber-500 text-gray-950 p-3.5 flex items-center justify-between shadow-md">
+        <div className={`p-3.5 flex items-center justify-between shadow-md ${
+          activeCall.status === 'ringing'
+            ? 'bg-gradient-to-r from-amber-400 to-amber-500 text-gray-950 animate-pulse'
+            : 'bg-gradient-to-r from-emerald-500 to-emerald-600 text-white'
+        }`}>
           <div className="flex items-center gap-2.5">
-            <PhoneCall size={18} className="animate-bounce" />
+            <PhoneCall size={18} className={activeCall.status === 'ringing' ? 'animate-bounce' : ''} />
             <div>
               <p className="font-black text-xs">
                 {activeCall.callerId === currentUserId
-                  ? `Llamando a ${activeCall.receiverName}...`
-                  : `Llamada entrante de ${activeCall.callerName}`}
+                  ? activeCall.status === 'ringing'
+                    ? `📞 Llamando a ${activeCall.receiverName}...`
+                    : `📞 En llamada con ${activeCall.receiverName}`
+                  : activeCall.status === 'ringing'
+                    ? `📞 Llamada entrante de ${activeCall.callerName}`
+                    : `📞 En llamada con ${activeCall.callerName}`
+                }
               </p>
               <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">
-                {activeCall.status === 'ringing' ? 'Timbres...' : 'Llamada de voz en curso'}
+                {activeCall.status === 'ringing'
+                  ? 'Timbrando...'
+                  : `En curso — ${formatCallTime(callDuration)}`
+                }
               </p>
             </div>
           </div>
           <div className="flex gap-2">
+            {/* Botón Contestar (solo receptor cuando está timbrando) */}
             {activeCall.receiverId === currentUserId && activeCall.status === 'ringing' && (
               <button
-                onClick={() => updateCallStatus('connected')}
-                className="bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1 rounded-xl font-black text-xs shadow-sm"
+                onClick={() => {
+                  getAudioCtx();
+                  updateCallStatus('connected');
+                }}
+                className="bg-emerald-600 hover:bg-emerald-500 text-white px-4 py-1.5 rounded-xl font-black text-xs shadow-sm active:scale-95 transition-all"
               >
-                Contestar
+                ✅ Contestar
               </button>
             )}
+            {/* Botón Colgar (ambos) */}
             <button
               onClick={() => updateCallStatus('ended')}
-              className="bg-red-600 hover:bg-red-500 text-white px-3 py-1 rounded-xl font-black text-xs shadow-sm"
+              className="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-xl font-black text-xs shadow-sm flex items-center gap-1 active:scale-95 transition-all"
             >
-              Colgar
+              <PhoneOff size={13} /> Colgar
             </button>
           </div>
         </div>

@@ -214,32 +214,54 @@ export const useChatStore = create(
           const updatedCall = { ...currentCall, status };
 
           if (status === 'ended') {
+            // Determinar texto del log basándose en el estado ACTUAL (antes de finalizar)
+            const wasConnected = currentCall.status === 'connected';
+            const durationSec = Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000);
+            const logText = wasConnected
+              ? `📞 Llamada de voz finalizada (${Math.floor(durationSec / 60)}:${(durationSec % 60).toString().padStart(2, '0')})`
+              : '📞 Llamada de voz cancelada';
+
+            // 1. Broadcast la señal de "ended" PRIMERO para que el otro lado la reciba
+            try {
+              if (realtimeChannel) {
+                realtimeChannel.send({
+                  type: 'broadcast',
+                  event: 'voice_call_signal',
+                  payload: updatedCall,
+                }).catch(() => {});
+              }
+            } catch (_) {}
+
+            // 2. Registrar log de llamada en el chat
             get().sendMessage({
               shiftId: 'shift-active',
-              branchId: 'BRANCH-001',
+              branchId: currentCall.branchId || 'BRANCH-001',
               senderId: currentCall.callerId,
               senderName: currentCall.callerName,
               senderRole: currentCall.callerRole,
               receiverId: currentCall.receiverId,
               receiverName: currentCall.receiverName,
               type: 'call_log',
-              text: `📞 Llamada de voz (${status === 'connected' ? 'Finalizada' : 'Cancelada'})`,
-              durationSeconds: Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000),
+              text: logText,
+              durationSeconds: durationSec,
             });
+
+            // 3. Limpiar estado local de llamada
             set({ activeCall: null });
           } else {
             set({ activeCall: updatedCall });
-          }
 
-          try {
-            if (realtimeChannel) {
-              realtimeChannel.send({
-                type: 'broadcast',
-                event: 'voice_call_signal',
-                payload: updatedCall,
-              }).catch(() => {});
-            }
-          } catch (_) {}
+            // Broadcast actualización de estado (ej: 'connected')
+            try {
+              if (realtimeChannel) {
+                realtimeChannel.send({
+                  type: 'broadcast',
+                  event: 'voice_call_signal',
+                  payload: updatedCall,
+                }).catch(() => {});
+              }
+            } catch (_) {}
+          }
         },
       };
     },
