@@ -65,6 +65,7 @@ export const useFinanceStore = create(
             ...e,
             facturaUrl: e.facturaUrl || e.factura_url || null,
             monto: e.monto ?? e.valor ?? 0,
+            valor: e.monto ?? e.valor ?? 0,
           });
           if (!expensesRes.error) {
             set({ expenses: (expensesRes.data || []).map(normalizeExpense) });
@@ -245,15 +246,22 @@ export const useFinanceStore = create(
           created_at: new Date().toISOString(),
           branch_id: branchId || 'BRANCH-001',
           ...expenseData,
+          monto: expenseData.valor ?? expenseData.monto ?? 0,
+          valor: expenseData.valor ?? expenseData.monto ?? 0,
         };
         set((state) => ({ expenses: [newExpense, ...state.expenses] }));
 
         try {
-          const { valor, created_at: _ca, id: _id, ...rest } = expenseData;
           const expenseForDB = {
-            ...rest,
-            branch_id: branchId || 'BRANCH-001',
-            monto: valor ?? expenseData.monto ?? 0,
+            fecha: expenseData.fecha || new Date().toISOString().slice(0, 10),
+            descripcion: expenseData.descripcion || '',
+            proveedor: expenseData.proveedor || null,
+            supplierId: expenseData.supplierId || null,
+            monto: expenseData.valor ?? expenseData.monto ?? 0,
+            categoria: expenseData.tipoGasto || expenseData.categoria || null,
+            facturaUrl: expenseData.facturaUrl || null,
+            creado_por: expenseData.creado_por || expenseData.createdBy || 'Desconocido',
+            branch_id: branchId || expenseData.branch_id || 'BRANCH-001',
           };
           console.log('[FinanceStore] addExpense payload:', expenseForDB);
           const { data, error } = await supabase.from('expenses').insert([expenseForDB]).select();
@@ -263,7 +271,7 @@ export const useFinanceStore = create(
             set((state) => ({
               expenses: state.expenses.map((e) =>
                 e.id === newExpense.id
-                  ? { ...data[0], valor: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null }
+                  ? { ...e, ...data[0], valor: data[0].monto, monto: data[0].monto, facturaUrl: data[0].facturaUrl || data[0].factura_url || expenseData.facturaUrl || null }
                   : e
               ),
             }));

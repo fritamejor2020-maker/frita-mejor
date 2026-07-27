@@ -22,6 +22,20 @@ export function FinanceDashboard() {
   const [showExpensesChat,  setShowExpensesChat]  = useState(false);
   const [showPayroll,       setShowPayroll]       = useState(false);
 
+  const fetchFinances       = useFinanceStore((s) => s.fetchFinances);
+  const subscribeToExpenses = useFinanceStore((s) => s.subscribeToExpenses);
+  const subscribeToIncomes  = useFinanceStore((s) => s.subscribeToIncomes);
+
+  React.useEffect(() => {
+    fetchFinances();
+    const unsubExpenses = subscribeToExpenses();
+    const unsubIncomes  = subscribeToIncomes();
+    return () => {
+      unsubExpenses?.();
+      unsubIncomes?.();
+    };
+  }, [fetchFinances, subscribeToExpenses, subscribeToIncomes]);
+
   const payrollRecords = usePayrollStore((s) => s.payrollRecords);
 
   const isAdmin      = user?.role === 'ADMIN';
