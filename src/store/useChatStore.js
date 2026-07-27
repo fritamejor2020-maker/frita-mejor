@@ -136,13 +136,26 @@ export const useChatStore = create(
         },
 
         /**
-         * Retorna los mensajes de una conversación entre dos usuarios (o para una sede/turno)
+         * Retorna los mensajes de una conversación entre dos usuarios para el turno activo
          */
-        getConversation: (userAId, userBId) => {
-          return get().messages.filter(m => {
+        getConversation: (userAId, userBId, activeShiftId = null) => {
+          const currentMessages = get().messages || [];
+          const now = Date.now();
+          const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+          return currentMessages.filter(m => {
+            // Filtro de turno: si hay un turno activo específico, priorizar mensajes del turno
+            if (activeShiftId && activeShiftId !== 'shift-active' && m.shiftId && m.shiftId !== 'shift-active') {
+              if (m.shiftId !== activeShiftId) return false;
+            } else {
+              // Si no hay shiftId específico, descartar mensajes de jornadas pasadas (>24 horas)
+              const msgTime = new Date(m.createdAt).getTime();
+              if (now - msgTime > TWENTY_FOUR_HOURS) return false;
+            }
+
             // Si la conversación seleccionada es 'ALL' (Canal General)
             if (!userBId || userBId === 'ALL') {
-              return true; // Muestra todo el canal de radio del turno
+              return true; // Muestra todo el canal de radio del turno activo
             }
 
             // Para canal individual (ej: T1, T2, etc.)

@@ -65,7 +65,7 @@ export const IntercomChatModule = ({
     };
   }, []);
 
-  const conversation = getConversation(currentUserId, targetUserId);
+  const conversation = getConversation(currentUserId, targetUserId, shiftId);
 
   // Auto-scroll al último mensaje
   useEffect(() => {
