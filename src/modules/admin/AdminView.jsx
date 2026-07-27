@@ -722,19 +722,11 @@ function FryKitchensPanel() {
                             )}
 
                             <button
-                              className="text-xs font-bold text-orange-700 hover:text-red-600 bg-white border border-orange-200 hover:border-red-300 px-2.5 py-0.5 rounded-full transition-colors"
+                              className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
                               onClick={handleUnlink}
-                              title="Quitar de esta cocina"
+                              title="Quitar receta de esta cocina"
                             >
-                              ✕ Quitar de cocina
-                            </button>
-
-                            <button
-                              className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-0.5 rounded-full transition-colors"
-                              onClick={() => deleteFritadoRecipe(recipe.id)}
-                              title="Eliminar receta por completo"
-                            >
-                              🗑️ Eliminar
+                              ✕ Quitar
                             </button>
                           </div>
                         </div>
