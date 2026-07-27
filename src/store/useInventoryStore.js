@@ -1030,15 +1030,9 @@ export const useInventoryStore = create(
       deletePosRegister: (id) => { set((s) => ({ posRegisters: (s.posRegisters || []).filter(r => r.id !== id) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
 
       // Fritado Recipes
-      addFritadoRecipe: (recipe) => set((s) => ({
-        fritadoRecipes: [...(s.fritadoRecipes || []), { ...recipe, id: `FR-${Date.now()}` }]
-      })),
-      updateFritadoRecipe: (id, data) => set((s) => ({
-        fritadoRecipes: (s.fritadoRecipes || []).map(r => r.id === id ? { ...r, ...data } : r)
-      })),
-      deleteFritadoRecipe: (id) => set((s) => ({
-        fritadoRecipes: (s.fritadoRecipes || []).filter(r => r.id !== id)
-      })),
+      addFritadoRecipe: (recipe) => { set((s) => ({ fritadoRecipes: [...(s.fritadoRecipes || []), { ...recipe, id: `FR-${Date.now()}` }] })); syncKey('fritadoRecipes', useInventoryStore.getState().fritadoRecipes); },
+      updateFritadoRecipe: (id, data) => { set((s) => ({ fritadoRecipes: (s.fritadoRecipes || []).map(r => r.id === id ? { ...r, ...data } : r) })); syncKey('fritadoRecipes', useInventoryStore.getState().fritadoRecipes); },
+      deleteFritadoRecipe: (id) => { set((s) => ({ fritadoRecipes: (s.fritadoRecipes || []).filter(r => r.id !== id) })); syncKey('fritadoRecipes', useInventoryStore.getState().fritadoRecipes); },
 
       // Plantillas de Carga / Surtido
       addLoadTemplate: (template) => { set((s) => ({ loadTemplates: [...(s.loadTemplates || []), { ...template, id: `TPL-${Date.now()}` }] })); syncKey('loadTemplates', useInventoryStore.getState().loadTemplates); },

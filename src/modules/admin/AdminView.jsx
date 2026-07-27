@@ -317,16 +317,34 @@ function WarehousesPanel() {
 
 // ─── Panel: Puntos de Producción ───────────────────────────────────────────────
 function ProductionPointsPanel() {
-  const { productionPoints, products, inventory, addProductionPoint, updateProductionPoint, deleteProductionPoint, updateProduct, addProduct } = useInventoryStore();
+  const { productionPoints, products, recipes, inventory, addProductionPoint, updateProductionPoint, deleteProductionPoint, updateProduct, addProduct } = useInventoryStore();
   const [editId, setEditId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', location: '' });
+  const [editingPresetsKey, setEditingPresetsKey] = useState(null);
+  const [draftPresets, setDraftPresets] = useState([]);
 
   const fields = [
     { key: 'name',     label: 'Nombre',     wide: true },
     { key: 'location', label: 'Sala/Área',  wide: true },
   ];
   const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const startEditPresets = (prod, ppId) => {
+    setEditingPresetsKey(`${prod.id}_${ppId}`);
+    setDraftPresets([...(prod.linePresets?.[ppId] ?? [1, 2, 5, 10, 20])]);
+  };
+
+  const saveEditPresets = (prod, ppId) => {
+    const parsed = draftPresets.map((v) => parseFloat(v)).filter((v) => !isNaN(v) && v > 0);
+    const final = parsed.slice(0, 5);
+    while (final.length < 5) final.push(final[final.length - 1] ?? 1);
+    
+    const current = prod.linePresets ? { ...prod.linePresets } : {};
+    current[ppId] = final;
+    updateProduct(prod.id, { linePresets: current });
+    setEditingPresetsKey(null);
+  };
 
   return (
     <div>
@@ -345,7 +363,7 @@ function ProductionPointsPanel() {
         </div>
       )}
 
-      <div className="space-y-3">
+      <div className="space-y-4">
         {productionPoints.map((pp) => {
           const assigned = products.filter((p) => p.productionPointIds?.includes(pp.id));
           return editId === pp.id ? (
@@ -355,14 +373,14 @@ function ProductionPointsPanel() {
                 onCancel={() => setEditId(null)} />
             </div>
           ) : (
-            <div key={pp.id} className="border border-gray-100 rounded-2xl p-4 hover:border-gray-200 transition-colors">
+            <div key={pp.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 transition-colors bg-white shadow-sm">
               <div className="flex flex-wrap items-center gap-4">
                 <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-xl border border-yellow-100 shrink-0">🏭</div>
                 <div className="flex-1 min-w-[140px]">
-                  <span className="font-black text-chunky-dark block">{pp.name}</span>
+                  <span className="font-black text-chunky-dark text-lg block">{pp.name}</span>
                   <span className="text-gray-400 font-bold text-xs">{pp.location}</span>
                 </div>
-                <span className={`text-xs font-bold px-2 py-1 rounded-full ${pp.active ? 'bg-green-50 text-green-500' : 'bg-gray-50 text-gray-400'}`}>{pp.active ? 'Activo' : 'Inactivo'}</span>
+                <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${pp.active ? 'bg-green-50 text-green-600 font-black' : 'bg-gray-50 text-gray-400'}`}>{pp.active ? 'Activo' : 'Inactivo'}</span>
                 <div className="flex gap-2 ml-auto">
                   <button className="text-gray-300 hover:text-chunky-main" onClick={() => { setEditId(pp.id); setForm({ name: pp.name, location: pp.location }); setShowAdd(false); }} title="Editar">
                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
@@ -384,72 +402,128 @@ function ProductionPointsPanel() {
                 </div>
               </div>
 
-              {/* Productos asignados + selector */}
-              <div className="mt-3 pl-14">
-                <p className="text-xs font-bold text-gray-400 mb-2">Productos asignados:</p>
-                <div className="flex flex-wrap gap-2">
-                  {assigned.map((p) => (
-                    <span key={p.id} className="bg-yellow-50 border border-yellow-100 text-xs font-bold px-3 py-1 rounded-full text-chunky-dark flex items-center gap-1">
-                      {p.name}
-                      <button className="text-gray-300 hover:text-red-400 ml-1" onClick={() => updateProduct(p.id, { productionPointIds: p.productionPointIds.filter(id => id !== pp.id) })}>✕</button>
-                    </span>
-                  ))}
-                  {/* Asignar un producto no asignado a este punto */}
-                  {(() => {
-                    const availableProducts = products.filter((p) => !p.productionPointIds?.includes(pp.id));
-                    const unlinkedInventory = inventory.filter(i => 
-                      ['PRODUCTO', 'FRITO', 'CRUDO'].includes(i.type) && 
-                      !products.some(p => p.outputInventoryId === i.id || p.name === i.name)
-                    );
-                    
-                    if (availableProducts.length === 0 && unlinkedInventory.length === 0) return null;
-                    
-                    return (
-                      <select
-                        className="bg-gray-50 border border-gray-200 text-xs font-bold px-3 py-1 rounded-full text-gray-500 outline-none max-w-[160px]"
-                        value=""
-                        onChange={(e) => { 
-                          if (e.target.value) {
-                            const val = e.target.value;
-                            if (val.startsWith('INV:')) {
-                              const invId = val.replace('INV:', '');
-                              const invItem = inventory.find(i => i.id === invId);
-                              if (invItem) {
-                                addProduct({
-                                  name: invItem.name,
-                                  recipeId: '',
-                                  unit: invItem.unit || 'kg',
-                                  outputInventoryId: invItem.id,
-                                  productionPointIds: [pp.id],
-                                  linePresets: {}
-                                });
-                              }
-                            } else {
-                              const pToUpdate = products.find(p => p.id === val);
-                              updateProduct(val, { productionPointIds: [...(pToUpdate.productionPointIds || []), pp.id] }); 
+              {/* Productos asignados + Botones editables por línea */}
+              <div className="mt-4 pt-3 border-t border-gray-100">
+                <p className="text-xs font-bold text-gray-400 mb-2">Productos y Botones Rápida Producción en esta Línea:</p>
+                
+                {assigned.length > 0 ? (
+                  <div className="space-y-2 mb-3">
+                    {assigned.map((prod) => {
+                      const isEditing = editingPresetsKey === `${prod.id}_${pp.id}`;
+                      const presets = prod.linePresets?.[pp.id] ?? [1, 2, 5, 10, 20];
+                      const recipe = recipes.find(r => r.id === prod.recipeId);
+                      const unit = recipe?.yieldUnit ?? prod.unit;
+
+                      return (
+                        <div key={prod.id} className="bg-yellow-50/50 border border-yellow-100 rounded-xl p-3 flex flex-col gap-2">
+                          <div className="flex justify-between items-center">
+                            <span className="font-black text-sm text-chunky-dark flex items-center gap-1.5">
+                              📦 {prod.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              {!isEditing ? (
+                                <button
+                                  className="text-xs font-bold text-chunky-dark hover:text-black bg-yellow-200/60 hover:bg-yellow-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-colors"
+                                  onClick={() => startEditPresets(prod, pp.id)}
+                                >
+                                  ✏️ Botones
+                                </button>
+                              ) : (
+                                <div className="flex gap-1.5">
+                                  <button className="text-xs font-bold text-green-700 bg-green-100 hover:bg-green-200 px-3 py-0.5 rounded-full" onClick={() => saveEditPresets(prod, pp.id)}>Guardar</button>
+                                  <button className="text-xs font-bold text-gray-500 bg-white border border-gray-200 px-2.5 py-0.5 rounded-full" onClick={() => setEditingPresetsKey(null)}>Cancelar</button>
+                                </div>
+                              )}
+                              <button className="text-gray-300 hover:text-red-500 text-xs font-bold ml-1" onClick={() => updateProduct(prod.id, { productionPointIds: prod.productionPointIds.filter(id => id !== pp.id) })}>✕ Desvincular</button>
+                            </div>
+                          </div>
+
+                          {/* Grid de 5 botones */}
+                          <div className="grid grid-cols-5 gap-1.5 mt-1">
+                            {(isEditing ? draftPresets : presets).map((val, idx) => (
+                              isEditing ? (
+                                <input
+                                  key={idx}
+                                  type="number" min="0.1" step="0.5"
+                                  className="w-full text-center font-black text-chunky-dark text-xs border-2 border-yellow-400 bg-white rounded-lg py-1 outline-none"
+                                  value={draftPresets[idx]}
+                                  onChange={(e) => {
+                                    const copy = [...draftPresets];
+                                    copy[idx] = e.target.value;
+                                    setDraftPresets(copy);
+                                  }}
+                                />
+                              ) : (
+                                <div key={idx} className="bg-white border border-yellow-200 rounded-lg py-1 text-center shadow-xs">
+                                  <span className="font-black text-gray-800 text-xs">{val}</span>
+                                  <span className="text-[9px] font-bold text-gray-400 ml-0.5">{unit}</span>
+                                </div>
+                              )
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 italic font-bold mb-3">No hay productos asignados a este punto de producción.</p>
+                )}
+
+                {/* Asignar un producto no asignado a este punto */}
+                {(() => {
+                  const availableProducts = products.filter((p) => !p.productionPointIds?.includes(pp.id));
+                  const unlinkedInventory = inventory.filter(i => 
+                    ['PRODUCTO', 'FRITO', 'CRUDO'].includes(i.type) && 
+                    !products.some(p => p.outputInventoryId === i.id || p.name === i.name)
+                  );
+                  
+                  if (availableProducts.length === 0 && unlinkedInventory.length === 0) return null;
+                  
+                  return (
+                    <select
+                      className="bg-gray-50 border border-gray-200 text-xs font-bold px-3.5 py-1.5 rounded-full text-gray-600 outline-none max-w-[220px]"
+                      value=""
+                      onChange={(e) => { 
+                        if (e.target.value) {
+                          const val = e.target.value;
+                          if (val.startsWith('INV:')) {
+                            const invId = val.replace('INV:', '');
+                            const invItem = inventory.find(i => i.id === invId);
+                            if (invItem) {
+                              addProduct({
+                                name: invItem.name,
+                                recipeId: '',
+                                unit: invItem.unit || 'kg',
+                                outputInventoryId: invItem.id,
+                                productionPointIds: [pp.id],
+                                linePresets: {}
+                              });
                             }
+                          } else {
+                            const pToUpdate = products.find(p => p.id === val);
+                            updateProduct(val, { productionPointIds: [...(pToUpdate.productionPointIds || []), pp.id] }); 
                           }
-                        }}
-                      >
-                        <option value="">+ Asignar producto...</option>
-                        {availableProducts.length > 0 && (
-                          <optgroup label="Ya configurados (Botones)">
-                            {availableProducts.map((p) => (
-                              <option key={p.id} value={p.id}>{p.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                        {unlinkedInventory.length > 0 && (
-                          <optgroup label="Nuevos desde Inventario">
-                            {unlinkedInventory.map((i) => (
-                              <option key={`INV:${i.id}`} value={`INV:${i.id}`}>{i.name}</option>
-                            ))}
-                          </optgroup>
-                        )}
-                      </select>
-                    );
-                  })()}
-                </div>
+                        }
+                      }}
+                    >
+                      <option value="">+ Asignar producto a esta línea...</option>
+                      {availableProducts.length > 0 && (
+                        <optgroup label="Ya configurados (Botones)">
+                          {availableProducts.map((p) => (
+                            <option key={p.id} value={p.id}>{p.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                      {unlinkedInventory.length > 0 && (
+                        <optgroup label="Nuevos desde Inventario">
+                          {unlinkedInventory.map((i) => (
+                            <option key={`INV:${i.id}`} value={`INV:${i.id}`}>{i.name}</option>
+                          ))}
+                        </optgroup>
+                      )}
+                    </select>
+                  );
+                })()}
               </div>
             </div>
           );
@@ -461,16 +535,34 @@ function ProductionPointsPanel() {
 
 // ─── Panel: Cocinas de Fritado ────────────────────────────────────────────────
 function FryKitchensPanel() {
-  const { fryKitchens = [], products = [], inventory = [], addFryKitchen, updateFryKitchen, deleteFryKitchen, updateProduct, updateInventoryItem } = useInventoryStore();
+  const { fryKitchens = [], fritadoRecipes = [], inventory = [], addFryKitchen, updateFryKitchen, deleteFryKitchen, updateFritadoRecipe } = useInventoryStore();
   const [editId, setEditId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ name: '', location: '' });
+  const [editingPresetsKey, setEditingPresetsKey] = useState(null);
+  const [draftPresets, setDraftPresets] = useState([]);
 
   const fields = [
     { key: 'name',     label: 'Nombre de la Cocina', wide: true },
     { key: 'location', label: 'Ubicación/Zona',  wide: true },
   ];
   const change = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+
+  const startEditPresets = (recipe, fkId) => {
+    setEditingPresetsKey(`${recipe.id}_${fkId}`);
+    setDraftPresets([...(recipe.linePresets?.[fkId] ?? recipe.presets ?? [10, 20, 50, 100, 200])]);
+  };
+
+  const saveEditPresets = (recipe, fkId) => {
+    const parsed = draftPresets.map((v) => parseFloat(v)).filter((v) => !isNaN(v) && v > 0);
+    const final = parsed.slice(0, 5);
+    while (final.length < 5) final.push(final[final.length - 1] ?? 10);
+
+    const current = recipe.linePresets ? { ...recipe.linePresets } : {};
+    current[fkId] = final;
+    updateFritadoRecipe(recipe.id, { linePresets: current });
+    setEditingPresetsKey(null);
+  };
 
   return (
     <div>
@@ -491,15 +583,8 @@ function FryKitchensPanel() {
 
       {(fryKitchens || []).map((fk) => {
         const isEditing = editId === fk.id;
-        const assignedProducts  = products.filter((p) => p.fryKitchenIds?.includes(fk.id));
-        const assignedInventory = inventory.filter((i) => i.fryKitchenIds?.includes(fk.id) && !assignedProducts.some(p => p.outputInventoryId === i.id || p.name === i.name));
-        
-        const availableProducts = products.filter((p) => !p.fryKitchenIds?.includes(fk.id));
-        const availableInventory = inventory.filter((i) => 
-          ['FRITO', 'CRUDO', 'PRODUCTO'].includes(i.type) && 
-          !i.fryKitchenIds?.includes(fk.id) &&
-          !products.some(p => p.outputInventoryId === i.id || p.name === i.name)
-        );
+        const assignedRecipes = fritadoRecipes.filter(r => !r.fryKitchenIds?.length || r.fryKitchenIds.includes(fk.id));
+        const availableRecipes = fritadoRecipes.filter(r => r.fryKitchenIds?.length > 0 && !r.fryKitchenIds.includes(fk.id));
 
         return (
           <div key={fk.id} className="bg-white border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-200 transition-colors shadow-sm">
@@ -513,7 +598,7 @@ function FryKitchensPanel() {
                   <>
                     <div className="flex items-center gap-2">
                       <h4 className="font-black text-gray-800 text-lg">🍳 {fk.name}</h4>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${fk.active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${fk.active ? 'bg-green-100 text-green-700 font-black' : 'bg-gray-100 text-gray-500'}`}>
                         {fk.active ? 'ACTIVO' : 'INACTIVO'}
                       </span>
                     </div>
@@ -538,78 +623,108 @@ function FryKitchensPanel() {
               )}
             </div>
 
-            {/* Seccion de productos asignados a esta cocina */}
+            {/* Recetas y Botones Editables por Cocina */}
             <div className="mt-4 pt-3 border-t border-gray-100">
-              <p className="text-xs font-bold text-gray-400 mb-2">Productos asignados a esta cocina de fritado:</p>
-              <div className="flex flex-wrap gap-2 items-center">
-                {assignedProducts.map((p) => (
-                  <span key={p.id} className="bg-orange-50 border border-orange-200 text-xs font-bold px-3 py-1 rounded-full text-orange-800 flex items-center gap-1">
-                    🍳 {p.name}
-                    <button className="text-gray-300 hover:text-red-400 ml-1" onClick={() => {
-                      const updated = (p.fryKitchenIds || []).filter(id => id !== fk.id);
-                      updateProduct(p.id, { fryKitchenIds: updated });
-                      const inv = inventory.find(i => p.outputInventoryId ? i.id === p.outputInventoryId : i.name === p.name);
-                      if (inv) updateInventoryItem(inv.id, { fryKitchenIds: updated });
-                    }}>✕</button>
-                  </span>
-                ))}
-                {assignedInventory.map((item) => (
-                  <span key={item.id} className="bg-orange-50 border border-orange-200 text-xs font-bold px-3 py-1 rounded-full text-orange-800 flex items-center gap-1">
-                    🍳 {item.name}
-                    <button className="text-gray-300 hover:text-red-400 ml-1" onClick={() => {
-                      const updated = (item.fryKitchenIds || []).filter(id => id !== fk.id);
-                      updateInventoryItem(item.id, { fryKitchenIds: updated });
-                    }}>✕</button>
-                  </span>
-                ))}
+              <p className="text-xs font-bold text-gray-400 mb-2">Recetas y Botones Rápida Fritado en esta Cocina:</p>
 
-                {assignedProducts.length === 0 && assignedInventory.length === 0 && (
-                  <span className="text-xs text-gray-400 italic font-bold">Sin productos asignados a esta cocina.</span>
-                )}
+              {assignedRecipes.length > 0 ? (
+                <div className="space-y-2.5 mb-3">
+                  {assignedRecipes.map((recipe) => {
+                    const crudo = inventory.find(i => i.id === recipe.crudoId);
+                    const frito = inventory.find(i => i.id === recipe.fritoId);
+                    const name = frito?.name || 'Receta sin nombre';
+                    const crudoName = crudo?.name || 'Masa cruda';
+                    const isEditingPresets = editingPresetsKey === `${recipe.id}_${fk.id}`;
+                    const presets = recipe.linePresets?.[fk.id] ?? recipe.presets ?? [10, 20, 50, 100, 200];
 
-                {/* Selector de nuevo producto */}
-                {(availableProducts.length > 0 || availableInventory.length > 0) && (
-                  <select
-                    className="bg-gray-50 border border-gray-200 text-xs font-bold px-3 py-1 rounded-full text-gray-500 outline-none max-w-[180px]"
-                    value=""
-                    onChange={(e) => {
-                      if (!e.target.value) return;
-                      const val = e.target.value;
-                      if (val.startsWith('INV:')) {
-                        const invId = val.replace('INV:', '');
-                        const item = inventory.find(i => i.id === invId);
-                        if (item) {
-                          updateInventoryItem(item.id, { fryKitchenIds: [...(item.fryKitchenIds || []), fk.id] });
-                        }
-                      } else {
-                        const pToUpdate = products.find(p => p.id === val);
-                        if (pToUpdate) {
-                          const updated = [...(pToUpdate.fryKitchenIds || []), fk.id];
-                          updateProduct(pToUpdate.id, { fryKitchenIds: updated });
-                          const inv = inventory.find(i => pToUpdate.outputInventoryId ? i.id === pToUpdate.outputInventoryId : i.name === pToUpdate.name);
-                          if (inv) updateInventoryItem(inv.id, { fryKitchenIds: updated });
-                        }
-                      }
-                    }}
-                  >
-                    <option value="">+ Asignar producto...</option>
-                    {availableProducts.length > 0 && (
-                      <optgroup label="Productos">
-                        {availableProducts.map((p) => (
-                          <option key={p.id} value={p.id}>{p.name}</option>
-                        ))}
-                      </optgroup>
-                    )}
-                    {availableInventory.length > 0 && (
-                      <optgroup label="Inventario General">
-                        {availableInventory.map((i) => (
-                          <option key={`INV:${i.id}`} value={`INV:${i.id}`}>{i.name} ({i.type})</option>
-                        ))}
-                      </optgroup>
-                    )}
-                  </select>
-                )}
-              </div>
+                    return (
+                      <div key={recipe.id} className="bg-orange-50/40 border border-orange-100 rounded-xl p-3 flex flex-col gap-2">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <span className="font-black text-sm text-gray-800 flex items-center gap-1.5">
+                              🍳 {name}
+                            </span>
+                            <span className="text-[11px] font-bold text-gray-400 block">
+                              Masa: {crudoName}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {!isEditingPresets ? (
+                              <button
+                                className="text-xs font-bold text-orange-800 hover:text-orange-900 bg-orange-200/60 hover:bg-orange-300 px-2.5 py-0.5 rounded-full flex items-center gap-1 transition-colors"
+                                onClick={() => startEditPresets(recipe, fk.id)}
+                              >
+                                ✏️ Botones
+                              </button>
+                            ) : (
+                              <div className="flex gap-1.5">
+                                <button className="text-xs font-bold text-green-700 bg-green-100 hover:bg-green-200 px-3 py-0.5 rounded-full" onClick={() => saveEditPresets(recipe, fk.id)}>Guardar</button>
+                                <button className="text-xs font-bold text-gray-500 bg-white border border-gray-200 px-2.5 py-0.5 rounded-full" onClick={() => setEditingPresetsKey(null)}>Cancelar</button>
+                              </div>
+                            )}
+                            {recipe.fryKitchenIds?.length > 0 && (
+                              <button className="text-gray-300 hover:text-red-500 text-xs font-bold ml-1" onClick={() => {
+                                const updated = (recipe.fryKitchenIds || []).filter(id => id !== fk.id);
+                                updateFritadoRecipe(recipe.id, { fryKitchenIds: updated });
+                              }}>✕ Desvincular</button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Grid de 5 botones rápidas de fritado */}
+                        <div className="grid grid-cols-5 gap-1.5 mt-1">
+                          {(isEditingPresets ? draftPresets : presets).map((val, idx) => (
+                            isEditingPresets ? (
+                              <input
+                                key={idx}
+                                type="number" min="1" step="1"
+                                className="w-full text-center font-black text-gray-800 text-xs border-2 border-orange-400 bg-white rounded-lg py-1 outline-none"
+                                value={draftPresets[idx]}
+                                onChange={(e) => {
+                                  const copy = [...draftPresets];
+                                  copy[idx] = e.target.value;
+                                  setDraftPresets(copy);
+                                }}
+                              />
+                            ) : (
+                              <div key={idx} className="bg-white border border-orange-200 rounded-lg py-1 text-center shadow-xs">
+                                <span className="font-black text-gray-800 text-xs">{val}</span>
+                                <span className="text-[9px] font-bold text-gray-400 ml-0.5">uds</span>
+                              </div>
+                            )
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs text-gray-400 italic font-bold mb-3">No hay recetas de fritado asignadas a esta cocina.</p>
+              )}
+
+              {/* Selector de nueva receta de fritado */}
+              {availableRecipes.length > 0 && (
+                <select
+                  className="bg-gray-50 border border-gray-200 text-xs font-bold px-3.5 py-1.5 rounded-full text-gray-600 outline-none max-w-[240px]"
+                  value=""
+                  onChange={(e) => {
+                    if (!e.target.value) return;
+                    const rToUpdate = fritadoRecipes.find(r => r.id === e.target.value);
+                    if (rToUpdate) {
+                      const updated = [...(rToUpdate.fryKitchenIds || []), fk.id];
+                      updateFritadoRecipe(rToUpdate.id, { fryKitchenIds: updated });
+                    }
+                  }}
+                >
+                  <option value="">+ Asignar receta de fritado a esta cocina...</option>
+                  {availableRecipes.map((r) => {
+                    const frito = inventory.find(i => i.id === r.fritoId);
+                    return (
+                      <option key={r.id} value={r.id}>{frito?.name || r.id}</option>
+                    );
+                  })}
+                </select>
+              )}
             </div>
           </div>
         );
