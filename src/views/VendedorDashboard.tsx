@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image } from 'lucide-react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image, MessageSquare } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -15,6 +15,8 @@ import { toast } from 'react-hot-toast';
 import { useVendorTracking } from '../lib/useVendorTracking';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
 import { usePayrollStore } from '../store/usePayrollStore';
+import { useChatStore } from '../store/useChatStore';
+import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { supabase } from '../lib/supabase';
 
 export const VendedorDashboard = () => {
@@ -497,12 +499,14 @@ export const VendedorDashboard = () => {
   };
 
   const activeOrdersCount = (pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
+  const chatUnreadCount = useChatStore(state => state.getUnreadCount(trackingId));
 
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },
     { id: 'deliveries', label: 'Pedidos', icon: <Clock size={24} />, badge: activeOrdersCount },
     { id: 'restock', label: 'Pedir', icon: <Package size={24} /> },
     { id: 'transfers', label: 'Transf.', icon: <ArrowRightLeft size={24} /> },
+    { id: 'chat', label: 'Chat', icon: <MessageSquare size={24} />, badge: chatUnreadCount },
     { id: 'close', label: 'Cierre', icon: <DollarSign size={24} /> }
   ];
 
@@ -511,6 +515,7 @@ export const VendedorDashboard = () => {
     if (activeTab === 'deliveries') return 'Pedidos Clientes';
     if (activeTab === 'restock') return 'Pedir Surtido';
     if (activeTab === 'transfers') return 'Transferencias';
+    if (activeTab === 'chat') return 'Radio / Intercom Chat';
     if (activeTab === 'close') return 'Cierre Caja';
     return 'Dashboard';
   };
@@ -1462,6 +1467,21 @@ export const VendedorDashboard = () => {
                 <p className="text-gray-300 font-bold text-xs mt-1">Registra las transferencias que recibas</p>
               </div>
             )}
+          </div>
+        )}
+
+        {/* SUBVISTA: CHAT / RADIO INTERCOM */}
+        {activeTab === 'chat' && (
+          <div className="max-w-2xl mx-auto h-[600px] pb-16">
+            <IntercomChatModule
+              currentUserId={trackingId}
+              currentUserName={trackingName}
+              currentUserRole="VENDEDOR"
+              targetUserId="DEJADOR"
+              targetUserName="Dejador / Logística"
+              branchId={(user as any)?.branchId || 'BRANCH-001'}
+              shiftId={openedAt || 'shift-active'}
+            />
           </div>
         )}
 

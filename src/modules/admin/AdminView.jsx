@@ -12,6 +12,7 @@ import { usePayrollStore } from '../../store/usePayrollStore';
 import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab, ResumenOperativoTab } from '../../components/admin/AdminFinancesTab';
 import { AdminIncomesExpensesTab } from '../../components/admin/AdminIncomesExpensesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
+import { AdminChatAuditTab } from '../../components/admin/AdminChatAuditTab';
 import { AdminUsersTab } from '../../components/admin/AdminUsersTab';
 import { AdminVehiclesTab } from '../../components/admin/AdminVehiclesTab';
 import { AdminSuppliersTab } from '../../components/admin/AdminSuppliersTab';
@@ -4179,6 +4180,7 @@ export function AdminView() {
       { id: 'PRECIOS',    label: '🛺 Productos Triciclos' },
       { id: 'CIERRES',    label: '💰 Cierres Finanzas' },
       { id: 'GEOCERCAS',  label: '🛡️ Geocercas & Pedidos' },
+      { id: 'CHAT_AUDIT', label: '💬 Auditoría Chat & Radio' },
     ],
     FINANZAS: [
       { id: 'INGRESOS',   label: '💰 Ingresos' },
@@ -4345,6 +4347,7 @@ export function AdminView() {
         { activeTab === 'INVENTARIO_FLOTA' && <AdminVehicleInventoryTab /> }
         { activeTab === 'VEHICULOS' && <AdminVehiclesTab /> }
         { activeTab === 'GEOCERCAS' && <AdminGeofencesTab /> }
+        { activeTab === 'CHAT_AUDIT' && <AdminChatAuditTab /> }
         { activeTab === 'FUENTES_ING' && <AdminIncomeSourcesTab /> }
         { activeTab === 'PROVEEDORES' && <AdminSuppliersTab /> }
         { activeTab === 'NOMINA' && <NominaAdminPanel /> }

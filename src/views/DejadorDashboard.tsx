@@ -11,6 +11,8 @@ import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
 import { MapTrackingView } from './MapTrackingView';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
+import { useChatStore } from '../store/useChatStore';
+import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -583,6 +585,7 @@ export const DejadorDashboard = () => {
     if (activeTab === 'surtir')  return '#F59E0B'; // bg-amber-500
     if (activeTab === 'recibir') return '#4F46E5'; // bg-indigo-600
     if (activeTab === 'gps')     return '#10b981'; // bg-emerald-500
+    if (activeTab === 'chat')    return '#8b5cf6'; // bg-violet-500
     return '#EF4444';
   };
   
@@ -612,6 +615,12 @@ export const DejadorDashboard = () => {
       if (type === 'border') return 'border-emerald-500';
       if (type === 'activePill') return forceActive ? 'bg-emerald-500 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-emerald-500';
     }
+    if (activeTab === 'chat') {
+      if (type === 'bg') return 'bg-violet-600';
+      if (type === 'text') return 'text-violet-600';
+      if (type === 'border') return 'border-violet-600';
+      if (type === 'activePill') return forceActive ? 'bg-violet-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-violet-600';
+    }
     return '';
   };
 
@@ -620,6 +629,7 @@ export const DejadorDashboard = () => {
     if (activeTab === 'surtir') return 'Pedidos';
     if (activeTab === 'recibir') return 'Cierre Jornada';
     if (activeTab === 'gps') return 'GPS Triciclos';
+    if (activeTab === 'chat') return 'Radio / Chat Logística';
     return 'Logística';
   };
 
@@ -705,6 +715,7 @@ export const DejadorDashboard = () => {
               { id: 'surtir', label: 'Pedidos' },
               { id: 'recibir', label: 'Recibir' },
               { id: 'gps', label: '📍 GPS' },
+              { id: 'chat', label: '💬 Chat' },
             ].map(tab => (
               <button
                 key={tab.id}
@@ -1230,6 +1241,50 @@ export const DejadorDashboard = () => {
               <VehicleShiftCard vehicleId={gpsSelectedVehicle} currentShift={shift || undefined} />
             )}
 
+          </div>
+        )}
+
+        {/* ─── CHAT / RADIO LOGÍSTICA ─── */}
+        {activeTab === 'chat' && (
+          <div className="space-y-4">
+            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+              <button
+                onClick={() => setSelectedVehicle('ALL')}
+                className={`px-4 py-2 rounded-2xl font-black text-xs transition-all ${
+                  selectedVehicle === 'ALL' ? 'bg-violet-600 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200'
+                }`}
+              >
+                📻 Canal General (Todos)
+              </button>
+              {vehicles.map((v: string) => {
+                const vendorName = vehicleVendorMap[v] || v;
+                const isSelected = selectedVehicle === v;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setSelectedVehicle(v)}
+                    className={`px-4 py-2 rounded-2xl font-black text-xs flex items-center gap-1.5 transition-all ${
+                      isSelected ? 'bg-violet-600 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200'
+                    }`}
+                  >
+                    <span>{v}</span>
+                    <span className="opacity-75 font-normal">({vendorName.split(' ')[0]})</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="h-[600px] max-w-3xl mx-auto">
+              <IntercomChatModule
+                currentUserId="DEJADOR"
+                currentUserName={dejadorName || 'Dejador Logística'}
+                currentUserRole="DEJADOR"
+                targetUserId={selectedVehicle === 'ALL' ? 'ALL' : selectedVehicle}
+                targetUserName={selectedVehicle === 'ALL' ? 'Canal General Logística' : `Triciclo ${selectedVehicle} (${vehicleVendorMap[selectedVehicle] || 'Vendedor'})`}
+                branchId={userBranchId || 'BRANCH-001'}
+                shiftId="shift-active"
+              />
+            </div>
           </div>
         )}
 
