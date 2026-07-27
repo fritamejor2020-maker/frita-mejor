@@ -158,6 +158,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ loadTemplates: merged });
     };
     applicators[`vendorLocations_${bid}`]   = (v) => useInventoryStore.setState({ vendorLocations: v });
+    applicators[`chatMessages_${bid}`]      = (v) => {
+      const state = useChatStore.getState();
+      const merged = mergeArrays(state.messages || [], v || [], 'chatMessages');
+      useChatStore.setState({ messages: merged });
+    };
     applicators[`payrollRecords_${bid}`]    = (v) => {
       const state = usePayrollStore.getState();
       const merged = mergeArrays(state.payrollRecords || [], v || [], 'payrollRecords');

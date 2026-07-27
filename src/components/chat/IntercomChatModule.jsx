@@ -19,15 +19,13 @@ export const IntercomChatModule = ({
   shiftId = 'shift-active',
   compactMode = false,
 }) => {
-  const {
-    messages,
-    sendMessage,
-    markAsRead,
-    getConversation,
-    activeCall,
-    startCall,
-    updateCallStatus
-  } = useChatStore();
+  const messages = useChatStore(state => state.messages);
+  const sendMessage = useChatStore(state => state.sendMessage);
+  const markAsRead = useChatStore(state => state.markAsRead);
+  const getConversation = useChatStore(state => state.getConversation);
+  const activeCall = useChatStore(state => state.activeCall);
+  const startCall = useChatStore(state => state.startCall);
+  const updateCallStatus = useChatStore(state => state.updateCallStatus);
 
   const [textInput, setTextInput] = useState('');
   const [isRecording, setIsRecording] = useState(false);
@@ -43,13 +41,37 @@ export const IntercomChatModule = ({
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
+  // Escucha activa de eventos Broadcast en vivo
+  useEffect(() => {
+    const channel = supabase
+      .channel('chat_intercom_live')
+      .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
+        if (payload && payload.id) {
+          const current = useChatStore.getState().messages;
+          if (!current.some(m => m.id === payload.id)) {
+            useChatStore.setState({ messages: [payload, ...current] });
+          }
+        }
+      })
+      .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
+        if (payload) {
+          useChatStore.setState({ activeCall: payload });
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const conversation = getConversation(currentUserId, targetUserId);
 
   // Auto-scroll al último mensaje
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     markAsRead(targetUserId, currentUserId);
-  }, [conversation.length, targetUserId, currentUserId]);
+  }, [conversation.length, targetUserId, currentUserId, messages]);
 
   // Manejador de Notas de Voz (MediaRecorder)
   const startRecording = async () => {

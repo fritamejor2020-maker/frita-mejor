@@ -50,6 +50,8 @@ export const BRANCH_KEYS = [
   'vendorLocations',
   // Transferencias bancarias del vendedor — por sede
   'vendorTransfers',
+  // Chat e intercomunicador radio — por sede
+  'chatMessages',
 ];
 
 /**
