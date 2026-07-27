@@ -10,6 +10,41 @@ import { supabase } from '../../lib/supabase';
  * Módulo de Chat / Radio Intercomunicador Integrado
  * Rediseñado con la línea gráfica cálida, limpia y moderna de Frita Mejor.
  */
+// Reproduce un bip/tono de radio intercomunicador al recibir mensaje
+const playRadioChime = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    // Tono 1 (880Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(880, ctx.currentTime);
+    gain1.gain.setValueAtTime(0.3, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(ctx.currentTime);
+    osc1.stop(ctx.currentTime + 0.15);
+
+    // Tono 2 (1200Hz - Bip radio)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'triangle';
+    osc2.frequency.setValueAtTime(1200, ctx.currentTime + 0.12);
+    gain2.gain.setValueAtTime(0.4, ctx.currentTime + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(ctx.currentTime + 0.12);
+    osc2.stop(ctx.currentTime + 0.3);
+  } catch (e) {
+    console.warn('Audio chime error:', e);
+  }
+};
+
 export const IntercomChatModule = ({
   currentUserId,
   currentUserName,
@@ -42,7 +77,7 @@ export const IntercomChatModule = ({
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
 
-  // Escucha activa de eventos Broadcast en vivo
+  // Escucha activa de eventos Broadcast en vivo + Sonido de Radio
   useEffect(() => {
     const channel = supabase
       .channel('chat_intercom_live')
@@ -51,12 +86,18 @@ export const IntercomChatModule = ({
           const current = useChatStore.getState().messages;
           if (!current.some(m => m.id === payload.id)) {
             useChatStore.setState({ messages: [payload, ...current] });
+            if (payload.senderId !== currentUserId) {
+              playRadioChime();
+            }
           }
         }
       })
       .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
         if (payload) {
           useChatStore.setState({ activeCall: payload });
+          if (payload.receiverId === currentUserId && payload.status === 'ringing') {
+            playRadioChime();
+          }
         }
       })
       .subscribe();
@@ -64,7 +105,7 @@ export const IntercomChatModule = ({
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [currentUserId]);
 
   const conversation = getConversation(currentUserId, targetUserId, shiftId);
 
