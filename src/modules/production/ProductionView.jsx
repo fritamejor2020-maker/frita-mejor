@@ -367,8 +367,8 @@ function ProductionPanel({ productionPoint, onBack }) {
   const [manualProd, setManualProd] = useState(null);
   const showToast = (msg, type = 'success') => setToast({ visible: true, message: msg, type });
 
-  const filtered = products.filter((p) => !p.productionPointIds?.length || p.productionPointIds.includes(productionPoint.id));
-  const displayProducts = filtered.length > 0 ? filtered : products;
+  const isAssigned = (p) => Array.isArray(p.productionPointIds) && p.productionPointIds.includes(productionPoint.id);
+  const displayProducts = products.filter(isAssigned);
 
   const enriched = displayProducts.map((prod) => {
     const recipe     = getRecipeByProductId(prod.id);
