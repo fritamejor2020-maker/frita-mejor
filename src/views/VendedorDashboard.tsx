@@ -17,6 +17,7 @@ import { useVendorTransferStore } from '../store/useVendorTransferStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
+import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 import { supabase } from '../lib/supabase';
 
 export const VendedorDashboard = () => {
@@ -58,6 +59,9 @@ export const VendedorDashboard = () => {
   );
 
   const [activeTab, setActiveTab] = useState('pos');
+
+  // 🔊 Sonido global de radio — funciona en TODAS las pestañas, no solo en Chat
+  useChatSoundNotifier(pointId || trackingId);
 
   // --- Estados de Pedidos Móviles (Uber / Rappi-style) ---
   const [pendingDelivery, setPendingDelivery] = useState<any>(null);

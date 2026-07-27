@@ -41,7 +41,12 @@ function setupChatRealtime(set, get) {
       })
       .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
         if (payload) {
-          set({ activeCall: payload });
+          // Si la llamada terminó, limpiar estado; de lo contrario, actualizar
+          if (payload.status === 'ended') {
+            set({ activeCall: null });
+          } else {
+            set({ activeCall: payload });
+          }
         }
       })
       .subscribe();

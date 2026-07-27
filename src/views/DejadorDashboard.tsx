@@ -13,6 +13,7 @@ import { MapTrackingView } from './MapTrackingView';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
+import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -169,6 +170,9 @@ export const DejadorDashboard = () => {
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
   const { playOnce, startLoop, stopAll, isLooping } = useDeliveryAlert();
   const { unsubscribe: pushUnsubscribe } = usePushSubscription();
+
+  // 🔊 Sonido global de radio — funciona en TODAS las pestañas, no solo en Chat
+  useChatSoundNotifier('DEJADOR');
 
   // ─── Alarm state ───
   const [isAlertPlaying, setIsAlertPlaying] = useState(false);
