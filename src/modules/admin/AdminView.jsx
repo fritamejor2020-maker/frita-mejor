@@ -533,12 +533,14 @@ function ProductionPointsPanel() {
   );
 }
 
-// ─── Panel: Cocinas de Fritado ────────────────────────────────────────────────
+// ─── Panel: Cocinas de Fritado (Unificado) ────────────────────────────────────
 function FryKitchensPanel() {
-  const { fryKitchens = [], fritadoRecipes = [], inventory = [], addFryKitchen, updateFryKitchen, deleteFryKitchen, updateFritadoRecipe } = useInventoryStore();
+  const { fryKitchens = [], fritadoRecipes = [], inventory = [], products = [], addFryKitchen, updateFryKitchen, deleteFryKitchen, addFritadoRecipe, updateFritadoRecipe, deleteFritadoRecipe } = useInventoryStore();
   const [editId, setEditId] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
+  const [showAddRecipe, setShowAddRecipe] = useState(false);
   const [form, setForm] = useState({ name: '', location: '' });
+  const [newRecipe, setNewRecipe] = useState({ crudoId: '', fritoId: '' });
   const [editingPresetsKey, setEditingPresetsKey] = useState(null);
   const [draftPresets, setDraftPresets] = useState([]);
 
@@ -564,20 +566,67 @@ function FryKitchensPanel() {
     setEditingPresetsKey(null);
   };
 
+  const resolveItem = (id) => {
+    if (!id) return null;
+    const inv = inventory.find(i => i.id === id || i.name === id || i.barcode === id);
+    if (inv) return inv;
+    const prod = products.find(p => p.id === id || p.name === id || p.outputInventoryId === id);
+    if (prod) return prod;
+    return null;
+  };
+
+  const availableItemsForRecipe = inventory.filter(i => ['PRODUCTO', 'FRITO', 'CRUDO', 'INSUMO'].includes(i.type));
+
   return (
     <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="font-black text-chunky-dark text-lg">Cocinas de Fritado ({(fryKitchens || []).length})</h3>
-        <Button variant="secondary" className="rounded-full text-sm py-2 px-5 shadow-sm" onClick={() => { setShowAdd(true); setEditId(null); setForm({ name: '', location: '' }); }}>
-          + Nueva Cocina
-        </Button>
+      <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 mb-6">
+        <div>
+          <h3 className="font-black text-chunky-dark text-lg">Cocinas y Recetas de Fritado</h3>
+          <p className="text-sm font-bold text-gray-400">Administra cocinas de fritado, vincula masas crudas con fritos y personaliza los 5 botones rápidos por cocina.</p>
+        </div>
+        <div className="flex gap-2">
+          <button className="bg-yellow-500 hover:bg-yellow-600 text-chunky-dark font-black py-2 px-5 rounded-full shadow-sm transition-colors text-sm" onClick={() => { setShowAddRecipe(!showAddRecipe); setShowAdd(false); }}>
+            {showAddRecipe ? 'Cancelar' : '+ Nueva Receta Fritado'}
+          </button>
+          <button className="bg-chunky-dark hover:bg-black text-white font-black py-2 px-5 rounded-full shadow-sm transition-colors text-sm" onClick={() => { setShowAdd(!showAdd); setShowAddRecipe(false); setEditId(null); setForm({ name: '', location: '' }); }}>
+            {showAdd ? 'Cancelar' : '+ Nueva Cocina'}
+          </button>
+        </div>
       </div>
 
       {showAdd && (
-        <div className="mb-4">
+        <div className="mb-6">
           <EditableRow fields={fields} values={form} onChange={change}
             onSave={() => { addFryKitchen(form); setShowAdd(false); }}
             onCancel={() => setShowAdd(false)} />
+        </div>
+      )}
+
+      {showAddRecipe && (
+        <div className="bg-yellow-50 rounded-2xl p-6 border-2 border-yellow-200 mb-6 flex flex-wrap gap-4 items-end animate-fade-in">
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs font-bold text-gray-400 block mb-1">🧊 Producto Origen (Masa / Crudo Descontado)</label>
+            <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newRecipe.crudoId} onChange={(e) => setNewRecipe({...newRecipe, crudoId: e.target.value})}>
+              <option value="">Seleccionar origen (crudo)...</option>
+              {availableItemsForRecipe.map(i => <option key={i.id} value={i.id}>{i.name} ({i.type})</option>)}
+            </select>
+          </div>
+          <div className="flex-1 min-w-[200px]">
+            <label className="text-xs font-bold text-gray-400 block mb-1">🔥 Producto Destino (Frito Sumado)</label>
+            <select className="w-full bg-white border-2 border-gray-200 rounded-xl px-3 py-2 font-bold text-chunky-dark outline-none focus:border-chunky-main" value={newRecipe.fritoId} onChange={(e) => setNewRecipe({...newRecipe, fritoId: e.target.value})}>
+              <option value="">Seleccionar destino (frito)...</option>
+              {availableItemsForRecipe.map(i => <option key={i.id} value={i.id}>{i.name} ({i.type})</option>)}
+            </select>
+          </div>
+          <button className="bg-green-500 text-white font-black py-2 px-6 rounded-xl hover:bg-green-600 disabled:opacity-50 transition-colors w-full md:w-auto mt-2 md:mt-0" 
+            disabled={!newRecipe.crudoId || !newRecipe.fritoId}
+            onClick={() => {
+              addFritadoRecipe({ ...newRecipe, presets: [10, 20, 50, 100, 200], fryKitchenIds: [] });
+              setShowAddRecipe(false);
+              setNewRecipe({ crudoId: '', fritoId: '' });
+            }}>
+            Guardar Receta
+          </button>
         </div>
       )}
 
@@ -587,7 +636,7 @@ function FryKitchensPanel() {
         const availableRecipes = fritadoRecipes.filter(r => r.fryKitchenIds?.length > 0 && !r.fryKitchenIds.includes(fk.id));
 
         return (
-          <div key={fk.id} className="bg-white border border-gray-100 rounded-2xl p-5 mb-4 hover:border-gray-200 transition-colors shadow-sm">
+          <div key={fk.id} className="bg-white border border-gray-100 rounded-2xl p-5 mb-5 hover:border-gray-200 transition-colors shadow-sm">
             <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
               <div className="flex-1">
                 {isEditing ? (
@@ -630,10 +679,10 @@ function FryKitchensPanel() {
               {assignedRecipes.length > 0 ? (
                 <div className="space-y-2.5 mb-3">
                   {assignedRecipes.map((recipe) => {
-                    const crudo = inventory.find(i => i.id === recipe.crudoId || i.name === recipe.crudoId) || products.find(p => p.id === recipe.crudoId || p.name === recipe.crudoId);
-                    const frito = inventory.find(i => i.id === recipe.fritoId || i.name === recipe.fritoId) || products.find(p => p.id === recipe.fritoId || p.name === recipe.fritoId);
-                    const name = frito?.name || recipe.name || recipe.id || 'Receta sin nombre';
-                    const crudoName = crudo?.name || recipe.crudoName || 'Masa cruda';
+                    const crudo = resolveItem(recipe.crudoId);
+                    const frito = resolveItem(recipe.fritoId);
+                    const fritoName = frito?.name || recipe.fritoName || recipe.name || 'Empanadas Fritas';
+                    const crudoName = crudo?.name || recipe.crudoName || 'Empanadas Crudas';
                     const isEditingPresets = editingPresetsKey === `${recipe.id}_${fk.id}`;
                     const presets = recipe.linePresets?.[fk.id] ?? recipe.presets ?? [10, 20, 50, 100, 200];
 
@@ -651,7 +700,7 @@ function FryKitchensPanel() {
                         <div className="flex justify-between items-center">
                           <div>
                             <span className="font-black text-sm text-gray-800 flex items-center gap-1.5">
-                              🍳 {name}
+                              🍳 {fritoName}
                             </span>
                             <span className="text-[11px] font-bold text-gray-400 block">
                               Masa: {crudoName}
@@ -737,7 +786,7 @@ function FryKitchensPanel() {
                 >
                   <option value="">+ Asignar receta de fritado a esta cocina...</option>
                   {availableRecipes.map((r) => {
-                    const frito = inventory.find(i => i.id === r.fritoId);
+                    const frito = resolveItem(r.fritoId);
                     return (
                       <option key={r.id} value={r.id}>{frito?.name || r.id}</option>
                     );
