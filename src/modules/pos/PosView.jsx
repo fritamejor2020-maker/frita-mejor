@@ -815,7 +815,15 @@ export function PosView() {
   const displayedFolders = currentFolder ? [] : posCategories;
   
   let displayedItems = [];
-  if (currentFolder) {
+  if (searchTerm.trim()) {
+    // Búsqueda global: busca en TODO el inventario vendible por nombre o código de barras,
+    // ignorando la carpeta seleccionada o los productos fijados en el feed principal
+    const term = searchTerm.toLowerCase().trim();
+    displayedItems = sellableItems.filter(i => 
+      i.name.toLowerCase().includes(term) || 
+      (i.barcode && i.barcode.toLowerCase().includes(term))
+    ).sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
+  } else if (currentFolder) {
     // Dentro de una categoría: todos sus productos ordenados por sortOrder o alfabéticamente
     displayedItems = sellableItems
       .filter(i => i.posCategoryId === currentFolder)
@@ -839,15 +847,6 @@ export function PosView() {
     const unassigned = sellableItems.filter(i => !i.posCategoryId);
     const listToDisplay = unassigned.length > 0 ? unassigned : sellableItems;
     displayedItems = [...listToDisplay].sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
-  }
-
-  // Filtrar por término de búsqueda si el usuario escribe
-  if (searchTerm.trim()) {
-    const term = searchTerm.toLowerCase().trim();
-    displayedItems = displayedItems.filter(i => 
-      i.name.toLowerCase().includes(term) || 
-      (i.barcode && i.barcode.toLowerCase().includes(term))
-    );
   }
 
   // Paginación si hay filas definidas
