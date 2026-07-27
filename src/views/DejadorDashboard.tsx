@@ -585,7 +585,7 @@ export const DejadorDashboard = () => {
     if (activeTab === 'surtir')  return '#F59E0B'; // bg-amber-500
     if (activeTab === 'recibir') return '#4F46E5'; // bg-indigo-600
     if (activeTab === 'gps')     return '#10b981'; // bg-emerald-500
-    if (activeTab === 'chat')    return '#8b5cf6'; // bg-violet-500
+    if (activeTab === 'chat')    return '#F59E0B'; // bg-amber-500
     return '#EF4444';
   };
   
@@ -616,10 +616,10 @@ export const DejadorDashboard = () => {
       if (type === 'activePill') return forceActive ? 'bg-emerald-500 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-emerald-500';
     }
     if (activeTab === 'chat') {
-      if (type === 'bg') return 'bg-violet-600';
-      if (type === 'text') return 'text-violet-600';
-      if (type === 'border') return 'border-violet-600';
-      if (type === 'activePill') return forceActive ? 'bg-violet-600 text-white shadow-sm' : 'bg-transparent text-gray-500 hover:text-violet-600';
+      if (type === 'bg') return 'bg-amber-500';
+      if (type === 'text') return 'text-amber-500';
+      if (type === 'border') return 'border-amber-500';
+      if (type === 'activePill') return forceActive ? 'bg-amber-500 text-gray-950 font-black shadow-sm' : 'bg-transparent text-gray-500 hover:text-amber-500';
     }
     return '';
   };
@@ -1251,7 +1251,7 @@ export const DejadorDashboard = () => {
               <button
                 onClick={() => setSelectedVehicle('ALL')}
                 className={`px-4 py-2 rounded-2xl font-black text-xs transition-all ${
-                  selectedVehicle === 'ALL' ? 'bg-violet-600 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200'
+                  selectedVehicle === 'ALL' ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
                 }`}
               >
                 📻 Canal General (Todos)
@@ -1264,7 +1264,7 @@ export const DejadorDashboard = () => {
                     key={v}
                     onClick={() => setSelectedVehicle(v)}
                     className={`px-4 py-2 rounded-2xl font-black text-xs flex items-center gap-1.5 transition-all ${
-                      isSelected ? 'bg-violet-600 text-white shadow-md' : 'bg-white text-gray-700 border border-gray-200'
+                      isSelected ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
                     }`}
                   >
                     <span>{v}</span>
