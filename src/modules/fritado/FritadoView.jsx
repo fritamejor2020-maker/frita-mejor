@@ -336,7 +336,7 @@ function FritadoPanel({ fryKitchen, onBack }) {
   const showToast = (msg, type = 'success') => setToast({ visible: true, message: msg, type });
 
   const pairs = (fritadoRecipes || [])
-    .filter((r) => !r.fryKitchenIds?.length || r.fryKitchenIds.includes(fryKitchen.id))
+    .filter((r) => !r.fryKitchenIds ? true : Array.isArray(r.fryKitchenIds) && r.fryKitchenIds.includes(fryKitchen.id))
     .map((recipe) => {
       const crudo = inventory.find((i) => i.id === recipe.crudoId) || { id: null, qty: 0, name: 'Inválido' };
       const frito = inventory.find((i) => i.id === recipe.fritoId) || { id: null, qty: 0, name: 'Inválido' };

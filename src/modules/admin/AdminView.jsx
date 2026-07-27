@@ -632,8 +632,12 @@ function FryKitchensPanel() {
 
       {(fryKitchens || []).map((fk) => {
         const isEditing = editId === fk.id;
-        const assignedRecipes = fritadoRecipes.filter(r => !r.fryKitchenIds?.length || r.fryKitchenIds.includes(fk.id));
-        const availableRecipes = fritadoRecipes.filter(r => r.fryKitchenIds?.length > 0 && !r.fryKitchenIds.includes(fk.id));
+        const isAssignedToKitchen = (r) => {
+          if (r.fryKitchenIds === undefined || r.fryKitchenIds === null) return true;
+          return Array.isArray(r.fryKitchenIds) && r.fryKitchenIds.includes(fk.id);
+        };
+        const assignedRecipes = fritadoRecipes.filter(isAssignedToKitchen);
+        const availableRecipes = fritadoRecipes.filter(r => !isAssignedToKitchen(r));
 
         return (
           <div key={fk.id} className="bg-white border border-gray-100 rounded-2xl p-5 mb-5 hover:border-gray-200 transition-colors shadow-sm">
@@ -688,11 +692,15 @@ function FryKitchensPanel() {
 
                     const handleUnlink = () => {
                       const allKitchenIds = fryKitchens.map(k => k.id);
-                      const current = (recipe.fryKitchenIds && recipe.fryKitchenIds.length > 0)
+                      const current = (recipe.fryKitchenIds && Array.isArray(recipe.fryKitchenIds))
                         ? recipe.fryKitchenIds
                         : allKitchenIds;
                       const updated = current.filter(id => id !== fk.id);
                       updateFritadoRecipe(recipe.id, { fryKitchenIds: updated });
+                    };
+
+                    const handleDeleteSystemRecipe = () => {
+                      deleteFritadoRecipe(recipe.id);
                     };
 
                     return (
@@ -722,11 +730,19 @@ function FryKitchensPanel() {
                             )}
 
                             <button
-                              className="text-xs font-bold text-red-400 hover:text-red-600 hover:bg-red-50 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
+                              className="text-xs font-bold text-orange-700 hover:text-red-600 bg-white border border-orange-200 hover:border-red-300 px-2.5 py-0.5 rounded-full transition-colors flex items-center gap-1"
                               onClick={handleUnlink}
                               title="Quitar receta de esta cocina"
                             >
                               ✕ Quitar
+                            </button>
+
+                            <button
+                              className="text-xs font-bold text-red-500 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2 py-0.5 rounded-full transition-colors flex items-center gap-1"
+                              onClick={handleDeleteSystemRecipe}
+                              title="Eliminar receta por completo del sistema"
+                            >
+                              🗑️ Borrar
                             </button>
                           </div>
                         </div>
