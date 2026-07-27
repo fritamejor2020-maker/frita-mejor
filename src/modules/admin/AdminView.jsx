@@ -4148,7 +4148,6 @@ export function AdminView() {
       { id: 'BODEGAS',    label: '📦 Bodegas'    },
       { id: 'PRODUCCION', label: '🏭 Producción'  },
       { id: 'COCINAS_FRITADO', label: '🍳 Cocinas Fritado' },
-      { id: 'FRITADO',    label: '🍳 Recetas Fritado' },
       { id: 'INVENTARIO', label: '📋 Inventario'  },
       { id: 'ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
       { id: 'POS_INVENTORY', label: '⚙️ Inventario Modular' },
