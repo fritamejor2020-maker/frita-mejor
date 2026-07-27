@@ -4,6 +4,7 @@ import {
   PhoneCall, Volume2, Play, Pause, CheckCheck, User, Clock, AlertCircle, X
 } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
+import { supabase } from '../../lib/supabase';
 
 /**
  * Módulo de Chat / Radio Intercomunicador Integrado
