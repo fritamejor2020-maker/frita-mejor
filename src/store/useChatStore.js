@@ -4,6 +4,7 @@ import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useAuthStore } from './useAuthStore';
 import { supabase } from '../lib/supabase';
+import { safeJSONStorage } from '../utils/safeStorage';
 
 /**
  * Store de Chat e Intercomunicador Radio (Vendedor <-> Dejador <-> Admin)
@@ -295,6 +296,17 @@ export const useChatStore = create(
     },
     {
       name: 'frita_chat_store_v1',
+      storage: safeJSONStorage,
+      partialize: (state) => ({
+        ...state,
+        // Limitar a 30 mensajes y remover datos base64 pesados al guardar en localStorage
+        messages: (state.messages || []).slice(0, 30).map(m => {
+          if (m.mediaUrl && m.mediaUrl.length > 500) {
+            return { ...m, mediaUrl: null };
+          }
+          return m;
+        }),
+      }),
     }
   )
 );

@@ -3,6 +3,7 @@ import { persist } from 'zustand/middleware';
 import { push, BRANCH_KEYS } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useAuthStore } from './useAuthStore';
+import { safeJSONStorage } from '../utils/safeStorage';
 
 /**
  * Store de Transferencias Bancarias del Vendedor
@@ -127,8 +128,14 @@ export const useVendorTransferStore = create(
     {
       name: 'frita-vendor-transfers',
       version: 1,
+      storage: safeJSONStorage,
       partialize: (state) => ({
-        transfers: state.transfers,
+        transfers: (state.transfers || []).slice(0, 30).map(t => {
+          if (t.photoBase64 && t.photoBase64.length > 500) {
+            return { ...t, photoBase64: null };
+          }
+          return t;
+        }),
       }),
     }
   )
