@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { PhoneCall, PhoneOff } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
+import { useWebRTCCall } from '../../hooks/useWebRTCCall';
 
 interface ActiveCallBannerProps {
   currentUserId: string;
@@ -18,6 +19,9 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
   const activeCall = useChatStore((state) => state.activeCall);
   const updateCallStatus = useChatStore((state) => state.updateCallStatus);
   const [callDuration, setCallDuration] = useState(0);
+
+  // 🎙️ Conexión WebRTC de voz en vivo en tiempo real cuando la llamada está conectada
+  useWebRTCCall(currentUserId);
 
   useEffect(() => {
     let timer: any = null;
