@@ -3,13 +3,14 @@ import { PhoneCall, PhoneOff } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
 import { useWebRTCCall } from '../../hooks/useWebRTCCall';
+import { useLiveVoiceIntercom } from '../../hooks/useLiveVoiceIntercom';
 
 interface ActiveCallBannerProps {
   currentUserId: string;
 }
 
 /**
- * Banner Flotante Global de Llamada Activa con Audio WebRTC en vivo
+ * Banner Flotante Global de Llamada Activa con Audio WebRTC + Live Intercom
  * ─────────────────────────────────────────────────────────────
  * Contiene el elemento <audio> nativo del DOM y gestiona la conexión de voz
  * en tiempo real para garantizar reproducibilidad en móviles iOS/Android.
@@ -21,8 +22,9 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
 
   const domAudioRef = useRef<HTMLAudioElement | null>(null);
 
-  // 🎙️ Conexión WebRTC de voz en vivo conectada al <audio> del DOM
+  // 🎙️ Conexión Híbrida de Voz en Vivo (WebRTC + Live Intercom Streaming)
   useWebRTCCall(currentUserId, domAudioRef);
+  useLiveVoiceIntercom(currentUserId);
 
   useEffect(() => {
     let timer: any = null;
