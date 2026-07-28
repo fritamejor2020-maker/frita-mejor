@@ -7,13 +7,40 @@ import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
 
 /**
+ * Componente que calcula y muestra la duración exacta de una nota de voz,
+ * incluso si en la base de datos llegó con durationSeconds: 0.
+ */
+const AudioDurationLabel = ({ mediaUrl, initialDuration }) => {
+  const [duration, setDuration] = useState(initialDuration || 0);
+
+  useEffect(() => {
+    if (initialDuration && initialDuration > 0) {
+      setDuration(initialDuration);
+      return;
+    }
+    if (!mediaUrl) return;
+
+    try {
+      const tempAudio = new Audio(mediaUrl);
+      const handleMetadata = () => {
+        if (tempAudio.duration && !isNaN(tempAudio.duration) && tempAudio.duration > 0 && isFinite(tempAudio.duration)) {
+          setDuration(Math.max(1, Math.round(tempAudio.duration)));
+        }
+      };
+      tempAudio.addEventListener('loadedmetadata', handleMetadata);
+      return () => {
+        tempAudio.removeEventListener('loadedmetadata', handleMetadata);
+      };
+    } catch (_) {}
+  }, [mediaUrl, initialDuration]);
+
+  return <span className="text-[10px] opacity-75">{duration > 0 ? `${duration}s` : '1s'}</span>;
+};
+
+/**
  * Módulo de Chat / Radio Intercomunicador Integrado
  * Rediseñado con la línea gráfica cálida, limpia y moderna de Frita Mejor.
- *
- * Mantiene la llamada activa y estable en tiempo real, registrando la duración
- * y permitiendo notas de voz rápidas de radio y mensajes en vivo.
  */
-
 export const IntercomChatModule = ({
   currentUserId,
   currentUserName,
@@ -49,6 +76,9 @@ export const IntercomChatModule = ({
   const cameraInputRef = useRef(null);
   const galleryInputRef = useRef(null);
   const callTimerRef = useRef(null);
+
+  const recordingStartTimeRef = useRef(0);
+  const isRecordingRef = useRef(false);
 
   // ─── Timer continuo de llamada en curso (estable sin desconexión) ─────────
   useEffect(() => {
@@ -86,15 +116,20 @@ export const IntercomChatModule = ({
     markAsRead(currentUserId, targetUserId);
   }, [conversation.length, targetUserId, currentUserId, messages]);
 
-  const recordingStartTimeRef = useRef(0);
-
   // Manejador de Notas de Voz (MediaRecorder)
   const startRecording = async () => {
+    recordingStartTimeRef.current = Date.now();
+    isRecordingRef.current = true;
+
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (!isRecordingRef.current) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
+
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
-      recordingStartTimeRef.current = Date.now();
 
       mediaRecorderRef.current.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -135,16 +170,23 @@ export const IntercomChatModule = ({
         setRecordingTime(prev => prev + 1);
       }, 1000);
     } catch (err) {
+      isRecordingRef.current = false;
       console.warn('Microphone access denied or not supported:', err);
       alert('Por favor autoriza el permiso de micrófono en tu navegador para enviar notas de voz.');
     }
   };
 
   const stopRecording = () => {
-    if (mediaRecorderRef.current && isRecording) {
-      mediaRecorderRef.current.stop();
-      setIsRecording(false);
+    isRecordingRef.current = false;
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      try {
+        mediaRecorderRef.current.stop();
+      } catch (_) {}
+    }
+    setIsRecording(false);
+    if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
+      recordingTimerRef.current = null;
     }
   };
 
@@ -312,7 +354,7 @@ export const IntercomChatModule = ({
             </div>
           </div>
           <div className="flex gap-2">
-            {/* Botón Contestar: visible para cualquiera que NO sea el emisor mientras esté timbrando */}
+            {/* Botón Contestar */}
             {!isCaller && activeCall.status === 'ringing' && (
               <button
                 onClick={() => {
@@ -324,7 +366,7 @@ export const IntercomChatModule = ({
                 ✅ Contestar
               </button>
             )}
-            {/* Botón Colgar (ambos) */}
+            {/* Botón Colgar */}
             <button
               onClick={() => updateCallStatus('ended')}
               className="bg-red-600 hover:bg-red-500 text-white px-4 py-1.5 rounded-xl font-black text-xs shadow-sm flex items-center gap-1 active:scale-95 transition-all"
@@ -391,7 +433,7 @@ export const IntercomChatModule = ({
                           <Volume2 size={13} />
                           <span className="text-xs font-black">Nota de voz</span>
                         </div>
-                        <span className="text-[10px] opacity-75">{msg.durationSeconds || 0}s</span>
+                        <AudioDurationLabel mediaUrl={msg.mediaUrl} initialDuration={msg.durationSeconds} />
                       </div>
                     </div>
                   )}
@@ -486,7 +528,7 @@ export const IntercomChatModule = ({
         {textInput.trim() || photoPreview ? (
           <button
             type="submit"
-            className="p-2.5 bg-[#FFB700] hover:bg-yellow-400 text-gray-950 font-black rounded-2xl shadow-sm active:scale-95 transition-all"
+            className="p-[#FFB700] hover:bg-yellow-400 text-gray-950 font-black rounded-2xl shadow-sm active:scale-95 transition-all p-2.5"
           >
             <Send size={18} />
           </button>
