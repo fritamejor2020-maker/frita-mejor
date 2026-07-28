@@ -30,19 +30,12 @@ let realtimeChannel = null;
 function handleCallSignalFromPayload(msg, set, get) {
   if (!msg || !msg.type) return;
 
-  const currentCall = get().activeCall;
-
-  // Ignorar mensajes antiguos si son anteriores al inicio de la llamada actual
-  if (currentCall && msg.createdAt && new Date(msg.createdAt).getTime() < new Date(currentCall.startedAt).getTime() - 2000) {
-    return;
-  }
-
   if (msg.type === 'call_signal_ringing') {
     try {
       const callData = typeof msg.text === 'string' && msg.text.startsWith('{') ? JSON.parse(msg.text) : null;
       if (callData && callData.startedAt) {
         const ageSec = Math.floor((Date.now() - new Date(callData.startedAt).getTime()) / 1000);
-        if (ageSec < 45 && (!currentCall || currentCall.status !== 'connected')) {
+        if (ageSec < 60) {
           set({ activeCall: callData });
         }
       }
@@ -50,14 +43,12 @@ function handleCallSignalFromPayload(msg, set, get) {
   } else if (msg.type === 'call_signal_connected') {
     try {
       const callData = typeof msg.text === 'string' && msg.text.startsWith('{') ? JSON.parse(msg.text) : null;
-      if (callData && currentCall) {
-        set({ activeCall: { ...currentCall, status: 'connected' } });
+      if (callData) {
+        set({ activeCall: { ...callData, status: 'connected' } });
       }
     } catch (_) {}
   } else if (msg.type === 'call_signal_ended') {
-    if (currentCall) {
-      set({ activeCall: null });
-    }
+    set({ activeCall: null });
   }
 }
 
@@ -80,10 +71,7 @@ function setupChatRealtime(set, get) {
       .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
         if (payload) {
           if (payload.status === 'ended') {
-            const currentCall = get().activeCall;
-            if (currentCall && (currentCall.id === payload.id || currentCall.callerId === payload.callerId)) {
-              set({ activeCall: null });
-            }
+            set({ activeCall: null });
           } else {
             set({ activeCall: payload });
           }
