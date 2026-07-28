@@ -15,14 +15,13 @@ const ICE_SERVERS = {
 /**
  * Hook de Audio de Voz en Vivo WebRTC (Full-Duplex)
  * ─────────────────────────────────────────────────────────────
- * Captura el micrófono de ambos dispositivos al contestar la llamada
- * y transmite la voz en tiempo real con cero latencia mediante WebRTC.
+ * Utiliza un elemento <audio> montado directamente en el DOM
+ * desbloqueado por el toque del usuario para transmitir voz en tiempo real.
  */
-export function useWebRTCCall(currentUserId) {
+export function useWebRTCCall(currentUserId, domAudioRef) {
   const activeCall = useChatStore((state) => state.activeCall);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
-  const remoteAudioRef = useRef(null);
 
   useEffect(() => {
     if (!currentUserId || typeof window === 'undefined') return;
@@ -42,12 +41,11 @@ export function useWebRTCCall(currentUserId) {
         } catch (_) {}
         pcRef.current = null;
       }
-      if (remoteAudioRef.current) {
+      if (domAudioRef?.current) {
         try {
-          remoteAudioRef.current.pause();
-          remoteAudioRef.current.srcObject = null;
+          domAudioRef.current.pause();
+          domAudioRef.current.srcObject = null;
         } catch (_) {}
-        remoteAudioRef.current = null;
       }
     };
 
@@ -71,13 +69,10 @@ export function useWebRTCCall(currentUserId) {
         const pc = new RTCPeerConnection(ICE_SERVERS);
         pcRef.current = pc;
 
-        // Elemento de audio remoto para escuchar al interlocutor en tiempo real
-        const audioEl = new Audio();
-        audioEl.autoplay = true;
-        remoteAudioRef.current = audioEl;
-
+        // Conectar el flujo remoto de audio al elemento <audio> del DOM
         pc.ontrack = (event) => {
-          if (event.streams && event.streams[0]) {
+          if (event.streams && event.streams[0] && domAudioRef?.current) {
+            const audioEl = domAudioRef.current;
             audioEl.srcObject = event.streams[0];
             audioEl.play().catch((err) => console.warn('[WebRTC] Audio play error:', err));
           }
@@ -93,16 +88,23 @@ export function useWebRTCCall(currentUserId) {
           }
         };
 
-        // Capturar micrófono local
+        // Capturar micrófono local con cancelación de eco y supresión de ruido
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
           localStreamRef.current = stream;
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
         } catch (err) {
           console.warn('[WebRTC] Mic access error:', err);
         }
 
-        // Si soy el llamador y la llamada se conectó, iniciar la oferta SDP
+        // Si soy el llamador y la llamada está conectada, crear la oferta SDP
         if (isCaller && activeCall.status === 'connected') {
           const offer = await pc.createOffer();
           await pc.setLocalDescription(offer);
@@ -169,5 +171,5 @@ export function useWebRTCCall(currentUserId) {
     return () => {
       cleanupWebRTC();
     };
-  }, [activeCall?.status, activeCall?.id, currentUserId]);
+  }, [activeCall?.status, activeCall?.id, currentUserId, domAudioRef]);
 }

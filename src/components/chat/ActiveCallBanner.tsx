@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { PhoneCall, PhoneOff } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
@@ -9,19 +9,20 @@ interface ActiveCallBannerProps {
 }
 
 /**
- * Banner Flotante Global de Llamada Activa
+ * Banner Flotante Global de Llamada Activa con Audio WebRTC en vivo
  * ─────────────────────────────────────────────────────────────
- * Se muestra en la parte superior de TODAS las pestañas del dashboard
- * cuando hay una llamada timbrando o en curso, permitiendo contestar
- * o colgar al instante desde cualquier lugar de la aplicación.
+ * Contiene el elemento <audio> nativo del DOM y gestiona la conexión de voz
+ * en tiempo real para garantizar reproducibilidad en móviles iOS/Android.
  */
 export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserId }) => {
   const activeCall = useChatStore((state) => state.activeCall);
   const updateCallStatus = useChatStore((state) => state.updateCallStatus);
   const [callDuration, setCallDuration] = useState(0);
 
-  // 🎙️ Conexión WebRTC de voz en vivo en tiempo real cuando la llamada está conectada
-  useWebRTCCall(currentUserId);
+  const domAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 🎙️ Conexión WebRTC de voz en vivo conectada al <audio> del DOM
+  useWebRTCCall(currentUserId, domAudioRef);
 
   useEffect(() => {
     let timer: any = null;
@@ -50,8 +51,19 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
+  const handleAnswerCall = () => {
+    resumeAudioContext();
+    if (domAudioRef.current) {
+      domAudioRef.current.play().catch(() => {});
+    }
+    updateCallStatus('connected');
+  };
+
   return (
     <div className="fixed top-4 left-1/2 -translate-x-1/2 w-[92%] sm:w-11/12 max-w-lg z-[9999] animate-bounce-short">
+      {/* Elemento de Audio Nativo en el DOM (reproduce la voz entrante) */}
+      <audio ref={domAudioRef} autoPlay playsInline controls={false} className="hidden" />
+
       <div
         className={`p-3.5 sm:p-4 rounded-3xl shadow-2xl flex items-center justify-between border-2 border-white backdrop-blur-md transition-all ${
           activeCall.status === 'ringing'
@@ -76,7 +88,7 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
             <p className="text-[10px] font-bold opacity-90 tracking-wide uppercase mt-0.5">
               {activeCall.status === 'ringing'
                 ? '📻 Timbrando Radio...'
-                : `🎙️ Intercom Activo (${formatCallTime(callDuration)})`}
+                : `🎙️ Voz en Vivo Active (${formatCallTime(callDuration)})`}
             </p>
           </div>
         </div>
@@ -85,10 +97,7 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
           {/* Botón Contestar para el receptor */}
           {isIncoming && (
             <button
-              onClick={() => {
-                resumeAudioContext();
-                updateCallStatus('connected');
-              }}
+              onClick={handleAnswerCall}
               className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all"
             >
               ✅ Contestar
