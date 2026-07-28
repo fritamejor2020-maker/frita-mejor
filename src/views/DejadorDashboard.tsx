@@ -713,29 +713,39 @@ export const DejadorDashboard = () => {
           )}
 
           {/* ─── TABS ─── */}
-          <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-2xl">
-            {[
-              { id: 'carga', label: 'Surtir' },
-              { id: 'surtir', label: 'Pedidos' },
-              { id: 'recibir', label: 'Recibir' },
-              { id: 'gps', label: '📍 GPS' },
-              { id: 'chat', label: '💬 Chat' },
-            ].map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => {
-                  setActiveTab(tab.id);
-                  setLoadQuantities({});
-                  setActivePreset(null);
-                }}
-                className={`flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 ${
-                  activeTab === tab.id ? getThemeClass('activePill') : 'text-gray-500 hover:text-gray-800'
-                }`}
-              >
-                {tab.label}
-              </button>
-            ))}
-          </div>
+          {(() => {
+            const unreadTotalChat = useChatStore.getState().getUnreadCount('DEJADOR');
+            return (
+              <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-2xl">
+                {[
+                  { id: 'carga', label: 'Surtir' },
+                  { id: 'surtir', label: 'Pedidos' },
+                  { id: 'recibir', label: 'Recibir' },
+                  { id: 'gps', label: '📍 GPS' },
+                  { id: 'chat', label: '💬 Chat', badge: unreadTotalChat },
+                ].map(tab => (
+                  <button
+                    key={tab.id}
+                    onClick={() => {
+                      setActiveTab(tab.id);
+                      setLoadQuantities({});
+                      setActivePreset(null);
+                    }}
+                    className={`flex-1 py-3 px-2 rounded-xl text-sm font-bold transition-all duration-300 relative flex items-center justify-center gap-1 ${
+                      activeTab === tab.id ? getThemeClass('activePill') : 'text-gray-500 hover:text-gray-800'
+                    }`}
+                  >
+                    <span>{tab.label}</span>
+                    {!!tab.badge && tab.badge > 0 && (
+                      <span className="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full animate-bounce shadow-sm">
+                        {tab.badge}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            );
+          })()}
         </div>
       </div>
 
@@ -1252,17 +1262,28 @@ export const DejadorDashboard = () => {
         {activeTab === 'chat' && (
           <div className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-              <button
-                onClick={() => setSelectedVehicle('ALL')}
-                className={`px-4 py-2 rounded-2xl font-black text-xs transition-all ${
-                  selectedVehicle === 'ALL' ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
-                }`}
-              >
-                📻 Canal General (Todos)
-              </button>
+              {(() => {
+                const unreadGeneral = useChatStore.getState().getUnreadCount('DEJADOR', 'ALL');
+                return (
+                  <button
+                    onClick={() => setSelectedVehicle('ALL')}
+                    className={`px-4 py-2 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${
+                      selectedVehicle === 'ALL' ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
+                    }`}
+                  >
+                    <span>📻 Canal General (Todos)</span>
+                    {unreadGeneral > 0 && (
+                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                        {unreadGeneral}
+                      </span>
+                    )}
+                  </button>
+                );
+              })()}
               {vehicles.map((v: string) => {
                 const vendorName = vehicleVendorMap[v] || v;
                 const isSelected = selectedVehicle === v;
+                const unreadCount = useChatStore.getState().getUnreadCount('DEJADOR', v);
                 return (
                   <button
                     key={v}
@@ -1273,6 +1294,11 @@ export const DejadorDashboard = () => {
                   >
                     <span>{v}</span>
                     <span className="opacity-75 font-normal">({vendorName.split(' ')[0]})</span>
+                    {unreadCount > 0 && (
+                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full shadow-sm animate-pulse">
+                        {unreadCount}
+                      </span>
+                    )}
                   </button>
                 );
               })}

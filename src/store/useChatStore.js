@@ -132,11 +132,33 @@ export const useChatStore = create(
          * Retorna la cantidad de mensajes no leídos para un usuario
          */
         getUnreadCount: (myUserId, fromUserId = null) => {
-          return get().messages.filter(m => {
+          const msgs = get().messages || [];
+          const myId = String(myUserId || '').toLowerCase();
+          const isDejador = myId === 'dejador';
+
+          return msgs.filter(m => {
             if (m.read) return false;
-            if (m.senderId === myUserId) return false;
-            if (fromUserId && m.senderId !== fromUserId && m.pointId !== fromUserId) return false;
-            return m.receiverId === myUserId || m.receiverId === 'ALL' || m.receiverId === 'DEJADOR';
+
+            const sender = String(m.senderId || '').toLowerCase();
+            const point = String(m.pointId || '').toLowerCase();
+            const receiver = String(m.receiverId || '').toLowerCase();
+
+            // Descartar mensajes propios
+            if (sender === myId || point === myId) return false;
+
+            // Si se filtra por un vehículo específico (ej: 'T1')
+            if (fromUserId && fromUserId !== 'ALL') {
+              const target = String(fromUserId).toLowerCase();
+              if (sender !== target && point !== target && receiver !== target) return false;
+            }
+
+            // Verificar si el destinatario es para mí o mi rol
+            const isForMe =
+              receiver === 'all' ||
+              receiver === myId ||
+              (isDejador && (receiver === 'dejador' || receiver === 'logistica'));
+
+            return isForMe;
           }).length;
         },
 

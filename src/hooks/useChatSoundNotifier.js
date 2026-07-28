@@ -3,21 +3,19 @@ import { useChatStore } from '../store/useChatStore';
 import { supabase } from '../lib/supabase';
 
 /**
- * Hook Global de Notificaciones de Chat
+ * Hook Global de Notificaciones de Audio y Llamadas de Chat
  * ─────────────────────────────────────────────────────────────
- * Se monta UNA VEZ en el dashboard (fuera de tabs) para:
- *  1. Reproducir sonido de radio al recibir mensajes nuevos
- *  2. Reproducir ringtone continuo en llamadas entrantes
- *  3. Funcionar SIEMPRE, sin importar en qué pestaña esté el usuario
- *
- * IMPORTANTE: Este hook NO modifica el estado de mensajes ni llamadas.
- * Eso lo hace el store (useChatStore) vía su propio canal de broadcast.
- * Este hook SOLO se encarga del audio.
+ * Se monta a nivel raíz en los Dashboards (fuera de tabs) para:
+ *  1. Desbloquear AudioContext automáticamente al primer toque/clic
+ *  2. Reproducir bip de radio al recibir mensajes nuevos (en canal 'public_chat_channel')
+ *  3. Reproducir ringtone continuo durante llamadas entrantes
+ *  4. Funcionar SIEMPRE, sin importar la pestaña activa
  */
 
-// ─── Singleton AudioContext ─────────────────────────────────
 let _audioCtx = null;
+
 function getAudioCtx() {
+  if (typeof window === 'undefined') return null;
   if (!_audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) return null;
@@ -29,18 +27,33 @@ function getAudioCtx() {
   return _audioCtx;
 }
 
-// Exponer para que IntercomChatModule pueda reanudar con gesto de usuario
+// Desbloqueo global automático en cualquier toque o clic
+if (typeof window !== 'undefined') {
+  const unlockAudio = () => {
+    const ctx = getAudioCtx();
+    if (ctx && ctx.state === 'suspended') {
+      ctx.resume().catch(() => {});
+    }
+  };
+  window.addEventListener('click', unlockAudio, { passive: true });
+  window.addEventListener('touchstart', unlockAudio, { passive: true });
+  window.addEventListener('pointerdown', unlockAudio, { passive: true });
+}
+
 export function resumeAudioContext() {
   getAudioCtx();
 }
 
-// ─── Sonido de Notificación Radio (doble bip fuerte) ────────
+/**
+ * Tono característico de walkie-talkie / intercomunicador (doble bip)
+ */
 export function playRadioChime() {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
     const now = ctx.currentTime;
 
+    // Bip 1: 880Hz
     const osc1 = ctx.createOscillator();
     const g1 = ctx.createGain();
     osc1.type = 'square';
@@ -51,6 +64,7 @@ export function playRadioChime() {
     osc1.start(now);
     osc1.stop(now + 0.12);
 
+    // Bip 2: 1320Hz
     const osc2 = ctx.createOscillator();
     const g2 = ctx.createGain();
     osc2.type = 'square';
@@ -65,7 +79,9 @@ export function playRadioChime() {
   }
 }
 
-// ─── Ringtone continuo para llamadas ────────────────────────
+/**
+ * Ringtone continuo de llamada entrante
+ */
 function startRingtone() {
   try {
     const ctx = getAudioCtx();
@@ -116,20 +132,19 @@ function startRingtone() {
 }
 
 /**
- * Hook principal — montar en el dashboard a nivel raíz
- * @param {string} currentUserId - ID del usuario actual (ej: 'DEJADOR', 'T1')
+ * Hook global de sonidos — escuchar en el MISMO canal que useChatStore ('public_chat_channel')
  */
 export function useChatSoundNotifier(currentUserId) {
   const ringtoneStopRef = useRef(null);
   const lastMessageIdRef = useRef(null);
   const activeCall = useChatStore(state => state.activeCall);
 
-  // ─── Listener de Broadcast para sonido de mensajes nuevos ──
+  // Escuchar mensajes entrantes en el canal central broadcast 'public_chat_channel'
   useEffect(() => {
     if (!currentUserId) return;
 
     const channel = supabase
-      .channel('chat_sound_notifier_' + currentUserId)
+      .channel('public_chat_channel_sound_notifier')
       .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
         if (
           payload &&
@@ -148,13 +163,16 @@ export function useChatSoundNotifier(currentUserId) {
     };
   }, [currentUserId]);
 
-  // ─── Ringtone automático para llamadas entrantes ───────────
+  // Ringtone de llamada entrante
   useEffect(() => {
-    if (
+    const isIncomingCall =
       activeCall &&
       activeCall.status === 'ringing' &&
-      activeCall.receiverId === currentUserId
-    ) {
+      (activeCall.receiverId === currentUserId ||
+       activeCall.receiverId === 'ALL' ||
+       (currentUserId === 'DEJADOR' && activeCall.receiverId === 'DEJADOR'));
+
+    if (isIncomingCall) {
       if (!ringtoneStopRef.current) {
         ringtoneStopRef.current = startRingtone();
       }
@@ -171,5 +189,5 @@ export function useChatSoundNotifier(currentUserId) {
         ringtoneStopRef.current = null;
       }
     };
-  }, [activeCall?.status, activeCall?.id, currentUserId]);
+  }, [activeCall?.status, activeCall?.id, activeCall?.receiverId, currentUserId]);
 }

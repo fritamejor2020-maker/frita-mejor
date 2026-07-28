@@ -5,14 +5,17 @@ import {
 } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
+import { supabase } from '../../lib/supabase';
 
 /**
  * Módulo de Chat / Radio Intercomunicador Integrado
  * Rediseñado con la línea gráfica cálida, limpia y moderna de Frita Mejor.
  *
- * NOTA: Este componente NO maneja sonidos ni broadcast listeners.
- * Los sonidos se manejan en useChatSoundNotifier (montado a nivel dashboard).
- * Los broadcasts se manejan en useChatStore (setupChatRealtime).
+ * Características:
+ *  - Mensajes de Texto y Fotos comprimidas
+ *  - Notas de voz
+ *  - Intercomunicador de Voz en vivo durante llamadas conectadas
+ *  - Contadores de no leídos en tiempo real
  */
 
 export const IntercomChatModule = ({
@@ -50,7 +53,81 @@ export const IntercomChatModule = ({
   const galleryInputRef = useRef(null);
   const callTimerRef = useRef(null);
 
-  // ─── Timer de duración de llamada conectada ─────────────────
+  // Referencias para transmisión de voz en vivo durante la llamada
+  const callMediaRecorderRef = useRef(null);
+
+  // ─── Transmisión de voz en tiempo real durante llamada conectada ─────────
+  useEffect(() => {
+    let callChannel = null;
+
+    if (activeCall && activeCall.status === 'connected') {
+      // 1. Suscribirse a trozos de voz en vivo transmitidos por el interlocutor
+      callChannel = supabase.channel('public_chat_channel')
+        .on('broadcast', { event: 'live_voice_stream' }, ({ payload }) => {
+          if (payload && payload.senderId !== currentUserId && payload.audioUrl) {
+            try {
+              resumeAudioContext();
+              const voiceChunk = new Audio(payload.audioUrl);
+              voiceChunk.play().catch(() => {});
+            } catch (e) {
+              console.warn('Voice chunk play error:', e);
+            }
+          }
+        })
+        .subscribe();
+
+      // 2. Iniciar transmisión continua del micrófono (trozos de 1.2 segundos)
+      navigator.mediaDevices?.getUserMedia({ audio: true })
+        .then(stream => {
+          const rec = new MediaRecorder(stream);
+          callMediaRecorderRef.current = rec;
+
+          rec.ondataavailable = async (e) => {
+            if (e.data && e.data.size > 0) {
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const base64Audio = reader.result;
+                callChannel?.send({
+                  type: 'broadcast',
+                  event: 'live_voice_stream',
+                  payload: {
+                    senderId: currentUserId,
+                    audioUrl: base64Audio,
+                  },
+                }).catch(() => {});
+              };
+              reader.readAsDataURL(e.data);
+            }
+          };
+
+          rec.start(1200); // emitir trozo cada 1.2 segundos
+        })
+        .catch(err => {
+          console.warn('No se pudo acceder al micrófono para transmisión en vivo:', err);
+        });
+    } else {
+      // Si la llamada no está conectada, detener transmisión
+      if (callMediaRecorderRef.current) {
+        try {
+          callMediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+          callMediaRecorderRef.current.stop();
+        } catch (_) {}
+        callMediaRecorderRef.current = null;
+      }
+    }
+
+    return () => {
+      if (callMediaRecorderRef.current) {
+        try {
+          callMediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
+          callMediaRecorderRef.current.stop();
+        } catch (_) {}
+        callMediaRecorderRef.current = null;
+      }
+    };
+  }, [activeCall?.status, activeCall?.id, currentUserId]);
+
+  // ─── Timer de duración de llamada conectada ─────────────────────────────
   useEffect(() => {
     if (activeCall && activeCall.status === 'connected') {
       setCallDuration(0);
@@ -80,7 +157,7 @@ export const IntercomChatModule = ({
 
   const conversation = getConversation(currentUserId, targetUserId, shiftId);
 
-  // Auto-scroll al último mensaje
+  // Auto-scroll al último mensaje y marcar leídos
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     markAsRead(targetUserId, currentUserId);
@@ -164,7 +241,7 @@ export const IntercomChatModule = ({
     setPhotoPreview(null);
   };
 
-  // Manejar selección y compresión de foto (canvas a ~50KB max)
+  // Compresión de foto a max 800px / JPEG 0.6 (~50KB)
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -197,7 +274,6 @@ export const IntercomChatModule = ({
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        // Compresión ultra ligera a JPEG 0.6 (~50KB)
         const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
         setPhotoPreview(compressedBase64);
         setIsCompressingPhoto(false);
@@ -228,6 +304,9 @@ export const IntercomChatModule = ({
     const sec = s % 60;
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
+
+  // Determinar si soy el emisor o receptor de la llamada activa
+  const isCaller = activeCall?.callerId === currentUserId;
 
   return (
     <div
@@ -285,7 +364,7 @@ export const IntercomChatModule = ({
             <PhoneCall size={18} className={activeCall.status === 'ringing' ? 'animate-bounce' : ''} />
             <div>
               <p className="font-black text-xs">
-                {activeCall.callerId === currentUserId
+                {isCaller
                   ? activeCall.status === 'ringing'
                     ? `📞 Llamando a ${activeCall.receiverName}...`
                     : `📞 En llamada con ${activeCall.receiverName}`
@@ -297,14 +376,14 @@ export const IntercomChatModule = ({
               <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">
                 {activeCall.status === 'ringing'
                   ? 'Timbrando...'
-                  : `En curso — ${formatCallTime(callDuration)}`
+                  : `Intercom Activo — ${formatCallTime(callDuration)}`
                 }
               </p>
             </div>
           </div>
           <div className="flex gap-2">
-            {/* Botón Contestar (solo receptor cuando está timbrando) */}
-            {activeCall.receiverId === currentUserId && activeCall.status === 'ringing' && (
+            {/* Botón Contestar: visible para cualquiera que NO sea el emisor mientras esté timbrando */}
+            {!isCaller && activeCall.status === 'ringing' && (
               <button
                 onClick={() => {
                   resumeAudioContext();
@@ -326,7 +405,7 @@ export const IntercomChatModule = ({
         </div>
       )}
 
-      {/* Cuerpo del Chat (Fondo Cálido Suave) */}
+      {/* Cuerpo del Chat */}
       <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#FAF8F5]">
         {conversation.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 my-auto">
@@ -437,7 +516,7 @@ export const IntercomChatModule = ({
         </div>
       )}
 
-      {/* Footer de Entrada (Blanco y Limpio) */}
+      {/* Footer de Entrada */}
       <form onSubmit={handleSendText} className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
         <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
