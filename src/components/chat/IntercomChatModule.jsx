@@ -439,10 +439,10 @@ export const IntercomChatModule = ({
                   )}
 
                   {/* Log de llamada */}
-                  {msg.type === 'call_log' && (
+                  {(msg.type === 'call_log' || msg.type === 'call_signal_ended') && (
                     <div className="flex items-center gap-1.5 text-xs py-0.5">
                       <PhoneCall size={14} />
-                      <span>{msg.text}</span>
+                      <span>{msg.text || '📞 Llamada de voz'}</span>
                     </div>
                   )}
 

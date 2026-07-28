@@ -6,17 +6,30 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' },
+    { urls: 'stun:openrelay.metered.ca:80' },
+    {
+      urls: 'turn:openrelay.metered.ca:80',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
+    {
+      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      username: 'openrelayproject',
+      credential: 'openrelayproject',
+    },
   ],
 };
 
 /**
- * Hook de Audio de Voz en Vivo WebRTC (Full-Duplex)
- * ─────────────────────────────────────────────────────────────
- * Utiliza un elemento <audio> montado directamente en el DOM
- * desbloqueado por el toque del usuario para transmitir voz en tiempo real.
+ * Hook de Audio de Voz en Vivo WebRTC con Servidores TURN de Relevo (Full-Duplex)
+ * ─────────────────────────────────────────────────────────────────────────────
+ * Utiliza servidores TURN de relevo para atravesar redes móviles (3G/4G/5G CGNAT)
+ * y un elemento <audio> desbloqueado en el DOM para reproducir la voz sin cortes.
  */
 export function useWebRTCCall(currentUserId, domAudioRef) {
   const activeCall = useChatStore((state) => state.activeCall);
@@ -61,7 +74,6 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
 
     if (!isCaller && !isReceiver) return;
 
-    // Inicializar WebRTC PeerConnection
     const initPeer = async () => {
       if (pcRef.current) return;
 
@@ -88,7 +100,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           }
         };
 
-        // Capturar micrófono local con cancelación de eco y supresión de ruido
+        // Capturar micrófono local
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {

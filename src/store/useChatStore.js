@@ -345,7 +345,7 @@ export const useChatStore = create(
               receiverId: currentCall.receiverId,
               receiverName: currentCall.receiverName,
               pointId: currentCall.callerId,
-              type: 'call_signal_ended',
+              type: 'call_log',
               text: logText,
               durationSeconds: durationSec,
             });
