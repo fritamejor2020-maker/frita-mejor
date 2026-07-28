@@ -6,8 +6,8 @@ import { useChatStore } from '../store/useChatStore';
  * ─────────────────────────────────────────────────────────────
  * Se monta a nivel raíz en los Dashboards (fuera de tabs) para:
  *  1. Desbloquear AudioContext automáticamente al primer toque/clic
- *  2. Reproducir bip de radio al recibir mensajes nuevos (escuchando Zustand store)
- *  3. Reproducir ringtone continuo durante llamadas entrantes
+ *  2. Reproducir bip de radio al recibir mensajes nuevos
+ *  3. Reproducir el MISMO bip de radio repetidamente durante llamadas entrantes
  *  4. Funcionar SIEMPRE, sin importar la pestaña activa
  */
 
@@ -79,55 +79,17 @@ export function playRadioChime() {
 }
 
 /**
- * Ringtone continuo de llamada entrante
+ * Repite el MISMO sonido de radio (playRadioChime) continuamente durante una llamada entrante
  */
-function startRingtone() {
-  try {
-    const ctx = getAudioCtx();
-    if (!ctx) return () => {};
+function startRepeatingRadioChime() {
+  playRadioChime();
+  const intervalId = setInterval(() => {
+    playRadioChime();
+  }, 1200);
 
-    let stopped = false;
-    const masterGain = ctx.createGain();
-    masterGain.gain.value = 0.6;
-    masterGain.connect(ctx.destination);
-
-    function playRingBurst() {
-      if (stopped) return;
-      const now = ctx.currentTime;
-
-      const o1 = ctx.createOscillator();
-      const g1 = ctx.createGain();
-      o1.type = 'sine';
-      o1.frequency.value = 440;
-      g1.gain.setValueAtTime(0.6, now);
-      g1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
-      o1.connect(g1).connect(masterGain);
-      o1.start(now);
-      o1.stop(now + 0.4);
-
-      const o2 = ctx.createOscillator();
-      const g2 = ctx.createGain();
-      o2.type = 'sine';
-      o2.frequency.value = 560;
-      g2.gain.setValueAtTime(0.6, now + 0.5);
-      g2.gain.exponentialRampToValueAtTime(0.01, now + 0.9);
-      o2.connect(g2).connect(masterGain);
-      o2.start(now + 0.5);
-      o2.stop(now + 0.9);
-    }
-
-    playRingBurst();
-    const intervalId = setInterval(playRingBurst, 2400);
-
-    return function stop() {
-      stopped = true;
-      clearInterval(intervalId);
-      try { masterGain.disconnect(); } catch (_) {}
-    };
-  } catch (e) {
-    console.warn('Ringtone error:', e);
-    return () => {};
-  }
+  return function stop() {
+    clearInterval(intervalId);
+  };
 }
 
 /**
@@ -153,7 +115,7 @@ export function useChatSoundNotifier(currentUserId) {
     prevMsgCountRef.current = messages.length;
   }, [messages, currentUserId]);
 
-  // 📞 Ringtone continuo de llamada entrante
+  // 📞 Repetir el MISMO sonido de radio walkie-talkie durante llamadas entrantes hasta contestar
   useEffect(() => {
     const isIncomingCall =
       activeCall &&
@@ -162,7 +124,7 @@ export function useChatSoundNotifier(currentUserId) {
 
     if (isIncomingCall) {
       if (!ringtoneStopRef.current) {
-        ringtoneStopRef.current = startRingtone();
+        ringtoneStopRef.current = startRepeatingRadioChime();
       }
     } else {
       if (ringtoneStopRef.current) {

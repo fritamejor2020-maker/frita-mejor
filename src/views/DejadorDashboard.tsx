@@ -14,6 +14,7 @@ import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
+import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -675,6 +676,8 @@ export const DejadorDashboard = () => {
       className="min-h-screen pb-32 font-sans w-full bg-[#FFD56B] flex flex-col"
       onPointerDown={isAlertPlaying ? handleStopAlert : undefined}
     >
+      {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
+      <ActiveCallBanner currentUserId="DEJADOR" />
       
       {/* ─── HEADER ─── */}
       <div className="w-full bg-white rounded-b-[40px] shadow-sm relative z-10">

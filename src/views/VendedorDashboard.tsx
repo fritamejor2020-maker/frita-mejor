@@ -18,6 +18,7 @@ import { usePayrollStore } from '../store/usePayrollStore';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
+import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 
 export const VendedorDashboard = () => {
@@ -531,6 +532,8 @@ export const VendedorDashboard = () => {
 
   return (
     <div className="min-h-screen bg-[#FFD56B] font-sans w-full flex flex-col" style={{ paddingBottom: activeTab === 'pos' ? '240px' : '160px' }}>
+      {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
+      <ActiveCallBanner currentUserId={pointId || trackingId} />
       
       {/* OVERLAY DE PEDIDO ENTRANTE (UBER-STYLE ALERT) */}
       {pendingDelivery && (
