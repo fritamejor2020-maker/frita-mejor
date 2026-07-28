@@ -6,19 +6,16 @@ const ICE_SERVERS = {
   iceServers: [
     { urls: 'stun:stun.l.google.com:19302' },
     { urls: 'stun:stun1.l.google.com:19302' },
+    { urls: 'stun:stun2.l.google.com:19302' },
+    { urls: 'stun:stun3.l.google.com:19302' },
+    { urls: 'stun:stun4.l.google.com:19302' },
     { urls: 'stun:openrelay.metered.ca:80' },
     {
-      urls: 'turn:openrelay.metered.ca:80',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443',
-      username: 'openrelayproject',
-      credential: 'openrelayproject',
-    },
-    {
-      urls: 'turn:openrelay.metered.ca:443?transport=tcp',
+      urls: [
+        'turn:openrelay.metered.ca:80',
+        'turn:openrelay.metered.ca:443',
+        'turn:openrelay.metered.ca:443?transport=tcp'
+      ],
       username: 'openrelayproject',
       credential: 'openrelayproject',
     },
@@ -26,15 +23,17 @@ const ICE_SERVERS = {
 };
 
 /**
- * Hook de Audio de Voz en Vivo WebRTC con Servidores TURN de Relevo (Full-Duplex)
+ * Hook de Audio de Voz en Vivo WebRTC Full-Duplex (Llamada Telefónica Real)
  * ─────────────────────────────────────────────────────────────────────────────
- * Utiliza servidores TURN de relevo para atravesar redes móviles (3G/4G/5G CGNAT)
- * y un elemento <audio> desbloqueado en el DOM para reproducir la voz sin cortes.
+ * Establece conexión P2P bidireccional continua de audio con cola de candidatos ICE
+ * y reintento de señales SDP para garantizar audio en vivo continuo de alta calidad.
  */
 export function useWebRTCCall(currentUserId, domAudioRef) {
   const activeCall = useChatStore((state) => state.activeCall);
   const pcRef = useRef(null);
   const localStreamRef = useRef(null);
+  const pendingCandidatesRef = useRef([]);
+  const offerIntervalRef = useRef(null);
 
   useEffect(() => {
     if (!currentUserId || typeof window === 'undefined') return;
@@ -42,6 +41,10 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
     let channel = supabase.channel('public_chat_channel');
 
     const cleanupWebRTC = () => {
+      if (offerIntervalRef.current) {
+        clearInterval(offerIntervalRef.current);
+        offerIntervalRef.current = null;
+      }
       if (localStreamRef.current) {
         try {
           localStreamRef.current.getTracks().forEach((t) => t.stop());
@@ -60,6 +63,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           domAudioRef.current.srcObject = null;
         } catch (_) {}
       }
+      pendingCandidatesRef.current = [];
     };
 
     if (!activeCall || activeCall.status === 'ended') {
@@ -74,6 +78,30 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
 
     if (!isCaller && !isReceiver) return;
 
+    // Procesar candidatos ICE acumulados en la cola
+    const processPendingCandidates = async () => {
+      const pc = pcRef.current;
+      if (!pc || !pc.remoteDescription || !pc.remoteDescription.type) return;
+      while (pendingCandidatesRef.current.length > 0) {
+        const cand = pendingCandidatesRef.current.shift();
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(cand));
+        } catch (_) {}
+      }
+    };
+
+    const addOrQueueCandidate = async (candidate) => {
+      const pc = pcRef.current;
+      if (pc && pc.remoteDescription && pc.remoteDescription.type) {
+        try {
+          await pc.addIceCandidate(new RTCIceCandidate(candidate));
+        } catch (_) {}
+      } else {
+        pendingCandidatesRef.current.push(candidate);
+      }
+    };
+
+    // Inicializar WebRTC PeerConnection
     const initPeer = async () => {
       if (pcRef.current) return;
 
@@ -81,7 +109,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
         const pc = new RTCPeerConnection(ICE_SERVERS);
         pcRef.current = pc;
 
-        // Conectar el flujo remoto de audio al elemento <audio> del DOM
+        // Reproducir flujo remoto en vivo de audio en el elemento <audio> del DOM
         pc.ontrack = (event) => {
           if (event.streams && event.streams[0] && domAudioRef?.current) {
             const audioEl = domAudioRef.current;
@@ -100,7 +128,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           }
         };
 
-        // Capturar micrófono local
+        // Capturar micrófono local full-duplex HD
         try {
           const stream = await navigator.mediaDevices.getUserMedia({
             audio: {
@@ -116,15 +144,24 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           console.warn('[WebRTC] Mic access error:', err);
         }
 
-        // Si soy el llamador y la llamada está conectada, crear la oferta SDP
+        // Si soy el llamador y la llamada se conectó, crear la oferta SDP y reintentar la transmisión
         if (isCaller && activeCall.status === 'connected') {
-          const offer = await pc.createOffer();
+          const offer = await pc.createOffer({ offerToReceiveAudio: true });
           await pc.setLocalDescription(offer);
-          channel.send({
-            type: 'broadcast',
-            event: 'webrtc_offer',
-            payload: { offer, fromUserId: currentUserId, callId: activeCall.id },
-          }).catch(() => {});
+
+          const sendOffer = () => {
+            if (pcRef.current && pcRef.current.signalingState === 'have-local-offer') {
+              channel.send({
+                type: 'broadcast',
+                event: 'webrtc_offer',
+                payload: { offer, fromUserId: currentUserId, callId: activeCall.id },
+              }).catch(() => {});
+            }
+          };
+
+          sendOffer();
+          if (offerIntervalRef.current) clearInterval(offerIntervalRef.current);
+          offerIntervalRef.current = setInterval(sendOffer, 1500);
         }
       } catch (err) {
         console.warn('[WebRTC] initPeer error:', err);
@@ -140,6 +177,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           const pc = pcRef.current;
           if (pc && pc.signalingState !== 'closed') {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
+            await processPendingCandidates();
             const answer = await pc.createAnswer();
             await pc.setLocalDescription(answer);
             channel.send({
@@ -156,8 +194,13 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
         if (!payload || payload.callId !== activeCall.id || payload.fromUserId === currentUserId) return;
         try {
           const pc = pcRef.current;
+          if (offerIntervalRef.current) {
+            clearInterval(offerIntervalRef.current);
+            offerIntervalRef.current = null;
+          }
           if (pc && (pc.signalingState === 'have-local-offer' || pc.signalingState === 'have-remote-offer')) {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.answer));
+            await processPendingCandidates();
           }
         } catch (e) {
           console.warn('[WebRTC] Answer handling error:', e);
@@ -165,13 +208,8 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
       })
       .on('broadcast', { event: 'webrtc_candidate' }, async ({ payload }) => {
         if (!payload || payload.callId !== activeCall.id || payload.fromUserId === currentUserId) return;
-        try {
-          const pc = pcRef.current;
-          if (pc && payload.candidate && pc.remoteDescription) {
-            await pc.addIceCandidate(new RTCIceCandidate(payload.candidate));
-          }
-        } catch (e) {
-          console.warn('[WebRTC] Candidate handling error:', e);
+        if (payload.candidate) {
+          await addOrQueueCandidate(payload.candidate);
         }
       })
       .subscribe();
