@@ -86,12 +86,15 @@ export const IntercomChatModule = ({
     markAsRead(targetUserId, currentUserId);
   }, [conversation.length, targetUserId, currentUserId, messages]);
 
+  const recordingStartTimeRef = useRef(0);
+
   // Manejador de Notas de Voz (MediaRecorder)
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
+      recordingStartTimeRef.current = Date.now();
 
       mediaRecorderRef.current.ondataavailable = (e) => {
         if (e.data.size > 0) {
@@ -101,6 +104,8 @@ export const IntercomChatModule = ({
 
       mediaRecorderRef.current.onstop = async () => {
         const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const durationSec = Math.max(1, Math.round((Date.now() - recordingStartTimeRef.current) / 1000));
+
         const reader = new FileReader();
         reader.onloadend = () => {
           const base64Audio = reader.result;
@@ -115,7 +120,7 @@ export const IntercomChatModule = ({
             pointId: pointId || currentUserId,
             type: 'audio',
             mediaUrl: base64Audio,
-            durationSeconds: recordingTime,
+            durationSeconds: durationSec,
           });
         };
         reader.readAsDataURL(audioBlob);
