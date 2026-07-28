@@ -10,11 +10,13 @@ const APP_VERSION = 'v1';
 // y cause pérdida de datos no sincronizados.
 // La actualización se aplicará naturalmente cuando el usuario cierre y reabra la app.
 self.addEventListener('install', (event) => {
-  console.log('[SW] Nuevo Service Worker instalado. Se activará en la próxima recarga.');
+  self.skipWaiting();
+  console.log('[SW] Nuevo Service Worker instalado y activado inmediatamente.');
 });
 
 self.addEventListener('activate', (event) => {
-  console.log('[SW] Service Worker activado.');
+  event.waitUntil(self.clients.claim());
+  console.log('[SW] Service Worker activado y controlando clientes.');
 });
 
 // ── Recibir push del servidor ────────────────────────────────

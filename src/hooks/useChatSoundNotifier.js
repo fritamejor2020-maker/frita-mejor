@@ -115,14 +115,11 @@ export function useChatSoundNotifier(currentUserId) {
     prevMsgCountRef.current = messages.length;
   }, [messages, currentUserId]);
 
-  // 📞 Repetir el MISMO sonido de radio walkie-talkie durante llamadas entrantes hasta contestar
+  // 📞 Repetir el MISMO sonido de radio walkie-talkie durante llamadas (timbre para ambos lados)
   useEffect(() => {
-    const isIncomingCall =
-      activeCall &&
-      activeCall.status === 'ringing' &&
-      activeCall.callerId !== currentUserId;
+    const isRinging = activeCall && activeCall.status === 'ringing';
 
-    if (isIncomingCall) {
+    if (isRinging) {
       if (!ringtoneStopRef.current) {
         ringtoneStopRef.current = startRepeatingRadioChime();
       }
@@ -139,5 +136,5 @@ export function useChatSoundNotifier(currentUserId) {
         ringtoneStopRef.current = null;
       }
     };
-  }, [activeCall?.status, activeCall?.id, activeCall?.callerId, currentUserId]);
+  }, [activeCall?.status, activeCall?.id]);
 }
