@@ -27,10 +27,37 @@ function syncChatMessages(messages, branchId) {
 // Canal Global Supabase Realtime para recibir broadcasts instantáneos entre dispositivos
 let realtimeChannel = null;
 
+function handleCallSignalFromPayload(msg, set, get) {
+  if (!msg || !msg.type) return;
+
+  if (msg.type === 'call_signal_ringing') {
+    try {
+      const callData = typeof msg.text === 'string' && msg.text.startsWith('{') ? JSON.parse(msg.text) : null;
+      if (callData && callData.startedAt) {
+        const ageSec = Math.floor((Date.now() - new Date(callData.startedAt).getTime()) / 1000);
+        if (ageSec < 60) {
+          set({ activeCall: callData });
+        }
+      }
+    } catch (_) {}
+  } else if (msg.type === 'call_signal_connected') {
+    try {
+      const callData = typeof msg.text === 'string' && msg.text.startsWith('{') ? JSON.parse(msg.text) : null;
+      if (callData) {
+        set({ activeCall: { ...callData, status: 'connected' } });
+      }
+    } catch (_) {}
+  } else if (msg.type === 'call_signal_ended') {
+    set({ activeCall: null });
+  }
+}
+
 function setupChatRealtime(set, get) {
   if (typeof window === 'undefined' || realtimeChannel) return;
   try {
-    realtimeChannel = supabase.channel('public_chat_channel');
+    realtimeChannel = supabase.channel('public_chat_channel', {
+      config: { broadcast: { self: true } },
+    });
     
     realtimeChannel
       .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
@@ -38,6 +65,7 @@ function setupChatRealtime(set, get) {
         const currentMsgs = get().messages;
         if (!currentMsgs.some(m => m.id === payload.id)) {
           set({ messages: [payload, ...currentMsgs] });
+          handleCallSignalFromPayload(payload, set, get);
         }
       })
       .on('broadcast', { event: 'voice_call_signal' }, ({ payload }) => {
@@ -209,6 +237,11 @@ export const useChatStore = create(
               if (now - msgTime > TWENTY_FOUR_HOURS) return false;
             }
 
+            // Descartar señales internas de señalización de la vista del chat
+            if (m.type === 'call_signal_ringing' || m.type === 'call_signal_connected') {
+              return false;
+            }
+
             // Si la conversación seleccionada es 'ALL' (Canal General)
             if (!userBId || userBId === 'ALL') {
               return true; // Muestra todo el canal de radio del turno activo
@@ -251,6 +284,7 @@ export const useChatStore = create(
           };
           set({ activeCall: callData });
 
+          // 1. Broadcast instantáneo de alta velocidad
           try {
             if (realtimeChannel) {
               realtimeChannel.send({
@@ -260,6 +294,18 @@ export const useChatStore = create(
               }).catch(() => {});
             }
           } catch (_) {}
+
+          // 2. Señalización en base de datos para garantizar timbre aunque la red parpadee
+          get().sendMessage({
+            shiftId: 'shift-active',
+            senderId: callerId,
+            senderName: callerName,
+            senderRole: callerRole,
+            receiverId,
+            receiverName,
+            type: 'call_signal_ringing',
+            text: JSON.stringify(callData),
+          });
         },
 
         /**
@@ -272,14 +318,13 @@ export const useChatStore = create(
           const updatedCall = { ...currentCall, status };
 
           if (status === 'ended') {
-            // Determinar texto del log basándose en el estado ACTUAL (antes de finalizar)
             const wasConnected = currentCall.status === 'connected';
-            const durationSec = Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000);
+            const durationSec = Math.max(0, Math.floor((Date.now() - new Date(currentCall.startedAt).getTime()) / 1000));
             const logText = wasConnected
               ? `📞 Llamada de voz finalizada (${Math.floor(durationSec / 60)}:${(durationSec % 60).toString().padStart(2, '0')})`
               : '📞 Llamada de voz cancelada';
 
-            // 1. Broadcast la señal de "ended" PRIMERO para que el otro lado la reciba
+            // 1. Broadcast la señal de "ended"
             try {
               if (realtimeChannel) {
                 realtimeChannel.send({
@@ -290,7 +335,7 @@ export const useChatStore = create(
               }
             } catch (_) {}
 
-            // 2. Registrar log de llamada en el chat
+            // 2. Señal persistente "ended" (sirve como log de llamada en el chat)
             get().sendMessage({
               shiftId: 'shift-active',
               branchId: currentCall.branchId || 'BRANCH-001',
@@ -299,17 +344,18 @@ export const useChatStore = create(
               senderRole: currentCall.callerRole,
               receiverId: currentCall.receiverId,
               receiverName: currentCall.receiverName,
-              type: 'call_log',
+              pointId: currentCall.callerId,
+              type: 'call_signal_ended',
               text: logText,
               durationSeconds: durationSec,
             });
 
-            // 3. Limpiar estado local de llamada
+            // 3. Limpiar estado local
             set({ activeCall: null });
           } else {
             set({ activeCall: updatedCall });
 
-            // Broadcast actualización de estado (ej: 'connected')
+            // 1. Broadcast estado "connected"
             try {
               if (realtimeChannel) {
                 realtimeChannel.send({
@@ -319,6 +365,20 @@ export const useChatStore = create(
                 }).catch(() => {});
               }
             } catch (_) {}
+
+            // 2. Señal persistente "connected"
+            get().sendMessage({
+              shiftId: 'shift-active',
+              branchId: currentCall.branchId || 'BRANCH-001',
+              senderId: currentCall.callerId,
+              senderName: currentCall.callerName,
+              senderRole: currentCall.callerRole,
+              receiverId: currentCall.receiverId,
+              receiverName: currentCall.receiverName,
+              pointId: currentCall.callerId,
+              type: 'call_signal_connected',
+              text: JSON.stringify(updatedCall),
+            });
           }
         },
       };
