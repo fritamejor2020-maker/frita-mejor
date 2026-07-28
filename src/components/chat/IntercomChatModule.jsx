@@ -83,7 +83,7 @@ export const IntercomChatModule = ({
   // Auto-scroll al último mensaje y marcar leídos al tener el componente abierto
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    markAsRead(targetUserId, currentUserId);
+    markAsRead(currentUserId, targetUserId);
   }, [conversation.length, targetUserId, currentUserId, messages]);
 
   const recordingStartTimeRef = useRef(0);

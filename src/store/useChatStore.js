@@ -109,15 +109,44 @@ export const useChatStore = create(
         },
 
         /**
-         * Marca mensajes entre dos participantes como leídos
+         * Marca mensajes como leídos para un usuario al abrir un chat
          */
-        markAsRead: (senderId, receiverId) => {
+        markAsRead: (myUserId, targetUserId = null) => {
+          const myId = String(myUserId || '').toLowerCase();
+          const target = targetUserId ? String(targetUserId).toLowerCase() : null;
+          const isDejador = myId === 'dejador';
           let changed = false;
-          const updated = get().messages.map(m => {
-            if ((m.senderId === senderId || m.pointId === senderId) && !m.read) {
+
+          const updated = (get().messages || []).map(m => {
+            if (m.read) return m;
+
+            const sender = String(m.senderId || '').toLowerCase();
+            const point = String(m.pointId || '').toLowerCase();
+            const receiver = String(m.receiverId || '').toLowerCase();
+
+            // Ignorar mensajes propios
+            if (sender === myId || point === myId) return m;
+
+            // Verificar si el mensaje era para mí o mi rol
+            const isForMe =
+              receiver === 'all' ||
+              receiver === myId ||
+              (isDejador && (receiver === 'dejador' || receiver === 'logistica'));
+
+            if (!isForMe) return m;
+
+            // Si se está viendo un canal/vehículo específico (ej: 't1')
+            if (target && target !== 'all') {
+              if (sender === target || point === target || receiver === target) {
+                changed = true;
+                return { ...m, read: true };
+              }
+            } else {
+              // Viendo Canal General ('ALL'): marcar como leídos los mensajes no leídos
               changed = true;
               return { ...m, read: true };
             }
+
             return m;
           });
 
