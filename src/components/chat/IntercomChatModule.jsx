@@ -23,6 +23,7 @@ export const IntercomChatModule = ({
   branchId = 'BRANCH-001',
   shiftId = 'shift-active',
   compactMode = false,
+  pointId = null,
 }) => {
   const messages = useChatStore(state => state.messages);
   const sendMessage = useChatStore(state => state.sendMessage);
@@ -111,6 +112,7 @@ export const IntercomChatModule = ({
             senderRole: currentUserRole,
             receiverId: targetUserId,
             receiverName: targetUserName,
+            pointId: pointId || currentUserId,
             type: 'audio',
             mediaUrl: base64Audio,
             durationSeconds: recordingTime,
@@ -141,7 +143,7 @@ export const IntercomChatModule = ({
     }
   };
 
-  // Enviar mensaje de texto
+  // Enviar mensaje de texto o foto
   const handleSendText = (e) => {
     e?.preventDefault();
     if (!textInput.trim() && !photoPreview) return;
@@ -154,6 +156,7 @@ export const IntercomChatModule = ({
       senderRole: currentUserRole,
       receiverId: targetUserId,
       receiverName: targetUserName,
+      pointId: pointId || currentUserId,
       type: photoPreview ? 'photo' : 'text',
       text: textInput.trim(),
       mediaUrl: photoPreview || null,
@@ -163,7 +166,7 @@ export const IntercomChatModule = ({
     setPhotoPreview(null);
   };
 
-  // Compresión de foto a max 800px / JPEG 0.6 (~50KB)
+  // Compresión de foto a max 600px / JPEG 0.5 (~30KB)
   const handlePhotoSelect = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -174,8 +177,8 @@ export const IntercomChatModule = ({
       const img = new Image();
       img.onload = () => {
         const canvas = document.createElement('canvas');
-        const MAX_WIDTH = 800;
-        const MAX_HEIGHT = 800;
+        const MAX_WIDTH = 600;
+        const MAX_HEIGHT = 600;
         let width = img.width;
         let height = img.height;
 
@@ -196,7 +199,7 @@ export const IntercomChatModule = ({
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, 0, 0, width, height);
 
-        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.6);
+        const compressedBase64 = canvas.toDataURL('image/jpeg', 0.5);
         setPhotoPreview(compressedBase64);
         setIsCompressingPhoto(false);
       };

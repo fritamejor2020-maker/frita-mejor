@@ -189,13 +189,15 @@ export const useChatStore = create(
             const sender = String(m.senderId || '').toLowerCase();
             const receiver = String(m.receiverId || '').toLowerCase();
             const point = String(m.pointId || '').toLowerCase();
+            const senderNameStr = String(m.senderName || '').toLowerCase();
 
             const isDirectMatch =
               (sender === String(userAId).toLowerCase() && (receiver === targetId || receiver === 'dejador')) ||
               (sender === targetId && (receiver === String(userAId).toLowerCase() || receiver === 'dejador')) ||
               point === targetId ||
               receiver === targetId ||
-              sender === targetId;
+              sender === targetId ||
+              senderNameStr.includes(targetId);
 
             const isBroadcast = m.receiverId === 'ALL';
 
