@@ -1,13 +1,12 @@
 import { useEffect, useRef } from 'react';
 import { useChatStore } from '../store/useChatStore';
-import { supabase } from '../lib/supabase';
 
 /**
  * Hook Global de Notificaciones de Audio y Llamadas de Chat
  * ─────────────────────────────────────────────────────────────
  * Se monta a nivel raíz en los Dashboards (fuera de tabs) para:
  *  1. Desbloquear AudioContext automáticamente al primer toque/clic
- *  2. Reproducir bip de radio al recibir mensajes nuevos (en canal 'public_chat_channel')
+ *  2. Reproducir bip de radio al recibir mensajes nuevos (escuchando Zustand store)
  *  3. Reproducir ringtone continuo durante llamadas entrantes
  *  4. Funcionar SIEMPRE, sin importar la pestaña activa
  */
@@ -27,7 +26,7 @@ function getAudioCtx() {
   return _audioCtx;
 }
 
-// Desbloqueo global automático en cualquier toque o clic
+// Desbloqueo global automático en cualquier toque o clic del usuario
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
     const ctx = getAudioCtx();
@@ -45,7 +44,7 @@ export function resumeAudioContext() {
 }
 
 /**
- * Tono característico de walkie-talkie / intercomunicador (doble bip)
+ * Tono característico de walkie-talkie / intercomunicador (doble bip fuerte)
  */
 export function playRadioChime() {
   try {
@@ -58,22 +57,22 @@ export function playRadioChime() {
     const g1 = ctx.createGain();
     osc1.type = 'square';
     osc1.frequency.value = 880;
-    g1.gain.setValueAtTime(0.6, now);
-    g1.gain.exponentialRampToValueAtTime(0.01, now + 0.12);
+    g1.gain.setValueAtTime(0.7, now);
+    g1.gain.exponentialRampToValueAtTime(0.01, now + 0.14);
     osc1.connect(g1).connect(ctx.destination);
     osc1.start(now);
-    osc1.stop(now + 0.12);
+    osc1.stop(now + 0.14);
 
     // Bip 2: 1320Hz
     const osc2 = ctx.createOscillator();
     const g2 = ctx.createGain();
     osc2.type = 'square';
     osc2.frequency.value = 1320;
-    g2.gain.setValueAtTime(0.7, now + 0.20);
-    g2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    g2.gain.setValueAtTime(0.8, now + 0.18);
+    g2.gain.exponentialRampToValueAtTime(0.01, now + 0.38);
     osc2.connect(g2).connect(ctx.destination);
-    osc2.start(now + 0.20);
-    osc2.stop(now + 0.35);
+    osc2.start(now + 0.18);
+    osc2.stop(now + 0.38);
   } catch (e) {
     console.warn('Audio chime error:', e);
   }
@@ -89,7 +88,7 @@ function startRingtone() {
 
     let stopped = false;
     const masterGain = ctx.createGain();
-    masterGain.gain.value = 0.5;
+    masterGain.gain.value = 0.6;
     masterGain.connect(ctx.destination);
 
     function playRingBurst() {
@@ -100,7 +99,7 @@ function startRingtone() {
       const g1 = ctx.createGain();
       o1.type = 'sine';
       o1.frequency.value = 440;
-      g1.gain.setValueAtTime(0.5, now);
+      g1.gain.setValueAtTime(0.6, now);
       g1.gain.exponentialRampToValueAtTime(0.01, now + 0.4);
       o1.connect(g1).connect(masterGain);
       o1.start(now);
@@ -110,7 +109,7 @@ function startRingtone() {
       const g2 = ctx.createGain();
       o2.type = 'sine';
       o2.frequency.value = 560;
-      g2.gain.setValueAtTime(0.5, now + 0.5);
+      g2.gain.setValueAtTime(0.6, now + 0.5);
       g2.gain.exponentialRampToValueAtTime(0.01, now + 0.9);
       o2.connect(g2).connect(masterGain);
       o2.start(now + 0.5);
@@ -118,7 +117,7 @@ function startRingtone() {
     }
 
     playRingBurst();
-    const intervalId = setInterval(playRingBurst, 2500);
+    const intervalId = setInterval(playRingBurst, 2400);
 
     return function stop() {
       stopped = true;
@@ -132,45 +131,34 @@ function startRingtone() {
 }
 
 /**
- * Hook global de sonidos — escuchar en el MISMO canal que useChatStore ('public_chat_channel')
+ * Hook global de sonidos — reacciona directamente al store Zustand
  */
 export function useChatSoundNotifier(currentUserId) {
   const ringtoneStopRef = useRef(null);
-  const lastMessageIdRef = useRef(null);
+  const prevMsgCountRef = useRef(0);
+
   const activeCall = useChatStore(state => state.activeCall);
+  const messages = useChatStore(state => state.messages);
 
-  // Escuchar mensajes entrantes en el canal central broadcast 'public_chat_channel'
+  // 🔔 Sonido automático al recibir mensajes nuevos en el Zustand store
   useEffect(() => {
-    if (!currentUserId) return;
+    if (!currentUserId || !messages) return;
 
-    const channel = supabase
-      .channel('public_chat_channel_sound_notifier')
-      .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
-        if (
-          payload &&
-          payload.id &&
-          payload.senderId !== currentUserId &&
-          payload.id !== lastMessageIdRef.current
-        ) {
-          lastMessageIdRef.current = payload.id;
-          playRadioChime();
-        }
-      })
-      .subscribe();
+    if (prevMsgCountRef.current > 0 && messages.length > prevMsgCountRef.current) {
+      const latestMsg = messages[0]; // Mensajes ordenados más reciente primero
+      if (latestMsg && latestMsg.senderId !== currentUserId) {
+        playRadioChime();
+      }
+    }
+    prevMsgCountRef.current = messages.length;
+  }, [messages, currentUserId]);
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [currentUserId]);
-
-  // Ringtone de llamada entrante
+  // 📞 Ringtone continuo de llamada entrante
   useEffect(() => {
     const isIncomingCall =
       activeCall &&
       activeCall.status === 'ringing' &&
-      (activeCall.receiverId === currentUserId ||
-       activeCall.receiverId === 'ALL' ||
-       (currentUserId === 'DEJADOR' && activeCall.receiverId === 'DEJADOR'));
+      activeCall.callerId !== currentUserId;
 
     if (isIncomingCall) {
       if (!ringtoneStopRef.current) {
@@ -189,5 +177,5 @@ export function useChatSoundNotifier(currentUserId) {
         ringtoneStopRef.current = null;
       }
     };
-  }, [activeCall?.status, activeCall?.id, activeCall?.receiverId, currentUserId]);
+  }, [activeCall?.status, activeCall?.id, activeCall?.callerId, currentUserId]);
 }

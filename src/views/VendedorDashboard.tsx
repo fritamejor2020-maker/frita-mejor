@@ -503,7 +503,9 @@ export const VendedorDashboard = () => {
   };
 
   const activeOrdersCount = (pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
-  const chatUnreadCount = useChatStore(state => state.getUnreadCount(trackingId));
+  const chatMessages = useChatStore(state => state.messages);
+  const getUnreadCount = useChatStore(state => state.getUnreadCount);
+  const chatUnreadCount = getUnreadCount(pointId || trackingId);
 
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },

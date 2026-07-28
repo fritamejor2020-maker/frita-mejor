@@ -174,6 +174,10 @@ export const DejadorDashboard = () => {
   // 🔊 Sonido global de radio — funciona en TODAS las pestañas, no solo en Chat
   useChatSoundNotifier('DEJADOR');
 
+  // 💬 Estado reactivo del chat para actualizar contadores instantáneamente
+  const chatMessages = useChatStore(state => state.messages);
+  const getUnreadCount = useChatStore(state => state.getUnreadCount);
+
   // ─── Alarm state ───
   const [isAlertPlaying, setIsAlertPlaying] = useState(false);
   const [newOrderCount, setNewOrderCount] = useState(0);
@@ -714,7 +718,7 @@ export const DejadorDashboard = () => {
 
           {/* ─── TABS ─── */}
           {(() => {
-            const unreadTotalChat = useChatStore.getState().getUnreadCount('DEJADOR');
+            const unreadTotalChat = getUnreadCount('DEJADOR');
             return (
               <div className="bg-amber-100/50 rounded-2xl p-1 mt-5 flex max-w-2xl">
                 {[
@@ -1263,7 +1267,7 @@ export const DejadorDashboard = () => {
           <div className="space-y-4">
             <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
               {(() => {
-                const unreadGeneral = useChatStore.getState().getUnreadCount('DEJADOR', 'ALL');
+                const unreadGeneral = getUnreadCount('DEJADOR', 'ALL');
                 return (
                   <button
                     onClick={() => setSelectedVehicle('ALL')}
@@ -1283,7 +1287,7 @@ export const DejadorDashboard = () => {
               {vehicles.map((v: string) => {
                 const vendorName = vehicleVendorMap[v] || v;
                 const isSelected = selectedVehicle === v;
-                const unreadCount = useChatStore.getState().getUnreadCount('DEJADOR', v);
+                const unreadCount = getUnreadCount('DEJADOR', v);
                 return (
                   <button
                     key={v}

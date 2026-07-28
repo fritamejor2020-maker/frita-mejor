@@ -5,17 +5,13 @@ import {
 } from 'lucide-react';
 import { useChatStore } from '../../store/useChatStore';
 import { resumeAudioContext } from '../../hooks/useChatSoundNotifier';
-import { supabase } from '../../lib/supabase';
 
 /**
  * Módulo de Chat / Radio Intercomunicador Integrado
  * Rediseñado con la línea gráfica cálida, limpia y moderna de Frita Mejor.
  *
- * Características:
- *  - Mensajes de Texto y Fotos comprimidas
- *  - Notas de voz
- *  - Intercomunicador de Voz en vivo durante llamadas conectadas
- *  - Contadores de no leídos en tiempo real
+ * Mantiene la llamada activa y estable en tiempo real, registrando la duración
+ * y permitiendo notas de voz rápidas de radio y mensajes en vivo.
  */
 
 export const IntercomChatModule = ({
@@ -53,81 +49,7 @@ export const IntercomChatModule = ({
   const galleryInputRef = useRef(null);
   const callTimerRef = useRef(null);
 
-  // Referencias para transmisión de voz en vivo durante la llamada
-  const callMediaRecorderRef = useRef(null);
-
-  // ─── Transmisión de voz en tiempo real durante llamada conectada ─────────
-  useEffect(() => {
-    let callChannel = null;
-
-    if (activeCall && activeCall.status === 'connected') {
-      // 1. Suscribirse a trozos de voz en vivo transmitidos por el interlocutor
-      callChannel = supabase.channel('public_chat_channel')
-        .on('broadcast', { event: 'live_voice_stream' }, ({ payload }) => {
-          if (payload && payload.senderId !== currentUserId && payload.audioUrl) {
-            try {
-              resumeAudioContext();
-              const voiceChunk = new Audio(payload.audioUrl);
-              voiceChunk.play().catch(() => {});
-            } catch (e) {
-              console.warn('Voice chunk play error:', e);
-            }
-          }
-        })
-        .subscribe();
-
-      // 2. Iniciar transmisión continua del micrófono (trozos de 1.2 segundos)
-      navigator.mediaDevices?.getUserMedia({ audio: true })
-        .then(stream => {
-          const rec = new MediaRecorder(stream);
-          callMediaRecorderRef.current = rec;
-
-          rec.ondataavailable = async (e) => {
-            if (e.data && e.data.size > 0) {
-              const reader = new FileReader();
-              reader.onloadend = () => {
-                const base64Audio = reader.result;
-                callChannel?.send({
-                  type: 'broadcast',
-                  event: 'live_voice_stream',
-                  payload: {
-                    senderId: currentUserId,
-                    audioUrl: base64Audio,
-                  },
-                }).catch(() => {});
-              };
-              reader.readAsDataURL(e.data);
-            }
-          };
-
-          rec.start(1200); // emitir trozo cada 1.2 segundos
-        })
-        .catch(err => {
-          console.warn('No se pudo acceder al micrófono para transmisión en vivo:', err);
-        });
-    } else {
-      // Si la llamada no está conectada, detener transmisión
-      if (callMediaRecorderRef.current) {
-        try {
-          callMediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
-          callMediaRecorderRef.current.stop();
-        } catch (_) {}
-        callMediaRecorderRef.current = null;
-      }
-    }
-
-    return () => {
-      if (callMediaRecorderRef.current) {
-        try {
-          callMediaRecorderRef.current.stream?.getTracks().forEach(t => t.stop());
-          callMediaRecorderRef.current.stop();
-        } catch (_) {}
-        callMediaRecorderRef.current = null;
-      }
-    };
-  }, [activeCall?.status, activeCall?.id, currentUserId]);
-
-  // ─── Timer de duración de llamada conectada ─────────────────────────────
+  // ─── Timer continuo de llamada en curso (estable sin desconexión) ─────────
   useEffect(() => {
     if (activeCall && activeCall.status === 'connected') {
       setCallDuration(0);
@@ -157,7 +79,7 @@ export const IntercomChatModule = ({
 
   const conversation = getConversation(currentUserId, targetUserId, shiftId);
 
-  // Auto-scroll al último mensaje y marcar leídos
+  // Auto-scroll al último mensaje y marcar leídos al tener el componente abierto
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     markAsRead(targetUserId, currentUserId);
@@ -305,7 +227,7 @@ export const IntercomChatModule = ({
     return `${m}:${sec.toString().padStart(2, '0')}`;
   };
 
-  // Determinar si soy el emisor o receptor de la llamada activa
+  // Soy emisor de la llamada
   const isCaller = activeCall?.callerId === currentUserId;
 
   return (
@@ -376,7 +298,7 @@ export const IntercomChatModule = ({
               <p className="text-[10px] font-bold opacity-80 uppercase tracking-wider">
                 {activeCall.status === 'ringing'
                   ? 'Timbrando...'
-                  : `Intercom Activo — ${formatCallTime(callDuration)}`
+                  : `En curso — ${formatCallTime(callDuration)}`
                 }
               </p>
             </div>
