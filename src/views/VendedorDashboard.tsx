@@ -606,60 +606,49 @@ export const VendedorDashboard = () => {
         </div>
       )}
 
-      {/* HEADER */}
-      <div className={`w-full bg-white shadow-sm relative z-10 ${
-        activeTab === 'chat' ? 'rounded-b-2xl' : 'rounded-b-[40px]'
-      }`}>
-        <div className={`max-w-7xl mx-auto px-4 sm:px-6 relative ${
-          activeTab === 'chat' ? 'pt-2.5 pb-2' : 'pt-5 sm:pt-8 pb-4 sm:pb-6'
-        }`}>
-          <div className="pr-14">
-            <h1 className={`font-black text-gray-900 tracking-tight leading-tight ${
-              activeTab === 'chat' ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'
-            }`}>{getHeaderTitle()}</h1>
-            {activeTab !== 'chat' && (
-              <p className="text-xs sm:text-sm font-bold text-gray-400 mt-1">{formattedDate}</p>
+      {/* HEADER ULTRA COMPACTO */}
+      <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-2 pb-2 relative">
+          <div className="pr-12 flex items-center gap-2 flex-wrap">
+            <h1 className="text-base sm:text-xl font-black text-gray-900 tracking-tight leading-tight">
+              {getHeaderTitle()}
+            </h1>
+            {(shift || pointId || responsibleName) && (
+              <div className="flex flex-wrap items-center gap-1">
+                {pointId && <span className="bg-amber-400 text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-wider">{pointId}</span>}
+                {shift && <span className="bg-[#FF4040] text-white font-black text-[9px] px-2 py-0.5 rounded-full tracking-wider">{shift}</span>}
+                {responsibleName && <span className="bg-gray-900 text-white font-bold text-[9px] px-2 py-0.5 rounded-full">👤 {responsibleName.split(' ')[0]}</span>}
+                {/* Indicador GPS */}
+                {gpsStatus === 'active' && (
+                  <span className="flex items-center gap-1 bg-green-100 text-green-700 font-bold text-[9px] px-2 py-0.5 rounded-full">
+                    <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 2s infinite' }} />
+                    GPS
+                  </span>
+                )}
+                {gpsStatus === 'requesting' && (
+                  <span className="flex items-center gap-1 bg-yellow-100 text-yellow-700 font-bold text-[9px] px-2 py-0.5 rounded-full">
+                    📍 Solicitando...
+                  </span>
+                )}
+                {gpsStatus === 'denied' && (
+                  <button onClick={gpsRetry} className="flex items-center gap-1 bg-red-100 text-red-600 font-bold text-[9px] px-2 py-0.5 rounded-full active:scale-95">
+                    ⚠️ GPS
+                  </button>
+                )}
+              </div>
             )}
           </div>
 
           {/* Botón salir */}
-          <div className={`absolute right-4 ${activeTab === 'chat' ? 'top-2.5' : 'top-5 sm:top-8'}`}>
+          <div className="absolute top-2 right-3">
             <button
                onClick={() => signOut()}
                title="Salir (el turno sigue activo)"
-               className={`bg-white border-2 border-red-50 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95 ${
-                 activeTab === 'chat' ? 'w-8 h-8' : 'w-10 h-10'
-               }`}
+               className="w-8 h-8 bg-white border border-red-100 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95"
             >
-              <LogOut size={activeTab === 'chat' ? 15 : 18} strokeWidth={2.5} className="ml-0.5" />
+              <LogOut size={14} strokeWidth={2.5} className="ml-0.5" />
             </button>
           </div>
-
-          {/* Turno + punto + nombre badge */}
-          {(shift || pointId || responsibleName) && (
-            <div className={`flex flex-wrap items-center gap-1.5 ${activeTab === 'chat' ? 'mt-1' : 'mt-2'}`}>
-              {pointId && <span className="bg-amber-400 text-white font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full tracking-widest">{pointId}</span>}
-              {shift && <span className="bg-[#FF4040] text-white font-black text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full tracking-widest">{shift}</span>}
-              {responsibleName && <span className="bg-gray-900 text-white font-bold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full">👤 {responsibleName.split(' ')[0]}</span>}
-              {/* Indicador GPS */}
-              {gpsStatus === 'active' && (
-                <span className="flex items-center gap-1 bg-green-100 text-green-700 font-bold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full">
-                  <span style={{ width: 5, height: 5, borderRadius: '50%', background: '#22c55e', display: 'inline-block', animation: 'pulse 2s infinite' }} />
-                  GPS activo
-                </span>
-              )}
-              {gpsStatus === 'requesting' && (
-                <span className="flex items-center gap-1 bg-yellow-100 text-yellow-700 font-bold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full">
-                  📍 Solicitando GPS...
-                </span>
-              )}
-              {gpsStatus === 'denied' && (
-                <button onClick={gpsRetry} className="flex items-center gap-1 bg-red-100 text-red-600 font-bold text-[10px] sm:text-xs px-2.5 py-0.5 rounded-full active:scale-95">
-                  ⚠️ GPS denegado — toca para reintentar
-                </button>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

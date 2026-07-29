@@ -681,63 +681,51 @@ export const DejadorDashboard = () => {
       {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
       <ActiveCallBanner currentUserId="DEJADOR" />
       
-      {/* ─── HEADER ─── */}
-      <div className={`w-full bg-white shadow-sm relative z-10 ${
-        activeTab === 'chat' ? 'rounded-b-2xl' : 'rounded-b-[40px]'
-      }`}>
-        <div className={`max-w-7xl mx-auto px-4 sm:px-6 ${
-          activeTab === 'chat' ? 'pt-2.5 pb-2' : 'pt-5 sm:pt-8 pb-4 sm:pb-6'
-        }`}>
+      {/* ─── HEADER ULTRA COMPACTO ─── */}
+      <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl">
+        <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-2 pb-2">
 
-          {/* Top row: title + CERRAR JORNADA */}
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h1 className={`font-black text-gray-900 leading-tight ${
-                activeTab === 'chat' ? 'text-lg sm:text-2xl' : 'text-2xl sm:text-4xl'
-              }`}>{getHeaderTitle()}</h1>
-              {activeTab !== 'chat' && (
-                <p className="text-xs sm:text-sm font-bold text-gray-500 mt-1">Logística y Control</p>
+          {/* Top row: title + session info + CERRAR JORNADA */}
+          <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-xl font-black text-gray-900 leading-tight">
+                {getHeaderTitle()}
+              </h1>
+              {isSetupComplete && (
+                <div className="flex items-center gap-1.5">
+                  <span className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider">
+                    {shift}
+                  </span>
+                  {anotadorName && (
+                    <span className="hidden md:flex items-center gap-1 bg-gray-100 text-gray-600 text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      📋 {anotadorName}
+                    </span>
+                  )}
+                  {dejadorName && (
+                    <span className="flex items-center gap-1 bg-gray-900 text-white text-[9px] font-bold px-2 py-0.5 rounded-full">
+                      🛵 {dejadorName}
+                    </span>
+                  )}
+                </div>
               )}
             </div>
+
             <div className="flex items-center gap-2 shrink-0">
               <button
                 onClick={handleEndShift}
-                className={`flex items-center gap-1.5 bg-[#FF4040] text-white font-black rounded-full shadow-md hover:bg-red-600 transition-all active:scale-95 ${
-                  activeTab === 'chat' ? 'text-xs px-3 py-1.5' : 'text-xs sm:text-sm px-4 py-2.5'
-                }`}
+                className="flex items-center gap-1 bg-[#FF4040] text-white font-black text-[11px] sm:text-xs px-3 py-1.5 rounded-full shadow-sm hover:bg-red-600 transition-all active:scale-95"
               >
-                <LogOut size={14} strokeWidth={2.5} />
-                <span className={activeTab === 'chat' ? 'hidden sm:inline' : ''}>CERRAR JORNADA</span>
+                <LogOut size={13} strokeWidth={2.5} />
+                <span>CERRAR JORNADA</span>
               </button>
             </div>
           </div>
 
-          {/* Session badges: turno · anotador · dejador */}
-          {isSetupComplete && (
-            <div className={`flex items-center gap-2 flex-wrap ${activeTab === 'chat' ? 'mt-1' : 'mt-3'}`}>
-              <span className="bg-amber-500 text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest">
-                {shift}
-              </span>
-              {anotadorName && (
-                <span className="flex items-center gap-1 bg-gray-100 text-gray-600 text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                  📋 {anotadorName}
-                </span>
-              )}
-              {dejadorName && (
-                <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                  🛵 {dejadorName}
-                </span>
-              )}
-            </div>
-          )}
-
-          {/* ─── TABS ─── */}
+          {/* ─── TABS COMPACTAS ─── */}
           {(() => {
             const unreadTotalChat = getUnreadCount('DEJADOR');
             return (
-              <div className={`bg-amber-100/50 rounded-2xl p-1 flex max-w-2xl ${
-                activeTab === 'chat' ? 'mt-2' : 'mt-5'
-              }`}>
+              <div className="bg-amber-100/50 rounded-xl p-0.5 mt-1.5 flex max-w-2xl">
                 {[
                   { id: 'carga', label: 'Surtir' },
                   { id: 'surtir', label: 'Pedidos' },
@@ -752,15 +740,13 @@ export const DejadorDashboard = () => {
                       setLoadQuantities({});
                       setActivePreset(null);
                     }}
-                    className={`flex-1 rounded-xl text-xs sm:text-sm font-bold transition-all duration-300 relative flex items-center justify-center gap-1 ${
-                      activeTab === 'chat' ? 'py-1.5 px-1.5' : 'py-3 px-2'
-                    } ${
-                      activeTab === tab.id ? getThemeClass('activePill') : 'text-gray-500 hover:text-gray-800'
+                    className={`flex-1 py-1.5 px-1.5 rounded-lg text-xs font-bold transition-all duration-200 relative flex items-center justify-center gap-1 ${
+                      activeTab === tab.id ? getThemeClass('activePill') : 'text-gray-600 hover:text-gray-900'
                     }`}
                   >
                     <span>{tab.label}</span>
                     {!!tab.badge && tab.badge > 0 && (
-                      <span className="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.5 rounded-full animate-bounce shadow-sm">
+                      <span className="bg-red-600 text-white font-black text-[10px] px-1.5 py-0.2 rounded-full animate-bounce shadow-sm">
                         {tab.badge}
                       </span>
                     )}
@@ -774,7 +760,7 @@ export const DejadorDashboard = () => {
 
       {/* ─── CONTENT AREA ─── */}
       <div className={`w-full max-w-7xl mx-auto px-2 sm:px-6 animate-fade-in ${
-        activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-2 sm:my-3' : 'mt-8'
+        activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-1.5 sm:my-2' : 'mt-3 sm:mt-4'
       }`}>
         
         {/* ─── VEHICLE SELECTOR & PRESETS (Shown in Carga & Recibir) ─── */}
