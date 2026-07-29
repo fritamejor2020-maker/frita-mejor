@@ -712,10 +712,25 @@ export const AdminFinancesTab = ({
             const samePoint = String(t.pointId || '').trim().toLowerCase() === String(s.pointId || s._raw?.pointId || '').trim().toLowerCase();
             if (!samePoint) return false;
             if (sOpenedAt && t.shiftOpenedAt && String(t.shiftOpenedAt) === String(sOpenedAt)) return true;
-            return inWindow(t.createdAt);
+            if (inWindow(t.createdAt)) return true;
+            const tDate = t.createdAt ? new Date(t.createdAt).toISOString().split('T')[0] : null;
+            return tDate === shiftDate;
           });
           if (matched.length > 0) return matched;
-          return s.shiftTransfers || s._raw?.shiftTransfers || [];
+          const rawTransfers = s.shiftTransfers || s._raw?.shiftTransfers || [];
+          if (rawTransfers.length > 0) return rawTransfers;
+
+          // Respaldo retroactivo: si el cierre guardó monto de transferencia pero fue antes de sincronizar la lista de fotos
+          if ((s.transferAmount || 0) > 0) {
+            return [{
+              id: `legacy-${s.id}`,
+              amount: s.transferAmount,
+              note: 'Transferencia declarada en el cierre de turno',
+              createdAt: s.closedAt || s._raw?.closedAt || new Date().toISOString()
+            }];
+          }
+
+          return [];
         })()
       };
    });
