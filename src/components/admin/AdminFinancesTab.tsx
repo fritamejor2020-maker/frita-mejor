@@ -1608,33 +1608,44 @@ export const AdminFinancesTab = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {transfersModal.transfers.map((t: any, i: number) => (
-                    <div key={t.id || i} className="border border-gray-100 rounded-2xl p-4 flex gap-4 bg-gray-50/50">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Monto Transferido</p>
-                        <p className="text-lg font-black text-gray-800 mb-2">{fmt(t.amount)}</p>
-                        {t.note && (
-                          <p className="text-xs font-bold text-gray-500 bg-white border border-gray-100 p-2 rounded-lg truncate">
-                            {t.note}
+                  {transfersModal.transfers.map((t: any, i: number) => {
+                    const imgUrl = t.photoBase64 || t.photo || t.imageUrl || t.photoUrl || t.comprobanteUrl || t.comprobante;
+                    return (
+                      <div key={t.id || i} className="border border-gray-200/80 rounded-2xl p-4 flex items-center justify-between gap-3 bg-gray-50/60 shadow-sm">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Monto Transferido</p>
+                          <p className="text-xl font-black text-gray-900 mb-1">{fmt(t.amount)}</p>
+                          {t.note && (
+                            <p className="text-xs font-bold text-gray-600 bg-white border border-gray-200/60 p-2 rounded-xl mt-1 break-words">
+                              📝 {t.note}
+                            </p>
+                          )}
+                          <p className="text-[11px] font-bold text-gray-400 mt-2">
+                            🕒 {t.createdAt ? new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : 'Hora no disponible'}
                           </p>
-                        )}
-                        <p className="text-[10px] font-bold text-gray-400 mt-2">
-                          Hora: {new Date(t.createdAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                      {t.photoBase64 && (
-                        <button 
-                          onClick={() => setFullscreenPhoto(t.photoBase64)}
-                          className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 border-2 border-gray-200 hover:border-blue-400 transition-colors relative group"
-                        >
-                          <img src={t.photoBase64} alt="Comprobante" className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                        </div>
+
+                        {imgUrl ? (
+                          <button 
+                            onClick={() => setFullscreenPhoto(imgUrl)}
+                            className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-blue-400 hover:border-blue-600 shadow-md transition-all relative group cursor-pointer"
+                            title="Toca para ver la foto completa"
+                          >
+                            <img src={imgUrl} alt="Comprobante" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-black gap-1">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                              <span>Ver Grande</span>
+                            </div>
+                          </button>
+                        ) : (
+                          <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 text-center p-2 shrink-0">
+                            <span className="text-xl">🖼️</span>
+                            <span className="text-[9px] font-bold mt-1 leading-none">Sin foto</span>
                           </div>
-                        </button>
-                      )}
-                    </div>
-                  ))}
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </div>
