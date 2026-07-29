@@ -7,8 +7,8 @@ import { useChatStore } from '../store/useChatStore';
  * Se monta a nivel raíz en los Dashboards (fuera de tabs) para:
  *  1. Desbloquear AudioContext automáticamente al primer toque/clic
  *  2. Reproducir bip de radio al recibir mensajes nuevos
- *  3. Reproducir el MISMO bip de radio repetidamente durante llamadas entrantes
- *  4. Funcionar SIEMPRE, sin importar la pestaña activa
+ *  3. Reproducir el timbre de llamada entrante SOLO en el celular receptor
+ *  4. Reproducir tono suave de salida en el celular llamador
  */
 
 let _audioCtx = null;
@@ -79,13 +79,41 @@ export function playRadioChime() {
 }
 
 /**
- * Repite el MISMO sonido de radio (playRadioChime) continuamente durante una llamada entrante
+ * Tono suave de salida para quien HACE la llamada (esperando respuesta)
  */
+export function playOutgoingTone() {
+  try {
+    const ctx = getAudioCtx();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const g = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.value = 440;
+    g.gain.setValueAtTime(0.15, now);
+    g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+    osc.connect(g).connect(ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.3);
+  } catch (_) {}
+}
+
 function startRepeatingRadioChime() {
   playRadioChime();
   const intervalId = setInterval(() => {
     playRadioChime();
   }, 1200);
+
+  return function stop() {
+    clearInterval(intervalId);
+  };
+}
+
+function startRepeatingOutgoingTone() {
+  playOutgoingTone();
+  const intervalId = setInterval(() => {
+    playOutgoingTone();
+  }, 2500);
 
   return function stop() {
     clearInterval(intervalId);
@@ -107,7 +135,7 @@ export function useChatSoundNotifier(currentUserId) {
     if (!currentUserId || !messages) return;
 
     if (prevMsgCountRef.current > 0 && messages.length > prevMsgCountRef.current) {
-      const latestMsg = messages[0]; // Mensajes ordenados más reciente primero
+      const latestMsg = messages[0];
       if (latestMsg && latestMsg.senderId !== currentUserId) {
         playRadioChime();
       }
@@ -115,18 +143,32 @@ export function useChatSoundNotifier(currentUserId) {
     prevMsgCountRef.current = messages.length;
   }, [messages, currentUserId]);
 
-  // 📞 Repetir el MISMO sonido de radio walkie-talkie durante llamadas (timbre para ambos lados)
+  // 📞 Timbres diferenciados para Receptor (Llamada Entrante) vs Llamador (Salida)
   useEffect(() => {
-    const isRinging = activeCall && activeCall.status === 'ringing';
-
-    if (isRinging) {
-      if (!ringtoneStopRef.current) {
-        ringtoneStopRef.current = startRepeatingRadioChime();
-      }
-    } else {
+    if (!activeCall || activeCall.status !== 'ringing') {
       if (ringtoneStopRef.current) {
         ringtoneStopRef.current();
         ringtoneStopRef.current = null;
+      }
+      return;
+    }
+
+    const myId = String(currentUserId || '').toLowerCase();
+    const callerId = String(activeCall.callerId || '').toLowerCase();
+    const receiverId = String(activeCall.receiverId || '').toLowerCase();
+
+    const isCaller = callerId === myId || (myId === 'dejador' && (callerId === 'dejador' || callerId === 'logistica'));
+    const isReceiver = receiverId === myId || (myId === 'dejador' && (receiverId === 'dejador' || receiverId === 'logistica')) || receiverId === 'all';
+
+    if (isReceiver && !isCaller) {
+      // 🔔 RECEPTOR: Timbre de llamada entrante fuerte y continuo
+      if (!ringtoneStopRef.current) {
+        ringtoneStopRef.current = startRepeatingRadioChime();
+      }
+    } else if (isCaller) {
+      // 📞 LLAMADOR: Tono suave de salida (esperando respuesta)
+      if (!ringtoneStopRef.current) {
+        ringtoneStopRef.current = startRepeatingOutgoingTone();
       }
     }
 
@@ -136,5 +178,5 @@ export function useChatSoundNotifier(currentUserId) {
         ringtoneStopRef.current = null;
       }
     };
-  }, [activeCall?.status, activeCall?.id]);
+  }, [activeCall?.status, activeCall?.id, activeCall?.callerId, activeCall?.receiverId, currentUserId]);
 }
