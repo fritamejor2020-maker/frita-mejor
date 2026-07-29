@@ -705,11 +705,20 @@ export const AdminFinancesTab = ({
         transferAmount: s.transferAmount || 0,
         expenses,
         details,
-        shiftTransfers: s.type === 'VENDEDOR' 
-          ? vendorTransfers.filter((t: any) => t.pointId === s.pointId && inWindow(t.createdAt))
-          : []
-     };
-  });
+        shiftTransfers: (() => {
+          if (s.type !== 'VENDEDOR') return [];
+          const sOpenedAt = s.openedAt || s._raw?.openedAt;
+          const matched = (vendorTransfers || []).filter((t: any) => {
+            const samePoint = String(t.pointId || '').trim().toLowerCase() === String(s.pointId || s._raw?.pointId || '').trim().toLowerCase();
+            if (!samePoint) return false;
+            if (sOpenedAt && t.shiftOpenedAt && String(t.shiftOpenedAt) === String(sOpenedAt)) return true;
+            return inWindow(t.createdAt);
+          });
+          if (matched.length > 0) return matched;
+          return s.shiftTransfers || s._raw?.shiftTransfers || [];
+        })()
+      };
+   });
 
   // Deduplicar: si hay 2 registros cerrados para el mismo vehículo+turno+fecha,
   // quedarse con el más completo (con datos reales) o el más reciente.
