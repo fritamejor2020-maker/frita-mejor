@@ -23,10 +23,10 @@ const ICE_SERVERS = {
 };
 
 /**
- * Hook de Audio de Voz en Vivo WebRTC Full-Duplex (Llamada Telefónica Real)
+ * Hook de Audio de Voz en Vivo WebRTC Full-Duplex BIDIRECCIONAL (Llamada Telefónica Real)
  * ─────────────────────────────────────────────────────────────────────────────
- * Establece conexión P2P bidireccional continua de audio con cola de candidatos ICE
- * y reintento de señales SDP para garantizar audio en vivo continuo de alta calidad.
+ * Garantiza captura de micrófono local previa a la generación de SDP offer/answer
+ * para que el audio fluya en ambas direcciones (bidireccional) sin silencios.
  */
 export function useWebRTCCall(currentUserId, domAudioRef) {
   const activeCall = useChatStore((state) => state.activeCall);
@@ -34,6 +34,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
   const localStreamRef = useRef(null);
   const pendingCandidatesRef = useRef([]);
   const offerIntervalRef = useRef(null);
+  const isInitializingRef = useRef(false);
 
   useEffect(() => {
     if (!currentUserId || typeof window === 'undefined') return;
@@ -64,6 +65,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
         } catch (_) {}
       }
       pendingCandidatesRef.current = [];
+      isInitializingRef.current = false;
     };
 
     if (!activeCall || activeCall.status === 'ended') {
@@ -101,15 +103,32 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
       }
     };
 
-    // Inicializar WebRTC PeerConnection
+    // Inicializar WebRTC PeerConnection con micrófono bidireccional
     const initPeer = async () => {
-      if (pcRef.current) return;
+      if (pcRef.current || isInitializingRef.current) return;
+      isInitializingRef.current = true;
 
       try {
+        // 1. Obtener micrófono local PRIMERO para garantizar pista de salida bidireccional
+        let stream = null;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+              echoCancellation: true,
+              noiseSuppression: true,
+              autoGainControl: true,
+            },
+            video: false,
+          });
+          localStreamRef.current = stream;
+        } catch (err) {
+          console.warn('[WebRTC] Mic access error:', err);
+        }
+
+        // 2. Crear PeerConnection y conectar elemento <audio> del DOM
         const pc = new RTCPeerConnection(ICE_SERVERS);
         pcRef.current = pc;
 
-        // Reproducir flujo remoto en vivo de audio en el elemento <audio> del DOM
         pc.ontrack = (event) => {
           if (event.streams && event.streams[0] && domAudioRef?.current) {
             const audioEl = domAudioRef.current;
@@ -128,23 +147,12 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           }
         };
 
-        // Capturar micrófono local full-duplex HD
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-            },
-            video: false,
-          });
-          localStreamRef.current = stream;
+        // 3. Adjuntar pistas del micrófono local a la conexión peer
+        if (stream) {
           stream.getTracks().forEach((track) => pc.addTrack(track, stream));
-        } catch (err) {
-          console.warn('[WebRTC] Mic access error:', err);
         }
 
-        // Si soy el llamador y la llamada se conectó, crear la oferta SDP y reintentar la transmisión
+        // 4. Si soy el llamador y la llamada está conectada, crear oferta SDP bidireccional
         if (isCaller && activeCall.status === 'connected') {
           const offer = await pc.createOffer({ offerToReceiveAudio: true });
           await pc.setLocalDescription(offer);
@@ -165,6 +173,8 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
         }
       } catch (err) {
         console.warn('[WebRTC] initPeer error:', err);
+      } finally {
+        isInitializingRef.current = false;
       }
     };
 
@@ -173,12 +183,20 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
       .on('broadcast', { event: 'webrtc_offer' }, async ({ payload }) => {
         if (!payload || payload.callId !== activeCall.id || payload.fromUserId === currentUserId) return;
         try {
-          if (!pcRef.current) await initPeer();
+          if (!pcRef.current) {
+            await initPeer();
+          }
           const pc = pcRef.current;
           if (pc && pc.signalingState !== 'closed') {
             await pc.setRemoteDescription(new RTCSessionDescription(payload.offer));
             await processPendingCandidates();
-            const answer = await pc.createAnswer();
+
+            // Garantizar que las pistas locales estén agregadas antes de responder
+            if (localStreamRef.current && pc.getSenders().length === 0) {
+              localStreamRef.current.getTracks().forEach((track) => pc.addTrack(track, localStreamRef.current));
+            }
+
+            const answer = await pc.createAnswer({ offerToReceiveAudio: true });
             await pc.setLocalDescription(answer);
             channel.send({
               type: 'broadcast',
