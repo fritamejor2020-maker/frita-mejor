@@ -673,7 +673,9 @@ export const DejadorDashboard = () => {
 
   return (
     <div
-      className="min-h-screen pb-32 font-sans w-full bg-[#FFD56B] flex flex-col"
+      className={`font-sans w-full bg-[#FFD56B] flex flex-col ${
+        activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden pb-0' : 'min-h-screen pb-32'
+      }`}
       onPointerDown={isAlertPlaying ? handleStopAlert : undefined}
     >
       {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
@@ -757,7 +759,9 @@ export const DejadorDashboard = () => {
       </div>
 
       {/* ─── CONTENT AREA ─── */}
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 mt-8 animate-fade-in">
+      <div className={`w-full max-w-7xl mx-auto px-2 sm:px-6 animate-fade-in ${
+        activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-2 sm:my-3' : 'mt-8'
+      }`}>
         
         {/* ─── VEHICLE SELECTOR & PRESETS (Shown in Carga & Recibir) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
@@ -1267,8 +1271,8 @@ export const DejadorDashboard = () => {
 
         {/* ─── CHAT / RADIO LOGÍSTICA ─── */}
         {activeTab === 'chat' && (
-          <div className="space-y-4">
-            <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-2 h-full">
+            <div className="flex gap-2 overflow-x-auto pb-1 shrink-0 no-scrollbar">
               {(() => {
                 const unreadGeneral = getUnreadCount('DEJADOR', 'ALL');
                 return (
@@ -1311,7 +1315,7 @@ export const DejadorDashboard = () => {
               })}
             </div>
 
-            <div className="h-[600px] max-w-3xl mx-auto">
+            <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto flex flex-col overflow-hidden">
               <IntercomChatModule
                 currentUserId="DEJADOR"
                 currentUserName={dejadorName || 'Dejador Logística'}

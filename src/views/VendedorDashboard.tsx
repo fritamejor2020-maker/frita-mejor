@@ -531,7 +531,14 @@ export const VendedorDashboard = () => {
   const formattedDate = currentDate.charAt(0).toUpperCase() + currentDate.slice(1);
 
   return (
-    <div className="min-h-screen bg-[#FFD56B] font-sans w-full flex flex-col" style={{ paddingBottom: activeTab === 'pos' ? '240px' : '160px' }}>
+    <div
+      className={`font-sans w-full bg-[#FFD56B] flex flex-col ${
+        activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden' : 'min-h-screen'
+      }`}
+      style={{
+        paddingBottom: activeTab === 'chat' ? '0px' : activeTab === 'pos' ? '240px' : '160px'
+      }}
+    >
       {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
       <ActiveCallBanner currentUserId={pointId || trackingId} />
       
@@ -646,7 +653,9 @@ export const VendedorDashboard = () => {
         </div>
       </div>
 
-      <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 mt-8">
+      <div className={`w-full max-w-7xl mx-auto px-2 sm:px-6 ${
+        activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-2 sm:my-3' : 'mt-8'
+      }`}>
         
         {/* BANNER DE PEDIDO ACTIVO (CAMINO AL CLIENTE) */}
         {activeDelivery && (
@@ -1481,7 +1490,7 @@ export const VendedorDashboard = () => {
 
         {/* SUBVISTA: CHAT / RADIO INTERCOM */}
         {activeTab === 'chat' && (
-          <div className="max-w-2xl mx-auto h-[600px] pb-16">
+          <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col w-full overflow-hidden pb-16 md:pb-2">
             <IntercomChatModule
               currentUserId={pointId || trackingId}
               currentUserName={`${pointId ? pointId + ' (' : ''}${responsibleName || trackingName}${pointId ? ')' : ''}`}

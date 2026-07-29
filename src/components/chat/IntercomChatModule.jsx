@@ -282,13 +282,13 @@ export const IntercomChatModule = ({
 
   return (
     <div
-      className={`flex flex-col h-full bg-white rounded-[32px] border-2 border-amber-100 overflow-hidden shadow-xl ${compactMode ? 'max-h-[500px]' : ''}`}
+      className={`flex flex-col h-full min-h-0 w-full bg-white rounded-2xl md:rounded-[32px] border-2 border-amber-100 overflow-hidden shadow-xl ${compactMode ? 'max-h-[500px]' : ''}`}
       onTouchStart={handleUserGesture}
       onClick={handleUserGesture}
     >
 
       {/* Header Estilo Frita Mejor */}
-      <div className="p-4 bg-gradient-to-r from-amber-500/10 to-amber-400/5 border-b border-amber-100 flex items-center justify-between">
+      <div className="p-3 sm:p-4 bg-gradient-to-r from-amber-500/10 to-amber-400/5 border-b border-amber-100 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[#FFB700] to-amber-500 text-gray-950 flex items-center justify-center font-black shadow-sm">
             💬
@@ -378,7 +378,7 @@ export const IntercomChatModule = ({
       )}
 
       {/* Cuerpo del Chat */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3 bg-[#FAF8F5]">
+      <div className="flex-1 min-h-0 p-3 sm:p-4 overflow-y-auto space-y-3 bg-[#FAF8F5]">
         {conversation.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-center p-6 my-auto">
             <div className="w-16 h-16 rounded-3xl bg-amber-100/70 border border-amber-200/60 flex items-center justify-center text-3xl mb-3 shadow-sm">
@@ -461,7 +461,7 @@ export const IntercomChatModule = ({
 
       {/* Preview de foto cargada */}
       {photoPreview && (
-        <div className="p-3 bg-amber-50 border-t border-amber-100 flex items-center justify-between">
+        <div className="p-3 bg-amber-50 border-t border-amber-100 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <img src={photoPreview} alt="Preview" className="w-12 h-12 rounded-xl object-cover border border-amber-200" />
             <span className="text-xs font-bold text-gray-700">Foto seleccionada</span>
@@ -474,7 +474,7 @@ export const IntercomChatModule = ({
 
       {/* Grabación en Curso */}
       {isRecording && (
-        <div className="p-3 bg-red-50 border-t border-red-200 flex items-center justify-between animate-pulse">
+        <div className="p-3 bg-red-50 border-t border-red-200 flex items-center justify-between animate-pulse shrink-0">
           <div className="flex items-center gap-2">
             <span className="w-3 h-3 rounded-full bg-red-500 animate-ping"></span>
             <span className="text-xs font-black text-red-700">Graba nota de voz: {recordingTime}s</span>
@@ -489,7 +489,7 @@ export const IntercomChatModule = ({
       )}
 
       {/* Footer de Entrada */}
-      <form onSubmit={handleSendText} className="p-3 bg-white border-t border-gray-100 flex items-center gap-2">
+      <form onSubmit={handleSendText} className="p-2.5 sm:p-3 bg-white border-t border-gray-100 flex items-center gap-2 shrink-0">
         <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handlePhotoSelect} />
         <input ref={galleryInputRef} type="file" accept="image/*" className="hidden" onChange={handlePhotoSelect} />
 
@@ -498,7 +498,7 @@ export const IntercomChatModule = ({
           type="button"
           onClick={() => cameraInputRef.current?.click()}
           disabled={isCompressingPhoto}
-          className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
+          className="p-2 sm:p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
           title="📸 Tomar Foto Cámara"
         >
           <Camera size={18} />
@@ -509,7 +509,7 @@ export const IntercomChatModule = ({
           type="button"
           onClick={() => galleryInputRef.current?.click()}
           disabled={isCompressingPhoto}
-          className="p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
+          className="p-2 sm:p-2.5 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-600 transition-colors active:scale-95 disabled:opacity-40"
           title="📁 Subir de Galería"
         >
           <ImageIcon size={18} />
@@ -520,8 +520,13 @@ export const IntercomChatModule = ({
           type="text"
           value={textInput}
           onChange={(e) => setTextInput(e.target.value)}
+          onFocus={() => {
+            setTimeout(() => {
+              messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+            }, 300);
+          }}
           placeholder="Escribe un mensaje o nota de voz..."
-          className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl py-2.5 px-4 text-xs font-bold text-gray-900 placeholder:text-gray-400 outline-none focus:border-amber-400 transition-colors"
+          className="flex-1 bg-gray-50 border border-gray-200 rounded-2xl py-2.5 px-3.5 text-xs font-bold text-gray-900 placeholder:text-gray-400 outline-none focus:border-amber-400 transition-colors"
         />
 
         {/* Botón Enviar o Micrófono */}
