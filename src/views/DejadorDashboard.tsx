@@ -1271,20 +1271,23 @@ export const DejadorDashboard = () => {
 
         {/* ─── CHAT / RADIO LOGÍSTICA ─── */}
         {activeTab === 'chat' && (
-          <div className="flex-1 min-h-0 flex flex-col overflow-hidden gap-2 h-full">
-            <div className="flex gap-2 overflow-x-auto pb-1 shrink-0 no-scrollbar">
+          <div className="flex-1 min-h-0 flex flex-col landscape:flex-row md:flex-row overflow-hidden gap-2 sm:gap-3 h-full">
+            {/* Selector de Vehículos / Canales (Fila en vertical, Barra lateral en horizontal) */}
+            <div className="flex flex-row landscape:flex-col md:flex-col gap-1.5 overflow-x-auto landscape:overflow-y-auto md:overflow-y-auto landscape:w-48 md:w-56 shrink-0 no-scrollbar p-1.5 bg-amber-200/40 rounded-2xl border border-amber-300/40">
               {(() => {
                 const unreadGeneral = getUnreadCount('DEJADOR', 'ALL');
                 return (
                   <button
                     onClick={() => setSelectedVehicle('ALL')}
-                    className={`px-4 py-2 rounded-2xl font-black text-xs transition-all flex items-center gap-1.5 ${
-                      selectedVehicle === 'ALL' ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
+                    className={`px-3 py-2 rounded-xl font-black text-xs transition-all flex items-center justify-between gap-1.5 text-left shrink-0 ${
+                      selectedVehicle === 'ALL'
+                        ? 'bg-[#FFB700] text-gray-950 shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-amber-50 border border-gray-200/80'
                     }`}
                   >
-                    <span>📻 Canal General (Todos)</span>
+                    <span className="truncate">📻 Canal General</span>
                     {unreadGeneral > 0 && (
-                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full shrink-0">
                         {unreadGeneral}
                       </span>
                     )}
@@ -1299,14 +1302,18 @@ export const DejadorDashboard = () => {
                   <button
                     key={v}
                     onClick={() => setSelectedVehicle(v)}
-                    className={`px-4 py-2 rounded-2xl font-black text-xs flex items-center gap-1.5 transition-all ${
-                      isSelected ? 'bg-[#FFB700] text-gray-950 shadow-sm' : 'bg-white text-gray-700 border border-gray-200'
+                    className={`px-3 py-2 rounded-xl font-black text-xs flex items-center justify-between gap-1.5 text-left transition-all shrink-0 ${
+                      isSelected
+                        ? 'bg-[#FFB700] text-gray-950 shadow-sm'
+                        : 'bg-white text-gray-700 hover:bg-amber-50 border border-gray-200/80'
                     }`}
                   >
-                    <span>{v}</span>
-                    <span className="opacity-75 font-normal">({vendorName.split(' ')[0]})</span>
+                    <div className="flex items-center gap-1 min-w-0 truncate">
+                      <span className="font-black">{v}</span>
+                      <span className="opacity-75 font-normal text-[11px] truncate">({vendorName.split(' ')[0]})</span>
+                    </div>
                     {unreadCount > 0 && (
-                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full shadow-sm animate-pulse">
+                      <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.2 rounded-full shadow-sm animate-pulse shrink-0">
                         {unreadCount}
                       </span>
                     )}
@@ -1315,7 +1322,7 @@ export const DejadorDashboard = () => {
               })}
             </div>
 
-            <div className="flex-1 min-h-0 w-full max-w-4xl mx-auto flex flex-col overflow-hidden">
+            <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col overflow-hidden">
               <IntercomChatModule
                 currentUserId="DEJADOR"
                 currentUserName={dejadorName || 'Dejador Logística'}
