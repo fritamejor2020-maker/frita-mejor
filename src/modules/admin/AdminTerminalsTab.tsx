@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { BiometricTerminal, useAttendanceStore } from '../../store/useAttendanceStore';
 import { useBranchStore } from '../../store/useBranchStore';
-import { Cpu, Plus, Trash2, Edit2, RefreshCw, Key, CheckCircle, AlertCircle, Building } from 'lucide-react';
+import { Cpu, Plus, Trash2, Edit2, RefreshCw, Key, CheckCircle, AlertCircle, Building, Users } from 'lucide-react';
+import { AdminEmployeeBiometricsModal } from './AdminEmployeeBiometricsModal';
 
 export function AdminTerminalsTab() {
   const { terminals, addTerminal, updateTerminal, deleteTerminal, syncTerminalEvents, fetchTerminalUsers } = useAttendanceStore();
@@ -18,6 +19,7 @@ export function AdminTerminalsTab() {
   const [password, setPassword] = useState('Control.1');
   const [syncStatusMsg, setSyncStatusMsg] = useState<string | null>(null);
   const [isTesting, setIsTesting] = useState(false);
+  const [showBioModal, setShowBioModal] = useState(false);
 
   const handleOpenModal = (term?: BiometricTerminal) => {
     if (term) {
@@ -89,13 +91,22 @@ export function AdminTerminalsTab() {
           </p>
         </div>
 
-        <button
-          onClick={() => handleOpenModal()}
-          className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
-        >
-          <Plus size={16} />
-          Agregar Biométrico
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowBioModal(true)}
+            className="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+          >
+            <Users size={16} />
+            Enrolar Personal & Claves
+          </button>
+          <button
+            onClick={() => handleOpenModal()}
+            className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-4 py-2.5 rounded-xl flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+          >
+            <Plus size={16} />
+            Agregar Biométrico
+          </button>
+        </div>
       </div>
 
       {syncStatusMsg && (
@@ -275,6 +286,10 @@ export function AdminTerminalsTab() {
             </div>
           </form>
         </div>
+      )}
+
+      {showBioModal && (
+        <AdminEmployeeBiometricsModal onClose={() => setShowBioModal(false)} />
       )}
     </div>
   );

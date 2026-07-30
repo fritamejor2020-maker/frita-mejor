@@ -4476,12 +4476,6 @@ export function AdminView() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          <Button
-            className="rounded-full font-bold text-xs sm:text-sm bg-amber-400 text-gray-950 hover:bg-amber-500 shadow-sm border-none"
-            onClick={() => setShowBiometricsModal(true)}
-          >
-            ⏱️ Enrolar Personal & Claves
-          </Button>
           <button
             onClick={() => navigate('/dashboard')}
             className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-gray-900 font-black text-sm px-4 py-2.5 rounded-full shadow-sm transition-all active:scale-95"
