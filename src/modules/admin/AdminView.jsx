@@ -9,6 +9,7 @@ import { useInventoryStore, INITIAL_ITEM_TYPES } from '../../store/useInventoryS
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { usePayrollStore } from '../../store/usePayrollStore';
+import { useVendorTransferStore } from '../../store/useVendorTransferStore';
 import { AdminFinancesTab, AdminIncomesTab, AdminExpensesTab, ResumenOperativoTab } from '../../components/admin/AdminFinancesTab';
 import { AdminIncomesExpensesTab } from '../../components/admin/AdminIncomesExpensesTab';
 import { AdminPricesTab } from '../../components/admin/AdminPricesTab';
@@ -1558,9 +1559,12 @@ function ReportsPanel() {
   
   const logLoadHistory = useLogisticsStore(s => s.loadHistory) || [];
   const logCompleted = useLogisticsStore(s => s.completedRequests) || [];
+  const vendorTransfers = useVendorTransferStore(s => s.transfers) || [];
 
   const [activeReport, setActiveReport] = useState('INVENTARIO');
   const [finSubtab, setFinSubtab] = useState('ingresos');
+  const [selectedReportPhoto, setSelectedReportPhoto] = useState(null);
+  const [selectedReportSale, setSelectedReportSale] = useState(null);
 
   // ─── Helpers ────────────────────────────────────────────────────
   const fmtMoney = (v) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(v || 0);
@@ -1610,9 +1614,20 @@ function ReportsPanel() {
   const buildSalesSheet = () => {
     return posSales.map((s) => ({
       Fecha: fmtDateTime(s.timestamp), Ticket: s.id?.replace('SALE-', '') || '—',
+      Cliente: s.customerName ? `${s.customerName}${s.customerDoc ? ' (' + s.customerDoc + ')' : ''}` : (s.clientName || s.client || 'Cliente General'),
       Estado: s.status === 'PAID' ? 'PAGADO' : 'SUSPENDIDA',
       'Método Pago': s.paymentMethod || '—', Descuento: s.discountAmount || 0,
-      Total: s.total || 0, Ítems: (s.items || []).map(i => `${i.name}x${i.qty}`).join(', ') || '—',
+      Total: s.total || 0,
+      Ítems: (s.items || []).map(i => `${i.qty || 1}x ${i.name} (${fmtMoney((i.price || 0) * (i.qty || 1))})`).join(' | ') || '—',
+    }));
+  };
+
+  const buildTransfersSheet = () => {
+    return vendorTransfers.map((t) => ({
+      Fecha: fmtDate(t.createdAt), Hora: fmtTime(t.createdAt),
+      Punto: t.pointId || '—', Vendedor: t.vendorName || '—',
+      Nota: t.note || '—', Monto: t.amount || 0,
+      'Foto Adjunta': (t.photoBase64 || t.photo || t.imageUrl) ? 'SÍ' : 'NO',
     }));
   };
 
@@ -1688,6 +1703,7 @@ function ReportsPanel() {
       const sheets = [
         { data: buildMovementsSheet(), name: 'Mov. Inventario' },
         { data: buildSalesSheet(), name: 'Ventas POS' },
+        { data: buildTransfersSheet(), name: 'Transferencias' },
         { data: buildShiftsSheet(), name: 'Turnos Caja' },
         { data: buildIncomesSheet(), name: 'Ingresos' },
         { data: buildExpensesSheet(), name: 'Egresos' },
@@ -1712,6 +1728,7 @@ function ReportsPanel() {
   const REPORT_TABS = [
     { id: 'INVENTARIO',   label: '📦 Inventario',   count: movements.length },
     { id: 'VENTAS_POS',   label: '💵 Ventas POS',   count: posSales.length },
+    { id: 'TRANSFERENCIAS', label: '📲 Transferencias', count: vendorTransfers.length },
     { id: 'TURNOS',       label: '💰 Turnos/Cierres', count: posShifts.length },
     { id: 'FINANZAS',     label: '📊 Finanzas',     count: finIncomes.length + finExpenses.length + posExpenses.length },
     { id: 'LOGISTICA',    label: '🚚 Logística',    count: logLoadHistory.length },
@@ -1842,26 +1859,111 @@ function ReportsPanel() {
                     <tr>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Fecha</th>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Ticket</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Cliente</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Ítems Comprados</th>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Estado</th>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Método</th>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Descuento</th>
                       <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Total</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase text-center">Detalle</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
-                    {posSales.slice(0, 50).map((sale) => (
-                      <tr key={sale.id} className="hover:bg-gray-50/50">
-                        <td className="py-3 px-4 font-bold text-gray-600">{fmtDateTime(sale.timestamp)}</td>
-                        <td className="py-3 px-4 font-bold text-chunky-dark">{sale.id?.replace('SALE-', '') || '—'}</td>
-                        <td className="py-3 px-4"><span className={`text-xs font-bold px-2 py-1 rounded-full ${sale.status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>{sale.status === 'PAID' ? 'PAGADO' : 'SUSPENDIDA'}</span></td>
-                        <td className="py-3 px-4 font-bold text-gray-600">{sale.paymentMethod || '—'}</td>
-                        <td className="py-3 px-4 text-orange-500 font-bold">{sale.discountAmount > 0 ? `-${fmtMoney(sale.discountAmount)}` : '—'}</td>
-                        <td className="py-3 px-4 text-right font-black text-chunky-dark">{fmtMoney(sale.total)}</td>
-                      </tr>
-                    ))}
+                    {posSales.slice(0, 50).map((sale) => {
+                      const clientLabel = sale.customerName ? `${sale.customerName}${sale.customerDoc ? ' (' + sale.customerDoc + ')' : ''}` : (sale.clientName || sale.client || 'Cliente General');
+                      const itemsSummary = (sale.items || []).map(i => `${i.qty || 1}x ${i.name}`).join(', ');
+                      return (
+                        <tr key={sale.id} className="hover:bg-gray-50/50">
+                          <td className="py-3 px-4 font-bold text-gray-600">{fmtDateTime(sale.timestamp)}</td>
+                          <td className="py-3 px-4 font-bold text-chunky-dark">{sale.id?.replace('SALE-', '') || '—'}</td>
+                          <td className="py-3 px-4 font-bold text-gray-700">{clientLabel}</td>
+                          <td className="py-3 px-4">
+                            <span className="text-xs font-bold text-gray-600 bg-gray-100 px-2.5 py-1 rounded-xl max-w-[200px] inline-block truncate" title={itemsSummary}>
+                              🛒 {itemsSummary || 'Sin ítems'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4"><span className={`text-xs font-bold px-2 py-1 rounded-full ${sale.status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>{sale.status === 'PAID' ? 'PAGADO' : 'SUSPENDIDA'}</span></td>
+                          <td className="py-3 px-4 font-bold text-gray-600">{sale.paymentMethod || '—'}</td>
+                          <td className="py-3 px-4 text-orange-500 font-bold">{sale.discountAmount > 0 ? `-${fmtMoney(sale.discountAmount)}` : '—'}</td>
+                          <td className="py-3 px-4 text-right font-black text-chunky-dark">{fmtMoney(sale.total)}</td>
+                          <td className="py-3 px-4 text-center">
+                            <button
+                              onClick={() => setSelectedReportSale(sale)}
+                              className="px-3 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs transition-all active:scale-95 cursor-pointer"
+                            >
+                              👁️ Ticket
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
                 {posSales.length > 50 && <p className="text-center text-xs text-gray-400 font-bold py-3">Mostrando 50 de {posSales.length}</p>}
+              </div>
+            )}
+          </div>
+        );
+      })()}
+
+      {/* ════════ TAB: TRANSFERENCIAS BANCARIAS ════════ */}
+      {activeReport === 'TRANSFERENCIAS' && (() => {
+        const totalTransf = vendorTransfers.reduce((acc, t) => acc + (t.amount || 0), 0);
+        const withPhotoCount = vendorTransfers.filter(t => t.photoBase64 || t.photo || t.imageUrl).length;
+        return (
+          <div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3 mb-5">
+              <Kpi icon="📲" label="Total Transferencias" value={vendorTransfers.length} color="bg-blue-50" />
+              <Kpi icon="💰" label="Monto Acumulado" value={fmtMoney(totalTransf)} color="bg-green-50" />
+              <Kpi icon="🖼️" label="Con Comprobante" value={withPhotoCount} color="bg-purple-50" />
+            </div>
+            <div className="flex justify-end mb-3">
+              <button className="bg-green-600 hover:bg-green-500 text-white font-bold text-xs px-4 py-2 rounded-full flex items-center gap-2 transition-all cursor-pointer" onClick={() => downloadSingleExcel(buildTransfersSheet(), 'Transferencias', 'Frita_Transferencias')}>
+                <DownloadIcon /> Excel Transferencias
+              </button>
+            </div>
+            {vendorTransfers.length === 0 ? (
+              <div className="text-center py-12"><span className="text-5xl block mb-3">📲</span><p className="font-bold text-gray-400">No hay transferencias bancarias registradas.</p></div>
+            ) : (
+              <div className="overflow-x-auto border border-gray-100 rounded-2xl">
+                <table className="w-full text-sm text-left whitespace-nowrap">
+                  <thead className="bg-gray-50 border-b border-gray-100">
+                    <tr>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Fecha / Hora</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Punto / Vehículo</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Vendedor</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase">Nota / Motivo</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase text-right">Monto</th>
+                      <th className="py-3 px-4 text-[10px] font-bold text-gray-400 uppercase text-center">Foto Comprobante</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {vendorTransfers.map((t, idx) => {
+                      const imgUrl = t.photoBase64 || t.photo || t.imageUrl || t.photoUrl || t.comprobanteUrl || t.comprobante;
+                      return (
+                        <tr key={t.id || idx} className="hover:bg-gray-50/50">
+                          <td className="py-3 px-4 font-bold text-gray-600">{fmtDateTime(t.createdAt)}</td>
+                          <td className="py-3 px-4 font-black text-chunky-dark">{t.pointId || '—'}</td>
+                          <td className="py-3 px-4 font-bold text-gray-600">{t.vendorName || 'Vendedor'}</td>
+                          <td className="py-3 px-4 text-gray-500 font-bold text-xs truncate max-w-[180px]">{t.note || '—'}</td>
+                          <td className="py-3 px-4 text-right font-black text-green-600">{fmtMoney(t.amount)}</td>
+                          <td className="py-3 px-4 text-center">
+                            {imgUrl ? (
+                              <button
+                                onClick={() => setSelectedReportPhoto(imgUrl)}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 rounded-xl font-black text-xs transition-all active:scale-95 cursor-pointer"
+                              >
+                                🖼️ Ver Comprobante
+                              </button>
+                            ) : (
+                              <span className="text-xs font-bold text-gray-300">Sin foto</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>
@@ -2215,6 +2317,132 @@ function ReportsPanel() {
           </div>
         );
       })()}
+
+      {/* ─── Modal: Foto de Transferencia Ampliada ─── */}
+      {selectedReportPhoto && (
+        <div
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 animate-fade-in"
+          onClick={() => setSelectedReportPhoto(null)}
+        >
+          <div 
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center bg-gray-900 rounded-3xl border border-white/20 shadow-2xl p-3 sm:p-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-full flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              <span className="text-white font-black text-sm flex items-center gap-2">
+                📸 Comprobante de Transferencia Bancaria
+              </span>
+              <button
+                onClick={() => setSelectedReportPhoto(null)}
+                className="bg-white text-gray-950 font-black text-xs px-4 py-1.5 rounded-full hover:bg-gray-200 transition-all active:scale-95 cursor-pointer shadow-md"
+              >
+                ✕ CERRAR
+              </button>
+            </div>
+            <div className="w-full flex-1 min-h-0 flex items-center justify-center my-3 overflow-hidden rounded-2xl bg-black">
+              <img 
+                src={selectedReportPhoto} 
+                alt="Comprobante Completo" 
+                className="max-w-full max-h-[75vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Detalle de Ticket POS ─── */}
+      {selectedReportSale && (
+        <div
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in"
+          onClick={() => setSelectedReportSale(null)}
+        >
+          <div 
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-4 border-b border-gray-100 mb-4 shrink-0">
+              <div>
+                <h3 className="font-black text-gray-900 text-lg leading-tight">
+                  🧾 Ticket #{selectedReportSale.id?.replace('SALE-', '') || '—'}
+                </h3>
+                <p className="text-xs font-bold text-gray-400">
+                  {fmtDateTime(selectedReportSale.timestamp)}
+                </p>
+              </div>
+              <button
+                onClick={() => setSelectedReportSale(null)}
+                className="w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-black cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Info de Cliente y Cajero */}
+            <div className="bg-blue-50/60 rounded-2xl p-4 mb-4 border border-blue-100/60 space-y-1.5 shrink-0">
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-blue-500 uppercase tracking-widest text-[10px]">Cliente</span>
+                <span className="font-black text-gray-800">
+                  {selectedReportSale.customerName
+                    ? `${selectedReportSale.customerName}${selectedReportSale.customerDoc ? ' (' + selectedReportSale.customerDoc + ')' : ''}`
+                    : (selectedReportSale.clientName || selectedReportSale.client || 'Cliente General')
+                  }
+                </span>
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="font-bold text-blue-500 uppercase tracking-widest text-[10px]">Método Pago</span>
+                <span className="font-black text-gray-800">{selectedReportSale.paymentMethod || 'Efectivo'}</span>
+              </div>
+              {selectedReportSale.userName && (
+                <div className="flex justify-between items-center text-xs">
+                  <span className="font-bold text-blue-500 uppercase tracking-widest text-[10px]">Cajero/Vendedor</span>
+                  <span className="font-bold text-gray-600">{selectedReportSale.userName}</span>
+                </div>
+              )}
+            </div>
+
+            {/* Lista de Ítems */}
+            <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-4">
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Ítems Comprados</p>
+              {(selectedReportSale.items || []).length === 0 ? (
+                <p className="text-xs font-bold text-gray-400 italic">No hay detalle de productos registrado.</p>
+              ) : (
+                (selectedReportSale.items || []).map((item, i) => (
+                  <div key={i} className="flex items-center justify-between bg-gray-50 p-3 rounded-xl border border-gray-100">
+                    <div>
+                      <span className="font-black text-gray-900 text-sm">{item.name}</span>
+                      <span className="block text-xs font-bold text-gray-400">{item.qty || 1} x {fmtMoney(item.price || 0)}</span>
+                    </div>
+                    <span className="font-black text-gray-900 text-sm">
+                      {fmtMoney((item.price || 0) * (item.qty || 1))}
+                    </span>
+                  </div>
+                ))
+              )}
+            </div>
+
+            {/* Totales */}
+            <div className="border-t border-gray-100 pt-3 space-y-1.5 shrink-0">
+              {selectedReportSale.discountAmount > 0 && (
+                <div className="flex justify-between text-xs font-bold text-orange-500">
+                  <span>Descuento Aplicado</span>
+                  <span>-{fmtMoney(selectedReportSale.discountAmount)}</span>
+                </div>
+              )}
+              <div className="flex justify-between text-lg font-black text-gray-900 pt-1">
+                <span>TOTAL COMPRA</span>
+                <span>{fmtMoney(selectedReportSale.total)}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => setSelectedReportSale(null)}
+              className="mt-5 w-full py-3.5 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-800 transition-colors active:scale-95 shrink-0 cursor-pointer"
+            >
+              Cerrar Ticket
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
