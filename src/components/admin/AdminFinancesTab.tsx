@@ -1679,6 +1679,41 @@ export const AdminFinancesTab = ({
         </div>
       )}
 
+      {/* ─── Modal: Foto en Pantalla Completa ─── */}
+      {fullscreenPhoto && (
+        <div
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 animate-fade-in"
+          onClick={() => setFullscreenPhoto(null)}
+        >
+          <div 
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center bg-gray-900 rounded-3xl border border-white/20 shadow-2xl p-3 sm:p-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header del visor */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              <span className="text-white font-black text-sm flex items-center gap-2">
+                📸 Comprobante de Transferencia
+              </span>
+              <button
+                onClick={() => setFullscreenPhoto(null)}
+                className="bg-white text-gray-950 font-black text-xs px-4 py-1.5 rounded-full hover:bg-gray-200 transition-all active:scale-95 cursor-pointer shadow-md"
+              >
+                ✕ CERRAR
+              </button>
+            </div>
+
+            {/* Imagen completa */}
+            <div className="w-full flex-1 min-h-0 flex items-center justify-center my-3 overflow-hidden rounded-2xl bg-black/80">
+              <img 
+                src={fullscreenPhoto} 
+                alt="Comprobante Completo" 
+                className="max-w-full max-h-[75vh] object-contain rounded-xl"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
@@ -1866,41 +1901,6 @@ export const AdminExpensesTab = () => {
             >
               Cerrar
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* ─── Modal: Foto en Pantalla Completa ─── */}
-      {fullscreenPhoto && (
-        <div
-          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 animate-fade-in"
-          onClick={() => setFullscreenPhoto(null)}
-        >
-          <div 
-            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center bg-gray-900 rounded-3xl border border-white/20 shadow-2xl p-3 sm:p-4 overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Header del visor */}
-            <div className="w-full flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
-              <span className="text-white font-black text-sm flex items-center gap-2">
-                📸 Comprobante de Transferencia
-              </span>
-              <button
-                onClick={() => setFullscreenPhoto(null)}
-                className="bg-white text-gray-950 font-black text-xs px-4 py-1.5 rounded-full hover:bg-gray-200 transition-all active:scale-95 cursor-pointer shadow-md"
-              >
-                ✕ CERRAR
-              </button>
-            </div>
-
-            {/* Imagen completa */}
-            <div className="w-full flex-1 min-h-0 flex items-center justify-center my-3 overflow-hidden rounded-2xl bg-black/80">
-              <img 
-                src={fullscreenPhoto} 
-                alt="Comprobante Completo" 
-                className="max-w-full max-h-[75vh] object-contain rounded-xl"
-              />
-            </div>
           </div>
         </div>
       )}
