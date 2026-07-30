@@ -459,6 +459,7 @@ export const VendedorDashboard = () => {
           transferAmount: transferVal,
           expenses: expensesVal,
           expensesDesc: expensesDesc,
+          shiftTransfers: shiftTransfers || [],
           status: status,
           difference: difference,
           type: 'VENDEDOR',
@@ -1301,12 +1302,15 @@ export const VendedorDashboard = () => {
                           accept="image/*"
                           capture="environment"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = (ev) => setEditPhoto(ev.target?.result as string);
-                            reader.readAsDataURL(file);
+                            try {
+                              const compressedBase64 = await compressImage(file, 800, 0.7);
+                              setEditPhoto(compressedBase64);
+                            } catch (err) {
+                              console.error('Error comprimiendo foto editada:', err);
+                            }
                             e.target.value = '';
                           }}
                         />
@@ -1315,12 +1319,15 @@ export const VendedorDashboard = () => {
                           type="file"
                           accept="image/*"
                           className="hidden"
-                          onChange={(e) => {
+                          onChange={async (e) => {
                             const file = e.target.files?.[0];
                             if (!file) return;
-                            const reader = new FileReader();
-                            reader.onload = (ev) => setEditPhoto(ev.target?.result as string);
-                            reader.readAsDataURL(file);
+                            try {
+                              const compressedBase64 = await compressImage(file, 800, 0.7);
+                              setEditPhoto(compressedBase64);
+                            } catch (err) {
+                              console.error('Error comprimiendo foto editada:', err);
+                            }
                             e.target.value = '';
                           }}
                         />

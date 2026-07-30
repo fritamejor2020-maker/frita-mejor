@@ -60,25 +60,35 @@ export const parseMoney = (str: string): number => {
  * @param quality Calidad JPEG (0 - 1)
  */
 export const compressImage = (file: File, maxWidth: number = 800, quality: number = 0.7): Promise<string> => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     const reader = new FileReader();
-    reader.readAsDataURL(file);
     reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) { resolve(''); return; }
+
       const img = new Image();
-      img.src = event.target?.result as string;
       img.onload = () => {
-        const scaleSize = maxWidth / img.width;
-        // Si la imagen es más pequeña que el maxWidth, no agrandar
-        const scale = scaleSize < 1 ? scaleSize : 1;
-        const canvas = document.createElement('canvas');
-        canvas.width = img.width * scale;
-        canvas.height = img.height * scale;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-        resolve(canvas.toDataURL('image/jpeg', quality));
+        try {
+          const scaleSize = maxWidth / (img.width || 800);
+          const scale = scaleSize < 1 ? scaleSize : 1;
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(img.width * scale));
+          canvas.height = Math.max(1, Math.round(img.height * scale));
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL('image/jpeg', quality));
+            return;
+          }
+          resolve(result);
+        } catch (e) {
+          resolve(result);
+        }
       };
-      img.onerror = (err) => reject(err);
+      img.onerror = () => resolve(result);
+      img.src = result;
     };
-    reader.onerror = (err) => reject(err);
+    reader.onerror = () => resolve('');
+    reader.readAsDataURL(file);
   });
 };
