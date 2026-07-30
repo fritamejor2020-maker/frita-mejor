@@ -6,10 +6,14 @@ import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
 import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hooks/useAttendanceData';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
-import { DollarSign, Clock, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useAuthStore } from '../../store/useAuthStore';
+import { useNavigate } from 'react-router-dom';
+import { DollarSign, Clock, CheckCircle2, AlertCircle, LogOut, ArrowLeft } from 'lucide-react';
 
 export function AttendanceView() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const signOut = useAuthStore((s) => s.signOut);
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [weekStartDate, setWeekStartDate] = useState<Date>(() => {
@@ -78,16 +82,32 @@ export function AttendanceView() {
           </p>
         </div>
 
-        <button
-          onClick={() => {
-            setSelectedPayrollEmp(undefined);
-            setShowPayrollModal(true);
-          }}
-          className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2 transition-all shadow-sm cursor-pointer self-start sm:self-auto"
-        >
-          <DollarSign size={16} />
-          Ver Liquidación Semanal ($)
-        </button>
+        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+          <button
+            onClick={() => {
+              setSelectedPayrollEmp(undefined);
+              setShowPayrollModal(true);
+            }}
+            className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+          >
+            <DollarSign size={16} />
+            Ver Liquidación Semanal ($)
+          </button>
+          <button
+            onClick={() => navigate('/')}
+            className="bg-white hover:bg-gray-100 text-gray-600 font-bold text-xs px-3 py-2.5 rounded-2xl flex items-center gap-1.5 transition-all border border-gray-200 cursor-pointer"
+          >
+            <ArrowLeft size={14} />
+            Menú
+          </button>
+          <button
+            onClick={signOut}
+            className="bg-white hover:bg-red-50 text-red-500 font-bold text-xs px-3 py-2.5 rounded-2xl flex items-center gap-1.5 transition-all border border-red-100 cursor-pointer"
+          >
+            <LogOut size={14} />
+            Cerrar Sesión
+          </button>
+        </div>
       </div>
 
       {/* Toast de Sincronización */}
