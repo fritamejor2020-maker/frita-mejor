@@ -360,8 +360,9 @@ function CardCompact({ prod, productionPoint, wasteMode, onProduce, onManual }) 
 
 // ─── Panel Principal ───────────────────────────────────────────────────────────
 function ProductionPanel({ productionPoint, onBack }) {
-  const { products, inventory, produceItem, reportWaste, checkStock, getRecipeByProductId } = useInventoryStore();
+  const { products, inventory, produceItem, reportWaste, checkStock, getRecipeByProductId, posSettings } = useInventoryStore();
   const signOut = useAuthStore((s) => s.signOut);
+  const linkProduction = posSettings?.inventoryControl?.linkProduction ?? false;
   const [toast, setToast]          = useState({ visible: false, message: '', type: 'success' });
   const [wasteMode, setWasteMode]  = useState(false);
   const [manualProd, setManualProd] = useState(null);
@@ -372,7 +373,7 @@ function ProductionPanel({ productionPoint, onBack }) {
 
   const enriched = displayProducts.map((prod) => {
     const recipe     = getRecipeByProductId(prod.id);
-    const stockCheck = recipe ? checkStock(recipe.id, 1) : { canProduce: true, missing: [] };
+    const stockCheck = (recipe && linkProduction) ? checkStock(recipe.id, 1) : { canProduce: true, missing: [] };
     const inv        = inventory.find((i) => prod.outputInventoryId ? i.id === prod.outputInventoryId : i.name === prod.name);
     return { ...prod, stockOk: stockCheck.canProduce, currentStock: inv?.qty ?? 0, recipe };
   });

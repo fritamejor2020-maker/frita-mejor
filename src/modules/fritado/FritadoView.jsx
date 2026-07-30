@@ -102,11 +102,12 @@ function ActionModal({ config, wasteMode, onClose, onConfirm }) {
 // ─── Tarjeta PÍLDORA Fritado: móvil (sm) y tablet (md) ────────────────────────
 function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
-  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+  const linkProduction = useInventoryStore((s) => s.posSettings?.inventoryControl?.linkProduction ?? false);
+  const isDisabled = linkProduction ? (pair.crudo.qty === 0 && !wasteMode) : false;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/10'
-    : pair.crudo.qty > 0 ? 'border border-gray-200 bg-white'
-    : 'border border-red-200 bg-red-50/10';
+    : (linkProduction && pair.crudo.qty === 0) ? 'border border-red-200 bg-red-50/10'
+    : 'border border-gray-200 bg-white';
 
   const circleCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
     : wasteMode ? 'bg-red-100 text-red-700 active:scale-95'
@@ -128,7 +129,7 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
       <div style={{ minWidth: 0, width: nameW, flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
         <div className="flex items-center gap-0.5 mt-0.5">
-          <span style={{ fontWeight: 900, fontSize: stockSz, color: pair.crudo.qty > 0 ? '#16a34a' : '#ef4444' }}>{pair.crudo.qty}</span>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: (linkProduction && pair.crudo.qty === 0) ? '#ef4444' : '#16a34a' }}>{pair.crudo.qty}</span>
           <span style={{ fontSize: stockSz - 2, color: '#9ca3af', fontWeight: 700 }}>cr</span>
           <span style={{ fontSize: stockSz, color: '#d1d5db' }}>→</span>
           <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{pair.frito.qty}</span>
@@ -140,7 +141,7 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
       <div style={{ display: 'flex', gap: 6, flex: 1, justifyContent: 'center', minWidth: 0, overflow: 'hidden' }}>
         {presets.slice(0, maxCircles).map((amount, i) => (
           <button key={i} disabled={isDisabled} onClick={() => onFry(pair, amount)}
-            style={{ width: circleD, height: circleD, minWidth: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
+            style={{ width: circleD, height: circleD, minWidth: circleD, borderRadius: '50%', flexShrink: 0, display: 'flex', itemsAlign: 'center', justifyContent: 'center', fontSize: btnSz, fontWeight: 900 }}
             className={`transition-all select-none ${circleCls}`}>
             {amount}
           </button>
@@ -159,11 +160,12 @@ function FritadoCardMobile({ pair, wasteMode, onFry, onManual, size = 'sm' }) {
 function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
   const [big, ...smalls] = presets;
-  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+  const linkProduction = useInventoryStore((s) => s.posSettings?.inventoryControl?.linkProduction ?? false);
+  const isDisabled = linkProduction ? (pair.crudo.qty === 0 && !wasteMode) : false;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : pair.crudo.qty > 0 ? 'border border-gray-200 bg-white'
-    : 'border border-red-200 bg-red-50/20';
+    : (linkProduction && pair.crudo.qty === 0) ? 'border border-red-200 bg-red-50/20'
+    : 'border border-gray-200 bg-white';
   const btnCls = wasteMode ? 'bg-red-400 hover:bg-red-500 text-white border-2 border-red-500'
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
@@ -189,7 +191,7 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
       <div className={`flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl shrink-0 ${boxPy}`}>
         <div className="flex-1 text-center">
           <div className="text-[9px] font-black text-gray-400 uppercase">Crudo</div>
-          {pair.crudo.qty === 0 && !wasteMode
+          {pair.crudo.qty === 0 && !wasteMode && linkProduction
             ? <div className={`font-black text-red-500 ${stockSz}`}>Agotado</div>
             : <div className={`font-black text-green-600 leading-none ${stockSz}`}>{pair.crudo.qty}<span className={`text-gray-400 ml-0.5 ${unitSz}`}>uds</span></div>
           }
@@ -230,11 +232,12 @@ function FritadoCardTablet({ pair, wasteMode, onFry, onManual, cardH = 300 }) {
 function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
   const presets = pair.presets || [10, 20, 50, 100, 200];
   const [big, ...smalls] = presets;
-  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+  const linkProduction = useInventoryStore((s) => s.posSettings?.inventoryControl?.linkProduction ?? false);
+  const isDisabled = linkProduction ? (pair.crudo.qty === 0 && !wasteMode) : false;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : pair.crudo.qty > 0 ? 'border border-gray-100 bg-white'
-    : 'border border-red-200 bg-red-50/20';
+    : (linkProduction && pair.crudo.qty === 0) ? 'border border-red-200 bg-red-50/20'
+    : 'border border-gray-100 bg-white';
   const btnCls = wasteMode ? 'bg-red-400 hover:bg-red-500 text-white border-2 border-red-500'
     : isDisabled ? 'bg-gray-100 text-gray-300 border-2 border-gray-200 cursor-not-allowed'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white border-2 border-chunky-secondary shadow-sm';
@@ -254,7 +257,7 @@ function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
       <div style={{ textAlign: 'center', flexShrink: 0 }}>
         <div style={{ fontWeight: 900, fontSize: nameSz, lineHeight: 1.2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1f2937' }}>{pair.frito.name}</div>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3 }}>
-          <span style={{ fontWeight: 900, fontSize: stockSz, color: pair.crudo.qty > 0 ? '#16a34a' : '#ef4444' }}>{pair.crudo.qty}</span>
+          <span style={{ fontWeight: 900, fontSize: stockSz, color: (linkProduction && pair.crudo.qty === 0) ? '#ef4444' : '#16a34a' }}>{pair.crudo.qty}</span>
           <span style={{ fontSize: stockSz - 1, color: '#d1d5db' }}>→</span>
           <span style={{ fontWeight: 900, fontSize: stockSz, color: '#1f2937' }}>{pair.frito.qty}</span>
           <span style={{ fontSize: stockSz - 2, color: '#9ca3af', fontWeight: 700 }}>uds</span>
@@ -291,11 +294,12 @@ function FritadoCard({ pair, wasteMode, onFry, onManual, cardH = 180 }) {
 // ─── Tarjeta COMPACTA cocina ──────────────────────────────────────────────────
 function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
   const presets    = pair.presets || [10, 20, 50, 100, 200];
-  const isDisabled = pair.crudo.qty === 0 && !wasteMode;
+  const linkProduction = useInventoryStore((s) => s.posSettings?.inventoryControl?.linkProduction ?? false);
+  const isDisabled = linkProduction ? (pair.crudo.qty === 0 && !wasteMode) : false;
 
   const cardCls = wasteMode ? 'border-2 border-dashed border-red-300 bg-red-50/20'
-    : pair.crudo.qty > 0 ? 'border border-gray-100 bg-white'
-    : 'border border-red-200 bg-red-50/20';
+    : (linkProduction && pair.crudo.qty === 0) ? 'border border-red-200 bg-red-50/20'
+    : 'border border-gray-100 bg-white';
   const btnCls = isDisabled ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
     : wasteMode ? 'bg-red-100 text-red-700'
     : 'bg-chunky-main hover:bg-chunky-secondary text-chunky-dark hover:text-white shadow-sm';
@@ -305,7 +309,7 @@ function FritadoCardCompact({ pair, wasteMode, onFry, onManual }) {
       <div className="flex items-center justify-between shrink-0">
         <span className="font-black text-chunky-dark text-[11px] truncate flex-1">{pair.frito.name}</span>
         <div className="flex items-center gap-0.5 shrink-0 ml-1">
-          <span className={`text-[9px] font-black ${pair.crudo.qty > 0 ? 'text-green-600' : 'text-red-500'}`}>{pair.crudo.qty}</span>
+          <span className={`text-[9px] font-black ${(linkProduction && pair.crudo.qty === 0) ? 'text-red-500' : 'text-green-600'}`}>{pair.crudo.qty}</span>
           <span className="text-gray-300 text-[8px]">→</span>
           <span className="text-[9px] font-black text-chunky-dark">{pair.frito.qty}</span>
         </div>
