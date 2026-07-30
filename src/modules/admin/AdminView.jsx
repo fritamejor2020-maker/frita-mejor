@@ -4388,7 +4388,6 @@ export function AdminView() {
       { id: 'INVENTARIO', label: '📋 Inventario'  },
       { id: 'ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
       { id: 'POS_INVENTORY', label: '⚙️ Inventario Modular' },
-      { id: 'RECETAS',    label: '🧾 Recetas'     },
     ],
     POS: [
       { id: 'POS_CONFIG',     label: '⚙️ Hardware & Pagos' },
@@ -4551,7 +4550,6 @@ export function AdminView() {
         {activeTab === 'FRITADO'    && <FritadoConfigPanel />}
         {activeTab === 'INVENTARIO' && <InventoryPanel branchId={null} onOpenItemTypes={() => setActiveTab('ITEM_TYPES')} />}
         {(activeTab === 'ITEM_TYPES' || activeTab === 'POS_ITEM_TYPES') && <ItemTypesPanel />}
-        {activeTab === 'RECETAS'    && <RecipesPanel />}
         {activeTab === 'USUARIOS'      && <AdminUsersTab />}
         { activeTab === 'RESET_GENERAL' && <ResetGeneralPanel /> }
         {activeTab === 'REPORTES'   && <ReportsPanel />}
