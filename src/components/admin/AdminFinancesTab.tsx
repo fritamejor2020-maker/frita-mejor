@@ -1641,7 +1641,7 @@ export const AdminFinancesTab = ({
                         </div>
 
                         {imgUrl ? (
-                          <button 
+                          <div 
                             onClick={(e) => {
                               e.preventDefault();
                               e.stopPropagation();
@@ -1650,12 +1650,12 @@ export const AdminFinancesTab = ({
                             className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-blue-500 hover:border-blue-700 shadow-md transition-all relative group cursor-pointer active:scale-95"
                             title="Toca para ver la foto completa"
                           >
-                            <img src={imgUrl} alt="Comprobante" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                            <div className="absolute inset-x-0 bottom-0 bg-black/70 backdrop-blur-xs py-1 px-1 flex items-center justify-center gap-1 text-white text-[9px] font-black pointer-events-none">
+                            <img src={imgUrl} alt="Comprobante" className="w-full h-full object-cover group-hover:scale-105 transition-transform pointer-events-none" />
+                            <div className="absolute inset-x-0 bottom-0 bg-black/80 backdrop-blur-xs py-1 px-1 flex items-center justify-center gap-1 text-white text-[9px] font-black pointer-events-none">
                               <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
                               <span>Ver Grande</span>
                             </div>
-                          </button>
+                          </div>
                         ) : (
                           <div className="w-20 h-20 rounded-2xl bg-gray-100 border border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 text-center p-2 shrink-0">
                             <span className="text-xl">🖼️</span>
@@ -1873,30 +1873,34 @@ export const AdminExpensesTab = () => {
       {/* ─── Modal: Foto en Pantalla Completa ─── */}
       {fullscreenPhoto && (
         <div
-          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-[fadeIn_0.15s_ease-out]"
+          className="fixed inset-0 z-[999999] flex items-center justify-center bg-black/95 backdrop-blur-md p-3 sm:p-6 animate-fade-in"
           onClick={() => setFullscreenPhoto(null)}
         >
           <div 
-            className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+            className="relative max-w-4xl w-full max-h-[92vh] flex flex-col items-center bg-gray-900 rounded-3xl border border-white/20 shadow-2xl p-3 sm:p-4 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
-            <button
-              onClick={() => setFullscreenPhoto(null)}
-              className="absolute -top-12 right-0 bg-white text-gray-900 font-black text-xs px-4 py-2 rounded-full shadow-lg hover:bg-gray-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
-            >
-              <span>✕ CERRAR</span>
-            </button>
-            <img 
-              src={fullscreenPhoto} 
-              alt="Comprobante Completo" 
-              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border-2 border-white/20"
-            />
-            <button
-              onClick={() => setFullscreenPhoto(null)}
-              className="mt-4 bg-white/20 hover:bg-white/30 text-white font-black text-xs px-6 py-2.5 rounded-full backdrop-blur transition-all active:scale-95 cursor-pointer"
-            >
-              Cerrar Vista Previa
-            </button>
+            {/* Header del visor */}
+            <div className="w-full flex items-center justify-between pb-3 border-b border-white/10 shrink-0">
+              <span className="text-white font-black text-sm flex items-center gap-2">
+                📸 Comprobante de Transferencia
+              </span>
+              <button
+                onClick={() => setFullscreenPhoto(null)}
+                className="bg-white text-gray-950 font-black text-xs px-4 py-1.5 rounded-full hover:bg-gray-200 transition-all active:scale-95 cursor-pointer shadow-md"
+              >
+                ✕ CERRAR
+              </button>
+            </div>
+
+            {/* Imagen completa */}
+            <div className="w-full flex-1 min-h-0 flex items-center justify-center my-3 overflow-hidden rounded-2xl bg-black/80">
+              <img 
+                src={fullscreenPhoto} 
+                alt="Comprobante Completo" 
+                className="max-w-full max-h-[75vh] object-contain rounded-xl"
+              />
+            </div>
           </div>
         </div>
       )}
