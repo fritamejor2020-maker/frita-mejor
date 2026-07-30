@@ -28,6 +28,8 @@ import { AdminVehicleInventoryTab } from '../../components/admin/AdminVehicleInv
 import { OlaClickConfigPanel } from './components/OlaClickConfigPanel';
 import { LuckyRewardsConfigPanel } from './components/LuckyRewardsConfigPanel';
 import { AdminTasksConfigPanel } from './components/AdminTasksConfigPanel';
+import { AdminTerminalsTab } from './AdminTerminalsTab';
+import { AdminEmployeeBiometricsModal } from './AdminEmployeeBiometricsModal';
 import { formatMoney } from '../../utils/formatUtils';
 import { AdminGeofencesTab } from './AdminGeofencesTab';
 
