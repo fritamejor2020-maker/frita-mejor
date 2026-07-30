@@ -171,13 +171,13 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
               </p>
               <p className="text-[10px] font-bold opacity-90 tracking-wide uppercase mt-0.5 flex items-center gap-1.5">
                 {activeCall.status === 'ringing' ? (
-                  '📻 Timbrando Radio...'
+                  '🔔 Timbrando...'
                 ) : isListeningPtt ? (
                   <span className="text-yellow-300 font-black animate-pulse flex items-center gap-1">
                     <Volume2 size={12} /> Escuchando voz...
                   </span>
                 ) : (
-                  `🎙️ Radio Activa (${formatCallTime(callDuration)})`
+                  `📞 Llamada en Curso (${formatCallTime(callDuration)})`
                 )}
               </p>
             </div>
@@ -188,7 +188,7 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
             {isIncoming && (
               <button
                 onClick={handleAnswerCall}
-                className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all"
+                className="bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all cursor-pointer"
               >
                 ✅ Contestar
               </button>
@@ -197,33 +197,13 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
             {/* Botón Colgar */}
             <button
               onClick={() => updateCallStatus('ended')}
-              className="bg-red-600 hover:bg-red-500 text-white px-3.5 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all flex items-center gap-1"
+              className="bg-red-600 hover:bg-red-500 text-white px-3.5 py-2 rounded-2xl font-black text-xs shadow-md active:scale-95 transition-all flex items-center gap-1 cursor-pointer"
             >
               <PhoneOff size={13} />
               <span>Colgar</span>
             </button>
           </div>
         </div>
-
-        {/* Control Push-To-Talk cuando la llamada está conectada */}
-        {activeCall.status === 'connected' && (
-          <div className="pt-2 border-t border-white/20 flex items-center justify-between gap-3">
-            <button
-              onMouseDown={startPttVoice}
-              onMouseUp={stopPttVoice}
-              onTouchStart={startPttVoice}
-              onTouchEnd={stopPttVoice}
-              className={`flex-1 py-2.5 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all shadow-md active:scale-95 ${
-                isTalkingPtt
-                  ? 'bg-red-500 text-white animate-pulse'
-                  : 'bg-amber-400 hover:bg-amber-300 text-gray-950'
-              }`}
-            >
-              <Mic size={16} />
-              <span>{isTalkingPtt ? '🔴 Transmitiendo Voz...' : '🎙️ MANTÉN O TOCA PARA HABLAR (RADIO)'}</span>
-            </button>
-          </div>
-        )}
       </div>
     </div>
   );
