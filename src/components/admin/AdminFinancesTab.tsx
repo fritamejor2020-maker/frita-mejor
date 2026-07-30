@@ -1642,13 +1642,17 @@ export const AdminFinancesTab = ({
 
                         {imgUrl ? (
                           <button 
-                            onClick={() => setFullscreenPhoto(imgUrl)}
-                            className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-blue-400 hover:border-blue-600 shadow-md transition-all relative group cursor-pointer"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setFullscreenPhoto(imgUrl);
+                            }}
+                            className="w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0 border-2 border-blue-500 hover:border-blue-700 shadow-md transition-all relative group cursor-pointer active:scale-95"
                             title="Toca para ver la foto completa"
                           >
                             <img src={imgUrl} alt="Comprobante" className="w-full h-full object-cover group-hover:scale-105 transition-transform" />
-                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-[10px] font-black gap-1">
-                              <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+                            <div className="absolute inset-x-0 bottom-0 bg-black/70 backdrop-blur-xs py-1 px-1 flex items-center justify-center gap-1 text-white text-[9px] font-black pointer-events-none">
+                              <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
                               <span>Ver Grande</span>
                             </div>
                           </button>
@@ -1869,22 +1873,30 @@ export const AdminExpensesTab = () => {
       {/* ─── Modal: Foto en Pantalla Completa ─── */}
       {fullscreenPhoto && (
         <div
-          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-md p-4 animate-[fadeIn_0.2s_ease-out]"
+          className="fixed inset-0 z-[99999] flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-[fadeIn_0.15s_ease-out]"
           onClick={() => setFullscreenPhoto(null)}
         >
-          <div className="relative max-w-4xl max-h-screen w-full h-full flex flex-col items-center justify-center pointer-events-none">
+          <div 
+            className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center justify-center"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
-              onClick={(e) => { e.stopPropagation(); setFullscreenPhoto(null); }}
-              className="absolute top-4 right-4 w-12 h-12 rounded-full bg-white/10 hover:bg-white/20 backdrop-blur flex items-center justify-center text-white transition-colors pointer-events-auto shadow-lg"
+              onClick={() => setFullscreenPhoto(null)}
+              className="absolute -top-12 right-0 bg-white text-gray-900 font-black text-xs px-4 py-2 rounded-full shadow-lg hover:bg-gray-200 transition-all flex items-center gap-1.5 active:scale-95 cursor-pointer"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              <span>✕ CERRAR</span>
             </button>
             <img 
               src={fullscreenPhoto} 
               alt="Comprobante Completo" 
-              className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-2xl pointer-events-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="max-w-full max-h-[80vh] object-contain rounded-2xl shadow-2xl border-2 border-white/20"
             />
+            <button
+              onClick={() => setFullscreenPhoto(null)}
+              className="mt-4 bg-white/20 hover:bg-white/30 text-white font-black text-xs px-6 py-2.5 rounded-full backdrop-blur transition-all active:scale-95 cursor-pointer"
+            >
+              Cerrar Vista Previa
+            </button>
           </div>
         </div>
       )}
