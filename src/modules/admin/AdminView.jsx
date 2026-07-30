@@ -4377,6 +4377,7 @@ export function AdminView() {
   const navigate = useNavigate();
   const { inventory } = useInventoryStore();
   const [activeTab, setActiveTab] = useState('BODEGAS');
+  const [showBiometricsModal, setShowBiometricsModal] = useState(false);
   const dbInfo = useDbSize();
   const scrollContainerRef = React.useRef(null);
 
@@ -4418,6 +4419,7 @@ export function AdminView() {
     ],
     SISTEMA: [
       { id: 'SEDES',            label: '🏢 Sedes y Sucursales' },
+      { id: 'BIOMETRICOS',      label: '⏱️ Biométricos (ISAPI)' },
       { id: 'TAREAS',           label: '📋 Tareas & Supervisión' },
       { id: 'PERMISOS_MANAGER', label: '🔑 Permisos Gerentes' },
       { id: 'USUARIOS',         label: '👥 Usuarios del Sistema' },
@@ -4472,6 +4474,12 @@ export function AdminView() {
           )}
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            className="rounded-full font-bold text-xs sm:text-sm bg-amber-400 text-gray-950 hover:bg-amber-500 shadow-sm border-none"
+            onClick={() => setShowBiometricsModal(true)}
+          >
+            ⏱️ Enrolar Personal & Claves
+          </Button>
           <button
             onClick={() => navigate('/dashboard')}
             className="flex items-center gap-2 bg-amber-400 hover:bg-amber-500 text-gray-900 font-black text-sm px-4 py-2.5 rounded-full shadow-sm transition-all active:scale-95"
@@ -4580,9 +4588,14 @@ export function AdminView() {
 
         {/* Nuevas pestañas multisede */}
         { activeTab === 'SEDES' && <GlobalSettingsPanel /> }
+        { activeTab === 'BIOMETRICOS' && <AdminTerminalsTab /> }
         { activeTab === 'TAREAS' && <AdminTasksConfigPanel /> }
         { activeTab === 'PERMISOS_MANAGER' && <PermissionsPanel /> }
       </div>
+
+      {showBiometricsModal && (
+        <AdminEmployeeBiometricsModal onClose={() => setShowBiometricsModal(false)} />
+      )}
     </div>
   );
 }

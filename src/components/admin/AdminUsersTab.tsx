@@ -19,6 +19,7 @@ const ALL_MODULES = [
   { key: 'admin',             label: 'Admin',           icon: '🔧', color: 'bg-purple-100 text-purple-700 border-purple-200' },
   { key: 'tracking',          label: 'Rutas/Mapa',      icon: '🗺️', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
   { key: 'cierres',           label: 'Auditor Cierres', icon: '🧐', color: 'bg-teal-100 text-teal-700 border-teal-200' },
+  { key: 'asistencia',        label: 'Asistencia & Turnos', icon: '⏱️', color: 'bg-amber-100 text-amber-800 border-amber-300' },
 ];
 
 const ALL_ROLES = ['ADMIN', 'MANAGER', 'OPERARIO', 'FRITADOR', 'BODEGUERO', 'CAJERO', 'VENDEDOR', 'DEJADOR', 'FINANZAS'];

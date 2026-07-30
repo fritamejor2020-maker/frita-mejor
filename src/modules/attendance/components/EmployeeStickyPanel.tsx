@@ -1,0 +1,67 @@
+import React from 'react';
+import { EmployeeWeeklyPayroll } from '../hooks/useAttendanceData';
+
+interface EmployeeStickyPanelProps {
+  payrollList: EmployeeWeeklyPayroll[];
+  onSelectEmployee: (emp: EmployeeWeeklyPayroll) => void;
+}
+
+export function EmployeeStickyPanel({ payrollList, onSelectEmployee }: EmployeeStickyPanelProps) {
+  return (
+    <div className="w-60 min-w-[240px] max-w-[240px] shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
+      {/* Header fijo alignment con la cuadrícula */}
+      <div className="h-12 border-b border-gray-200 px-4 flex items-center bg-gray-50/90 font-black text-xs text-gray-500 uppercase tracking-wider">
+        Personal ({payrollList.length})
+      </div>
+
+      {/* Lista vertical de trabajadores */}
+      <div className="divide-y divide-gray-100">
+        {payrollList.map((emp) => (
+          <div
+            key={emp.employeeId}
+            onClick={() => onSelectEmployee(emp)}
+            className={`h-[68px] px-3 py-2 flex items-center gap-2.5 transition-all cursor-pointer select-none group hover:bg-amber-50/40 ${
+              emp.isPresentNow ? 'bg-emerald-50/80 border-l-4 border-l-emerald-500' : 'bg-white'
+            }`}
+          >
+            {/* Avatar Circular con Iniciales */}
+            <div
+              className="w-9 h-9 rounded-full shrink-0 flex items-center justify-center font-black text-xs text-white shadow-sm ring-2 ring-white"
+              style={{ backgroundColor: emp.avatarColor || '#3B82F6' }}
+            >
+              {emp.initials}
+            </div>
+
+            {/* Nombre y Estado */}
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1">
+                <span className="font-black text-xs text-gray-900 truncate leading-tight group-hover:text-amber-700">
+                  {emp.fullName}
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className="text-[10px] font-bold text-gray-400">#{emp.employeeNo}</span>
+                {emp.isPresentNow ? (
+                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-100 px-1.5 py-0.2 rounded-md flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                    En Turno
+                  </span>
+                ) : (
+                  <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.2 rounded-md">
+                    {emp.netHoursWorked}h
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+
+        {payrollList.length === 0 && (
+          <div className="h-32 flex items-center justify-center text-xs text-gray-400 font-bold px-4 text-center">
+            No hay trabajadores registrados en esta sede.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

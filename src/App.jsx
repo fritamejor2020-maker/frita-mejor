@@ -34,6 +34,7 @@ import { CierresView }         from './modules/cierres/CierresView';
 import { DashboardView }       from './modules/dashboard/DashboardView';
 import { ManagerDashboard }    from './views/ManagerDashboard';
 import { ClientePedirView }   from './views/ClientePedirView';
+import { AttendanceView }     from './modules/attendance/AttendanceView';
 
 import { Link } from 'react-router-dom';
 
@@ -329,6 +330,10 @@ function App() {
 
               <Route element={<ProtectedRoute allowedModules={['gerente']} />}>
                 <Route path="/gerente" element={<ManagerDashboard />} />
+              </Route>
+
+              <Route element={<ProtectedRoute allowedModules={['asistencia', 'admin', 'gerente']} />}>
+                <Route path="/asistencia" element={<AttendanceView />} />
               </Route>
 
               <Route element={<ProtectedRoute allowedModules={['tareas']} />}>

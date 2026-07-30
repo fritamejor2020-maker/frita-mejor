@@ -21,6 +21,7 @@ const MODULE_CARDS: Record<string, { label: string; icon: string; route: string;
   'traslados':        { label: 'Traslados',        icon: '🚛', route: '/traslados',     color: 'from-orange-500 to-red-500',   bg: 'bg-orange-50' },
   'gerente':          { label: 'Mi Sede',          icon: '👔', route: '/gerente',       color: 'from-violet-500 to-purple-600',bg: 'bg-violet-50' },
   'tareas':           { label: 'Tareas',           icon: '📋', route: '/tareas',        color: 'from-amber-500 to-yellow-500', bg: 'bg-amber-50' },
+  'asistencia':       { label: 'Asistencia & Turnos', icon: '⏱️', route: '/asistencia',    color: 'from-amber-500 to-amber-600',  bg: 'bg-amber-50' },
 };
 
 export const ModuleSelectorView = () => {
@@ -41,6 +42,7 @@ export const ModuleSelectorView = () => {
     ? [...new Set([
         ...storedAccess,
         'tareas',
+        'asistencia',
         ...(!storedAccess.includes('tracking')   ? ['tracking']   : []),
         ...(!storedAccess.includes('traslados')  ? ['traslados']  : []),
         ...(!storedAccess.includes('dashboard')  ? ['dashboard']  : []),

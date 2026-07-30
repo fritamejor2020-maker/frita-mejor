@@ -19,7 +19,7 @@ const DEFAULT_USERS = [
     active: true,
     branchId: null,        // null = acceso global a todas las sedes
     permissions: [],       // ADMIN tiene todos los permisos implícitamente
-    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor', 'dejador', 'tracking', 'cierres', 'traslados', 'dashboard', 'tareas'],
+    access: ['produccion', 'bodega', 'admin', 'pos', 'vendedor', 'dejador', 'tracking', 'cierres', 'traslados', 'dashboard', 'tareas', 'asistencia'],
   },
   {
     id: 'USR-002',
