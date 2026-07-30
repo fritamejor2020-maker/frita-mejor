@@ -4,22 +4,72 @@ import { useFinanceStore } from '../store/useFinanceStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 
-function inRange(dateStr: string, start: Date, end: Date) {
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
+function parseDate(dateStr: any): Date | null {
+  if (!dateStr) return null;
+  if (dateStr instanceof Date) return dateStr;
+  if (typeof dateStr === 'number') return new Date(dateStr);
+  const s = String(dateStr).trim();
+  if (!s) return null;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0); // local noon
+  }
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
+function inRange(dateStr: any, start: Date, end: Date): boolean {
+  const d = parseDate(dateStr);
+  if (!d) return false;
   return d >= start && d <= end;
 }
 
 export function useDashboardData() {
-  const { getRange, branchId } = useDashboardFilters();
+  const period = useDashboardFilters(s => s.period);
+  const branchId = useDashboardFilters(s => s.branchId);
+  const customStart = useDashboardFilters(s => s.customStart);
+  const customEnd = useDashboardFilters(s => s.customEnd);
+  const selectedMonth = useDashboardFilters(s => s.selectedMonth);
+  const selectedYear = useDashboardFilters(s => s.selectedYear);
+  const getRange = useDashboardFilters(s => s.getRange);
 
   const incomes  = (useFinanceStore as any)((s: any) => s.incomes)  || [];
   const expenses = (useFinanceStore as any)((s: any) => s.expenses) || [];
+  const posSales = (useInventoryStore as any)((s: any) => s.posSales) || [];
+  const posExpenses = (useInventoryStore as any)((s: any) => s.posExpenses) || [];
   const payrollRecords = (usePayrollStore as any)((s: any) => s.payrollRecords) || [];
   const movements = (useInventoryStore as any)((s: any) => s.movements) || [];
 
   return useMemo(() => {
     const { start, end } = getRange();
+
+    // ── Combinar Incomes de Finanzas + Ventas Pagadas del POS ─────────────────
+    const allIncomes = [
+      ...incomes,
+      ...posSales
+        .filter((s: any) => s.status === 'PAID')
+        .map((s: any) => ({
+          fecha: s.timestamp || s.date,
+          created_at: s.timestamp || s.date,
+          total: s.total || 0,
+          branch_id: s.branchId,
+        }))
+    ];
+
+    // ── Combinar Gastos de Finanzas + Gastos del POS ─────────────────────────
+    const allExpenses = [
+      ...expenses,
+      ...posExpenses.map((e: any) => ({
+        fecha: e.fecha || e.timestamp || e.created_at,
+        created_at: e.fecha || e.timestamp || e.created_at,
+        monto: e.valor ?? e.amount ?? 0,
+        valor: e.valor ?? e.amount ?? 0,
+        tipoGasto: e.tipoGasto || 'variable',
+        proveedor: e.proveedor || e.description || 'POS Gastos',
+        branch_id: e.branchId,
+      }))
+    ];
+
     // ── Filtros de período ────────────────────────────────────────────────────
     const filterIncome = (i: any) => {
       const dateOk = inRange(i.fecha || i.created_at, start, end);
@@ -33,13 +83,9 @@ export function useDashboardData() {
     };
     const filterMovement = (m: any) => inRange(m.timestamp, start, end);
 
-    // BUG-02 FIX: payroll filtered by branchId AND by period date
     const filterPayroll = (r: any) => {
-      // Filter by branchId if present
       const branchOk = !branchId || !r.branchId || r.branchId === branchId;
       if (!branchOk) return false;
-      // INC-03 FIX: try to parse the period string (e.g. "Abril 2026") as a date
-      // for range filtering; fall back to savedAt
       const MONTHS_ES: Record<string, number> = {
         enero:0, febrero:1, marzo:2, abril:3, mayo:4, junio:5,
         julio:6, agosto:7, septiembre:8, octubre:9, noviembre:10, diciembre:11,
@@ -53,18 +99,16 @@ export function useDashboardData() {
           if (m !== undefined && !isNaN(y)) {
             const periodStart = new Date(y, m, 1);
             const periodEnd   = new Date(y, m + 1, 0, 23, 59, 59);
-            // Period overlaps with filter range
             dateOk = periodStart <= end && periodEnd >= start;
           }
         }
       }
-      // Fallback: use savedAt
       if (!dateOk) dateOk = inRange(r.savedAt, start, end);
       return dateOk;
     };
 
-    const filteredIncomes  = incomes.filter(filterIncome);
-    const filteredExpenses = expenses.filter(filterExpense);
+    const filteredIncomes  = allIncomes.filter(filterIncome);
+    const filteredExpenses = allExpenses.filter(filterExpense);
 
     // ── KPIs Financieros ─────────────────────────────────────────────────────
     const totalSales = filteredIncomes.reduce((s: number, i: any) => s + (i.total || 0), 0);
@@ -78,7 +122,6 @@ export function useDashboardData() {
     const gastosSinClasif = filteredExpenses.filter((e: any) => !e.tipoGasto || e.tipoGasto === 'por_definir')
                              .reduce((s: number, e: any) => s + (e.monto ?? e.valor ?? 0), 0);
 
-    // Nómina: filtrada por sede y período
     const payrollInPeriod = payrollRecords.filter(filterPayroll);
     const gastoNomina = payrollInPeriod.reduce((sum: number, record: any) => {
       return sum + (record.filas || []).reduce((s2: number, f: any) => {
@@ -86,16 +129,11 @@ export function useDashboardData() {
       }, 0);
     }, 0);
 
-    // BUG-01 FIX: gastosSinClasif ya incluye los gastos sin tipo; no sumar insumos dos veces
     const totalGastos = gastosFijos + gastosVariables + gastosInsumos + gastoNomina + gastosSinClasif;
 
-    // Margen Bruto = solo descuenta insumos (costo directo de producción)
     const margenBruto = totalSales > 0
       ? ((totalSales - gastosInsumos) / totalSales) * 100
       : 0;
-    // Margen Neto = usa totalGastos completo para que los gastos sin clasificar
-    // (ni insumo, ni fijo, ni variable) también bajen el margen correctamente.
-    // Resultado puede ser negativo si hay pérdidas.
     const margenNeto = totalSales > 0
       ? ((totalSales - totalGastos) / totalSales) * 100
       : totalGastos > 0 ? -100 : 0;
@@ -104,12 +142,14 @@ export function useDashboardData() {
     // ── Tendencia de Ventas por día ───────────────────────────────────────────
     const salesByDay: Record<string, number> = {};
     filteredIncomes.forEach((i: any) => {
-      const key = (i.fecha || i.created_at || '').slice(0, 10);
+      const rawDate = i.fecha || i.created_at || '';
+      const key = String(rawDate).slice(0, 10);
       if (key) salesByDay[key] = (salesByDay[key] || 0) + (i.total || 0);
     });
     const expensesByDay: Record<string, number> = {};
     filteredExpenses.forEach((e: any) => {
-      const key = (e.fecha || e.created_at || '').slice(0, 10);
+      const rawDate = e.fecha || e.created_at || '';
+      const key = String(rawDate).slice(0, 10);
       if (key) expensesByDay[key] = (expensesByDay[key] || 0) + (e.monto ?? e.valor ?? 0);
     });
 
@@ -143,7 +183,6 @@ export function useDashboardData() {
     const totalProduc   = producMovs.reduce((s: number, m: any) => s + (m.qty || 0), 0);
     const pctMerma      = totalFritado > 0 ? (totalMerma / totalFritado) * 100 : 0;
 
-    // Fritado por día
     const fritByDay: Record<string, { fritado: number; merma: number }> = {};
     [...fritadoMovs, ...mermaMovs].forEach((m: any) => {
       const key = (m.timestamp || '').slice(0, 10);
@@ -170,22 +209,15 @@ export function useDashboardData() {
     });
 
     return {
-      // KPIs
       totalSales, totalGastos,
       gastosFijos, gastosVariables, gastosInsumos, gastoNomina, gastosSinClasif,
       margenBruto, margenNeto, puntoEquilibrio,
-      // Trends
       salesTrend, productionTrend,
-      // Suppliers
       topSuppliers,
-      // Production
       totalFritado, totalMerma, totalProduc, pctMerma,
-      // Payroll
       payrollDetail,
-      // Raw counts
       incomeCount: filteredIncomes.length,
       expenseCount: filteredExpenses.length,
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [branchId, incomes, expenses, payrollRecords, movements, getRange]);
+  }, [period, branchId, customStart, customEnd, selectedMonth, selectedYear, incomes, expenses, posSales, posExpenses, payrollRecords, movements]);
 }

@@ -20,6 +20,21 @@ interface DashboardFiltersState {
   getRange: () => { start: Date; end: Date };
 }
 
+function parseLocalYMD(ymdStr: string): Date | null {
+  if (!ymdStr) return null;
+  const parts = ymdStr.split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10) - 1;
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return new Date(y, m, d);
+    }
+  }
+  const d = new Date(ymdStr);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 export const useDashboardFilters = create<DashboardFiltersState>((set, get) => ({
   period: 'month',
   branchId: null,
@@ -64,8 +79,10 @@ export const useDashboardFilters = create<DashboardFiltersState>((set, get) => (
       }
       case 'custom':
         if (customStart) {
-          const s = new Date(customStart); s.setHours(0, 0, 0, 0);
-          const e = customEnd ? (() => { const x = new Date(customEnd); x.setHours(23,59,59,999); return x; })() : end;
+          const s = parseLocalYMD(customStart) || new Date();
+          s.setHours(0, 0, 0, 0);
+          const e = customEnd ? (parseLocalYMD(customEnd) || new Date()) : new Date();
+          e.setHours(23, 59, 59, 999);
           return { start: s, end: e };
         }
         return { start: new Date(new Date().setHours(0,0,0,0)), end };
