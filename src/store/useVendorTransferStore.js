@@ -130,12 +130,7 @@ export const useVendorTransferStore = create(
       version: 1,
       storage: safeJSONStorage,
       partialize: (state) => ({
-        transfers: (state.transfers || []).slice(0, 30).map(t => {
-          if (t.photoBase64 && t.photoBase64.length > 500) {
-            return { ...t, photoBase64: null };
-          }
-          return t;
-        }),
+        transfers: (state.transfers || []).slice(0, 50),
       }),
     }
   )
