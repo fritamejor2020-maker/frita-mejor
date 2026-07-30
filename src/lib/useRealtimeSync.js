@@ -227,9 +227,23 @@ function applyRemoteSnapshot(snapshot, branchId, allBranchIds) {
 
 export async function refreshAllFromSupabase(branchId, allBranchIds) {
   try {
-    const snapshot = await pullAll(branchId, allBranchIds);
+    const user = useAuthStore.getState().user;
+    const activeBranchId = useAuthStore.getState().activeBranchId;
+    const isAdmin = user?.role === 'ADMIN';
+
+    // Para ADMIN, targetBranchId debe ser explícitamente null para refrescar todas las sedes
+    const targetBranchId = branchId !== undefined 
+      ? branchId 
+      : (isAdmin ? null : (user?.branchId || activeBranchId || 'BRANCH-001'));
+      
+    const branches = useBranchStore.getState().branches || [];
+    const targetAllBranchIds = (allBranchIds && Array.isArray(allBranchIds) && allBranchIds.length > 0)
+      ? allBranchIds
+      : (branches.length > 0 ? branches.map(b => b.id) : ['BRANCH-001']);
+
+    const snapshot = await pullAll(targetBranchId, targetAllBranchIds);
     if (snapshot && Object.keys(snapshot).length > 0) {
-      applyRemoteSnapshot(snapshot, branchId, allBranchIds);
+      applyRemoteSnapshot(snapshot, targetBranchId, targetAllBranchIds);
       console.log('[Realtime] Estado fresco obtenido desde Supabase ✅');
     }
   } catch (err) {
