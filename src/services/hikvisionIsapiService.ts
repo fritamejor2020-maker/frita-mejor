@@ -514,15 +514,16 @@ export async function fetchAllEvents(
   options?: { startTime?: string; endTime?: string }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
-  const pageSize = 50; // Lotes de 50 para eventos de asistencia
+  const pageSize = 10; // Firmware DS-K1T8003MF entrega máximo 10 por página
   let position = 0;
   let totalMatches = Infinity;
   const allEvents: AcsEvent[] = [];
 
-  const startTime = options?.startTime || '2020-01-01T00:00:00-00:00';
-  const endTime = options?.endTime || '2030-12-31T23:59:59-00:00';
+  const startTime = options?.startTime || '2020-01-01T00:00:00-05:00';
+  const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
 
-  while (position < totalMatches) {
+  const maxEventsToFetch = 500; // Límite de seguridad para obtener 500 marcaciones recientes de todos los empleados
+  while (position < totalMatches && position < maxEventsToFetch) {
     const payload = JSON.stringify({
       AcsEventCond: {
         searchID: "1",
@@ -562,7 +563,7 @@ export async function fetchAllEvents(
       allEvents.push(...infoList);
       position += infoList.length;
 
-      if (position >= totalMatches || infoList.length < pageSize) {
+      if (position >= totalMatches || position >= maxEventsToFetch || eventResult.responseStatusStrg === 'OK') {
         break;
       }
     } catch (err) {
