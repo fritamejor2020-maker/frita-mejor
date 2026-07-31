@@ -197,9 +197,11 @@ import extractedLogs from '../data/extractedBiometricLogs.json';
 export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAttendanceLog[];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
-  const set = new Set((existing || []).map((l) => l.id));
-  const newLogs = INITIAL_BIOMETRIC_LOGS.filter((l) => !set.has(l.id));
-  return [...(existing || []), ...newLogs];
+  const validIds = new Set(INITIAL_BIOMETRIC_LOGS.map((l) => l.id));
+  const filteredExisting = (existing || []).filter((l) => validIds.has(l.id));
+  const existingIds = new Set(filteredExisting.map((l) => l.id));
+  const missing = INITIAL_BIOMETRIC_LOGS.filter((l) => !existingIds.has(l.id));
+  return [...filteredExisting, ...missing];
 }
 
 export const useAttendanceStore = create<AttendanceStoreState>()(
@@ -314,22 +316,24 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
           let logsAdded = 0;
           if (parsedEvents.length === 0) {
-            get().addAttendanceLogs(INITIAL_BIOMETRIC_LOGS);
-            logsAdded = get().attendanceLogs.length;
+            set({ attendanceLogs: INITIAL_BIOMETRIC_LOGS });
+            logsAdded = INITIAL_BIOMETRIC_LOGS.length;
           } else {
-            const mappedLogs: RawAttendanceLog[] = parsedEvents.map((ev: any) => ({
-              id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}`,
-              employeeId: `EMP-${ev.employeeNoString || ev.cardNo || 'UNK'}`,
-              employeeNo: String(ev.employeeNoString || ev.cardNo || '0'),
-              branchId: terminal.branchId,
-              terminalId: terminal.id,
-              timestamp: ev.time || new Date().toISOString(),
-              type: ev.minor === 38 || ev.minor === 1 || ev.attendanceStatus === 'checkIn' ? 'ENTRY' : ev.minor === 39 || ev.attendanceStatus === 'checkOut' ? 'EXIT' : 'ENTRY',
-              verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
-              doorNo: ev.doorNo || 1,
-            }));
-            get().addAttendanceLogs(mappedLogs);
-            logsAdded = get().attendanceLogs.length;
+            const mappedLogs: RawAttendanceLog[] = parsedEvents
+              .filter((ev: any) => ev.attendanceStatus === 'checkIn' || ev.attendanceStatus === 'checkOut')
+              .map((ev: any) => ({
+                id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}`,
+                employeeId: `EMP-${ev.employeeNoString || ev.cardNo || 'UNK'}`,
+                employeeNo: String(ev.employeeNoString || ev.cardNo || '0'),
+                branchId: terminal.branchId,
+                terminalId: terminal.id,
+                timestamp: ev.time || new Date().toISOString(),
+                type: ev.attendanceStatus === 'checkIn' ? 'ENTRY' : 'EXIT',
+                verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
+                doorNo: ev.doorNo || 1,
+              }));
+            set({ attendanceLogs: mappedLogs });
+            logsAdded = mappedLogs.length;
           }
 
           get().updateTerminal(terminalId, {
