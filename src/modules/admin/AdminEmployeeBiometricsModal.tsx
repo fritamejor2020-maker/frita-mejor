@@ -1,3 +1,4 @@
+import React, { useState, useRef } from 'react';
 import { X, UserCheck, Key, Shield, DollarSign, Download, Upload, CheckCircle2, FileSpreadsheet, AlertTriangle, Users, Trash2 } from 'lucide-react';
 import { useAttendanceStore, EmployeeContract } from '../../store/useAttendanceStore';
 import { useBranchStore } from '../../store/useBranchStore';
