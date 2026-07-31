@@ -142,99 +142,136 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           return;
         }
 
-        // Determinar marcas de entrada y salida estrictamente por checkIn / checkOut del biométrico
-        const entries = dayLogs.filter((l) => l.type === 'ENTRY');
-        const exits   = dayLogs.filter((l) => l.type === 'EXIT');
+        // ── Algoritmo de Pareo de Múltiples Turnos en el Mismo Día ───────────────
+        const shiftPairs: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] }[] = [];
 
-        const rawFirstIn = override?.customFirstIn || (entries.length > 0 ? entries[0].timestamp.slice(11, 19) : '');
-        const rawLastOut = override?.customLastOut || (exits.length > 0 ? exits[exits.length - 1].timestamp.slice(11, 19) : '');
-
-        // Auto-Detección de Turno (o plantilla fija/override)
-        let assignedShift: ShiftTemplate | undefined = shiftTemplates.find((s) => s.id === override?.shiftId);
-
-        if (!assignedShift) {
-          if (contract.shiftType === 'FIXED' && contract.defaultShiftId) {
-            assignedShift = shiftTemplates.find((s) => s.id === contract.defaultShiftId);
-          } else if (rawFirstIn) {
-            // Algoritmo de Coincidencia de Turno Variable (buscar el turno más cercano a la hora de entrada)
-            const firstInMins = timeToMinutes(rawFirstIn.slice(0, 5));
-            let closestDist = Infinity;
-            shiftTemplates.forEach((st) => {
-              const stStartMins = timeToMinutes(st.startTime);
-              const dist = Math.abs(firstInMins - stStartMins);
-              if (dist < closestDist) {
-                closestDist = dist;
-                assignedShift = st;
-              }
-            });
-          }
-        }
-
-        if (!assignedShift) {
-          assignedShift = shiftTemplates[0] || {
-            id: 'SHIFT-DEFAULT',
-            name: 'Turno Regular',
-            startTime: '06:00',
-            endTime: '14:00',
-            targetMinutes: 480,
-            color: '#3B82F6',
-          };
-        }
-
-        // Evaluación de Marcas Faltantes y Tardanza
-        const isMissingMarks = !rawFirstIn || !rawLastOut;
-        let isTardy = false;
-
-        if (rawFirstIn && assignedShift) {
-          const actualInMins = timeToMinutes(rawFirstIn.slice(0, 5));
-          const shiftStartMins = timeToMinutes(assignedShift.startTime);
-          // Tolerancia > 5 minutos
-          if (actualInMins - shiftStartMins > 5) {
-            isTardy = true;
-          }
-        }
-
-        // Cálculo de Minutos Brutos
-        let grossMins = 0;
-        if (rawFirstIn && rawLastOut) {
-          const inMins = timeToMinutes(rawFirstIn.slice(0, 5));
-          const outMins = timeToMinutes(rawLastOut.slice(0, 5));
-          grossMins = outMins >= inMins ? outMins - inMins : (1440 - inMins) + outMins; // Soporte turno nocturno
+        if (override) {
+          shiftPairs.push({
+            firstIn: override.customFirstIn,
+            lastOut: override.customLastOut,
+            logs: dayLogs,
+          });
         } else {
-          // Si falta una marca, tomamos los minutos previstos del turno como bruto
-          grossMins = assignedShift.targetMinutes || 480;
+          let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
+
+          dayLogs.forEach((log) => {
+            if (log.type === 'ENTRY') {
+              if (currentPair && !currentPair.lastOut) {
+                shiftPairs.push(currentPair);
+              }
+              currentPair = {
+                firstIn: log.timestamp.slice(11, 19),
+                logs: [log],
+              };
+            } else if (log.type === 'EXIT') {
+              if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
+                currentPair.lastOut = log.timestamp.slice(11, 19);
+                currentPair.logs.push(log);
+                shiftPairs.push(currentPair);
+                currentPair = null;
+              } else {
+                shiftPairs.push({
+                  lastOut: log.timestamp.slice(11, 19),
+                  logs: [log],
+                });
+              }
+            }
+          });
+
+          if (currentPair) {
+            shiftPairs.push(currentPair);
+          }
         }
 
-        // Aplicación de Penalizaciones (-30 min cada una)
-        const deductedTardinessMins = isTardy ? 30 : 0;
-        const deductedMissingMins   = isMissingMarks ? 30 : 0;
-        const netMins = Math.max(0, grossMins - deductedTardinessMins - deductedMissingMins);
+        const dayBlocks: DailyShiftBlock[] = [];
 
-        totalGrossMins += grossMins;
-        totalTardyDeductedMins += deductedTardinessMins;
-        totalMissingDeductedMins += deductedMissingMins;
+        shiftPairs.forEach((pair) => {
+          const rawFirstIn = pair.firstIn || '';
+          const rawLastOut = pair.lastOut || '';
 
-        const formattedTotal = formatMinutesToHHMM(netMins);
-        const displayPillText = `${formattedTotal} (${rawFirstIn || '??:??:??'} - ${rawLastOut || '??:??:??'})`;
+          // Auto-Detección de Turno (o plantilla fija/override)
+          let assignedShift: ShiftTemplate | undefined = shiftTemplates.find((s) => s.id === override?.shiftId);
 
-        const block: DailyShiftBlock = {
-          shiftId: assignedShift.id,
-          shiftName: assignedShift.name,
-          shiftColor: assignedShift.color,
-          firstIn: rawFirstIn,
-          lastOut: rawLastOut,
-          grossMinutes: grossMins,
-          deductedTardinessMinutes: deductedTardinessMins,
-          deductedMissingMarksMinutes: deductedMissingMins,
-          netMinutes: netMins,
-          formattedTotal,
-          displayPillText,
-          isMissingMarks,
-          isTardy,
-          rawLogs: dayLogs,
-        };
+          if (!assignedShift) {
+            if (contract.shiftType === 'FIXED' && contract.defaultShiftId) {
+              assignedShift = shiftTemplates.find((s) => s.id === contract.defaultShiftId);
+            } else if (rawFirstIn) {
+              const firstInMins = timeToMinutes(rawFirstIn.slice(0, 5));
+              let closestDist = Infinity;
+              shiftTemplates.forEach((st) => {
+                const stStartMins = timeToMinutes(st.startTime);
+                const dist = Math.abs(firstInMins - stStartMins);
+                if (dist < closestDist) {
+                  closestDist = dist;
+                  assignedShift = st;
+                }
+              });
+            }
+          }
 
-        dailyBlocks[wDay.dateStr] = [block];
+          if (!assignedShift) {
+            assignedShift = shiftTemplates[0] || {
+              id: 'SHIFT-DEFAULT',
+              name: 'Turno Regular',
+              startTime: '06:00',
+              endTime: '14:00',
+              targetMinutes: 480,
+              color: '#3B82F6',
+            };
+          }
+
+          // Evaluación de Marcas Faltantes y Tardanza
+          const isMissingMarks = !rawFirstIn || !rawLastOut;
+          let isTardy = false;
+
+          if (rawFirstIn && assignedShift) {
+            const actualInMins = timeToMinutes(rawFirstIn.slice(0, 5));
+            const shiftStartMins = timeToMinutes(assignedShift.startTime);
+            if (actualInMins - shiftStartMins > 5) {
+              isTardy = true;
+            }
+          }
+
+          // Cálculo de Minutos Brutos
+          let grossMins = 0;
+          if (rawFirstIn && rawLastOut) {
+            const inMins = timeToMinutes(rawFirstIn.slice(0, 5));
+            const outMins = timeToMinutes(rawLastOut.slice(0, 5));
+            grossMins = outMins >= inMins ? outMins - inMins : (1440 - inMins) + outMins;
+          } else {
+            grossMins = assignedShift.targetMinutes || 480;
+          }
+
+          const deductedTardinessMins = isTardy ? 30 : 0;
+          const deductedMissingMins   = isMissingMarks ? 30 : 0;
+          const netMins = Math.max(0, grossMins - deductedTardinessMins - deductedMissingMins);
+
+          totalGrossMins += grossMins;
+          totalTardyDeductedMins += deductedTardinessMins;
+          totalMissingDeductedMins += deductedMissingMins;
+
+          const formattedTotal = formatMinutesToHHMM(netMins);
+          const displayPillText = `${formattedTotal} (${rawFirstIn || '??:??:??'} - ${rawLastOut || '??:??:??'})`;
+
+          dayBlocks.push({
+            shiftId: assignedShift.id,
+            shiftName: assignedShift.name,
+            shiftColor: assignedShift.color,
+            firstIn: rawFirstIn,
+            lastOut: rawLastOut,
+            grossMinutes: grossMins,
+            deductedTardinessMinutes: deductedTardinessMins,
+            deductedMissingMarksMinutes: deductedMissingMins,
+            netMinutes: netMins,
+            formattedTotal,
+            displayPillText,
+            isMissingMarks,
+            isTardy,
+            rawLogs: pair.logs,
+          });
+        });
+
+        dailyBlocks[wDay.dateStr] = dayBlocks;
       });
 
       // Cálculo de Nómina Semanal acumulada

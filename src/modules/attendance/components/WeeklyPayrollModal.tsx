@@ -217,20 +217,31 @@ function EditableEmployeePayrollCard({
                   <span className="text-[9px] font-bold text-gray-400">{d.dateStr.slice(8, 10)}</span>
                 </div>
 
-                {/* Horas de Llegada (Entrada) y Salida */}
-                <div className="w-full bg-white rounded-lg p-1 border border-gray-200/90 text-[9px] font-extrabold flex flex-col gap-0.5 shadow-2xs">
-                  <div className="flex items-center justify-between text-emerald-800">
-                    <span className="text-gray-400 font-bold text-[8px]">Ent:</span>
-                    <span className={firstIn ? 'text-emerald-700 font-black' : 'text-gray-300 font-normal'}>
-                      {firstIn || '--:--'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between text-amber-800">
-                    <span className="text-gray-400 font-bold text-[8px]">Sal:</span>
-                    <span className={lastOut ? 'text-amber-700 font-black' : 'text-gray-300 font-normal'}>
-                      {lastOut || '--:--'}
-                    </span>
-                  </div>
+                {/* Horas de Llegada (Entrada) y Salida (Soporta Múltiples Turnos) */}
+                <div className="w-full bg-white rounded-lg p-1 border border-gray-200/90 text-[9px] font-extrabold flex flex-col gap-0.5 shadow-2xs max-h-16 overflow-y-auto">
+                  {blocks.length === 0 ? (
+                    <div className="flex items-center justify-between text-gray-300 font-normal py-1">
+                      <span className="text-[8px]">Ent:</span>
+                      <span>--:--</span>
+                    </div>
+                  ) : (
+                    blocks.map((blk, idx) => (
+                      <div key={idx} className="flex flex-col border-b border-gray-100 last:border-0 pb-0.5">
+                        <div className="flex items-center justify-between text-emerald-800">
+                          <span className="text-gray-400 font-bold text-[8px]">Ent{blocks.length > 1 ? `${idx+1}` : ''}:</span>
+                          <span className={blk.firstIn ? 'text-emerald-700 font-black' : 'text-gray-300 font-normal'}>
+                            {blk.firstIn ? blk.firstIn.slice(0, 5) : '--:--'}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-amber-800">
+                          <span className="text-gray-400 font-bold text-[8px]">Sal{blocks.length > 1 ? `${idx+1}` : ''}:</span>
+                          <span className={blk.lastOut ? 'text-amber-700 font-black' : 'text-gray-300 font-normal'}>
+                            {blk.lastOut ? blk.lastOut.slice(0, 5) : '--:--'}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
 
                 {/* Input Horas Trabajadas */}
