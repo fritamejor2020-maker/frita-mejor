@@ -17,15 +17,23 @@ export function AttendanceView() {
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
-  const [weekStartDate, setWeekStartDate] = useState<Date>(() => {
-    const now = new Date();
-    const day = now.getDay();
+  const [activeDate, setActiveDate] = useState<Date>(new Date());
+
+  const selectedDateStr = useMemo(() => {
+    const year = activeDate.getFullYear();
+    const month = String(activeDate.getMonth() + 1).padStart(2, '0');
+    const day = String(activeDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [activeDate]);
+
+  const weekStartDate = useMemo(() => {
+    const day = activeDate.getDay();
     const diff = day === 0 ? 6 : day - 1; // Lunes como primer día de la semana
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - diff);
+    const monday = new Date(activeDate);
+    monday.setDate(activeDate.getDate() - diff);
     monday.setHours(0, 0, 0, 0);
     return monday;
-  });
+  }, [activeDate]);
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -86,52 +94,51 @@ export function AttendanceView() {
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">
       {/* Header Superior con Botón de Nómina */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
-            ⏱️ Control de Asistencia y Turnos
-          </h1>
-          <p className="text-xs font-bold text-gray-500 mt-0.5">
-            Visualización Timeline/Gantt, auto-detección de turnos, penalizaciones y liquidación semanal.
-          </p>
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => navigate('/dashboard')}
+            className="p-2 bg-white hover:bg-gray-100 rounded-xl text-gray-700 font-bold border border-gray-200 flex items-center gap-1.5 text-xs transition-colors shadow-2xs cursor-pointer"
+          >
+            <ArrowLeft size={16} /> Menú
+          </button>
+          <div>
+            <h1 className="text-xl sm:text-2xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+              <Clock className="text-amber-500" size={26} /> Control de Asistencia y Turnos
+            </h1>
+            <p className="text-xs text-gray-500 font-medium hidden sm:block">
+              Visualización Timeline/Gantt, auto-detección de turnos, penalizaciones y liquidación semanal.
+            </p>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 self-start sm:self-auto">
+        <div className="flex items-center gap-2">
           <button
             onClick={() => {
               setSelectedPayrollEmp(undefined);
               setShowPayrollModal(true);
             }}
-            className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-4 py-2.5 rounded-2xl flex items-center gap-2 transition-all shadow-sm cursor-pointer"
+            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer border border-amber-300"
           >
-            <DollarSign size={16} />
-            Ver Liquidación Semanal ($)
-          </button>
-          <button
-            onClick={() => navigate('/')}
-            className="bg-white hover:bg-gray-100 text-gray-600 font-bold text-xs px-3 py-2.5 rounded-2xl flex items-center gap-1.5 transition-all border border-gray-200 cursor-pointer"
-          >
-            <ArrowLeft size={14} />
-            Menú
+            <DollarSign size={18} /> Ver Liquidación Semanal ($)
           </button>
           <button
             onClick={signOut}
-            className="bg-white hover:bg-red-50 text-red-500 font-bold text-xs px-3 py-2.5 rounded-2xl flex items-center gap-1.5 transition-all border border-red-100 cursor-pointer"
+            className="p-2.5 text-red-600 hover:bg-red-50 rounded-2xl transition-colors border border-red-200 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            title="Cerrar Sesión"
           >
-            <LogOut size={14} />
-            Cerrar Sesión
+            <LogOut size={16} /> <span className="hidden sm:inline">Cerrar Sesión</span>
           </button>
         </div>
       </div>
 
-      {/* Toast de Sincronización */}
+      {/* Banner de Estado de Sincronización */}
       {syncToast && (
-        <div className="mb-4 bg-emerald-900 text-emerald-100 px-4 py-2.5 rounded-2xl text-xs font-black flex items-center justify-between shadow-md animate-in fade-in duration-200">
+        <div className="mb-4 bg-emerald-600 text-white font-black text-xs sm:text-sm p-3.5 rounded-2xl shadow-md flex items-center justify-between animate-in fade-in slide-in-from-top duration-200">
           <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-400" />
+            <CheckCircle2 size={18} />
             <span>{syncToast}</span>
           </div>
-          <button onClick={() => setSyncToast(null)} className="text-emerald-300 hover:text-white">✕</button>
         </div>
       )}
 
@@ -139,8 +146,8 @@ export function AttendanceView() {
       <AttendanceToolbar
         viewMode={viewMode}
         setViewMode={setViewMode}
-        weekStartDate={weekStartDate}
-        setWeekStartDate={setWeekStartDate}
+        activeDate={activeDate}
+        setActiveDate={setActiveDate}
         selectedBranchId={selectedBranchId}
         setSelectedBranchId={setSelectedBranchId}
         isFullscreen={isFullscreen}
@@ -165,6 +172,7 @@ export function AttendanceView() {
 
         <TimelineGridPanel
           viewMode={viewMode}
+          selectedDateStr={selectedDateStr}
           weekDays={viewMode === 'week' ? weekDays : [weekDays[0]]}
           payrollList={payrollList}
           onSelectBlock={(emp, dateStr, block) => {

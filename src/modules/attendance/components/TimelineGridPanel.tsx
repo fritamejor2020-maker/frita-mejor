@@ -4,6 +4,7 @@ import { AlertTriangle, HelpCircle, Clock } from 'lucide-react';
 
 interface TimelineGridPanelProps {
   viewMode: 'week' | 'day';
+  selectedDateStr?: string;
   weekDays: { dateStr: string; dayLabel: string; dayName: string; isToday: boolean }[];
   payrollList: EmployeeWeeklyPayroll[];
   onSelectBlock: (emp: EmployeeWeeklyPayroll, dateStr: string, block: DailyShiftBlock) => void;
@@ -22,14 +23,16 @@ const HOURS_24 = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '
 
 export function TimelineGridPanel({
   viewMode,
+  selectedDateStr,
   weekDays,
   payrollList,
   onSelectBlock,
   onAddBlock,
 }: TimelineGridPanelProps) {
   const isDayView = viewMode === 'day';
-  const targetDay = weekDays[0];
-  const targetDateStr = targetDay?.dateStr || new Date().toISOString().slice(0, 10);
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const targetDateStr = selectedDateStr || weekDays.find((d) => d.isToday)?.dateStr || todayStr;
+  const targetDay = weekDays.find((d) => d.dateStr === targetDateStr) || { dateStr: targetDateStr, isToday: targetDateStr === todayStr };
 
   // Minutos actuales para la línea roja de hora actual
   const now = new Date();

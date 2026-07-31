@@ -6,8 +6,8 @@ import { useAuthStore } from '../../../store/useAuthStore';
 interface AttendanceToolbarProps {
   viewMode: 'week' | 'day';
   setViewMode: (mode: 'week' | 'day') => void;
-  weekStartDate: Date;
-  setWeekStartDate: (d: Date) => void;
+  activeDate: Date;
+  setActiveDate: (d: Date) => void;
   selectedBranchId: string | null;
   setSelectedBranchId: (id: string | null) => void;
   isFullscreen: boolean;
@@ -19,8 +19,8 @@ interface AttendanceToolbarProps {
 export function AttendanceToolbar({
   viewMode,
   setViewMode,
-  weekStartDate,
-  setWeekStartDate,
+  activeDate,
+  setActiveDate,
   selectedBranchId,
   setSelectedBranchId,
   isFullscreen,
@@ -40,30 +40,33 @@ export function AttendanceToolbar({
 
   // Navegar semana/día previo o siguiente
   const handlePrev = () => {
-    const d = new Date(weekStartDate);
+    const d = new Date(activeDate);
     d.setDate(d.getDate() - (viewMode === 'week' ? 7 : 1));
-    setWeekStartDate(d);
+    setActiveDate(d);
   };
 
   const handleNext = () => {
-    const d = new Date(weekStartDate);
+    const d = new Date(activeDate);
     d.setDate(d.getDate() + (viewMode === 'week' ? 7 : 1));
-    setWeekStartDate(d);
+    setActiveDate(d);
   };
 
   const handleToday = () => {
-    const now = new Date();
-    const day = now.getDay();
-    const diff = day === 0 ? 6 : day - 1; // Lunes como primer día
-    const monday = new Date(now);
-    monday.setDate(now.getDate() - diff);
-    monday.setHours(0, 0, 0, 0);
-    setWeekStartDate(monday);
+    setActiveDate(new Date());
   };
 
-  // Rango formateado ej. "Semana 30, de 20 jul a 26 jul 2026"
+  // Rango formateado ej. "Viernes, 31 de Julio de 2026"
   const getFormattedRange = () => {
-    const monday = new Date(weekStartDate);
+    if (viewMode === 'day') {
+      const formatted = activeDate.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+      return formatted.charAt(0).toUpperCase() + formatted.slice(1);
+    }
+
+    const day = activeDate.getDay();
+    const diff = day === 0 ? 6 : day - 1;
+    const monday = new Date(activeDate);
+    monday.setDate(activeDate.getDate() - diff);
+
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
 
@@ -72,10 +75,6 @@ export function AttendanceToolbar({
     const endDay = sunday.getDate();
     const endMonth = sunday.toLocaleDateString('es-CO', { month: 'short' });
     const year = sunday.getFullYear();
-
-    if (viewMode === 'day') {
-      return monday.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
-    }
 
     return `De ${startDay} ${startMonth} a ${endDay} ${endMonth} (${year})`;
   };
