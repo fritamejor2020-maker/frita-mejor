@@ -108,7 +108,7 @@ const INITIAL_TERMINALS: BiometricTerminal[] = [
     id: 'TERM-001',
     name: 'Biométrico Entrada Principal',
     branchId: 'BRANCH-001',
-    ipAddress: '192.168.3.220',
+    ipAddress: '181.174.230.92',
     port: 80,
     username: 'admin',
     password: 'Control.1',
