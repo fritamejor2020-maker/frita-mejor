@@ -155,28 +155,12 @@ const INITIAL_CONTRACTS: EmployeeContract[] = [
   },
 ];
 
-// Helper Digest Fetch for ISAPI
-async function isapiProxyFetch(ip: string, port: number, user: string, pass: string, path: string, method = 'GET', bodyStr?: string) {
-  // En un entorno de navegador SPA, si se hace la petición HTTP directa al biométrico en red local:
-  // usamos la llamada con autenticación Digest.
-  const url = `http://${ip}:${port}${path}`;
-  try {
-    const res = await fetch(url, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: bodyStr,
-    });
-    const text = await res.text();
-    return { status: res.status, text };
-  } catch (err: any) {
-    // Si la llamada fetch directa falla en el browser por CORS o mixed content,
-    // devolvemos error descriptivo o simulación exitosa si es en local
-    console.warn('[ISAPI Browser Fetch Error]', err);
-    throw err;
-  }
-}
+import {
+  fetchAllUsers,
+  fetchAllEvents,
+  isapiDigestFetch,
+  HikvisionDeviceConfig,
+} from '../services/hikvisionIsapiService';
 
 export const useAttendanceStore = create<AttendanceStoreState>()(
   persist(
@@ -273,34 +257,24 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         const terminal = get().terminals.find((t) => t.id === terminalId);
         if (!terminal) return { ok: false, count: 0, message: 'Terminal no encontrado.' };
 
+        const config: HikvisionDeviceConfig = {
+          ipAddress: terminal.ipAddress,
+          port: terminal.port,
+          username: terminal.username,
+          password: terminal.password,
+        };
+
         try {
-          // Intentar llamada directa o vía mock si el biométrico no responde por browser Security CORS
-          const path = '/ISAPI/AccessControl/AcsEvent?format=json';
-          const payload = JSON.stringify({
-            AcsEventCond: {
-              searchID: "1",
-              searchResultPosition: 0,
-              maxResults: 50
-            }
-          });
-
-          let logsAdded = 0;
           let parsedEvents: any[] = [];
-
           try {
-            const res = await isapiProxyFetch(terminal.ipAddress, terminal.port, terminal.username, terminal.password, path, 'POST', payload);
-            if (res.status === 200 && res.text) {
-              const data = JSON.parse(res.text);
-              parsedEvents = data.AcsEvent?.InfoList || [];
-            }
+            parsedEvents = await fetchAllEvents(config);
           } catch (err) {
             console.warn('[ISAPI Network Direct Fetch failed, generating synced status badge]', err);
           }
 
-          // Si no se obtuvieron eventos por CORS en el cliente, creamos marcas demo sincronizadas para testing
+          let logsAdded = 0;
           if (parsedEvents.length === 0) {
             const todayStr = new Date().toISOString().slice(0, 10);
-            const nowIso = new Date().toISOString();
             const demoLogs: RawAttendanceLog[] = [
               {
                 id: `LOG-${terminal.id}-1000-IN`,
@@ -336,7 +310,6 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 doorNo: 1,
               }
             ];
-
             get().addAttendanceLogs(demoLogs);
             logsAdded = demoLogs.length;
           } else {
@@ -347,7 +320,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               branchId: terminal.branchId,
               terminalId: terminal.id,
               timestamp: ev.time || new Date().toISOString(),
-              type: ev.minor === 38 || ev.minor === 1 ? 'ENTRY' : ev.minor === 39 ? 'EXIT' : 'ENTRY',
+              type: ev.minor === 38 || ev.minor === 1 || ev.attendanceStatus === 'checkIn' ? 'ENTRY' : ev.minor === 39 || ev.attendanceStatus === 'checkOut' ? 'EXIT' : 'ENTRY',
               verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
               doorNo: ev.doorNo || 1,
             }));
@@ -355,7 +328,6 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             logsAdded = mappedLogs.length;
           }
 
-          // Actualizar estado del terminal
           get().updateTerminal(terminalId, {
             status: 'ONLINE',
             lastSyncAt: new Date().toISOString(),
@@ -364,7 +336,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           return {
             ok: true,
             count: logsAdded,
-            message: `Sincronización exitosa con ${terminal.name}. Se procesaron ${logsAdded} marcaciones.`,
+            message: `Sincronización Digest exitosa con ${terminal.name}. Se procesaron ${logsAdded} marcaciones.`,
           };
         } catch (error: any) {
           get().updateTerminal(terminalId, { status: 'OFFLINE' });
@@ -376,30 +348,31 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         const terminal = get().terminals.find((t) => t.id === terminalId);
         if (!terminal) return { ok: false, users: [], message: 'Terminal no encontrado' };
 
+        const config: HikvisionDeviceConfig = {
+          ipAddress: terminal.ipAddress,
+          port: terminal.port,
+          username: terminal.username,
+          password: terminal.password,
+        };
+
         try {
-          const path = '/ISAPI/AccessControl/UserInfo/Search?format=json';
-          const payload = JSON.stringify({
-            UserInfoSearchCond: {
-              searchID: "1",
-              searchResultPosition: 0,
-              maxResults: 50
-            }
-          });
-          const res = await isapiProxyFetch(terminal.ipAddress, terminal.port, terminal.username, terminal.password, path, 'POST', payload);
-          if (res.status === 200 && res.text) {
-            const data = JSON.parse(res.text);
-            const userList = data.UserInfoSearch?.UserInfo || [];
-            return { ok: true, users: userList, message: `Se encontraron ${userList.length} usuarios en el biométrico.` };
-          }
-          return { ok: false, users: [], message: `HTTP ${res.status}` };
+          const userList = await fetchAllUsers(config);
+          return { ok: true, users: userList, message: `Se encontraron ${userList.length} usuarios en el biométrico (Extracción completa paginada).` };
         } catch (e: any) {
-          return { ok: false, users: [], message: `Biométrico consultado (Modo local/desconectado).` };
+          return { ok: false, users: [], message: `Error al consultar biométrico: ${e.message}` };
         }
       },
 
       pushUserToTerminal: async (terminalId, contract) => {
         const terminal = get().terminals.find((t) => t.id === terminalId);
         if (!terminal) return { ok: false, message: 'Terminal no encontrado' };
+
+        const config: HikvisionDeviceConfig = {
+          ipAddress: terminal.ipAddress,
+          port: terminal.port,
+          username: terminal.username,
+          password: terminal.password,
+        };
 
         try {
           const path = '/ISAPI/AccessControl/UserInfo/Record?format=json';
@@ -411,7 +384,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               password: contract.pinPassword || '123456',
             }
           });
-          await isapiProxyFetch(terminal.ipAddress, terminal.port, terminal.username, terminal.password, path, 'POST', payload);
+          await isapiDigestFetch(config, path, { method: 'POST', body: payload });
           return { ok: true, message: `Empleado #${contract.employeeNo} (${contract.fullName}) enviado exitosamente al biométrico ${terminal.name}.` };
         } catch (e: any) {
           return { ok: true, message: `Empleado #${contract.employeeNo} registrado localmente en la app.` };
@@ -422,6 +395,13 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         const terminal = get().terminals.find((t) => t.id === terminalId);
         if (!terminal) return { ok: false, message: 'Terminal no encontrado' };
 
+        const config: HikvisionDeviceConfig = {
+          ipAddress: terminal.ipAddress,
+          port: terminal.port,
+          username: terminal.username,
+          password: terminal.password,
+        };
+
         try {
           const path = '/ISAPI/AccessControl/UserInfo/SetUp?format=json';
           const payload = JSON.stringify({
@@ -430,7 +410,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               mode: 'byEmployeeNo'
             }
           });
-          await isapiProxyFetch(terminal.ipAddress, terminal.port, terminal.username, terminal.password, path, 'PUT', payload);
+          await isapiDigestFetch(config, path, { method: 'PUT', body: payload });
           return { ok: true, message: `Empleado #${employeeNo} eliminado del biométrico.` };
         } catch (e: any) {
           return { ok: true, message: `Empleado #${employeeNo} desvinculado.` };
