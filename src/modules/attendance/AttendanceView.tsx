@@ -161,6 +161,7 @@ export function AttendanceView() {
         />
 
         <TimelineGridPanel
+          viewMode={viewMode}
           weekDays={viewMode === 'week' ? weekDays : [weekDays[0]]}
           payrollList={payrollList}
           onSelectBlock={(emp, dateStr, block) => {
