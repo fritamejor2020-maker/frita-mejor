@@ -163,24 +163,65 @@ function EditableEmployeePayrollCard({
 
   return (
     <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 space-y-3.5 transition-all hover:border-amber-300">
-      {/* Empleado Header & Pago Total */}
-      <div className="flex items-center justify-between border-b border-gray-200/80 pb-2.5">
+      {/* Empleado Header, Penalizaciones (Tardanza/Olvidos) Al Lado del Nombre & Pago Total */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
+        {/* Nombre e Info del Empleado */}
         <div className="flex items-center gap-3">
           <div
-            className="w-9 h-9 rounded-full flex items-center justify-center font-black text-xs text-white shadow-sm"
+            className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white shadow-sm shrink-0"
             style={{ backgroundColor: emp.avatarColor }}
           >
             {emp.initials}
           </div>
           <div>
-            <h4 className="font-black text-sm text-gray-900">{emp.fullName}</h4>
+            <h4 className="font-black text-sm text-gray-900 leading-tight">{emp.fullName}</h4>
             <span className="text-[10px] font-bold text-gray-400">
               ID #{emp.employeeNo} • Sede: {emp.branchId}
             </span>
           </div>
         </div>
 
-        <div className="text-right">
+        {/* Controles de Penalización (Llegadas Tarde y Olvidos Marca) Al Lado del Nombre */}
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Llegadas Tarde */}
+          <div className="bg-amber-50/90 border border-amber-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
+            <div>
+              <span className="text-[9px] font-black text-amber-900 uppercase block leading-none">Llegadas Tarde</span>
+              <span className="text-[8px] text-amber-700 font-bold leading-none">-30m (-{deductedTardinessHours}h)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                value={tardinessCount}
+                onChange={(e) => setTardinessCount(Math.max(0, Number(e.target.value) || 0))}
+                className="w-10 bg-white border border-amber-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-amber-950 outline-none focus:border-amber-500"
+              />
+              <span className="text-[10px] font-bold text-amber-800">x</span>
+            </div>
+          </div>
+
+          {/* Olvidos Marca */}
+          <div className="bg-red-50/90 border border-red-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
+            <div>
+              <span className="text-[9px] font-black text-red-900 uppercase block leading-none">Olvidos Marca</span>
+              <span className="text-[8px] text-red-700 font-bold leading-none">-30m (-{deductedMissingMarksHours}h)</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <input
+                type="number"
+                min="0"
+                value={missingMarksCount}
+                onChange={(e) => setMissingMarksCount(Math.max(0, Number(e.target.value) || 0))}
+                className="w-10 bg-white border border-red-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-red-950 outline-none focus:border-red-500"
+              />
+              <span className="text-[10px] font-bold text-red-800">x</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Pago Total Calculado */}
+        <div className="text-right shrink-0">
           <span className="text-[10px] text-gray-400 block font-bold uppercase">Pago Total Calculado</span>
           <span className="text-lg font-black text-emerald-600">
             ${totalPay.toLocaleString('es-CO')}
@@ -261,42 +302,7 @@ function EditableEmployeePayrollCard({
         </div>
       </div>
 
-      {/* ── 2. Ajustes de Penalizaciones (Tardanzas y Faltas de Marca) ──────── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-        <div className="bg-amber-50/70 border border-amber-200 rounded-xl p-2.5 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black text-amber-900 uppercase block">Llegadas Tarde (&gt;5m)</span>
-            <span className="text-[10px] text-amber-700 font-bold">Descuento: -{deductedTardinessHours} h</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="0"
-              value={tardinessCount}
-              onChange={(e) => setTardinessCount(Math.max(0, Number(e.target.value) || 0))}
-              className="w-14 bg-white border border-amber-300 rounded-lg px-2 py-1 text-center text-xs font-black text-amber-950 outline-none focus:border-amber-500"
-            />
-            <span className="text-xs font-bold text-amber-800">veces</span>
-          </div>
-        </div>
 
-        <div className="bg-red-50/70 border border-red-200 rounded-xl p-2.5 flex items-center justify-between">
-          <div>
-            <span className="text-[10px] font-black text-red-900 uppercase block">Olvidos Marca (Ent/Sal)</span>
-            <span className="text-[10px] text-red-700 font-bold">Descuento: -{deductedMissingMarksHours} h</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="0"
-              value={missingMarksCount}
-              onChange={(e) => setMissingMarksCount(Math.max(0, Number(e.target.value) || 0))}
-              className="w-14 bg-white border border-red-300 rounded-lg px-2 py-1 text-center text-xs font-black text-red-950 outline-none focus:border-red-500"
-            />
-            <span className="text-xs font-bold text-red-800">veces</span>
-          </div>
-        </div>
-      </div>
 
       {/* ── 3. Parámetros de Contrato & Tarifas ──────────────────────────────── */}
       <div className="bg-white p-2.5 rounded-xl border border-gray-200 grid grid-cols-3 gap-2 text-xs font-bold">
