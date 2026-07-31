@@ -73,7 +73,7 @@ export function TimelineGridPanel({
               const blocks = emp.dailyBlocks[targetDateStr] || [];
 
               return (
-                <div key={emp.employeeId} className="h-[68px] flex relative hover:bg-amber-50/20 transition-colors group/row">
+                <div key={emp.employeeId} className="h-[46px] flex relative hover:bg-amber-50/20 transition-colors group/row">
                   {/* Cuadrícula de fondo de 24 horas */}
                   {HOURS_24.map((_, hIdx) => (
                     <div
@@ -98,7 +98,7 @@ export function TimelineGridPanel({
                       <div
                         key={bIdx}
                         onClick={() => onSelectBlock(emp, targetDateStr, b)}
-                        className={`absolute top-2.5 bottom-2.5 rounded-2xl px-3 flex items-center justify-between text-xs font-black transition-all cursor-pointer shadow-sm border select-none overflow-hidden z-10 hover:scale-[1.01] hover:shadow-md ${
+                        className={`absolute top-1.5 bottom-1.5 rounded-xl px-2.5 flex items-center justify-between text-xs font-black transition-all cursor-pointer shadow-2xs border select-none overflow-hidden z-10 hover:scale-[1.01] hover:shadow-sm ${
                           b.isTardy || b.isMissingMarks
                             ? 'bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-200'
                             : 'bg-emerald-100 border-emerald-300 text-emerald-950 hover:bg-emerald-200'
@@ -110,9 +110,9 @@ export function TimelineGridPanel({
                         title={`${b.shiftName}: ${b.displayPillText}`}
                       >
                         {/* Etiqueta de hora e información */}
-                        <div className="flex items-center gap-2 truncate min-w-0">
+                        <div className="flex items-center gap-1.5 truncate min-w-0">
                           {emp.isPresentNow && !b.lastOut && (
-                            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping shrink-0" />
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping shrink-0" />
                           )}
                           <span className="truncate font-black text-xs">
                             {b.firstIn ? b.firstIn.slice(0, 5) : '??:??'} - {b.lastOut ? b.lastOut.slice(0, 5) : 'Sin Salida'}
@@ -122,10 +122,10 @@ export function TimelineGridPanel({
                         {/* Indicadores de Penalización / Alerta */}
                         <div className="flex items-center gap-1 shrink-0 ml-1">
                           {b.isTardy && (
-                            <AlertTriangle size={14} className="text-amber-600 shrink-0" title="Tardanza (>5 min) -> -30m" />
+                            <AlertTriangle size={13} className="text-amber-600 shrink-0" title="Tardanza (>5 min) -> -30m" />
                           )}
                           {b.isMissingMarks && (
-                            <HelpCircle size={14} className="text-red-500 shrink-0" title="Falta marca de salida -> -30m" />
+                            <HelpCircle size={13} className="text-red-500 shrink-0" title="Falta marca de salida -> -30m" />
                           )}
                         </div>
                       </div>
@@ -136,7 +136,7 @@ export function TimelineGridPanel({
                   {blocks.length === 0 && (
                     <button
                       onClick={() => onAddBlock(emp, targetDateStr)}
-                      className="absolute inset-x-2 top-2 bottom-2 rounded-xl border border-dashed border-transparent group-hover/row:border-gray-300 text-gray-300 group-hover/row:text-gray-500 font-bold text-xs flex items-center justify-center transition-all opacity-0 group-hover/row:opacity-100 cursor-pointer bg-white/60 z-10"
+                      className="absolute inset-x-2 top-1.5 bottom-1.5 rounded-lg border border-dashed border-transparent group-hover/row:border-gray-300 text-gray-300 group-hover/row:text-gray-500 font-bold text-xs flex items-center justify-center transition-all opacity-0 group-hover/row:opacity-100 cursor-pointer bg-white/60 z-10"
                     >
                       + Registrar Marcación / Asignar Turno
                     </button>
@@ -172,7 +172,7 @@ export function TimelineGridPanel({
         {/* Filas de la Cuadrícula (Sincronizadas con la lista izquierda) */}
         <div className="divide-y divide-gray-100">
           {payrollList.map((emp) => (
-            <div key={emp.employeeId} className="h-[68px] flex hover:bg-amber-50/20 transition-colors">
+            <div key={emp.employeeId} className="h-[46px] flex hover:bg-amber-50/20 transition-colors">
               {weekDays.map((day) => {
                 const blocks = emp.dailyBlocks[day.dateStr] || [];
 
