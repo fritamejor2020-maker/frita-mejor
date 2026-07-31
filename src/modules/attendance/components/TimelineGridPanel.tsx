@@ -73,7 +73,7 @@ export function TimelineGridPanel({
               const blocks = emp.dailyBlocks[targetDateStr] || [];
 
               return (
-                <div key={emp.employeeId} className="h-[46px] flex relative hover:bg-amber-50/20 transition-colors group/row">
+                <div key={emp.employeeId} className="h-[36px] flex relative hover:bg-amber-50/20 transition-colors group/row">
                   {/* Cuadrícula de fondo de 24 horas */}
                   {HOURS_24.map((_, hIdx) => (
                     <div
@@ -172,7 +172,7 @@ export function TimelineGridPanel({
         {/* Filas de la Cuadrícula (Sincronizadas con la lista izquierda) */}
         <div className="divide-y divide-gray-100">
           {payrollList.map((emp) => (
-            <div key={emp.employeeId} className="h-[46px] flex hover:bg-amber-50/20 transition-colors">
+            <div key={emp.employeeId} className="h-[36px] flex hover:bg-amber-50/20 transition-colors">
               {weekDays.map((day) => {
                 const blocks = emp.dailyBlocks[day.dateStr] || [];
 

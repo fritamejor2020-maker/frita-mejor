@@ -30,34 +30,25 @@ export function EmployeeStickyPanel({ payrollList, onSelectEmployee, onManageEmp
           <div
             key={emp.employeeId}
             onClick={() => onSelectEmployee(emp)}
-            className={`h-[46px] px-3 flex items-center gap-2 transition-all cursor-pointer select-none group hover:bg-amber-50/40 ${
+            className={`h-[36px] px-3 flex items-center justify-between transition-all cursor-pointer select-none group hover:bg-amber-50/40 ${
               emp.isPresentNow ? 'bg-emerald-50/80 border-l-4 border-l-emerald-500' : 'bg-white'
             }`}
           >
-            {/* Avatar Circular con Iniciales */}
-            <div
-              className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center font-black text-[10px] text-white shadow-2xs ring-1 ring-white"
-              style={{ backgroundColor: emp.avatarColor || '#3B82F6' }}
-            >
-              {emp.initials}
-            </div>
+            {/* Nombre, ID y Estado (Sin círculo de avatar) */}
+            <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+              <span className="font-black text-xs text-gray-900 truncate leading-none group-hover:text-amber-700">
+                {emp.fullName}
+              </span>
 
-            {/* Nombre y Estado */}
-            <div className="min-w-0 flex-1">
-              <div className="flex items-center justify-between gap-1">
-                <span className="font-black text-xs text-gray-900 truncate leading-tight group-hover:text-amber-700">
-                  {emp.fullName}
-                </span>
-                <span className="text-[10px] font-bold text-gray-400 shrink-0">#{emp.employeeNo}</span>
-              </div>
-              <div className="flex items-center gap-1.5 mt-0.5">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <span className="text-[10px] font-extrabold text-gray-400">#{emp.employeeNo}</span>
                 {emp.isPresentNow ? (
-                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-100/90 px-1.5 py-0.2 rounded-md flex items-center gap-1 leading-none">
+                  <span className="text-[9px] font-black text-emerald-700 bg-emerald-100/90 px-1.5 py-0.5 rounded-md flex items-center gap-1 leading-none">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     En Turno
                   </span>
                 ) : (
-                  <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.2 rounded-md leading-none">
+                  <span className="text-[9px] font-bold text-gray-400 bg-gray-100 px-1.5 py-0.5 rounded-md leading-none">
                     {emp.netHoursWorked}h
                   </span>
                 )}
