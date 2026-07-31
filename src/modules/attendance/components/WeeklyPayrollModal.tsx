@@ -195,22 +195,58 @@ function EditableEmployeePayrollCard({
           Línea de Tiempo Semanal — Ajustar Horas por Día:
         </label>
 
-        <div className="grid grid-cols-7 gap-1.5 bg-white p-2 rounded-xl border border-gray-200">
-          {daysList.map((d) => (
-            <div key={d.dateStr} className="flex flex-col items-center">
-              <span className="text-[10px] font-black text-gray-600">{d.dayName}</span>
-              <span className="text-[9px] font-bold text-gray-400 mb-1">{d.dateStr.slice(8, 10)}</span>
-              <input
-                type="number"
-                step="0.1"
-                min="0"
-                max="24"
-                value={dailyHours[d.dateStr] ?? 0}
-                onChange={(e) => handleDayHourChange(d.dateStr, e.target.value)}
-                className="w-full bg-gray-50 border border-gray-300 focus:border-amber-500 rounded-lg py-1 px-1 text-center text-xs font-black text-gray-900 outline-none"
-              />
-            </div>
-          ))}
+        <div className="grid grid-cols-7 gap-1.5 bg-white p-2 rounded-2xl border border-gray-200">
+          {daysList.map((d) => {
+            const blocks = emp.dailyBlocks[d.dateStr] || [];
+            const b = blocks[0];
+            const firstIn = b?.firstIn ? b.firstIn.slice(0, 5) : null;
+            const lastOut = b?.lastOut ? b.lastOut.slice(0, 5) : null;
+            const hasPunches = firstIn || lastOut;
+
+            return (
+              <div
+                key={d.dateStr}
+                className={`flex flex-col items-center p-1.5 rounded-xl border text-center space-y-1 transition-all ${
+                  hasPunches
+                    ? 'bg-amber-50/40 border-amber-200/90'
+                    : 'bg-gray-50/60 border-gray-200/60'
+                }`}
+              >
+                <div className="flex flex-col items-center leading-none">
+                  <span className="text-[10px] font-black text-gray-700">{d.dayName}</span>
+                  <span className="text-[9px] font-bold text-gray-400">{d.dateStr.slice(8, 10)}</span>
+                </div>
+
+                {/* Horas de Llegada (Entrada) y Salida */}
+                <div className="w-full bg-white rounded-lg p-1 border border-gray-200/90 text-[9px] font-extrabold flex flex-col gap-0.5 shadow-2xs">
+                  <div className="flex items-center justify-between text-emerald-800">
+                    <span className="text-gray-400 font-bold text-[8px]">Ent:</span>
+                    <span className={firstIn ? 'text-emerald-700 font-black' : 'text-gray-300 font-normal'}>
+                      {firstIn || '--:--'}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-amber-800">
+                    <span className="text-gray-400 font-bold text-[8px]">Sal:</span>
+                    <span className={lastOut ? 'text-amber-700 font-black' : 'text-gray-300 font-normal'}>
+                      {lastOut || '--:--'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Input Horas Trabajadas */}
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0"
+                  max="24"
+                  value={dailyHours[d.dateStr] ?? 0}
+                  onChange={(e) => handleDayHourChange(d.dateStr, e.target.value)}
+                  className="w-full bg-amber-100/60 border border-amber-300 focus:border-amber-500 rounded-lg py-1 px-0.5 text-center text-xs font-black text-amber-950 outline-none"
+                  title="Horas trabajadas calculadas para la nómina"
+                />
+              </div>
+            );
+          })}
         </div>
       </div>
 
