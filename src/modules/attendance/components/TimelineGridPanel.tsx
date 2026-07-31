@@ -23,11 +23,11 @@ export function TimelineGridPanel({
           {weekDays.map((day) => (
             <div
               key={day.dateStr}
-              className={`flex-1 min-w-[130px] border-r border-gray-200 px-3 flex flex-col justify-center items-center text-center font-black text-xs ${
+              className={`flex-1 min-w-[115px] border-r border-gray-200 px-2 flex flex-col justify-center items-center text-center font-black text-xs ${
                 day.isToday ? 'bg-amber-100/60 text-amber-900' : 'text-gray-600'
               }`}
             >
-              <span className="capitalize">{day.dayName}</span>
+              <span className="font-extrabold">{day.dayName}</span>
               <span className="text-[10px] text-gray-500 font-bold">{day.dateStr.slice(8, 10)}</span>
             </div>
           ))}
@@ -43,7 +43,7 @@ export function TimelineGridPanel({
                 return (
                   <div
                     key={day.dateStr}
-                    className={`flex-1 min-w-[130px] border-r border-gray-100 p-1.5 flex flex-col justify-center gap-1 relative group/cell ${
+                    className={`flex-1 min-w-[115px] border-r border-gray-100 p-1.5 flex flex-col justify-center gap-1 relative group/cell ${
                       day.isToday ? 'bg-amber-50/20' : ''
                     }`}
                   >

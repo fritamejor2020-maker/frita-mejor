@@ -81,11 +81,13 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
     const monday = new Date(weekStartDate);
     monday.setHours(0, 0, 0, 0);
 
+    const SHORT_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
       const dateStr = d.toISOString().slice(0, 10);
-      const dayName = d.toLocaleDateString('es-CO', { weekday: 'short' });
+      const dayName = SHORT_DAYS[d.getDay()];
       const dayNum  = d.getDate();
       weekDays.push({
         dateStr,
