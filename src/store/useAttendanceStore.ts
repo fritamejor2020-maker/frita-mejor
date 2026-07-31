@@ -193,13 +193,132 @@ import {
   HikvisionDeviceConfig,
 } from '../services/hikvisionIsapiService';
 
+export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [
+  {
+    id: 'LOG-TERM-001-8',
+    employeeId: 'EMP-1000',
+    employeeNo: '1000',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T06:07:54-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-13',
+    employeeId: 'EMP-1000',
+    employeeNo: '1000',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T14:16:27-05:00',
+    type: 'EXIT',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-18',
+    employeeId: 'EMP-2',
+    employeeNo: '2',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T14:04:10-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-25',
+    employeeId: 'EMP-1000',
+    employeeNo: '1000',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-31T06:12:30-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-28',
+    employeeId: 'EMP-3',
+    employeeNo: '3',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-31T06:30:15-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-31',
+    employeeId: 'EMP-4',
+    employeeNo: '4',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T07:15:00-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-34',
+    employeeId: 'EMP-5',
+    employeeNo: '5',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T07:30:00-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-37',
+    employeeId: 'EMP-6',
+    employeeNo: '6',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T08:00:00-05:00',
+    type: 'ENTRY',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-42',
+    employeeId: 'EMP-2',
+    employeeNo: '2',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-30T22:00:00-05:00',
+    type: 'EXIT',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  },
+  {
+    id: 'LOG-TERM-001-47',
+    employeeId: 'EMP-3',
+    employeeNo: '3',
+    branchId: 'BRANCH-001',
+    terminalId: 'TERM-001',
+    timestamp: '2026-07-31T14:30:00-05:00',
+    type: 'EXIT',
+    verifyMethod: 'BIOMETRIC',
+    doorNo: 1,
+  }
+];
+
+function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
+  const set = new Set((existing || []).map((l) => l.id));
+  const newLogs = INITIAL_BIOMETRIC_LOGS.filter((l) => !set.has(l.id));
+  return [...(existing || []), ...newLogs];
+}
+
 export const useAttendanceStore = create<AttendanceStoreState>()(
   persist(
     (set, get) => ({
       terminals: INITIAL_TERMINALS,
       shiftTemplates: INITIAL_SHIFTS,
       employeeContracts: INITIAL_CONTRACTS,
-      attendanceLogs: [],
+      attendanceLogs: INITIAL_BIOMETRIC_LOGS,
       shiftOverrides: [],
 
       addTerminal: (termData) => {
@@ -483,6 +602,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         ...currentState,
         ...persistedState,
         employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
+        attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs),
       }),
     }
   )
