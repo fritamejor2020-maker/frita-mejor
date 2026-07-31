@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { AttendanceToolbar } from './components/AttendanceToolbar';
 import { EmployeeStickyPanel } from './components/EmployeeStickyPanel';
 import { TimelineGridPanel } from './components/TimelineGridPanel';
