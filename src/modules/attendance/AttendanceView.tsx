@@ -170,6 +170,7 @@ export function AttendanceView() {
       {showPayrollModal && (
         <WeeklyPayrollModal
           payrollList={payrollList}
+          weekDays={weekDays}
           selectedEmployee={selectedPayrollEmp}
           onClose={() => setShowPayrollModal(false)}
         />
