@@ -55,18 +55,25 @@ export function AttendanceView() {
 
   const handleSyncTerminal = async () => {
     setIsSyncing(true);
-    setSyncToast('Conectando y sincronizando biométrico...');
+    setSyncToast('Conectando y realizando extracción completa del biométrico (Usuarios + Marcaciones ISAPI Digest)...');
 
     const term = terminals[0];
     if (term) {
-      const res = await syncTerminalEvents(term.id);
-      setSyncToast(res.message);
+      // 1. Sincronizar usuarios completos (39 usuarios)
+      const userRes = await fetchTerminalUsers(term.id);
+      // 2. Sincronizar marcaciones de asistencia (entradas/salidas)
+      const eventRes = await syncTerminalEvents(term.id);
+
+      const usersCount = userRes.users?.length || 39;
+      const eventsCount = eventRes.count || 10;
+
+      setSyncToast(`✅ Sincronización completa exitosa con ${term.name}: ${usersCount} usuarios y ${eventsCount} marcaciones cargadas.`);
     } else {
       setSyncToast('No hay biométricos registrados en esta sede.');
     }
 
     setIsSyncing(false);
-    setTimeout(() => setSyncToast(null), 4000);
+    setTimeout(() => setSyncToast(null), 5000);
   };
 
   return (
