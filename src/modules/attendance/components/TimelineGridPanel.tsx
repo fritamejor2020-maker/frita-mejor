@@ -85,14 +85,18 @@ export function TimelineGridPanel({
                   {/* Barras de Turno / Marcaciones estilo Gantt */}
                   {blocks.map((b, bIdx) => {
                     const startMins = parseTimeToMinutes(b.firstIn || '06:00');
+                    const now = new Date();
+                    const nowMins = now.getHours() * 60 + now.getMinutes();
+
+                    // Si no tiene salida (Sin Salida), limitar la barra exactamente al momento actual (AHORA) si es el día de hoy
                     const endMins = b.lastOut
                       ? parseTimeToMinutes(b.lastOut)
-                      : Math.min(1440, startMins + 480);
+                      : (isToday ? Math.max(startMins + 15, nowMins) : Math.min(1440, startMins + 480));
 
                     // Posicionamiento horizontal dinámico %
                     const leftPct = (startMins / 1440) * 100;
-                    const durationMins = Math.max(30, endMins >= startMins ? endMins - startMins : (1440 - startMins) + endMins);
-                    const widthPct = Math.min(100 - leftPct, Math.max(5, (durationMins / 1440) * 100));
+                    const durationMins = Math.max(15, endMins >= startMins ? endMins - startMins : (1440 - startMins) + endMins);
+                    const widthPct = Math.min(100 - leftPct, Math.max(2, (durationMins / 1440) * 100));
 
                     return (
                       <div
