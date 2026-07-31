@@ -91,7 +91,7 @@ export function TimelineGridPanel({
                     // Si no tiene salida (Sin Salida), limitar la barra exactamente al momento actual (AHORA) si es el día de hoy
                     const endMins = b.lastOut
                       ? parseTimeToMinutes(b.lastOut)
-                      : (isToday ? Math.max(startMins + 15, nowMins) : Math.min(1440, startMins + 480));
+                      : (targetDay.isToday ? Math.max(startMins + 15, nowMins) : Math.min(1440, startMins + 480));
 
                     // Posicionamiento horizontal dinámico %
                     const leftPct = (startMins / 1440) * 100;
