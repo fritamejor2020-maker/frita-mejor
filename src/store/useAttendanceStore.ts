@@ -82,6 +82,7 @@ interface AttendanceStoreState {
   // Contracts
   upsertEmployeeContract: (contract: EmployeeContract) => void;
   deleteEmployeeContract: (employeeId: string) => void;
+  updateGlobalRates: (targetHours: number, baseRate: number, overtimeRate: number) => void;
 
   // Logs & Overrides
   addAttendanceLogs: (logs: RawAttendanceLog[]) => void;
@@ -264,6 +265,18 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       deleteEmployeeContract: (employeeId) => {
         set((s) => ({
           employeeContracts: s.employeeContracts.filter((c) => c.employeeId !== employeeId),
+        }));
+        push('attendance_contracts', get().employeeContracts);
+      },
+
+      updateGlobalRates: (targetHours, baseRate, overtimeRate) => {
+        set((s) => ({
+          employeeContracts: s.employeeContracts.map((c) => ({
+            ...c,
+            weeklyTargetHours: targetHours,
+            baseHourlyRate: baseRate,
+            overtimeHourlyRate: overtimeRate,
+          })),
         }));
         push('attendance_contracts', get().employeeContracts);
       },

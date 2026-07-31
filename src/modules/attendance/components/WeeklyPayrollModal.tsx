@@ -84,11 +84,20 @@ function EditableEmployeePayrollCard({
 
   const [tardinessCount, setTardinessCount] = useState<number>(initialTardinessCount);
   const [missingMarksCount, setMissingMarksCount] = useState<number>(initialMissingMarksCount);
-  const [weeklyTargetHours, setWeeklyTargetHours] = useState<number>(emp.weeklyTargetHours || 44);
-  const [baseHourlyRate, setBaseHourlyRate] = useState<number>(emp.baseHourlyRate || 6500);
-  const [overtimeHourlyRate, setOvertimeHourlyRate] = useState<number>(emp.overtimeHourlyRate || 9750);
+  const [weeklyTargetHours, setWeeklyTargetHours] = useState<number>(contract?.weeklyTargetHours || emp.weeklyTargetHours || 44);
+  const [baseHourlyRate, setBaseHourlyRate] = useState<number>(contract?.baseHourlyRate || emp.baseHourlyRate || 6500);
+  const [overtimeHourlyRate, setOvertimeHourlyRate] = useState<number>(contract?.overtimeHourlyRate || emp.overtimeHourlyRate || 9750);
 
   const [isSaved, setIsSaved] = useState(false);
+
+  // Sincronizar automáticamente si se actualizan las tarifas globales
+  React.useEffect(() => {
+    if (contract) {
+      setWeeklyTargetHours(contract.weeklyTargetHours || 44);
+      setBaseHourlyRate(contract.baseHourlyRate || 6500);
+      setOvertimeHourlyRate(contract.overtimeHourlyRate || 9750);
+    }
+  }, [contract?.weeklyTargetHours, contract?.baseHourlyRate, contract?.overtimeHourlyRate]);
 
   // ── Recálculo en tiempo real ──────────────────────────────────────────────
   const grossHours = Number(Object.values(dailyHours).reduce((acc, h) => acc + Number(h || 0), 0).toFixed(2));
@@ -340,6 +349,20 @@ export function WeeklyPayrollModal({
   selectedEmployee,
   onClose,
 }: WeeklyPayrollModalProps) {
+  const { updateGlobalRates, employeeContracts } = useAttendanceStore();
+  const firstContract = employeeContracts[0];
+
+  const [globalTargetHours, setGlobalTargetHours] = useState<number>(firstContract?.weeklyTargetHours || 44);
+  const [globalBaseRate, setGlobalBaseRate] = useState<number>(firstContract?.baseHourlyRate || 6500);
+  const [globalOvertimeRate, setGlobalOvertimeRate] = useState<number>(firstContract?.overtimeHourlyRate || 9750);
+  const [isGlobalSaved, setIsGlobalSaved] = useState(false);
+
+  const handleApplyGlobalRates = () => {
+    updateGlobalRates(globalTargetHours, globalBaseRate, globalOvertimeRate);
+    setIsGlobalSaved(true);
+    setTimeout(() => setIsGlobalSaved(false), 3000);
+  };
+
   const displayList = selectedEmployee ? [selectedEmployee] : payrollList;
 
   // Mapa de estados completos recibidos de las filas editables
@@ -508,6 +531,61 @@ export function WeeklyPayrollModal({
           <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-3 text-center">
             <span className="text-[10px] font-black text-emerald-700 uppercase block">HORAS EXTRAS</span>
             <span className="text-lg font-black text-emerald-800">{totalOvertimeHours.toFixed(1)} h</span>
+          </div>
+        </div>
+
+        {/* ── BARRA DE CONFIGURACIÓN GLOBAL DE TARIFAS (APLICA A TODOS) ──────────────── */}
+        <div className="bg-gradient-to-r from-amber-500/10 via-amber-50 to-orange-50 border border-amber-200/90 rounded-2xl p-3.5 mb-4 shrink-0 shadow-2xs">
+          <div className="flex items-center justify-between gap-2 mb-2">
+            <span className="text-xs font-black text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+              ⚙️ Configuración Global de la Semana (Aplica a todos los trabajadores)
+            </span>
+            {isGlobalSaved && (
+              <span className="text-[10px] font-black text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1">
+                <CheckCircle2 size={12} /> Guardado para todos
+              </span>
+            )}
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+            <div>
+              <label className="text-[10px] font-black text-gray-500 block uppercase mb-1">META SEMANAL (H)</label>
+              <input
+                type="number"
+                value={globalTargetHours}
+                onChange={(e) => setGlobalTargetHours(Math.max(1, Number(e.target.value) || 0))}
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-gray-500 block uppercase mb-1">VALOR HORA BASE ($)</label>
+              <input
+                type="number"
+                step="100"
+                value={globalBaseRate}
+                onChange={(e) => setGlobalBaseRate(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+              />
+            </div>
+
+            <div>
+              <label className="text-[10px] font-black text-gray-500 block uppercase mb-1">VALOR HORA EXTRA ($)</label>
+              <input
+                type="number"
+                step="100"
+                value={globalOvertimeRate}
+                onChange={(e) => setGlobalOvertimeRate(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full bg-white border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-black text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+              />
+            </div>
+
+            <button
+              onClick={handleApplyGlobalRates}
+              className="w-full bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-3 py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer border border-amber-300"
+            >
+              <Save size={15} /> Aplicar a Todos
+            </button>
           </div>
         </div>
 
