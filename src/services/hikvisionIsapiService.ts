@@ -532,6 +532,7 @@ export async function fetchAllEvents(
         minor: 0,
         startTime,
         endTime,
+        timeReverseOrder: true,
       },
     });
 
