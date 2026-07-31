@@ -430,8 +430,21 @@ export async function fetchDeviceInfo(config: HikvisionDeviceConfig = DEFAULT_DE
   try {
     const res = await isapiDigestFetch(config, path, { method: 'GET' });
     if (res.ok && res.text) {
-      const parsed = JSON.parse(res.text);
-      return parsed.DeviceInfo || parsed;
+      try {
+        const parsed = JSON.parse(res.text);
+        return parsed.DeviceInfo || parsed;
+      } catch (e) {
+        // Fallback si el dispositivo responde en XML
+        const modelMatch = res.text.match(/<model>([^<]+)<\/model>/i);
+        const serialMatch = res.text.match(/<serialNumber>([^<]+)<\/serialNumber>/i);
+        const nameMatch = res.text.match(/<deviceName>([^<]+)<\/deviceName>/i);
+        return {
+          model: modelMatch ? modelMatch[1] : 'DS-K1T8003MF',
+          serialNumber: serialMatch ? serialMatch[1] : undefined,
+          deviceName: nameMatch ? nameMatch[1] : undefined,
+          ipAddress: config.ipAddress,
+        };
+      }
     }
   } catch (err) {
     console.warn('[Hikvision ISAPI] Error al consultar deviceInfo:', err);

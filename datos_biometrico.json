@@ -1,14 +1,1284 @@
 {
   "deviceInfo": {
     "model": "DS-K1T8003MF",
+    "serialNumber": "GC7438798",
+    "deviceName": "T&amp;A Access Controller",
     "ipAddress": "192.168.3.220"
   },
-  "users": [],
-  "events": [],
-  "extractedAt": "2026-07-31T12:49:55.113Z",
+  "users": [
+    {
+      "employeeNo": "1000",
+      "name": "Jaime",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "2",
+      "name": "Yei",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "3",
+      "name": "Moni",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "4",
+      "name": "Jhon",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "5",
+      "name": "Luis",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "6",
+      "name": "Fernanda",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "8",
+      "name": "Jose",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "9",
+      "name": "Jaider",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "10",
+      "name": "Yisela",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "11",
+      "name": "Yesica",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "12",
+      "name": "Valentina",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "13",
+      "name": "Lorena",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "14",
+      "name": "Kevin",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "15",
+      "name": "Fernando",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "16",
+      "name": "Felipe",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "17",
+      "name": "Miller",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "18",
+      "name": "Laura",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "19",
+      "name": "Leo",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "20",
+      "name": "Johana",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "21",
+      "name": "Eduwin",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "22",
+      "name": "Cristian",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "23",
+      "name": "Esteban",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "24",
+      "name": "Arlin",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "4321",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": true,
+      "userVerifyMode": "cardOrFpOrPw"
+    },
+    {
+      "employeeNo": "25",
+      "name": "Hugo",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "27",
+      "name": "Juli",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "28",
+      "name": "Yeimy",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "29",
+      "name": "Sandra Q",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "30",
+      "name": "Duber",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "31",
+      "name": "Nelcy",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "32",
+      "name": "Jime",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "33",
+      "name": "Leidy",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "34",
+      "name": "Sandra Paladinez",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "35",
+      "name": "Argenis",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "36",
+      "name": "Napo",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "37",
+      "name": "Javier",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "38",
+      "name": "Edilma",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "39",
+      "name": "Maye",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "40",
+      "name": "Brigith",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    },
+    {
+      "employeeNo": "41",
+      "name": "Vic",
+      "userType": "normal",
+      "closeDelayEnabled": false,
+      "Valid": {
+        "enable": true,
+        "timeType": "UTC",
+        "beginTime": "1969-12-31T19:00:00-05:00",
+        "endTime": "2037-12-31T10:59:59-05:00"
+      },
+      "password": "",
+      "doorRight": "1",
+      "RightPlan": [
+        {
+          "doorNo": 1,
+          "planTemplateNo": "1"
+        }
+      ],
+      "maxOpenDoorTime": 0,
+      "openDoorTime": 0,
+      "localUIRight": false,
+      "userVerifyMode": ""
+    }
+  ],
+  "events": [
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T17:37:43+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 8,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T17:51:09+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 13,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T17:54:21+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "2",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 18,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T17:57:39+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 25,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:05:47+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 28,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:06:06+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 31,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:06:18+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 34,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:10:34+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "1000",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 37,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:13:03+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "2",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 42,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    },
+    {
+      "major": 5,
+      "minor": 38,
+      "time": "2026-01-29T18:14:33+08:00",
+      "netUser": "",
+      "remoteHostAddr": "0.0.0.0",
+      "cardNo": "",
+      "cardType": 1,
+      "whiteListNo": 0,
+      "reportChannel": 0,
+      "cardReaderKind": 0,
+      "cardReaderNo": 1,
+      "doorNo": 1,
+      "verifyNo": 0,
+      "alarmInNo": 0,
+      "alarmOutNo": 0,
+      "caseSensorNo": 0,
+      "RS485No": 0,
+      "multiCardGroupNo": 0,
+      "accessChannel": 0,
+      "deviceNo": 0,
+      "distractControlNo": 0,
+      "employeeNoString": "3",
+      "localControllerID": 0,
+      "InternetAccess": 0,
+      "type": 0,
+      "MACAddr": "",
+      "swipeCardType": 0,
+      "serialNo": 47,
+      "userType": "normal",
+      "attendanceStatus": "undefined",
+      "statusValue": 0
+    }
+  ],
+  "extractedAt": "2026-07-31T13:16:35.909Z",
   "summary": {
-    "totalUsers": 0,
-    "totalEvents": 0,
+    "totalUsers": 39,
+    "totalEvents": 10,
     "deviceIp": "192.168.3.220"
   }
 }
