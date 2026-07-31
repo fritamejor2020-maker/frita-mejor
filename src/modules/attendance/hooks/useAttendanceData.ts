@@ -142,12 +142,12 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           return;
         }
 
-        // Determinar marcas de entrada y salida
+        // Determinar marcas de entrada y salida estrictamente por checkIn / checkOut del biométrico
         const entries = dayLogs.filter((l) => l.type === 'ENTRY');
         const exits   = dayLogs.filter((l) => l.type === 'EXIT');
 
-        const rawFirstIn = override?.customFirstIn || (entries.length > 0 ? entries[0].timestamp.slice(11, 19) : (dayLogs[0]?.timestamp.slice(11, 19) || ''));
-        const rawLastOut = override?.customLastOut || (exits.length > 0 ? exits[exits.length - 1].timestamp.slice(11, 19) : (dayLogs.length > 1 ? dayLogs[dayLogs.length - 1].timestamp.slice(11, 19) : ''));
+        const rawFirstIn = override?.customFirstIn || (entries.length > 0 ? entries[0].timestamp.slice(11, 19) : '');
+        const rawLastOut = override?.customLastOut || (exits.length > 0 ? exits[exits.length - 1].timestamp.slice(11, 19) : '');
 
         // Auto-Detección de Turno (o plantilla fija/override)
         let assignedShift: ShiftTemplate | undefined = shiftTemplates.find((s) => s.id === override?.shiftId);
