@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { X, DollarSign, Clock, AlertTriangle, ShieldCheck, Save, Calendar, CheckCircle2 } from 'lucide-react';
+import { X, DollarSign, Clock, AlertTriangle, ShieldCheck, Save, Calendar, CheckCircle2, FileSpreadsheet, Download } from 'lucide-react';
 import { EmployeeWeeklyPayroll } from '../hooks/useAttendanceData';
 import { useAttendanceStore, EmployeeContract } from '../../../store/useAttendanceStore';
+import * as XLSX from 'xlsx';
 
 interface WeekDayInfo {
   dateStr: string;
@@ -17,15 +18,33 @@ interface WeeklyPayrollModalProps {
   onClose: () => void;
 }
 
+export interface CardStateData {
+  dailyHours: Record<string, number>;
+  tardinessCount: number;
+  missingMarksCount: number;
+  weeklyTargetHours: number;
+  baseHourlyRate: number;
+  overtimeHourlyRate: number;
+  grossHours: number;
+  deductedTardinessHours: number;
+  deductedMissingMarksHours: number;
+  netHoursWorked: number;
+  regularHours: number;
+  overtimeHours: number;
+  regularPay: number;
+  overtimePay: number;
+  totalPay: number;
+}
+
 // ── Componente de Fila Editable por Empleado ──────────────────────────────────
 function EditableEmployeePayrollCard({
   emp,
   weekDays = [],
-  onUpdateTotal,
+  onUpdateCardState,
 }: {
   emp: EmployeeWeeklyPayroll;
   weekDays: WeekDayInfo[];
-  onUpdateTotal: (empId: string, totals: { totalPay: number; regularHours: number; overtimeHours: number }) => void;
+  onUpdateCardState: (empId: string, state: CardStateData) => void;
 }) {
   const { employeeContracts, upsertEmployeeContract } = useAttendanceStore();
   const contract = employeeContracts.find((c) => c.employeeId === emp.employeeId);
@@ -84,10 +103,35 @@ function EditableEmployeePayrollCard({
   const overtimePay = Math.round(overtimeHours * overtimeHourlyRate);
   const totalPay = regularPay + overtimePay;
 
-  // Notificar al componente padre de los cambios para actualizar el resumen global
+  // Notificar al componente padre de los cambios completos para la exportación a Excel y resumenes
   React.useEffect(() => {
-    onUpdateTotal(emp.employeeId, { totalPay, regularHours, overtimeHours });
-  }, [totalPay, regularHours, overtimeHours]);
+    onUpdateCardState(emp.employeeId, {
+      dailyHours,
+      tardinessCount,
+      missingMarksCount,
+      weeklyTargetHours,
+      baseHourlyRate,
+      overtimeHourlyRate,
+      grossHours,
+      deductedTardinessHours,
+      deductedMissingMarksHours,
+      netHoursWorked,
+      regularHours,
+      overtimeHours,
+      regularPay,
+      overtimePay,
+      totalPay,
+    });
+  }, [
+    JSON.stringify(dailyHours),
+    tardinessCount,
+    missingMarksCount,
+    weeklyTargetHours,
+    baseHourlyRate,
+    overtimeHourlyRate,
+    grossHours,
+    totalPay,
+  ]);
 
   const handleDayHourChange = (dateStr: string, valueStr: string) => {
     const val = Math.max(0, Number(valueStr) || 0);
@@ -298,27 +342,129 @@ export function WeeklyPayrollModal({
 }: WeeklyPayrollModalProps) {
   const displayList = selectedEmployee ? [selectedEmployee] : payrollList;
 
-  // Mapa de totales dinámicos recibidos de las filas editables
-  const [totalsMap, setTotalsMap] = useState<Record<string, { totalPay: number; regularHours: number; overtimeHours: number }>>({});
+  // Mapa de estados completos recibidos de las filas editables
+  const [cardsStateMap, setCardsStateMap] = useState<Record<string, CardStateData>>({});
 
-  const handleUpdateTotal = (empId: string, totals: { totalPay: number; regularHours: number; overtimeHours: number }) => {
-    setTotalsMap((prev) => ({ ...prev, [empId]: totals }));
+  const handleUpdateCardState = (empId: string, state: CardStateData) => {
+    setCardsStateMap((prev) => ({ ...prev, [empId]: state }));
   };
 
   const totalPayrollAmount = displayList.reduce((acc, curr) => {
-    const updated = totalsMap[curr.employeeId];
+    const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.totalPay : curr.totalPay);
   }, 0);
 
   const totalRegularHours = displayList.reduce((acc, curr) => {
-    const updated = totalsMap[curr.employeeId];
+    const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.regularHours : curr.regularHours);
   }, 0);
 
   const totalOvertimeHours = displayList.reduce((acc, curr) => {
-    const updated = totalsMap[curr.employeeId];
+    const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.overtimeHours : curr.overtimeHours);
   }, 0);
+
+  // ── Generar Excel con Formato Exacto de la Imagen ────────────────────────────
+  const handleExportExcel = () => {
+    const headers = [
+      'Empleado',
+      'Tarde',
+      'No Reg',
+      'Lun',
+      'Mar',
+      'Mi',
+      'Jue',
+      'Vier',
+      'Sab',
+      'Dom',
+      'Total',
+      'Extras',
+      'Descuento Horas',
+      'Extras a Pagar',
+      'DEBE',
+      'Pagar',
+      'Observaciones',
+      'Pagado',
+    ];
+
+    const rows: any[][] = [headers];
+
+    displayList.forEach((emp) => {
+      const state = cardsStateMap[emp.employeeId];
+
+      const dailyMap = state?.dailyHours || {};
+      const daysHours = (weekDays.length === 7 ? weekDays : []).map((d) => {
+        if (dailyMap[d.dateStr] !== undefined) return Number(dailyMap[d.dateStr]) || 0;
+        const blocks = emp.dailyBlocks[d.dateStr] || [];
+        const mins = blocks.reduce((acc, b) => acc + (b.grossMinutes || 0), 0);
+        return Number((mins / 60).toFixed(2));
+      });
+
+      while (daysHours.length < 7) daysHours.push(0);
+
+      const [lun, mar, mi, jue, vier, sab, dom] = daysHours;
+
+      const tardeCount = state?.tardinessCount ?? Math.round(emp.deductedTardinessHours / 0.5);
+      const noRegCount = state?.missingMarksCount ?? Math.round(emp.deductedMissingMarksHours / 0.5);
+      const targetH = state?.weeklyTargetHours ?? emp.weeklyTargetHours ?? 44;
+
+      const totalGross = state?.grossHours ?? Number((lun + mar + mi + jue + vier + sab + dom).toFixed(2));
+      const extras = Number((totalGross - targetH).toFixed(2));
+      const descuentoHoras = -Number(((tardeCount * 0.5) + (noRegCount * 0.5)).toFixed(2));
+      const extrasAPagar = Number((extras + descuentoHoras).toFixed(2));
+      const pagarVal = state?.totalPay ?? emp.totalPay;
+
+      rows.push([
+        emp.fullName,
+        tardeCount > 0 ? tardeCount : '',
+        noRegCount > 0 ? noRegCount : '',
+        lun > 0 ? lun : '',
+        mar > 0 ? mar : '',
+        mi > 0 ? mi : '',
+        jue > 0 ? jue : '',
+        vier > 0 ? vier : '',
+        sab > 0 ? sab : '',
+        dom > 0 ? dom : '',
+        totalGross,
+        extras,
+        descuentoHoras,
+        extrasAPagar,
+        '', // DEBE
+        pagarVal > 0 ? `$ ${pagarVal.toLocaleString('es-CO')}` : '-',
+        '', // Observaciones
+        '', // Pagado
+      ]);
+    });
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(rows);
+
+    // Ajustar anchos de columnas
+    ws['!cols'] = [
+      { wch: 30 }, // Empleado
+      { wch: 8 },  // Tarde
+      { wch: 8 },  // No Reg
+      { wch: 7 },  // Lun
+      { wch: 7 },  // Mar
+      { wch: 7 },  // Mi
+      { wch: 7 },  // Jue
+      { wch: 7 },  // Vier
+      { wch: 7 },  // Sab
+      { wch: 7 },  // Dom
+      { wch: 9 },  // Total
+      { wch: 9 },  // Extras
+      { wch: 15 }, // Descuento Horas
+      { wch: 15 }, // Extras a Pagar
+      { wch: 8 },  // DEBE
+      { wch: 16 }, // Pagar
+      { wch: 20 }, // Observaciones
+      { wch: 10 }, // Pagado
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Liquidacion_Semanal');
+    const todayIso = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Liquidacion_Nomina_Semanal_${todayIso}.xlsx`);
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
@@ -328,15 +474,25 @@ export function WeeklyPayrollModal({
           <div>
             <h3 className="font-black text-lg text-gray-900 flex items-center gap-2">
               <DollarSign className="text-amber-500" size={20} />
-              Liquidación de Nómina Semanal (Interactive)
+              Liquidación de Nómina Semanal
             </h3>
             <p className="text-xs font-bold text-gray-400">
-              Ajusta las horas por día, penalizaciones por tardanza/falta y tarifas de hora en tiempo real.
+              Ajusta las horas por día, penalizaciones por tardanza/falta y exporta a Excel en el formato oficial.
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 cursor-pointer">
-            <X size={20} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              className="bg-green-600 hover:bg-green-500 text-white font-black text-xs px-3.5 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+              title="Descargar reporte Excel idéntico al formato oficial"
+            >
+              <FileSpreadsheet size={16} />
+              Exportar Excel (.xlsx)
+            </button>
+            <button onClick={onClose} className="p-1.5 rounded-full hover:bg-gray-100 text-gray-400 cursor-pointer">
+              <X size={20} />
+            </button>
+          </div>
         </div>
 
         {/* Resumen Superior Dinámico */}
@@ -362,16 +518,20 @@ export function WeeklyPayrollModal({
               key={emp.employeeId}
               emp={emp}
               weekDays={weekDays}
-              onUpdateTotal={handleUpdateTotal}
+              onUpdateCardState={handleUpdateCardState}
             />
           ))}
         </div>
 
         {/* Footer */}
         <div className="pt-4 border-t border-gray-100 shrink-0 flex items-center justify-between">
-          <span className="text-xs font-bold text-gray-400">
-            * Los cambios en tarifas se guardan en el perfil del trabajador.
-          </span>
+          <button
+            onClick={handleExportExcel}
+            className="px-4 py-2 bg-green-100 hover:bg-green-200 text-green-800 font-black text-xs rounded-xl cursor-pointer transition-all border border-green-300 flex items-center gap-1.5"
+          >
+            <Download size={14} />
+            Descargar Plantilla Excel (.xlsx)
+          </button>
           <button
             onClick={onClose}
             className="px-6 py-2.5 bg-gray-900 hover:bg-gray-800 text-white font-black text-xs rounded-xl cursor-pointer transition-all shadow-xs"
