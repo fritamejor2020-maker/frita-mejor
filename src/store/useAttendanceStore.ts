@@ -115,45 +115,76 @@ const INITIAL_TERMINALS: BiometricTerminal[] = [
   },
 ];
 
-const INITIAL_CONTRACTS: EmployeeContract[] = [
-  {
-    employeeId: 'EMP-1000',
-    employeeNo: '1000',
-    fullName: 'Carlos Andrés Mendoza',
-    branchId: 'BRANCH-001',
-    shiftType: 'VARIABLE',
-    defaultShiftId: 'SHIFT-MANANA',
-    weeklyTargetHours: 44,
-    baseHourlyRate: 6500,
-    overtimeHourlyRate: 9750,
-    pinPassword: 'Control.1',
-    avatarColor: '#3B82F6',
-  },
-  {
-    employeeId: 'EMP-002',
-    employeeNo: '2',
-    fullName: 'Jhoan Álvarez',
-    branchId: 'BRANCH-001',
-    shiftType: 'VARIABLE',
-    defaultShiftId: 'SHIFT-TARDE',
-    weeklyTargetHours: 44,
-    baseHourlyRate: 6500,
-    overtimeHourlyRate: 9750,
-    avatarColor: '#10B981',
-  },
-  {
-    employeeId: 'EMP-003',
-    employeeNo: '3',
-    fullName: 'María Fernanda Gómez',
-    branchId: 'BRANCH-001',
-    shiftType: 'FIXED',
-    defaultShiftId: 'SHIFT-MANANA',
-    weeklyTargetHours: 48,
-    baseHourlyRate: 7000,
-    overtimeHourlyRate: 10500,
-    avatarColor: '#F59E0B',
-  },
+const AVATAR_COLORS = [
+  '#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6',
+  '#EC4899', '#06B6D4', '#14B8A6', '#6366F1', '#D97706'
 ];
+
+export const REAL_BIOMETRIC_USERS = [
+  { employeeNo: '1000', name: 'Jaime' },
+  { employeeNo: '2', name: 'Yei' },
+  { employeeNo: '3', name: 'Moni' },
+  { employeeNo: '4', name: 'Jhon' },
+  { employeeNo: '5', name: 'Luis' },
+  { employeeNo: '6', name: 'Fernanda' },
+  { employeeNo: '8', name: 'Jose' },
+  { employeeNo: '9', name: 'Jaider' },
+  { employeeNo: '10', name: 'Yisela' },
+  { employeeNo: '11', name: 'Yesica' },
+  { employeeNo: '12', name: 'Valentina' },
+  { employeeNo: '13', name: 'Lorena' },
+  { employeeNo: '14', name: 'Kevin' },
+  { employeeNo: '15', name: 'Fernando' },
+  { employeeNo: '16', name: 'Felipe' },
+  { employeeNo: '17', name: 'Miller' },
+  { employeeNo: '18', name: 'Laura' },
+  { employeeNo: '19', name: 'Leo' },
+  { employeeNo: '20', name: 'Johana' },
+  { employeeNo: '21', name: 'Eduwin' },
+  { employeeNo: '22', name: 'Cristian' },
+  { employeeNo: '23', name: 'Esteban' },
+  { employeeNo: '24', name: 'Arlin' },
+  { employeeNo: '25', name: 'Hugo' },
+  { employeeNo: '27', name: 'Juli' },
+  { employeeNo: '28', name: 'Yeimy' },
+  { employeeNo: '29', name: 'Sandra Q' },
+  { employeeNo: '30', name: 'Duber' },
+  { employeeNo: '31', name: 'Nelcy' },
+  { employeeNo: '32', name: 'Jime' },
+  { employeeNo: '33', name: 'Leidy' },
+  { employeeNo: '34', name: 'Sandra Paladinez' },
+  { employeeNo: '35', name: 'Argenis' },
+  { employeeNo: '36', name: 'Napo' },
+  { employeeNo: '37', name: 'Javier' },
+  { employeeNo: '38', name: 'Edilma' },
+  { employeeNo: '39', name: 'Maye' },
+  { employeeNo: '40', name: 'Brigith' },
+  { employeeNo: '41', name: 'Vic' }
+];
+
+const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) => ({
+  employeeId: `EMP-${u.employeeNo}`,
+  employeeNo: u.employeeNo,
+  fullName: u.name,
+  branchId: 'BRANCH-001',
+  shiftType: 'VARIABLE',
+  defaultShiftId: 'SHIFT-MANANA',
+  weeklyTargetHours: 44,
+  baseHourlyRate: 6500,
+  overtimeHourlyRate: 9750,
+  avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+}));
+
+function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
+  const map = new Map<string, EmployeeContract>();
+  (existing || []).forEach((c) => map.set(c.employeeNo, c));
+  INITIAL_CONTRACTS.forEach((c) => {
+    if (!map.has(c.employeeNo)) {
+      map.set(c.employeeNo, c);
+    }
+  });
+  return Array.from(map.values());
+}
 
 import {
   fetchAllUsers,
@@ -357,7 +388,36 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
         try {
           const userList = await fetchAllUsers(config);
-          return { ok: true, users: userList, message: `Se encontraron ${userList.length} usuarios en el biométrico (Extracción completa paginada).` };
+          if (userList.length > 0) {
+            set((state) => {
+              const existingEmpNos = new Set(state.employeeContracts.map((c) => c.employeeNo));
+              const newContracts: EmployeeContract[] = [];
+
+              userList.forEach((u: any, idx: number) => {
+                const empNo = String(u.employeeNo || u.employeeNoString || '');
+                if (empNo && !existingEmpNos.has(empNo)) {
+                  newContracts.push({
+                    employeeId: `EMP-${empNo}`,
+                    employeeNo: empNo,
+                    fullName: u.name || `Empleado #${empNo}`,
+                    branchId: terminal.branchId || 'BRANCH-001',
+                    shiftType: 'VARIABLE',
+                    defaultShiftId: 'SHIFT-MANANA',
+                    weeklyTargetHours: 44,
+                    baseHourlyRate: 6500,
+                    overtimeHourlyRate: 9750,
+                    avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+                  });
+                }
+              });
+
+              if (newContracts.length === 0) return {};
+              const updated = [...state.employeeContracts, ...newContracts];
+              push('attendance_contracts', updated);
+              return { employeeContracts: updated };
+            });
+          }
+          return { ok: true, users: userList, message: `Se importaron/sincronizaron ${userList.length} usuarios en el sistema.` };
         } catch (e: any) {
           return { ok: false, users: [], message: `Error al consultar biométrico: ${e.message}` };
         }
@@ -419,6 +479,11 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
     }),
     {
       name: 'frita_attendance_store',
+      merge: (persistedState: any, currentState: any) => ({
+        ...currentState,
+        ...persistedState,
+        employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
+      }),
     }
   )
 );
