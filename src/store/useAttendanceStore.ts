@@ -193,118 +193,8 @@ import {
   HikvisionDeviceConfig,
 } from '../services/hikvisionIsapiService';
 
-export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [
-  {
-    id: 'LOG-TERM-001-25344',
-    employeeId: 'EMP-24',
-    employeeNo: '24',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T08:27:21-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25341',
-    employeeId: 'EMP-19',
-    employeeNo: '19',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T08:21:25-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25334',
-    employeeId: 'EMP-15',
-    employeeNo: '15',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T08:08:40-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25326',
-    employeeId: 'EMP-22',
-    employeeNo: '22',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T06:11:21-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25323',
-    employeeId: 'EMP-11',
-    employeeNo: '11',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T06:10:35-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25320',
-    employeeId: 'EMP-40',
-    employeeNo: '40',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T05:58:34-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25317',
-    employeeId: 'EMP-25',
-    employeeNo: '25',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T05:55:33-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25313',
-    employeeId: 'EMP-35',
-    employeeNo: '35',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T05:47:21-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25310',
-    employeeId: 'EMP-12',
-    employeeNo: '12',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T04:59:17-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  },
-  {
-    id: 'LOG-TERM-001-25307',
-    employeeId: 'EMP-18',
-    employeeNo: '18',
-    branchId: 'BRANCH-001',
-    terminalId: 'TERM-001',
-    timestamp: '2026-07-31T04:58:01-05:00',
-    type: 'ENTRY',
-    verifyMethod: 'BIOMETRIC',
-    doorNo: 1,
-  }
-];
+import extractedLogs from '../data/extractedBiometricLogs.json';
+export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAttendanceLog[];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
   const set = new Set((existing || []).map((l) => l.id));
@@ -424,44 +314,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
           let logsAdded = 0;
           if (parsedEvents.length === 0) {
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const demoLogs: RawAttendanceLog[] = [
-              {
-                id: `LOG-${terminal.id}-1000-IN`,
-                employeeId: 'EMP-1000',
-                employeeNo: '1000',
-                branchId: terminal.branchId,
-                terminalId: terminal.id,
-                timestamp: `${todayStr}T06:07:54-05:00`,
-                type: 'ENTRY',
-                verifyMethod: 'FINGERPRINT',
-                doorNo: 1,
-              },
-              {
-                id: `LOG-${terminal.id}-1000-OUT`,
-                employeeId: 'EMP-1000',
-                employeeNo: '1000',
-                branchId: terminal.branchId,
-                terminalId: terminal.id,
-                timestamp: `${todayStr}T14:16:27-05:00`,
-                type: 'EXIT',
-                verifyMethod: 'FINGERPRINT',
-                doorNo: 1,
-              },
-              {
-                id: `LOG-${terminal.id}-2-IN`,
-                employeeId: 'EMP-002',
-                employeeNo: '2',
-                branchId: terminal.branchId,
-                terminalId: terminal.id,
-                timestamp: `${todayStr}T14:04:10-05:00`,
-                type: 'ENTRY',
-                verifyMethod: 'CARD',
-                doorNo: 1,
-              }
-            ];
-            get().addAttendanceLogs(demoLogs);
-            logsAdded = demoLogs.length;
+            get().addAttendanceLogs(INITIAL_BIOMETRIC_LOGS);
+            logsAdded = get().attendanceLogs.length;
           } else {
             const mappedLogs: RawAttendanceLog[] = parsedEvents.map((ev: any) => ({
               id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}`,
@@ -475,7 +329,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               doorNo: ev.doorNo || 1,
             }));
             get().addAttendanceLogs(mappedLogs);
-            logsAdded = mappedLogs.length;
+            logsAdded = get().attendanceLogs.length;
           }
 
           get().updateTerminal(terminalId, {

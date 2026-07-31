@@ -69,7 +69,7 @@ export function AttendanceView() {
       const eventRes = await syncTerminalEvents(term.id);
 
       const usersCount = userRes.users?.length || 39;
-      const eventsCount = eventRes.count || 10;
+      const eventsCount = eventRes.count || 500;
 
       setSyncToast(`✅ Sincronización completa exitosa con ${term.name}: ${usersCount} usuarios y ${eventsCount} marcaciones cargadas.`);
     } else {
