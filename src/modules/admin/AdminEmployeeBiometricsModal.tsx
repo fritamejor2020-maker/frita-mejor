@@ -1,14 +1,13 @@
-import React, { useState, useRef } from 'react';
-import { X, UserCheck, Key, Shield, DollarSign, Download, Upload, CheckCircle2, FileSpreadsheet, AlertTriangle, Users } from 'lucide-react';
+import { X, UserCheck, Key, Shield, DollarSign, Download, Upload, CheckCircle2, FileSpreadsheet, AlertTriangle, Users, Trash2 } from 'lucide-react';
 import { useAttendanceStore, EmployeeContract } from '../../store/useAttendanceStore';
 import { useBranchStore } from '../../store/useBranchStore';
 import * as XLSX from 'xlsx';
 
 interface AdminEmployeeBiometricsModalProps {
   onClose: () => void;
+  initialSelectedEmployeeNo?: string;
 }
 
-// ── Columnas de la plantilla Excel ─────────────────────────────────────────────
 const TEMPLATE_COLUMNS = [
   'ID Biométrico (Número)',
   'Nombre Completo',
@@ -27,8 +26,8 @@ const TEMPLATE_EXAMPLE_ROWS = [
   ['1003', 'Juan David Ríos',      'BRANCH-002', 'VARIABLE', 'SHIFT-MANANA', 48, 7000, 10500, '111222'],
 ];
 
-export function AdminEmployeeBiometricsModal({ onClose }: AdminEmployeeBiometricsModalProps) {
-  const { employeeContracts, shiftTemplates, terminals, upsertEmployeeContract, deleteEmployeeContract, pushUserToTerminal, fetchTerminalUsers } = useAttendanceStore();
+export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeNo }: AdminEmployeeBiometricsModalProps) {
+  const { employeeContracts, shiftTemplates, terminals, upsertEmployeeContract, deleteEmployeeContract, pushUserToTerminal, deleteUserFromTerminal, fetchTerminalUsers } = useAttendanceStore();
   const { branches = [] } = useBranchStore();
 
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
@@ -41,6 +40,32 @@ export function AdminEmployeeBiometricsModal({ onClose }: AdminEmployeeBiometric
   const [baseHourlyRate, setBaseHourlyRate] = useState(6500);
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(9750);
   const [pinPassword, setPinPassword] = useState('123456');
+
+  // Preseleccionar si viene por prop
+  React.useEffect(() => {
+    if (initialSelectedEmployeeNo) {
+      const match = employeeContracts.find((c) => c.employeeNo === initialSelectedEmployeeNo || c.employeeId === initialSelectedEmployeeNo);
+      if (match) {
+        handleSelectContract(match);
+      }
+    }
+  }, [initialSelectedEmployeeNo]);
+
+  const handleDeleteSelectedContract = async () => {
+    if (!selectedEmpId || !fullName) return;
+    if (!confirm(`¿Estás seguro de eliminar a "${fullName}" (#${employeeNo}) del biométrico y del sistema?`)) return;
+
+    setIsProcessing(true);
+    const term = terminals[0];
+    if (term) {
+      await deleteUserFromTerminal(term.id, employeeNo);
+    }
+
+    deleteEmployeeContract(selectedEmpId);
+    showStatus(`🗑️ Empleado "${fullName}" (#${employeeNo}) eliminado del biométrico y del sistema.`);
+    setIsProcessing(false);
+    handleNew();
+  };
 
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusType, setStatusType] = useState<'success' | 'error' | 'info'>('success');
@@ -628,15 +653,30 @@ export function AdminEmployeeBiometricsModal({ onClose }: AdminEmployeeBiometric
               </div>
 
               <div className="flex items-center justify-between pt-4 border-t border-gray-100">
-                <button
-                  type="button"
-                  onClick={handlePushToBiometric}
-                  disabled={isProcessing || !fullName}
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
-                >
-                  <Upload size={14} />
-                  Enviar a Biométrico (ISAPI)
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handlePushToBiometric}
+                    disabled={isProcessing || !fullName}
+                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                  >
+                    <Upload size={14} />
+                    Enviar a Biométrico (ISAPI)
+                  </button>
+
+                  {selectedEmpId && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteSelectedContract}
+                      disabled={isProcessing}
+                      className="px-3.5 py-2 bg-red-100 hover:bg-red-200 text-red-700 font-black text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer border border-red-200 disabled:opacity-50"
+                      title="Eliminar de la app y desvincular del biométrico"
+                    >
+                      <Trash2 size={14} />
+                      Eliminar
+                    </button>
+                  )}
+                </div>
 
                 <div className="flex items-center gap-2">
                   <button

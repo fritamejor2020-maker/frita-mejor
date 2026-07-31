@@ -4,6 +4,7 @@ import { EmployeeStickyPanel } from './components/EmployeeStickyPanel';
 import { TimelineGridPanel } from './components/TimelineGridPanel';
 import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
+import { AdminEmployeeBiometricsModal } from '../admin/AdminEmployeeBiometricsModal';
 import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hooks/useAttendanceData';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -40,8 +41,11 @@ export function AttendanceView() {
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [selectedPayrollEmp, setSelectedPayrollEmp] = useState<EmployeeWeeklyPayroll | undefined>(undefined);
 
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [selectedBioEmpNo, setSelectedBioEmpNo] = useState<string | undefined>(undefined);
+
   const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate);
-  const { terminals, syncTerminalEvents } = useAttendanceStore();
+  const { terminals, syncTerminalEvents, fetchTerminalUsers } = useAttendanceStore();
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -147,8 +151,12 @@ export function AttendanceView() {
         <EmployeeStickyPanel
           payrollList={payrollList}
           onSelectEmployee={(emp) => {
-            setSelectedPayrollEmp(emp);
-            setShowPayrollModal(true);
+            setSelectedBioEmpNo(emp.employeeNo);
+            setShowBioModal(true);
+          }}
+          onManageEmployees={() => {
+            setSelectedBioEmpNo(undefined);
+            setShowBioModal(true);
           }}
         />
 
@@ -165,6 +173,13 @@ export function AttendanceView() {
       </div>
 
       {/* Modales */}
+      {showBioModal && (
+        <AdminEmployeeBiometricsModal
+          initialSelectedEmployeeNo={selectedBioEmpNo}
+          onClose={() => setShowBioModal(false)}
+        />
+      )}
+
       {activeDetail && (
         <ShiftDetailModal
           employee={activeDetail.emp}

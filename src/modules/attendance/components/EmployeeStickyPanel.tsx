@@ -4,14 +4,24 @@ import { EmployeeWeeklyPayroll } from '../hooks/useAttendanceData';
 interface EmployeeStickyPanelProps {
   payrollList: EmployeeWeeklyPayroll[];
   onSelectEmployee: (emp: EmployeeWeeklyPayroll) => void;
+  onManageEmployees?: () => void;
 }
 
-export function EmployeeStickyPanel({ payrollList, onSelectEmployee }: EmployeeStickyPanelProps) {
+export function EmployeeStickyPanel({ payrollList, onSelectEmployee, onManageEmployees }: EmployeeStickyPanelProps) {
   return (
     <div className="w-60 min-w-[240px] max-w-[240px] shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
       {/* Header fijo alignment con la cuadrícula */}
-      <div className="h-12 border-b border-gray-200 px-4 flex items-center bg-gray-50/90 font-black text-xs text-gray-500 uppercase tracking-wider">
-        Personal ({payrollList.length})
+      <div className="h-12 border-b border-gray-200 px-3 flex items-center justify-between bg-gray-50/90 font-black text-xs text-gray-500 uppercase tracking-wider">
+        <span>Personal ({payrollList.length})</span>
+        {onManageEmployees && (
+          <button
+            onClick={onManageEmployees}
+            className="text-[10px] font-black bg-amber-400 hover:bg-amber-500 text-gray-950 px-2 py-0.5 rounded-lg cursor-pointer transition-all flex items-center gap-1 shadow-2xs"
+            title="Editar o eliminar personas del biométrico y del sistema"
+          >
+            ⚙️ Editar / Eliminar
+          </button>
+        )}
       </div>
 
       {/* Lista vertical de trabajadores */}
