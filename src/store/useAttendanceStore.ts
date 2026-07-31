@@ -85,6 +85,7 @@ interface AttendanceStoreState {
 
   // Logs & Overrides
   addAttendanceLogs: (logs: RawAttendanceLog[]) => void;
+  deleteAttendanceLogsForDate: (employeeNo: string, dateStr: string) => void;
   upsertShiftOverride: (override: ShiftOverride) => void;
   deleteShiftOverride: (id: string) => void;
 
@@ -273,6 +274,15 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           const toAdd = newLogs.filter((l) => !existingIds.has(l.id));
           return { attendanceLogs: [...toAdd, ...s.attendanceLogs] };
         });
+        push('attendance_logs', get().attendanceLogs);
+      },
+
+      deleteAttendanceLogsForDate: (employeeNo, dateStr) => {
+        set((s) => ({
+          attendanceLogs: s.attendanceLogs.filter(
+            (l) => !((l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr))
+          ),
+        }));
         push('attendance_logs', get().attendanceLogs);
       },
 

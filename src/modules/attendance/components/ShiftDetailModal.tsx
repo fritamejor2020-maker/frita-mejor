@@ -11,7 +11,7 @@ interface ShiftDetailModalProps {
 }
 
 export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDetailModalProps) {
-  const { shiftTemplates, upsertShiftOverride, deleteShiftOverride, shiftOverrides } = useAttendanceStore();
+  const { shiftTemplates, upsertShiftOverride, deleteShiftOverride, deleteAttendanceLogsForDate, shiftOverrides } = useAttendanceStore();
 
   const existingOverride = shiftOverrides.find(
     (o) => (o.employeeId === employee.employeeId || o.employeeId === employee.employeeNo) && o.date === dateStr
@@ -37,10 +37,14 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
   };
 
   const handleDelete = () => {
-    if (existingOverride) {
-      deleteShiftOverride(existingOverride.id);
+    if (confirm(`¿Estás seguro de eliminar las marcaciones y el turno de ${employee.fullName} para la jornada ${dateStr}?`)) {
+      if (existingOverride) {
+        deleteShiftOverride(existingOverride.id);
+      }
+      deleteAttendanceLogsForDate(employee.employeeNo, dateStr);
+      deleteAttendanceLogsForDate(employee.employeeId, dateStr);
+      onClose();
     }
-    onClose();
   };
 
   return (
@@ -158,15 +162,13 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
 
         {/* Acciones */}
         <div className="flex items-center justify-between gap-3 pt-5 mt-4 border-t border-gray-100">
-          {existingOverride ? (
-            <button
-              onClick={handleDelete}
-              className="px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 rounded-xl flex items-center gap-1 transition-colors cursor-pointer"
-            >
-              <Trash2 size={15} />
-              Quitar Ajuste
-            </button>
-          ) : <div></div>}
+          <button
+            onClick={handleDelete}
+            className="px-3.5 py-2 text-xs font-black text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200 shadow-2xs"
+          >
+            <Trash2 size={15} />
+            Eliminar Registro
+          </button>
 
           <div className="flex items-center gap-2">
             <button
