@@ -63,15 +63,18 @@ export function AttendanceView() {
 
     const term = terminals[0];
     if (term) {
-      // 1. Sincronizar usuarios completos (39 usuarios)
+      // 1. Sincronizar usuarios completos
       const userRes = await fetchTerminalUsers(term.id);
-      // 2. Sincronizar marcaciones de asistencia (entradas/salidas)
+      // 2. Sincronizar marcaciones de asistencia (entradas/salidas manuales)
       const eventRes = await syncTerminalEvents(term.id);
 
-      const usersCount = userRes.users?.length || 39;
-      const eventsCount = eventRes.count || 500;
+      const currentContracts = useAttendanceStore.getState().employeeContracts;
+      const currentLogs = useAttendanceStore.getState().attendanceLogs;
 
-      setSyncToast(`✅ Sincronización completa exitosa con ${term.name}: ${usersCount} usuarios y ${eventsCount} marcaciones cargadas.`);
+      const usersCount = userRes.users?.length || currentContracts.length;
+      const eventsCount = typeof eventRes.count === 'number' ? eventRes.count : currentLogs.length;
+
+      setSyncToast(`✅ Sincronización completa exitosa con ${term.name}: ${usersCount} usuarios y ${eventsCount} marcaciones de asistencia cargadas.`);
     } else {
       setSyncToast('No hay biométricos registrados en esta sede.');
     }
