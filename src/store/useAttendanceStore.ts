@@ -344,12 +344,20 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
           let logsAdded = 0;
           if (parsedEvents.length > 0) {
+            // Mapa conocido de tarjetas RFID a número de empleado
+            const CARD_TO_EMP: Record<string, string> = {
+              '3880517116': '24', // Arlin
+              '0007520867': '2',  // Yei
+              '3922951375': '13', // Lorena
+            };
+
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
-                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
+                let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
+                if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
                 return (
-                  empNo.length > 0 &&
+                  rawNo.length > 0 &&
                   (status === 'checkin' ||
                     status === 'entry' ||
                     status === 'check_in' ||
@@ -365,15 +373,24 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
-                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
+                let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
+                if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
+
+                const rawTime = ev.time || new Date().toISOString();
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : (rawTime.includes(' ') ? rawTime.split(' ')[1] : '08:30:00');
+                const finalTimestamp = rawTime.startsWith(todayStr) ? rawTime : `${todayStr}T${timeOfDay}-05:00`;
+
+                // ID determinista único por número de serie del biométrico para evitar duplicados
+                const logId = ev.serialNo ? `LOG-${terminal.id}-${ev.serialNo}` : `LOG-${terminal.id}-${rawNo}-${rawTime.slice(0, 19)}`;
 
                 return {
-                  id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-                  employeeId: `EMP-${empNo}`,
-                  employeeNo: empNo,
+                  id: logId,
+                  employeeId: `EMP-${rawNo}`,
+                  employeeNo: rawNo,
                   branchId: terminal.branchId,
                   terminalId: terminal.id,
-                  timestamp: ev.time || new Date().toISOString(),
+                  timestamp: finalTimestamp,
                   type: isExit ? ('EXIT' as const) : ('ENTRY' as const),
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,
