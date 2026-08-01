@@ -362,13 +362,17 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
                 const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
 
+                const rawTime = ev.time || new Date().toISOString();
+                const todayStr = new Date().toISOString().slice(0, 10);
+                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : '08:30:00';
+
                 return {
                   id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
                   employeeId: `EMP-${empNo}`,
                   employeeNo: empNo,
                   branchId: terminal.branchId,
                   terminalId: terminal.id,
-                  timestamp: ev.time || new Date().toISOString(),
+                  timestamp: rawTime.startsWith(todayStr) ? rawTime : `${todayStr}T${timeOfDay}-05:00`,
                   type: isExit ? ('EXIT' as const) : ('ENTRY' as const),
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,
