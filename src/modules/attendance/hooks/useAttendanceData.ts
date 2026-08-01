@@ -50,7 +50,21 @@ function timeToMinutes(timeStr: string): number {
 }
 
 // Format minutes to "HH:mm"
-function formatMinutesToHHMM(mins: number): string {
+export function roundToCustomHalfHour(h: number): number {
+  if (h <= 0) return 0;
+  const floorVal = Math.floor(h);
+  const frac = Number((h - floorVal).toFixed(4));
+
+  if (frac >= 0.9) {
+    return floorVal + 1.0;
+  } else if (frac >= 0.4) {
+    return floorVal + 0.5;
+  } else {
+    return floorVal + 0.0;
+  }
+}
+
+export function formatMinutesToHHMM(mins: number): string {
   const total = Math.max(0, Math.round(mins));
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -274,18 +288,13 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
         dailyBlocks[wDay.dateStr] = dayBlocks;
       });
 
-      // Cálculo de Nómina Semanal acumulada con redondeo a la media hora más cercana (pasos de 0.5h)
-      const rawGrossHours = totalGrossMins / 60;
-      const grossHours = Math.round(rawGrossHours * 2) / 2;
 
-      const rawTardyHours = totalTardyDeductedMins / 60;
-      const deductedTardinessHours = Math.round(rawTardyHours * 2) / 2;
 
-      const rawMissingHours = totalMissingDeductedMins / 60;
-      const deductedMissingMarksHours = Math.round(rawMissingHours * 2) / 2;
-
-      const rawNetHours = Math.max(0, (totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60);
-      const netHoursWorked = Math.round(rawNetHours * 2) / 2;
+      // Cálculo de Nómina Semanal acumulada con regla de redondeo personalizado
+      const grossHours = roundToCustomHalfHour(totalGrossMins / 60);
+      const deductedTardinessHours = roundToCustomHalfHour(totalTardyDeductedMins / 60);
+      const deductedMissingMarksHours = roundToCustomHalfHour(totalMissingDeductedMins / 60);
+      const netHoursWorked = roundToCustomHalfHour(Math.max(0, (totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60));
 
       const targetHours = contract.weeklyTargetHours || 44;
       const regularHours = Math.min(netHoursWorked, targetHours);

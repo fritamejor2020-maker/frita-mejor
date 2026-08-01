@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { X, DollarSign, Clock, AlertTriangle, ShieldCheck, Save, Calendar, CheckCircle2, FileSpreadsheet, Download } from 'lucide-react';
-import { EmployeeWeeklyPayroll } from '../hooks/useAttendanceData';
+import { EmployeeWeeklyPayroll, roundToCustomHalfHour } from '../hooks/useAttendanceData';
 import { useAttendanceStore, EmployeeContract } from '../../../store/useAttendanceStore';
 import * as XLSX from 'xlsx';
 
@@ -74,8 +74,7 @@ function EditableEmployeePayrollCard({
     daysList.forEach((d) => {
       const blocks = emp.dailyBlocks[d.dateStr] || [];
       const grossMins = blocks.reduce((acc, b) => acc + (b.grossMinutes || 0), 0);
-      const rawHours = grossMins / 60;
-      map[d.dateStr] = Math.round(rawHours * 2) / 2;
+      map[d.dateStr] = roundToCustomHalfHour(grossMins / 60);
     });
     return map;
   });
