@@ -340,18 +340,37 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           let logsAdded = 0;
           if (parsedEvents.length > 0) {
             const mappedLogs: RawAttendanceLog[] = parsedEvents
-              .filter((ev: any) => ev.attendanceStatus === 'checkIn' || ev.attendanceStatus === 'checkOut')
-              .map((ev: any) => ({
-                id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}`,
-                employeeId: `EMP-${ev.employeeNoString || ev.cardNo || 'UNK'}`,
-                employeeNo: String(ev.employeeNoString || ev.cardNo || '0'),
-                branchId: terminal.branchId,
-                terminalId: terminal.id,
-                timestamp: ev.time || new Date().toISOString(),
-                type: ev.attendanceStatus === 'checkIn' ? 'ENTRY' : 'EXIT',
-                verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
-                doorNo: ev.doorNo || 1,
-              }));
+              .filter((ev: any) => {
+                const status = String(ev.attendanceStatus || '').toLowerCase();
+                return (
+                  status === 'checkin' ||
+                  status === 'entry' ||
+                  status === 'check_in' ||
+                  status === 'in' ||
+                  status === 'checkout' ||
+                  status === 'exit' ||
+                  status === 'check_out' ||
+                  status === 'out' ||
+                  !ev.attendanceStatus
+                );
+              })
+              .map((ev: any) => {
+                const status = String(ev.attendanceStatus || '').toLowerCase();
+                const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
+                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
+
+                return {
+                  id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                  employeeId: `EMP-${empNo}`,
+                  employeeNo: empNo,
+                  branchId: terminal.branchId,
+                  terminalId: terminal.id,
+                  timestamp: ev.time || new Date().toISOString(),
+                  type: isExit ? ('EXIT' as const) : ('ENTRY' as const),
+                  verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
+                  doorNo: ev.doorNo || 1,
+                };
+              });
 
             set((state) => {
               const existingIds = new Set(state.attendanceLogs.map((l) => l.id));

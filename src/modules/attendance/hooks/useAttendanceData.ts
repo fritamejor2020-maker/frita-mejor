@@ -127,17 +127,34 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       let totalMissingDeductedMins = 0;
       let isPresentNow = false;
 
-      // Obtener logs del empleado en el rango de la semana (o del día de hoy)
-      const empLogs = attendanceLogs.filter((l) => l.employeeNo === contract.employeeNo || l.employeeId === contract.employeeId);
+      // Obtener logs del empleado en el rango de la semana (con coincidencia robusta de ID/número)
+      const empLogs = attendanceLogs.filter((l) => {
+        const logNo = String(l.employeeNo || '').trim();
+        const contractNo = String(contract.employeeNo || '').trim();
+        const logEmpId = String(l.employeeId || '').trim();
+        const contractEmpId = String(contract.employeeId || '').trim();
+
+        if (logNo === contractNo || logEmpId === contractEmpId) return true;
+        const numA = parseInt(logNo, 10);
+        const numB = parseInt(contractNo, 10);
+        return numA > 0 && numA === numB;
+      });
+
+      const getTimeString = (ts?: string) => {
+        if (!ts) return '';
+        if (ts.includes('T')) return ts.slice(11, 19);
+        if (ts.includes(' ')) return ts.split(' ')[1] || ts.slice(11, 19);
+        return ts.slice(11, 19);
+      };
 
       // Verificar si está "En Turno" hoy (última marca de hoy fue ENTRY)
       const todayLogs = empLogs
-        .filter((l) => (l.timestamp || '').startsWith(todayStr))
+        .filter((l) => (l.timestamp || '').slice(0, 10) === todayStr)
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
       if (todayLogs.length > 0) {
         const lastLog = todayLogs[todayLogs.length - 1];
-        if (lastLog.type === 'ENTRY') {
+        if (lastLog.type === 'ENTRY' || (lastLog.type as string).toUpperCase() === 'CHECKIN') {
           isPresentNow = true;
         }
       }
@@ -145,7 +162,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       // Procesar cada día de la semana
       weekDays.forEach((wDay) => {
         const dayLogs = empLogs
-          .filter((l) => (l.timestamp || '').startsWith(wDay.dateStr))
+          .filter((l) => (l.timestamp || '').slice(0, 10) === wDay.dateStr)
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
         // Verificar si hay modificación manual de turno para este día
@@ -169,23 +186,26 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
 
           dayLogs.forEach((log) => {
-            if (log.type === 'ENTRY') {
+            const isEntry = log.type === 'ENTRY' || (log.type as string).toUpperCase() === 'CHECKIN';
+            const isExit  = log.type === 'EXIT'  || (log.type as string).toUpperCase() === 'CHECKOUT';
+
+            if (isEntry) {
               if (currentPair && !currentPair.lastOut) {
                 shiftPairs.push(currentPair);
               }
               currentPair = {
-                firstIn: log.timestamp.slice(11, 19),
+                firstIn: getTimeString(log.timestamp),
                 logs: [log],
               };
-            } else if (log.type === 'EXIT') {
+            } else if (isExit) {
               if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
-                currentPair.lastOut = log.timestamp.slice(11, 19);
+                currentPair.lastOut = getTimeString(log.timestamp);
                 currentPair.logs.push(log);
                 shiftPairs.push(currentPair);
                 currentPair = null;
               } else {
                 shiftPairs.push({
-                  lastOut: log.timestamp.slice(11, 19),
+                  lastOut: getTimeString(log.timestamp),
                   logs: [log],
                 });
               }
