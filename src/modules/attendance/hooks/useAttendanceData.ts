@@ -50,21 +50,7 @@ function timeToMinutes(timeStr: string): number {
 }
 
 // Format minutes to "HH:mm"
-export function roundToCustomHalfHour(h: number): number {
-  if (h <= 0) return 0;
-  const floorVal = Math.floor(h);
-  const frac = Number((h - floorVal).toFixed(4));
-
-  if (frac >= 0.9) {
-    return floorVal + 1.0;
-  } else if (frac >= 0.4) {
-    return floorVal + 0.5;
-  } else {
-    return floorVal + 0.0;
-  }
-}
-
-export function formatMinutesToHHMM(mins: number): string {
+function formatMinutesToHHMM(mins: number): string {
   const total = Math.max(0, Math.round(mins));
   const h = Math.floor(total / 60);
   const m = total % 60;
@@ -127,34 +113,17 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       let totalMissingDeductedMins = 0;
       let isPresentNow = false;
 
-      // Obtener logs del empleado en el rango de la semana (con coincidencia robusta de ID/número)
-      const empLogs = attendanceLogs.filter((l) => {
-        const logNo = String(l.employeeNo || '').trim();
-        const contractNo = String(contract.employeeNo || '').trim();
-        const logEmpId = String(l.employeeId || '').trim();
-        const contractEmpId = String(contract.employeeId || '').trim();
-
-        if (logNo === contractNo || logEmpId === contractEmpId) return true;
-        const numA = parseInt(logNo, 10);
-        const numB = parseInt(contractNo, 10);
-        return numA > 0 && numA === numB;
-      });
-
-      const getTimeString = (ts?: string) => {
-        if (!ts) return '';
-        if (ts.includes('T')) return ts.slice(11, 19);
-        if (ts.includes(' ')) return ts.split(' ')[1] || ts.slice(11, 19);
-        return ts.slice(11, 19);
-      };
+      // Obtener logs del empleado en el rango de la semana (o del día de hoy)
+      const empLogs = attendanceLogs.filter((l) => l.employeeNo === contract.employeeNo || l.employeeId === contract.employeeId);
 
       // Verificar si está "En Turno" hoy (última marca de hoy fue ENTRY)
       const todayLogs = empLogs
-        .filter((l) => (l.timestamp || '').slice(0, 10) === todayStr)
+        .filter((l) => (l.timestamp || '').startsWith(todayStr))
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
       if (todayLogs.length > 0) {
         const lastLog = todayLogs[todayLogs.length - 1];
-        if (lastLog.type === 'ENTRY' || (lastLog.type as string).toUpperCase() === 'CHECKIN') {
+        if (lastLog.type === 'ENTRY') {
           isPresentNow = true;
         }
       }
@@ -162,7 +131,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       // Procesar cada día de la semana
       weekDays.forEach((wDay) => {
         const dayLogs = empLogs
-          .filter((l) => (l.timestamp || '').slice(0, 10) === wDay.dateStr)
+          .filter((l) => (l.timestamp || '').startsWith(wDay.dateStr))
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
         // Verificar si hay modificación manual de turno para este día
@@ -186,26 +155,23 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
 
           dayLogs.forEach((log) => {
-            const isEntry = log.type === 'ENTRY' || (log.type as string).toUpperCase() === 'CHECKIN';
-            const isExit  = log.type === 'EXIT'  || (log.type as string).toUpperCase() === 'CHECKOUT';
-
-            if (isEntry) {
+            if (log.type === 'ENTRY') {
               if (currentPair && !currentPair.lastOut) {
                 shiftPairs.push(currentPair);
               }
               currentPair = {
-                firstIn: getTimeString(log.timestamp),
+                firstIn: log.timestamp.slice(11, 19),
                 logs: [log],
               };
-            } else if (isExit) {
+            } else if (log.type === 'EXIT') {
               if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
-                currentPair.lastOut = getTimeString(log.timestamp);
+                currentPair.lastOut = log.timestamp.slice(11, 19);
                 currentPair.logs.push(log);
                 shiftPairs.push(currentPair);
                 currentPair = null;
               } else {
                 shiftPairs.push({
-                  lastOut: getTimeString(log.timestamp),
+                  lastOut: log.timestamp.slice(11, 19),
                   logs: [log],
                 });
               }
@@ -308,13 +274,11 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
         dailyBlocks[wDay.dateStr] = dayBlocks;
       });
 
-
-
-      // Cálculo de Nómina Semanal acumulada con regla de redondeo personalizado
-      const grossHours = roundToCustomHalfHour(totalGrossMins / 60);
-      const deductedTardinessHours = roundToCustomHalfHour(totalTardyDeductedMins / 60);
-      const deductedMissingMarksHours = roundToCustomHalfHour(totalMissingDeductedMins / 60);
-      const netHoursWorked = roundToCustomHalfHour(Math.max(0, (totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60));
+      // Cálculo de Nómina Semanal acumulada
+      const grossHours = +(totalGrossMins / 60).toFixed(2);
+      const deductedTardinessHours = +(totalTardyDeductedMins / 60).toFixed(2);
+      const deductedMissingMarksHours = +(totalMissingDeductedMins / 60).toFixed(2);
+      const netHoursWorked = +((totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60).toFixed(2);
 
       const targetHours = contract.weeklyTargetHours || 44;
       const regularHours = Math.min(netHoursWorked, targetHours);

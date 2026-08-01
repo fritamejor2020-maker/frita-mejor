@@ -183,35 +183,35 @@ export function TimelineGridPanel({
                 return (
                   <div
                     key={day.dateStr}
-                    className={`flex-1 min-w-[125px] border-r border-gray-100 px-1 py-1 flex items-center gap-1 overflow-x-auto overflow-y-hidden relative group/cell ${
+                    className={`flex-1 min-w-[115px] border-r border-gray-100 p-1.5 flex flex-col justify-center gap-1 relative group/cell ${
                       day.isToday ? 'bg-amber-50/20' : ''
                     }`}
                   >
-                    {blocks.map((b, idx) => {
-                      const pillLabel = `${b.formattedTotal} (${b.firstIn ? b.firstIn.slice(0, 5) : '??:??'}...)`;
+                    {blocks.map((b, idx) => (
+                      <div
+                        key={idx}
+                        onClick={() => onSelectBlock(emp, day.dateStr, b)}
+                        className={`rounded-xl px-2.5 py-1 flex items-center justify-between text-xs font-black transition-all cursor-pointer shadow-2xs select-none border truncate ${
+                          b.isTardy || b.isMissingMarks
+                            ? 'bg-amber-50 border-amber-300 text-amber-900 hover:bg-amber-100'
+                            : 'bg-gray-100 border-gray-200 text-gray-800 hover:bg-gray-200'
+                        }`}
+                        title={`${b.shiftName}: ${b.displayPillText}`}
+                      >
+                        <span className="truncate leading-tight font-extrabold">
+                          {b.displayPillText}
+                        </span>
 
-                      return (
-                        <div
-                          key={idx}
-                          onClick={() => onSelectBlock(emp, day.dateStr, b)}
-                          className={`rounded-md px-1.5 py-0.5 flex items-center gap-1 text-[10px] font-black transition-all cursor-pointer shadow-2xs select-none border shrink-0 ${
-                            b.isTardy || b.isMissingMarks
-                              ? 'bg-amber-100 border-amber-300 text-amber-950 hover:bg-amber-200'
-                              : 'bg-gray-200/90 border-gray-300/90 text-gray-800 hover:bg-gray-300'
-                          }`}
-                          title={`${b.shiftName}: ${b.displayPillText}`}
-                        >
-                          <span className="font-extrabold whitespace-nowrap leading-none">{pillLabel}</span>
-
+                        <div className="flex items-center gap-1 shrink-0 ml-1">
                           {b.isTardy && (
-                            <AlertTriangle size={11} className="text-amber-600 shrink-0" title="Tardanza (>5 min) -> -30m" />
+                            <AlertTriangle size={13} className="text-amber-600 shrink-0" title="Tardanza (>5 min) -> -30m" />
                           )}
                           {b.isMissingMarks && (
-                            <HelpCircle size={11} className="text-red-500 shrink-0" title="Falta marca -> -30m" />
+                            <HelpCircle size={13} className="text-red-500 shrink-0" title="Falta marca -> -30m" />
                           )}
                         </div>
-                      );
-                    })}
+                      </div>
+                    ))}
 
                     {blocks.length === 0 && (
                       <button

@@ -91,11 +91,6 @@ export function AttendanceView() {
     setTimeout(() => setSyncToast(null), 5000);
   };
 
-  // Auto-Sincronizar Biométrico al entrar al módulo Asistencia & Turnos
-  React.useEffect(() => {
-    handleSyncTerminal();
-  }, []);
-
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">
       {/* Header Superior con Botón de Nómina */}
