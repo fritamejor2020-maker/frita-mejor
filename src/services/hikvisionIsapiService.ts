@@ -508,66 +508,81 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia (AcsEvent Paginado) ─────────
+// ── 6. Extracción TOTAL de Registros de Asistencia (AcsEvent Paginado desde los más recientes) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
   const pageSize = 10; // Firmware DS-K1T8003MF entrega máximo 10 por página
-  let position = 0;
-  let totalMatches = Infinity;
-  const allEvents: AcsEvent[] = [];
-
   const startTime = options?.startTime || '2020-01-01T00:00:00-05:00';
   const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
+  const maxEventsToFetch = 300; // Obtener hasta 300 eventos más recientes
 
-  const maxEventsToFetch = 500; // Límite de seguridad para obtener 500 marcaciones recientes de todos los empleados
-  while (position < totalMatches && position < maxEventsToFetch) {
+  // 1. Probar el total de registros almacenados en el hardware
+  let totalMatches = 0;
+  try {
+    const probePayload = JSON.stringify({
+      AcsEventCond: {
+        searchID: "1",
+        searchResultPosition: 0,
+        maxResults: 1,
+        major: 0,
+        minor: 0,
+        startTime,
+        endTime,
+      },
+    });
+    const probeRes = await isapiDigestFetch(config, path, { method: 'POST', body: probePayload });
+    if (probeRes.ok && probeRes.text) {
+      const probeData = JSON.parse(probeRes.text);
+      totalMatches = probeData.AcsEvent?.totalMatches || 0;
+    }
+  } catch (err) {
+    console.warn('[Hikvision ISAPI] Error al consultar totalMatches:', err);
+  }
+
+  if (totalMatches <= 0) {
+    return [];
+  }
+
+  const allEvents: AcsEvent[] = [];
+  // Empezar desde el FINAL de la memoria (donde están los eventos recién marcados) hacia atrás
+  let currentPos = Math.max(0, totalMatches - pageSize);
+  let fetchedCount = 0;
+
+  while (currentPos >= 0 && fetchedCount < maxEventsToFetch) {
     const payload = JSON.stringify({
       AcsEventCond: {
         searchID: "1",
-        searchResultPosition: position,
+        searchResultPosition: currentPos,
         maxResults: pageSize,
         major: 0,
         minor: 0,
         startTime,
         endTime,
-        timeReverseOrder: true,
       },
     });
 
     try {
       const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
-      if (!res.ok || !res.text) {
-        console.warn(`[Hikvision ISAPI] AcsEvent Search falló en posición ${position} con HTTP ${res.status}`);
-        break;
-      }
+      if (!res.ok || !res.text) break;
 
       const data = JSON.parse(res.text);
-      const eventResult = data.AcsEvent || {};
-
-      if (typeof eventResult.totalMatches === 'number') {
-        totalMatches = eventResult.totalMatches;
-      }
-
-      let infoList = eventResult.InfoList || [];
+      let infoList = data.AcsEvent?.InfoList || [];
       if (!Array.isArray(infoList)) {
         infoList = [infoList];
       }
 
-      if (infoList.length === 0) {
-        break;
-      }
+      if (infoList.length === 0) break;
 
-      allEvents.push(...infoList);
-      position += infoList.length;
+      allEvents.unshift(...infoList);
+      fetchedCount += infoList.length;
 
-      if (position >= totalMatches || position >= maxEventsToFetch || eventResult.responseStatusStrg === 'OK') {
-        break;
-      }
+      if (currentPos === 0) break;
+      currentPos = Math.max(0, currentPos - pageSize);
     } catch (err) {
-      console.error(`[Hikvision ISAPI] Excepción al buscar AcsEvents en posición ${position}:`, err);
+      console.error(`[Hikvision ISAPI] Excepción al buscar AcsEvents en posición ${currentPos}:`, err);
       break;
     }
   }
