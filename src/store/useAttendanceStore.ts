@@ -200,7 +200,7 @@ export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAt
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
-  // 1. Conservar TODOS los registros existentes (sincronizados del biométrico o ingresados)
+  // 1. Conservar TODOS los registros existentes (sincronizados del biométrico o ingresados manualmente)
   (existing || []).forEach((l) => {
     if (l && l.id) map.set(l.id, l);
   });
@@ -211,23 +211,6 @@ function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
       map.set(l.id, l);
     }
   });
-
-  // 3. Garantizar siempre la marcación del día de hoy para Arlin (#24)
-  const todayStr = new Date().toISOString().slice(0, 10);
-  const arlinTodayId = 'LOG-TERM-001-24-TODAY';
-  if (!map.has(arlinTodayId)) {
-    map.set(arlinTodayId, {
-      id: arlinTodayId,
-      employeeId: 'EMP-24',
-      employeeNo: '24',
-      branchId: 'BRANCH-001',
-      terminalId: 'TERM-001',
-      timestamp: `${todayStr}T10:20:05-05:00`,
-      type: 'ENTRY',
-      verifyMethod: 'BIOMETRIC',
-      doorNo: 1,
-    });
-  }
 
   return Array.from(map.values());
 }
@@ -368,11 +351,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
-                let empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
-                // Si el evento ocurrió hoy y no trae empNo (ej. huella no matriculada en hardware), asignar por defecto a #24 (Arlin)
-                if (!empNo && (ev.minor === 21 || ev.minor === 22 || ev.minor === 38)) {
-                  empNo = '24';
-                }
+                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 return (
                   empNo.length > 0 &&
                   (status === 'checkin' ||
@@ -390,12 +369,11 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
-                let empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
-                if (!empNo) empNo = '24';
+                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
 
                 const rawTime = ev.time || new Date().toISOString();
                 const todayStr = new Date().toISOString().slice(0, 10);
-                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : '10:20:05';
+                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : '08:30:00';
 
                 return {
                   id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -410,26 +388,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 };
               });
 
-            // Garantizar la marcación de hoy para Arlin (#24) si fue registrada
-            const todayStr = new Date().toISOString().slice(0, 10);
-            const arlinTodayLog: RawAttendanceLog = {
-              id: `LOG-TERM-001-24-TODAY`,
-              employeeId: 'EMP-24',
-              employeeNo: '24',
-              branchId: terminal.branchId,
-              terminalId: terminal.id,
-              timestamp: `${todayStr}T10:20:05-05:00`,
-              type: 'ENTRY',
-              verifyMethod: 'BIOMETRIC',
-              doorNo: 1,
-            };
-
             set((state) => {
               const existingIds = new Set(state.attendanceLogs.map((l) => l.id));
               const toAdd = mappedLogs.filter((l) => !existingIds.has(l.id));
-              if (!existingIds.has(arlinTodayLog.id)) {
-                toAdd.push(arlinTodayLog);
-              }
               const updated = [...toAdd, ...state.attendanceLogs];
               push('attendance_logs', updated);
               return { attendanceLogs: updated };
