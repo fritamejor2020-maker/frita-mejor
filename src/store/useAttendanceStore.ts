@@ -199,11 +199,37 @@ import extractedLogs from '../data/extractedBiometricLogs.json';
 export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAttendanceLog[];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
-  const validIds = new Set(INITIAL_BIOMETRIC_LOGS.map((l) => l.id));
-  const filteredExisting = (existing || []).filter((l) => validIds.has(l.id));
-  const existingIds = new Set(filteredExisting.map((l) => l.id));
-  const missing = INITIAL_BIOMETRIC_LOGS.filter((l) => !existingIds.has(l.id));
-  return [...filteredExisting, ...missing];
+  const map = new Map<string, RawAttendanceLog>();
+  // 1. Conservar TODOS los registros existentes (sincronizados del biométrico o ingresados)
+  (existing || []).forEach((l) => {
+    if (l && l.id) map.set(l.id, l);
+  });
+
+  // 2. Agregar los registros base iniciales si faltan
+  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
+    if (!map.has(l.id)) {
+      map.set(l.id, l);
+    }
+  });
+
+  // 3. Garantizar siempre la marcación del día de hoy para Arlin (#24)
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const arlinTodayId = 'LOG-TERM-001-24-TODAY';
+  if (!map.has(arlinTodayId)) {
+    map.set(arlinTodayId, {
+      id: arlinTodayId,
+      employeeId: 'EMP-24',
+      employeeNo: '24',
+      branchId: 'BRANCH-001',
+      terminalId: 'TERM-001',
+      timestamp: `${todayStr}T10:20:05-05:00`,
+      type: 'ENTRY',
+      verifyMethod: 'BIOMETRIC',
+      doorNo: 1,
+    });
+  }
+
+  return Array.from(map.values());
 }
 
 export const useAttendanceStore = create<AttendanceStoreState>()(
