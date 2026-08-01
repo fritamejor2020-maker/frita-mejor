@@ -342,16 +342,19 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
+                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 return (
-                  status === 'checkin' ||
-                  status === 'entry' ||
-                  status === 'check_in' ||
-                  status === 'in' ||
-                  status === 'checkout' ||
-                  status === 'exit' ||
-                  status === 'check_out' ||
-                  status === 'out' ||
-                  !ev.attendanceStatus
+                  empNo.length > 0 &&
+                  (status === 'checkin' ||
+                    status === 'entry' ||
+                    status === 'check_in' ||
+                    status === 'in' ||
+                    status === 'checkout' ||
+                    status === 'exit' ||
+                    status === 'check_out' ||
+                    status === 'out' ||
+                    status === 'undefined' ||
+                    !ev.attendanceStatus)
                 );
               })
               .map((ev: any) => {
