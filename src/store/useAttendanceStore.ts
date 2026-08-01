@@ -338,10 +338,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           }
 
           let logsAdded = 0;
-          if (parsedEvents.length === 0) {
-            set({ attendanceLogs: INITIAL_BIOMETRIC_LOGS });
-            logsAdded = INITIAL_BIOMETRIC_LOGS.length;
-          } else {
+          if (parsedEvents.length > 0) {
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => ev.attendanceStatus === 'checkIn' || ev.attendanceStatus === 'checkOut')
               .map((ev: any) => ({
@@ -355,8 +352,17 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                 doorNo: ev.doorNo || 1,
               }));
-            set({ attendanceLogs: mappedLogs });
+
+            set((state) => {
+              const existingIds = new Set(state.attendanceLogs.map((l) => l.id));
+              const toAdd = mappedLogs.filter((l) => !existingIds.has(l.id));
+              const updated = [...toAdd, ...state.attendanceLogs];
+              push('attendance_logs', updated);
+              return { attendanceLogs: updated };
+            });
             logsAdded = mappedLogs.length;
+          } else {
+            logsAdded = get().attendanceLogs.length;
           }
 
           get().updateTerminal(terminalId, {
