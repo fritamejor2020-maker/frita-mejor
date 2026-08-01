@@ -274,11 +274,18 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
         dailyBlocks[wDay.dateStr] = dayBlocks;
       });
 
-      // Cálculo de Nómina Semanal acumulada
-      const grossHours = +(totalGrossMins / 60).toFixed(2);
-      const deductedTardinessHours = +(totalTardyDeductedMins / 60).toFixed(2);
-      const deductedMissingMarksHours = +(totalMissingDeductedMins / 60).toFixed(2);
-      const netHoursWorked = +((totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60).toFixed(2);
+      // Cálculo de Nómina Semanal acumulada con redondeo a la media hora más cercana (pasos de 0.5h)
+      const rawGrossHours = totalGrossMins / 60;
+      const grossHours = Math.round(rawGrossHours * 2) / 2;
+
+      const rawTardyHours = totalTardyDeductedMins / 60;
+      const deductedTardinessHours = Math.round(rawTardyHours * 2) / 2;
+
+      const rawMissingHours = totalMissingDeductedMins / 60;
+      const deductedMissingMarksHours = Math.round(rawMissingHours * 2) / 2;
+
+      const rawNetHours = Math.max(0, (totalGrossMins - totalTardyDeductedMins - totalMissingDeductedMins) / 60);
+      const netHoursWorked = Math.round(rawNetHours * 2) / 2;
 
       const targetHours = contract.weeklyTargetHours || 44;
       const regularHours = Math.min(netHoursWorked, targetHours);

@@ -74,7 +74,8 @@ function EditableEmployeePayrollCard({
     daysList.forEach((d) => {
       const blocks = emp.dailyBlocks[d.dateStr] || [];
       const grossMins = blocks.reduce((acc, b) => acc + (b.grossMinutes || 0), 0);
-      map[d.dateStr] = Number((grossMins / 60).toFixed(2));
+      const rawHours = grossMins / 60;
+      map[d.dateStr] = Math.round(rawHours * 2) / 2;
     });
     return map;
   });
@@ -288,7 +289,7 @@ function EditableEmployeePayrollCard({
                 {/* Input Horas Trabajadas */}
                 <input
                   type="number"
-                  step="0.1"
+                  step="0.5"
                   min="0"
                   max="24"
                   value={dailyHours[d.dateStr] ?? 0}
