@@ -200,18 +200,14 @@ export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAt
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
-  // 1. Conservar TODOS los registros existentes (sincronizados del biométrico o ingresados manualmente)
   (existing || []).forEach((l) => {
     if (l && l.id) map.set(l.id, l);
   });
-
-  // 2. Agregar los registros base iniciales si faltan
   INITIAL_BIOMETRIC_LOGS.forEach((l) => {
     if (!map.has(l.id)) {
       map.set(l.id, l);
     }
   });
-
   return Array.from(map.values());
 }
 
@@ -369,11 +365,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
-                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
-
-                const rawTime = ev.time || new Date().toISOString();
-                const todayStr = new Date().toISOString().slice(0, 10);
-                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : '08:30:00';
+                const empNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
 
                 return {
                   id: `LOG-${terminal.id}-${ev.serialNo || Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
@@ -381,7 +373,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   employeeNo: empNo,
                   branchId: terminal.branchId,
                   terminalId: terminal.id,
-                  timestamp: rawTime.startsWith(todayStr) ? rawTime : `${todayStr}T${timeOfDay}-05:00`,
+                  timestamp: ev.time || new Date().toISOString(),
                   type: isExit ? ('EXIT' as const) : ('ENTRY' as const),
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,

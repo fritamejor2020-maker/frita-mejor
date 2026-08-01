@@ -519,7 +519,7 @@ export async function fetchAllEvents(
   const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
   const maxEventsToFetch = 300; // Obtener hasta 300 eventos más recientes
 
-  // 1. Probar el total de registros almacenados en el hardware
+  // 1. Obtener el total de registros en la memoria del hardware
   let totalMatches = 0;
   try {
     const probePayload = JSON.stringify({
@@ -547,7 +547,7 @@ export async function fetchAllEvents(
   }
 
   const allEvents: AcsEvent[] = [];
-  // Empezar desde el FINAL de la memoria (donde están los eventos recién marcados) hacia atrás
+  // Empezar desde el FINAL de la memoria (donde están los eventos más recientes) hacia atrás
   let currentPos = Math.max(0, totalMatches - pageSize);
   let fetchedCount = 0;
 
