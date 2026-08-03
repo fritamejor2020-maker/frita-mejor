@@ -371,18 +371,14 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 );
               })
               .map((ev: any) => {
-                const status = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
-                const rawTime = ev.time || new Date().toISOString();
-                const todayStr = new Date().toISOString().slice(0, 10);
-                const timeOfDay = rawTime.includes('T') ? rawTime.slice(11, 19) : (rawTime.includes(' ') ? rawTime.split(' ')[1] : '08:30:00');
-                const finalTimestamp = rawTime.startsWith(todayStr) ? rawTime : `${todayStr}T${timeOfDay}-05:00`;
+                const finalTimestamp = ev.time || new Date().toISOString();
 
                 // ID determinista único por número de serie del biométrico para evitar duplicados
-                const logId = ev.serialNo ? `LOG-${terminal.id}-${ev.serialNo}` : `LOG-${terminal.id}-${rawNo}-${rawTime.slice(0, 19)}`;
+                const logId = ev.serialNo ? `LOG-${terminal.id}-${ev.serialNo}` : `LOG-${terminal.id}-${rawNo}-${finalTimestamp.slice(0, 19)}`;
 
                 return {
                   id: logId,
