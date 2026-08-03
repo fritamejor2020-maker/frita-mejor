@@ -200,14 +200,26 @@ export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAt
 
 function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
+  // IDs de aperturas de portón descartadas (no son marcaciones de asistencia Check In)
+  const INVALID_GATE_OPENING_IDS = new Set([
+    'LOG-TERM-001-25650',
+    'LOG-TERM-001-25647',
+    'LOG-TERM-001-25644',
+    'LOG-TERM-001-25641',
+  ]);
+
   (existing || []).forEach((l) => {
-    if (l && l.id) map.set(l.id, l);
-  });
-  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
-    if (!map.has(l.id)) {
+    if (l && l.id && !INVALID_GATE_OPENING_IDS.has(l.id)) {
       map.set(l.id, l);
     }
   });
+
+  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
+    if (!map.has(l.id) && !INVALID_GATE_OPENING_IDS.has(l.id)) {
+      map.set(l.id, l);
+    }
+  });
+
   return Array.from(map.values());
 }
 
