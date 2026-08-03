@@ -371,7 +371,13 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 );
               })
               .map((ev: any) => {
-                const isExit = status === 'checkout' || status === 'exit' || status === 'check_out' || status === 'out';
+                const status = String(ev.attendanceStatus || '').toLowerCase();
+                const isExit =
+                  status === 'checkout' ||
+                  status === 'exit' ||
+                  status === 'check_out' ||
+                  status === 'out' ||
+                  ev.statusValue === 2;
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
