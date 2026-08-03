@@ -509,8 +509,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         };
 
         try {
-          // 1. Enviar datos de usuario (Nombre + PIN)
-          const pathUser = '/ISAPI/AccessControl/UserInfo/Record?format=json';
+          // 1. Enviar/Actualizar datos de usuario (Nombre + PIN)
           const payloadUser = JSON.stringify({
             UserInfo: {
               employeeNo: contract.employeeNo,
@@ -519,7 +518,12 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               password: contract.pinPassword || '123456',
             }
           });
-          await isapiDigestFetch(config, pathUser, { method: 'POST', body: payloadUser });
+
+          try {
+            await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
+          } catch {
+            await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payloadUser });
+          }
 
           // 2. Enviar tarjeta RFID si está configurada
           if (contract.cardNo) {
