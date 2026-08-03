@@ -36,6 +36,7 @@ export interface EmployeeContract {
   baseHourlyRate: number;    // $ / hora ordinaria
   overtimeHourlyRate: number;// $ / hora extra
   pinPassword?: string;      // Clave de acceso en el biométrico
+  cardNo?: string;           // Código de tarjeta RFID asignada
   avatarColor?: string;
 }
 
@@ -502,8 +503,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         };
 
         try {
-          const path = '/ISAPI/AccessControl/UserInfo/Record?format=json';
-          const payload = JSON.stringify({
+          // 1. Enviar datos de usuario (Nombre + PIN)
+          const pathUser = '/ISAPI/AccessControl/UserInfo/Record?format=json';
+          const payloadUser = JSON.stringify({
             UserInfo: {
               employeeNo: contract.employeeNo,
               name: contract.fullName,
@@ -511,7 +513,21 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               password: contract.pinPassword || '123456',
             }
           });
-          await isapiDigestFetch(config, path, { method: 'POST', body: payload });
+          await isapiDigestFetch(config, pathUser, { method: 'POST', body: payloadUser });
+
+          // 2. Enviar tarjeta RFID si está configurada
+          if (contract.cardNo) {
+            const pathCard = '/ISAPI/AccessControl/CardInfo/Record?format=json';
+            const payloadCard = JSON.stringify({
+              CardInfo: {
+                employeeNo: contract.employeeNo,
+                cardNo: contract.cardNo,
+                cardType: 'normalCard',
+              }
+            });
+            await isapiDigestFetch(config, pathCard, { method: 'POST', body: payloadCard });
+          }
+
           return { ok: true, message: `Empleado #${contract.employeeNo} (${contract.fullName}) enviado exitosamente al biométrico ${terminal.name}.` };
         } catch (e: any) {
           return { ok: true, message: `Empleado #${contract.employeeNo} registrado localmente en la app.` };
