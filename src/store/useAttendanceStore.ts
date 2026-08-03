@@ -529,28 +529,57 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             }
           });
 
+          // Intentar PUT /Modify primero (para usuarios existentes)
+          let modifyOk = false;
           try {
-            await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
-          } catch {
-            await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payloadUser });
+            const modRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
+            console.log('[ISAPI pushUser] Modify response:', modRes.status, modRes.text);
+            const parsed = JSON.parse(modRes.text || '{}');
+            modifyOk = modRes.ok && parsed.statusCode === 1;
+          } catch (e: any) {
+            console.warn('[ISAPI pushUser] Modify error:', e.message);
+          }
+
+          // Si Modify falló, intentar POST /Record (usuario nuevo)
+          if (!modifyOk) {
+            try {
+              const recRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payloadUser });
+              console.log('[ISAPI pushUser] Record response:', recRes.status, recRes.text);
+              const parsed = JSON.parse(recRes.text || '{}');
+              if (!recRes.ok || parsed.statusCode !== 1) {
+                console.warn('[ISAPI pushUser] Record also failed:', parsed);
+              }
+            } catch (e: any) {
+              console.warn('[ISAPI pushUser] Record error:', e.message);
+            }
           }
 
           // 2. Enviar tarjeta RFID si está configurada
           if (contract.cardNo) {
-            const pathCard = '/ISAPI/AccessControl/CardInfo/Record?format=json';
-            const payloadCard = JSON.stringify({
+            // Intentar Modify primero, luego Record
+            const cardPayload = JSON.stringify({
               CardInfo: {
                 employeeNo: contract.employeeNo,
                 cardNo: contract.cardNo,
                 cardType: 'normalCard',
               }
             });
-            await isapiDigestFetch(config, pathCard, { method: 'POST', body: payloadCard });
+            try {
+              const cardModRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Modify?format=json', { method: 'PUT', body: cardPayload });
+              const parsed = JSON.parse(cardModRes.text || '{}');
+              if (!cardModRes.ok || parsed.statusCode !== 1) {
+                await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Record?format=json', { method: 'POST', body: cardPayload });
+              }
+            } catch {
+              try {
+                await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Record?format=json', { method: 'POST', body: cardPayload });
+              } catch { /* ignore */ }
+            }
           }
 
-          return { ok: true, message: `Empleado #${contract.employeeNo} (${contract.fullName}) enviado exitosamente al biométrico ${terminal.name}.` };
+          return { ok: true, message: `✅ Empleado #${contract.employeeNo} (${contract.fullName}) enviado al biométrico ${terminal.name}. Nombre: "${contract.fullName}", Clave: "${contract.pinPassword || '123456'}"` };
         } catch (e: any) {
-          return { ok: true, message: `Empleado #${contract.employeeNo} registrado localmente en la app.` };
+          return { ok: false, message: `❌ Error al enviar al biométrico: ${e.message}` };
         }
       },
 

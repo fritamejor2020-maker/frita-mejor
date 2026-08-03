@@ -151,7 +151,13 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
       employeeId: selectedEmpId || `EMP-${employeeNo}`,
       employeeNo, fullName, branchId, shiftType, defaultShiftId,
       weeklyTargetHours, baseHourlyRate, overtimeHourlyRate, pinPassword,
+      avatarColor: selectedEmpId
+        ? employeeContracts.find((c) => c.employeeId === selectedEmpId)?.avatarColor
+        : ['#3B82F6', '#10B981', '#F59E0B', '#6366F1', '#EC4899'][Math.floor(Math.random() * 5)],
     };
+
+    // Guardar primero en la app local
+    upsertEmployeeContract(contract);
 
     const res = await pushUserToTerminal(term.id, contract);
     showStatus(res.message, res.ok ? 'success' : 'error');
