@@ -508,86 +508,85 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia (AcsEvent Paginado desde los más recientes) ─────────
+// ── 6. Extracción TOTAL de Registros de Asistencia por Huella (38), Clave/Tarjeta (1, 9) y Facial (75) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
-  const pageSize = 10; // Firmware DS-K1T8003MF entrega máximo 10 por página
+  const pageSize = 10;
   const startTime = options?.startTime || '2020-01-01T00:00:00-05:00';
   const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
-  const maxEventsToFetch = 300; // Obtener hasta 300 eventos más recientes
 
-  // 1. Obtener el total de registros en la memoria del hardware
-  let totalMatches = 0;
-  try {
-    const probePayload = JSON.stringify({
-      AcsEventCond: {
-        searchID: "1",
-        searchResultPosition: 0,
-        maxResults: 1,
-        major: 0,
-        minor: 0,
-        startTime,
-        endTime,
-      },
-    });
-    const probeRes = await isapiDigestFetch(config, path, { method: 'POST', body: probePayload });
-    if (probeRes.ok && probeRes.text) {
-      const probeData = JSON.parse(probeRes.text);
-      totalMatches = probeData.AcsEvent?.totalMatches || 0;
-    }
-  } catch (err) {
-    console.warn('[Hikvision ISAPI] Error al consultar totalMatches:', err);
-  }
-
-  if (totalMatches <= 0) {
-    return [];
-  }
-
+  // Códigos Minor de Hikvision para Marcaciones Válidas:
+  // minor: 38 -> Huella Dactilar (Fingerprint Pass)
+  // minor: 1  -> Tarjeta / Contraseña / Teclado
+  // minor: 9  -> Autenticación por Tarjeta
+  // minor: 75 -> Reconocimiento Facial (Face Pass)
+  const targetMinors = [38, 1, 9, 75];
   const allEvents: AcsEvent[] = [];
-  // Empezar desde el FINAL de la memoria (donde están los eventos más recientes) hacia atrás
-  let currentPos = Math.max(0, totalMatches - pageSize);
-  let fetchedCount = 0;
 
-  while (currentPos >= 0 && fetchedCount < maxEventsToFetch) {
-    const payload = JSON.stringify({
-      AcsEventCond: {
-        searchID: "1",
-        searchResultPosition: currentPos,
-        maxResults: pageSize,
-        major: 0,
-        minor: 0,
-        startTime,
-        endTime,
-      },
-    });
-
+  for (const minorCode of targetMinors) {
     try {
-      const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
-      if (!res.ok || !res.text) break;
+      // 1. Consultar el total de eventos para este minor específico
+      const probePayload = JSON.stringify({
+        AcsEventCond: {
+          searchID: "1",
+          searchResultPosition: 0,
+          maxResults: 1,
+          major: 5,
+          minor: minorCode,
+          startTime,
+          endTime,
+        },
+      });
 
-      const data = JSON.parse(res.text);
-      let infoList = data.AcsEvent?.InfoList || [];
-      if (!Array.isArray(infoList)) {
-        infoList = [infoList];
+      const probeRes = await isapiDigestFetch(config, path, { method: 'POST', body: probePayload });
+      if (!probeRes.ok || !probeRes.text) continue;
+
+      const probeData = JSON.parse(probeRes.text);
+      const totalMatches = probeData.AcsEvent?.totalMatches || 0;
+      if (totalMatches <= 0) continue;
+
+      // 2. Extraer los eventos más recientes de atrás hacia adelante para este minor
+      const maxResultsForMinor = 150;
+      let currentPos = Math.max(0, totalMatches - pageSize);
+      let fetchedCount = 0;
+
+      while (currentPos >= 0 && fetchedCount < maxResultsForMinor) {
+        const payload = JSON.stringify({
+          AcsEventCond: {
+            searchID: "1",
+            searchResultPosition: currentPos,
+            maxResults: pageSize,
+            major: 5,
+            minor: minorCode,
+            startTime,
+            endTime,
+          },
+        });
+
+        const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
+        if (!res.ok || !res.text) break;
+
+        const data = JSON.parse(res.text);
+        let infoList = data.AcsEvent?.InfoList || [];
+        if (!Array.isArray(infoList)) infoList = [infoList];
+        if (infoList.length === 0) break;
+
+        allEvents.push(...infoList);
+        fetchedCount += infoList.length;
+
+        if (currentPos === 0) break;
+        currentPos = Math.max(0, currentPos - pageSize);
       }
-
-      if (infoList.length === 0) break;
-
-      allEvents.unshift(...infoList);
-      fetchedCount += infoList.length;
-
-      if (currentPos === 0) break;
-      currentPos = Math.max(0, currentPos - pageSize);
     } catch (err) {
-      console.error(`[Hikvision ISAPI] Excepción al buscar AcsEvents en posición ${currentPos}:`, err);
-      break;
+      console.warn(`[Hikvision ISAPI] Excepción al consultar minor ${minorCode}:`, err);
     }
   }
 
-  return allEvents;
+  // Ordenar cronológicamente todos los eventos combinados por fecha/hora
+  return allEvents.sort((a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime());
 }
 
 // ── 7. Función Consolidada Reutilizable: fetchCompleteDeviceData ───────────────
