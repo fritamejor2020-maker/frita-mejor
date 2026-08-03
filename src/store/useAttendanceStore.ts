@@ -356,19 +356,22 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 const status = String(ev.attendanceStatus || '').toLowerCase();
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
-                return (
-                  rawNo.length > 0 &&
-                  (status === 'checkin' ||
-                    status === 'entry' ||
-                    status === 'check_in' ||
-                    status === 'in' ||
-                    status === 'checkout' ||
-                    status === 'exit' ||
-                    status === 'check_out' ||
-                    status === 'out' ||
-                    status === 'undefined' ||
-                    !ev.attendanceStatus)
-                );
+
+                const isExplicitCheckInOrOut =
+                  status === 'checkin' ||
+                  status === 'entry' ||
+                  status === 'check_in' ||
+                  status === 'in' ||
+                  status === 'checkout' ||
+                  status === 'exit' ||
+                  status === 'check_out' ||
+                  status === 'out' ||
+                  ev.statusValue === 1 ||
+                  ev.statusValue === 2;
+
+                // Solo incluir si es una marcación explícita de asistencia (Check In / Check Out)
+                // Excluir aperturas de portón / puerta (status === 'undefined' o statusValue === 0)
+                return rawNo.length > 0 && isExplicitCheckInOrOut;
               })
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
