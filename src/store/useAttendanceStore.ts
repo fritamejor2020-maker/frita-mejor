@@ -176,11 +176,21 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
   baseHourlyRate: 6500,
   overtimeHourlyRate: 9750,
   avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+  pinPassword: u.employeeNo === '24' ? '4321' : String(1000 + Number(u.employeeNo)),
 }));
 
 function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
+  const initialMap = new Map<string, EmployeeContract>();
+  INITIAL_CONTRACTS.forEach((c) => initialMap.set(c.employeeNo, c));
+
   const map = new Map<string, EmployeeContract>();
-  (existing || []).forEach((c) => map.set(c.employeeNo, c));
+  (existing || []).forEach((c) => {
+    // Backfill pinPassword from INITIAL_CONTRACTS if missing
+    if (!c.pinPassword && initialMap.has(c.employeeNo)) {
+      c = { ...c, pinPassword: initialMap.get(c.employeeNo)!.pinPassword };
+    }
+    map.set(c.employeeNo, c);
+  });
   INITIAL_CONTRACTS.forEach((c) => {
     if (!map.has(c.employeeNo)) {
       map.set(c.employeeNo, c);
