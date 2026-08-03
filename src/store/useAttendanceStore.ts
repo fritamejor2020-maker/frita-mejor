@@ -379,8 +379,14 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   status === 'exit' ||
                   status === 'check_out' ||
                   status === 'out' ||
+                  status === 'overtimein' ||
+                  status === 'overtime_in' ||
+                  status === 'overtimeout' ||
+                  status === 'overtime_out' ||
                   ev.statusValue === 1 ||
-                  ev.statusValue === 2;
+                  ev.statusValue === 2 ||
+                  ev.statusValue === 5 ||
+                  ev.statusValue === 6;
 
                 // Solo incluir si es una marcación explícita de asistencia (Check In / Check Out)
                 // Excluir aperturas de portón / puerta (status === 'undefined' o statusValue === 0)
