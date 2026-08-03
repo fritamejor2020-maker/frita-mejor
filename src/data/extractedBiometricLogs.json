@@ -1,5 +1,27 @@
 [
   {
+    "id": "LOG-TERM-001-25668",
+    "employeeId": "EMP-2",
+    "employeeNo": "2",
+    "branchId": "BRANCH-001",
+    "terminalId": "TERM-001",
+    "timestamp": "2026-08-03T08:16:13-05:00",
+    "type": "ENTRY",
+    "verifyMethod": "CARD",
+    "doorNo": 1
+  },
+  {
+    "id": "LOG-TERM-001-25665",
+    "employeeId": "EMP-2",
+    "employeeNo": "2",
+    "branchId": "BRANCH-001",
+    "terminalId": "TERM-001",
+    "timestamp": "2026-08-03T08:08:05-05:00",
+    "type": "ENTRY",
+    "verifyMethod": "CARD",
+    "doorNo": 1
+  },
+  {
     "id": "LOG-TERM-001-25653",
     "employeeId": "EMP-24",
     "employeeNo": "24",

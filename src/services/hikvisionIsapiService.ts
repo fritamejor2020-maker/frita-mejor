@@ -508,7 +508,7 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia por Huella (38), Clave/Tarjeta (1, 9) y Facial (75) ─────────
+// ── 6. Extracción TOTAL de Registros de Asistencia por Huella, Clave, Tarjeta y Facial ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string }
@@ -518,23 +518,16 @@ export async function fetchAllEvents(
   const startTime = options?.startTime || '2020-01-01T00:00:00-05:00';
   const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
 
-  // Códigos Minor de Hikvision para Marcaciones Válidas:
-  // minor: 38 -> Huella Dactilar (Fingerprint Pass)
-  // minor: 1  -> Tarjeta / Contraseña / Teclado
-  // minor: 9  -> Autenticación por Tarjeta
-  // minor: 75 -> Reconocimiento Facial (Face Pass)
-  const targetMinors = [38, 1, 9, 75];
-  const allEvents: AcsEvent[] = [];
+  const allEventsMap = new Map<string, AcsEvent>();
 
-  for (const minorCode of targetMinors) {
+  const fetchEventsForCond = async (majorCode: number, minorCode: number, maxCount: number) => {
     try {
-      // 1. Consultar el total de eventos para este minor específico
       const probePayload = JSON.stringify({
         AcsEventCond: {
           searchID: "1",
           searchResultPosition: 0,
           maxResults: 1,
-          major: 5,
+          major: majorCode,
           minor: minorCode,
           startTime,
           endTime,
@@ -542,24 +535,22 @@ export async function fetchAllEvents(
       });
 
       const probeRes = await isapiDigestFetch(config, path, { method: 'POST', body: probePayload });
-      if (!probeRes.ok || !probeRes.text) continue;
+      if (!probeRes.ok || !probeRes.text) return;
 
       const probeData = JSON.parse(probeRes.text);
       const totalMatches = probeData.AcsEvent?.totalMatches || 0;
-      if (totalMatches <= 0) continue;
+      if (totalMatches <= 0) return;
 
-      // 2. Extraer los eventos más recientes de atrás hacia adelante para este minor
-      const maxResultsForMinor = 150;
       let currentPos = Math.max(0, totalMatches - pageSize);
       let fetchedCount = 0;
 
-      while (currentPos >= 0 && fetchedCount < maxResultsForMinor) {
+      while (currentPos >= 0 && fetchedCount < maxCount) {
         const payload = JSON.stringify({
           AcsEventCond: {
             searchID: "1",
             searchResultPosition: currentPos,
             maxResults: pageSize,
-            major: 5,
+            major: majorCode,
             minor: minorCode,
             startTime,
             endTime,
@@ -574,19 +565,30 @@ export async function fetchAllEvents(
         if (!Array.isArray(infoList)) infoList = [infoList];
         if (infoList.length === 0) break;
 
-        allEvents.push(...infoList);
-        fetchedCount += infoList.length;
+        infoList.forEach((ev: AcsEvent) => {
+          const key = ev.serialNo ? `S-${ev.serialNo}` : `T-${ev.employeeNoString || ev.cardNo}-${ev.time}`;
+          allEventsMap.set(key, ev);
+        });
 
+        fetchedCount += infoList.length;
         if (currentPos === 0) break;
         currentPos = Math.max(0, currentPos - pageSize);
       }
     } catch (err) {
-      console.warn(`[Hikvision ISAPI] Excepción al consultar minor ${minorCode}:`, err);
+      console.warn(`[Hikvision ISAPI] Error al buscar eventos major=${majorCode} minor=${minorCode}:`, err);
     }
+  };
+
+  // 1. Extraer los últimos 200 eventos globales (major: 0, minor: 0)
+  await fetchEventsForCond(0, 0, 200);
+
+  // 2. Extraer eventos específicos por minor de autenticación (1: Tarjeta/Clave, 9: Tarjeta, 38: Huella, 75: Facial)
+  for (const mCode of [1, 9, 38, 75]) {
+    await fetchEventsForCond(5, mCode, 100);
   }
 
-  // Ordenar cronológicamente todos los eventos combinados por fecha/hora
-  return allEvents.sort((a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime());
+  const result = Array.from(allEventsMap.values());
+  return result.sort((a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime());
 }
 
 // ── 7. Función Consolidada Reutilizable: fetchCompleteDeviceData ───────────────
