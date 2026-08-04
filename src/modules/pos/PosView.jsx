@@ -340,7 +340,16 @@ export function PosView() {
   // Helper to resolve effective special price for any product based on selected customer & type
   const getEffectivePrice = (item, custObj = customer, cTypes = customerTypes) => {
     if (!item) return { price: 0, isCustomPrice: false, originalPrice: 0 };
-    const origPrice = Number(item.price || 0);
+
+    // Always resolve the true base catalog price from inventory or item's original un-discounted price
+    const invItem = inventory?.find(inv => inv.id === (item.realId || item.id));
+    const origPrice = Number(
+      invItem?.price !== undefined && invItem?.price !== null
+        ? invItem.price
+        : item.originalPrice !== undefined && item.originalPrice !== null
+        ? item.originalPrice
+        : item.price || 0
+    );
 
     if (!custObj || !custObj.typeId || !cTypes || cTypes.length === 0) {
       return { price: origPrice, isCustomPrice: false, originalPrice: origPrice };
