@@ -58,15 +58,29 @@ function NivelesTab() {
     if (!item) return;
     const type = contrataTypes.find((t: any) => t.id === typeId);
     if (!type) return;
-    const existing = (type.productDiscounts || []).filter((d: any) => d.itemId !== newDiscItemId);
-    updateCustomerType(typeId, { productDiscounts: [...existing, { itemId: newDiscItemId, itemName: item.name, type: newDiscType, value: parseFloat(newDiscValue) }] });
+    const existing = (type.productDiscounts || []).filter((d: any) => (d.itemId || d.productId) !== newDiscItemId);
+    const parsedVal = parseFloat(newDiscValue);
+    const calcDiscVal = newDiscType === 'fixed' ? parsedVal : Math.max(0, (item.price || 0) * (1 - parsedVal / 100));
+    updateCustomerType(typeId, {
+      productDiscounts: [
+        ...existing,
+        {
+          itemId: newDiscItemId,
+          productId: newDiscItemId,
+          itemName: item.name,
+          type: newDiscType,
+          value: parsedVal,
+          discountValue: calcDiscVal,
+        }
+      ]
+    });
     setNewDiscItemId(''); setNewDiscValue('');
   };
 
   const removeProductDiscount = (typeId: string, itemId: string) => {
     const type = contrataTypes.find((t: any) => t.id === typeId);
     if (!type) return;
-    updateCustomerType(typeId, { productDiscounts: (type.productDiscounts || []).filter((d: any) => d.itemId !== itemId) });
+    updateCustomerType(typeId, { productDiscounts: (type.productDiscounts || []).filter((d: any) => (d.itemId || d.productId) !== itemId) });
   };
 
   return (

@@ -337,6 +337,53 @@ export function PosView() {
   const customer = customers?.find(c => c.id === selectedCustomer);
   const discountPercent = customer?.discountPercent || 0;
   
+  // Helper to resolve effective special price for any product based on selected customer & type
+  const getEffectivePrice = (item, custObj = customer, cTypes = customerTypes) => {
+    if (!item) return { price: 0, isCustomPrice: false, originalPrice: 0 };
+    const origPrice = Number(item.price || 0);
+
+    if (!custObj || !custObj.typeId || !cTypes || cTypes.length === 0) {
+      return { price: origPrice, isCustomPrice: false, originalPrice: origPrice };
+    }
+
+    const cType = cTypes.find(t => t.id === custObj.typeId);
+    if (!cType || !cType.productDiscounts || cType.productDiscounts.length === 0) {
+      return { price: origPrice, isCustomPrice: false, originalPrice: origPrice };
+    }
+
+    const targetId = item.realId || item.id;
+    const discountRule = cType.productDiscounts.find(d => (d.itemId || d.productId) === targetId);
+    if (!discountRule) {
+      return { price: origPrice, isCustomPrice: false, originalPrice: origPrice };
+    }
+
+    const rawVal = discountRule.value !== undefined ? discountRule.value : discountRule.discountValue;
+    if (rawVal === undefined || rawVal === null || isNaN(Number(rawVal))) {
+      return { price: origPrice, isCustomPrice: false, originalPrice: origPrice };
+    }
+
+    let finalPrice = Number(rawVal);
+    if (discountRule.type === 'percent') {
+      finalPrice = Math.max(0, origPrice * (1 - finalPrice / 100));
+    }
+
+    return {
+      price: finalPrice,
+      isCustomPrice: true,
+      originalPrice: origPrice,
+    };
+  };
+
+  // Recalculate cart item prices automatically when customer or customer type rules change
+  useEffect(() => {
+    if (!ticketItems || ticketItems.length === 0) return;
+    setTicketItems(prev => prev.map(i => {
+      if (i.id && String(i.id).includes('-var-')) return i; // Don't override variable manual prices
+      const eff = getEffectivePrice(i, customer, customerTypes);
+      return { ...i, price: eff.price, isCustomPrice: eff.isCustomPrice, originalPrice: eff.originalPrice };
+    }));
+  }, [selectedCustomer, customerTypes, customers]);
+
   const subtotal = ticketItems.reduce((acc, item) => acc + (item.price * item.qty), 0);
   const discountAmount = subtotal * (discountPercent/100);
   const total = subtotal - discountAmount;
@@ -559,25 +606,22 @@ export function PosView() {
     // Check for custom VIP price based on Customer Type
     let finalPrice = overridePrice !== null ? overridePrice : item.price;
     let isCustomPrice = overridePrice !== null;
-    
-    if (overridePrice === null && customer && customer.typeId) {
-      const cType = customerTypes.find(t => t.id === customer.typeId);
-      if (cType && cType.productDiscounts && cType.productDiscounts.length > 0) {
-        const discountRule = cType.productDiscounts.find(d => d.productId === item.id);
-        if (discountRule && discountRule.discountValue !== undefined) {
-          finalPrice = discountRule.discountValue;
-          isCustomPrice = true;
-        }
-      }
+    let originalPrice = item.price;
+
+    if (overridePrice === null) {
+      const eff = getEffectivePrice(item, customer, customerTypes);
+      finalPrice = eff.price;
+      isCustomPrice = eff.isCustomPrice;
+      originalPrice = eff.originalPrice;
     }
 
     setTicketItems(prev => {
       const ticketItemId = overridePrice !== null ? `${item.id}-var-${overridePrice}` : item.id;
       const existing = prev.find(i => i.id === ticketItemId);
       if (existing) {
-        return prev.map(i => i.id === ticketItemId ? { ...i, qty: i.qty + 1, price: finalPrice, isCustomPrice } : i);
+        return prev.map(i => i.id === ticketItemId ? { ...i, qty: i.qty + 1, price: finalPrice, originalPrice, isCustomPrice } : i);
       }
-      return [{ ...item, realId: item.id, id: ticketItemId, qty: 1, price: finalPrice, originalPrice: item.price, isCustomPrice }, ...prev];
+      return [{ ...item, realId: item.id, id: ticketItemId, qty: 1, price: finalPrice, originalPrice, isCustomPrice }, ...prev];
     });
     setSearchTerm(''); // Clear scanner
     setTimeout(() => searchInputRef.current?.focus(), 50);
@@ -1365,7 +1409,20 @@ export function PosView() {
 
                 <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
                   <span className={`font-bold leading-tight line-clamp-2 text-white ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
-                  <span className={`font-bold tracking-tight text-green-400 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>{formatMoney(item.price)}</span>
+                  <span className={`font-bold tracking-tight text-green-400 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
+                    {(() => {
+                      const eff = getEffectivePrice(item, customer, customerTypes);
+                      if (eff.isCustomPrice) {
+                        return (
+                          <span className="flex items-center gap-1.5 flex-wrap">
+                            <span className="line-through text-gray-400 text-xs font-normal">{formatMoney(item.price)}</span>
+                            <span className="text-yellow-400 font-black">{formatMoney(eff.price)}</span>
+                          </span>
+                        );
+                      }
+                      return formatMoney(item.price);
+                    })()}
+                  </span>
                 </div>
               </button>
             ))}

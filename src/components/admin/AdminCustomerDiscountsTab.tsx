@@ -59,14 +59,22 @@ export function AdminCustomerDiscountsTab() {
 
     if (newPrice === '' || isNaN(Number(newPrice)) || Number(newPrice) < 0) {
       // Remove setting if empty
-      updatedDiscounts = currentDiscounts.filter((d: any) => d.productId !== productId);
+      updatedDiscounts = currentDiscounts.filter((d: any) => (d.productId || d.itemId) !== productId);
     } else {
-      const existingIdx = currentDiscounts.findIndex((d: any) => d.productId === productId);
+      const val = Number(newPrice);
+      const discObj = {
+        productId,
+        itemId: productId,
+        discountValue: val,
+        value: val,
+        type: 'fixed'
+      };
+      const existingIdx = currentDiscounts.findIndex((d: any) => (d.productId || d.itemId) === productId);
       if (existingIdx >= 0) {
         updatedDiscounts = [...currentDiscounts];
-        updatedDiscounts[existingIdx].discountValue = Number(newPrice);
+        updatedDiscounts[existingIdx] = { ...updatedDiscounts[existingIdx], ...discObj };
       } else {
-        updatedDiscounts = [...currentDiscounts, { productId, discountValue: Number(newPrice) }];
+        updatedDiscounts = [...currentDiscounts, discObj];
       }
     }
 
