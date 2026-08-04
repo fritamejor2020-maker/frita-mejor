@@ -374,11 +374,19 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               '3922951375': '13', // Lorena
             };
 
+            const knownEmployeeNos = new Set(get().employeeContracts.map((c) => c.employeeNo));
+
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
+
+                // Descartar eventos anónimos de teclado (contraseña sin empleado identificado)
+                if (rawNo === '18446744073709551613' || rawNo === '') return false;
+
+                // Verificar que el rawNo corresponda a un empleado conocido
+                const isKnownEmployee = knownEmployeeNos.has(rawNo);
 
                 const isExplicitCheckInOrOut =
                   status === 'checkin' ||
@@ -398,9 +406,12 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   ev.statusValue === 5 ||
                   ev.statusValue === 6;
 
-                // Solo incluir si es una marcación explícita de asistencia (Check In / Check Out)
-                // Excluir aperturas de portón / puerta (status === 'undefined' o statusValue === 0)
-                return rawNo.length > 0 && isExplicitCheckInOrOut;
+                // Incluir si:
+                // 1. Es una marcación con status explícito (checkIn, checkOut, etc.)
+                // 2. O es un empleado conocido que marcó sin status explícito (statusValue=0)
+                //    desde un minor de autenticación válido (huella, contraseña, tarjeta, facial)
+                const isAuthMinor = [1, 9, 38, 75].includes(ev.minor);
+                return rawNo.length > 0 && (isExplicitCheckInOrOut || (isKnownEmployee && isAuthMinor));
               })
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
