@@ -424,12 +424,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   ev.statusValue === 5 ||
                   ev.statusValue === 6;
 
-                // Incluir si:
-                // 1. Es una marcación con status explícito (checkIn, checkOut, etc.)
-                // 2. O es un empleado conocido que marcó sin status explícito (statusValue=0)
-                //    desde un minor de autenticación válido (huella, contraseña, tarjeta, facial)
-                const isAuthMinor = [1, 9, 38, 75].includes(ev.minor);
-                return rawNo.length > 0 && (isExplicitCheckInOrOut || (isKnownEmployee && isAuthMinor));
+                // EXCLUSIVAMENTE Marcaciones de Asistencia (Check-In / Check-Out)
+                // Se descartan aperturas de portón/puerta sin marca de asistencia (statusValue = 0 / status = undefined)
+                return rawNo.length > 0 && isExplicitCheckInOrOut;
               })
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
