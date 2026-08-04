@@ -515,7 +515,12 @@ export async function fetchAllEvents(
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
   const pageSize = 10;
-  const startTime = options?.startTime || '2020-01-01T00:00:00-05:00';
+  // Si no se especifica fecha de inicio, buscar por defecto los últimos 30 días
+  // para evitar que totalMatches cuente 25,000+ eventos históricos desde 2020 y recorte los eventos recientes
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const defaultStart = thirtyDaysAgo.toISOString().slice(0, 10) + 'T00:00:00-05:00';
+
+  const startTime = options?.startTime || defaultStart;
   const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
 
   const allEventsMap = new Map<string, AcsEvent>();
@@ -579,12 +584,12 @@ export async function fetchAllEvents(
     }
   };
 
-  // 1. Extraer los últimos 200 eventos globales (major: 0, minor: 0)
-  await fetchEventsForCond(0, 0, 200);
+  // 1. Extraer los últimos eventos globales (major: 0, minor: 0) en la ventana de 30 días
+  await fetchEventsForCond(0, 0, 1000);
 
   // 2. Extraer eventos específicos por minor de autenticación (1: Tarjeta/Clave, 9: Tarjeta, 38: Huella, 75: Facial)
   for (const mCode of [1, 9, 38, 75]) {
-    await fetchEventsForCond(5, mCode, 100);
+    await fetchEventsForCond(5, mCode, 500);
   }
 
   const result = Array.from(allEventsMap.values());

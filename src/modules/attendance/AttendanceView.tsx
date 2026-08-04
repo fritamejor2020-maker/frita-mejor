@@ -162,7 +162,7 @@ export function AttendanceView() {
       />
 
       {/* Layout Split-Pane Principal (Panel Izquierdo Sticky + Cuadrícula Derecha Scrollable) */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 overflow-hidden flex flex-col md:flex-row relative">
+      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 flex flex-col md:flex-row relative max-h-[calc(100vh-210px)] min-h-[500px] overflow-auto">
         <EmployeeStickyPanel
           payrollList={payrollList}
           onSelectEmployee={(emp) => {

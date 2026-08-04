@@ -11,7 +11,7 @@ interface ShiftDetailModalProps {
 }
 
 export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDetailModalProps) {
-  const { shiftTemplates, upsertShiftOverride, deleteShiftOverride, deleteAttendanceLogsForDate, shiftOverrides } = useAttendanceStore();
+  const { shiftTemplates, upsertShiftOverride, deleteShiftOverride, deleteAttendanceLogsForDate, deleteSingleAttendanceLog, shiftOverrides } = useAttendanceStore();
 
   const existingOverride = shiftOverrides.find(
     (o) => (o.employeeId === employee.employeeId || o.employeeId === employee.employeeNo) && o.date === dateStr
@@ -36,13 +36,20 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
     onClose();
   };
 
-  const handleDelete = () => {
-    if (confirm(`¿Estás seguro de eliminar las marcaciones y el turno de ${employee.fullName} para la jornada ${dateStr}?`)) {
+  const handleDeleteAllForDay = () => {
+    if (confirm(`¿Estás seguro de eliminar todas las marcaciones y el turno de ${employee.fullName} para el día ${dateStr}? (No volverán a cargarse al sincronizar)`)) {
       if (existingOverride) {
         deleteShiftOverride(existingOverride.id);
       }
       deleteAttendanceLogsForDate(employee.employeeNo, dateStr);
       deleteAttendanceLogsForDate(employee.employeeId, dateStr);
+      onClose();
+    }
+  };
+
+  const handleDeleteSingleLog = (logId: string) => {
+    if (confirm('¿Deseas eliminar únicamente esta marcación? (No volverá a aparecer al sincronizar)')) {
+      deleteSingleAttendanceLog(logId);
       onClose();
     }
   };
@@ -69,26 +76,53 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
           </button>
         </div>
 
-        {/* Detalle y Penalizaciones actuales */}
+        {/* Detalle y Marcaciones Individuales */}
         {block && (
-          <div className="my-4 bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-2">
+          <div className="my-4 bg-gray-50 rounded-2xl p-4 border border-gray-200/80 space-y-3">
             <div className="flex justify-between items-center text-xs font-bold">
-              <span className="text-gray-500">Formato de Bloque:</span>
-              <span className="font-black text-gray-900 bg-white px-2 py-1 rounded-lg border border-gray-200">
-                {block.displayPillText}
+              <span className="text-gray-500">Horas netas:</span>
+              <span className="font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-200">
+                {block.formattedTotal} h ({block.grossMinutes} min brutos)
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-xs font-bold pt-2 border-t border-gray-200">
-              <div>
-                <span className="text-gray-400 block text-[10px]">MINUTOS BRUTOS</span>
-                <span className="text-gray-800 font-black">{block.grossMinutes} min</span>
+            {/* Marcaciones individuales asociadas a este bloque */}
+            {block.rawLogs && block.rawLogs.length > 0 && (
+              <div className="pt-2 border-t border-gray-200 space-y-1.5">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
+                  Marcaciones del día ({block.rawLogs.length})
+                </span>
+                <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                  {block.rawLogs.map((log) => {
+                    const timeOnly = log.timestamp ? (log.timestamp.includes('T') ? log.timestamp.slice(11, 19) : log.timestamp.split(' ')[1] || log.timestamp) : '??:??';
+                    const isEntry = log.type === 'ENTRY' || (log.type as string).toUpperCase() === 'CHECKIN';
+                    return (
+                      <div
+                        key={log.id}
+                        className="flex items-center justify-between bg-white px-3 py-2 rounded-xl border border-gray-200 text-xs shadow-2xs"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`w-2 h-2 rounded-full ${isEntry ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                          />
+                          <span className="font-black text-gray-900">{timeOnly}</span>
+                          <span className="text-[10px] font-bold text-gray-500">
+                            ({isEntry ? 'Entrada' : 'Salida'} • {log.verifyMethod || 'Biométrico'})
+                          </span>
+                        </div>
+                        <button
+                          onClick={() => handleDeleteSingleLog(log.id)}
+                          className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                          title="Eliminar únicamente esta marcación"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-              <div>
-                <span className="text-gray-400 block text-[10px]">HORAS NETAS APROBADAS</span>
-                <span className="text-emerald-600 font-black">{block.formattedTotal} h</span>
-              </div>
-            </div>
+            )}
 
             {/* Desglose de Descuentos */}
             {(block.isTardy || block.isMissingMarks) && (
@@ -163,11 +197,12 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
         {/* Acciones */}
         <div className="flex items-center justify-between gap-3 pt-5 mt-4 border-t border-gray-100">
           <button
-            onClick={handleDelete}
-            className="px-3.5 py-2 text-xs font-black text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200 shadow-2xs"
+            onClick={handleDeleteAllForDay}
+            className="px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200 shadow-2xs"
+            title="Borrar todas las marcas del día para este trabajador"
           >
             <Trash2 size={15} />
-            Eliminar Registro
+            Borrar Todo el Día
           </button>
 
           <div className="flex items-center gap-2">

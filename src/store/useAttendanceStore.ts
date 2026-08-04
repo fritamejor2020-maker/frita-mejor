@@ -68,6 +68,7 @@ interface AttendanceStoreState {
   shiftTemplates: ShiftTemplate[];
   employeeContracts: EmployeeContract[];
   attendanceLogs: RawAttendanceLog[];
+  deletedLogIds: string[];
   shiftOverrides: ShiftOverride[];
 
   // Terminal management
@@ -87,6 +88,7 @@ interface AttendanceStoreState {
 
   // Logs & Overrides
   addAttendanceLogs: (logs: RawAttendanceLog[]) => void;
+  deleteSingleAttendanceLog: (logId: string) => void;
   deleteAttendanceLogsForDate: (employeeNo: string, dateStr: string) => void;
   upsertShiftOverride: (override: ShiftOverride) => void;
   deleteShiftOverride: (id: string) => void;
@@ -241,6 +243,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       shiftTemplates: INITIAL_SHIFTS,
       employeeContracts: INITIAL_CONTRACTS,
       attendanceLogs: INITIAL_BIOMETRIC_LOGS,
+      deletedLogIds: [],
       shiftOverrides: [],
 
       addTerminal: (termData) => {
@@ -318,12 +321,27 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         push('attendance_logs', get().attendanceLogs);
       },
 
-      deleteAttendanceLogsForDate: (employeeNo, dateStr) => {
+      deleteSingleAttendanceLog: (logId) => {
         set((s) => ({
-          attendanceLogs: s.attendanceLogs.filter(
-            (l) => !((l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr))
-          ),
+          attendanceLogs: s.attendanceLogs.filter((l) => l.id !== logId),
+          deletedLogIds: [...(s.deletedLogIds || []), logId],
         }));
+        push('attendance_logs', get().attendanceLogs);
+      },
+
+      deleteAttendanceLogsForDate: (employeeNo, dateStr) => {
+        set((s) => {
+          const toRemove = s.attendanceLogs.filter(
+            (l) => (l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr)
+          );
+          const removedIds = toRemove.map((l) => l.id);
+          return {
+            attendanceLogs: s.attendanceLogs.filter(
+              (l) => !((l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr))
+            ),
+            deletedLogIds: [...(s.deletedLogIds || []), ...removedIds],
+          };
+        });
         push('attendance_logs', get().attendanceLogs);
       },
 
@@ -444,7 +462,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
             set((state) => {
               const existingIds = new Set(state.attendanceLogs.map((l) => l.id));
-              const toAdd = mappedLogs.filter((l) => !existingIds.has(l.id));
+              const deletedSet = new Set(state.deletedLogIds || []);
+              const toAdd = mappedLogs.filter((l) => !existingIds.has(l.id) && !deletedSet.has(l.id));
               const updated = [...toAdd, ...state.attendanceLogs];
               push('attendance_logs', updated);
               return { attendanceLogs: updated };

@@ -11,7 +11,7 @@ export function EmployeeStickyPanel({ payrollList, onSelectEmployee, onManageEmp
   return (
     <div className="w-60 min-w-[240px] max-w-[240px] shrink-0 border-r border-gray-200 bg-white sticky left-0 z-20">
       {/* Header fijo alignment con la cuadrícula */}
-      <div className="h-12 border-b border-gray-200 px-3 flex items-center justify-between bg-gray-50/90 font-black text-xs text-gray-500 uppercase tracking-wider">
+      <div className="h-12 border-b border-gray-200 px-3 flex items-center justify-between bg-gray-100 font-black text-xs text-gray-500 uppercase tracking-wider sticky top-0 z-30">
         <span>Personal ({payrollList.length})</span>
         {onManageEmployees && (
           <button

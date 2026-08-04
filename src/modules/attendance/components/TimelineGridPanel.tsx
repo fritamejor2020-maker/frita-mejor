@@ -159,12 +159,12 @@ export function TimelineGridPanel({
     <div className="flex-1 overflow-x-auto min-w-0 bg-white">
       <div className="inline-block min-w-full align-middle">
         {/* Encabezado de la Cuadrícula (Fechas) */}
-        <div className="h-12 border-b border-gray-200 flex bg-gray-50/90 sticky top-0 z-10">
+        <div className="h-12 border-b border-gray-200 flex bg-gray-100 sticky top-0 z-20">
           {weekDays.map((day) => (
             <div
               key={day.dateStr}
               className={`flex-1 min-w-[115px] border-r border-gray-200 px-2 flex flex-col justify-center items-center text-center font-black text-xs ${
-                day.isToday ? 'bg-amber-100/60 text-amber-900' : 'text-gray-600'
+                day.isToday ? 'bg-amber-100/80 text-amber-900' : 'text-gray-600'
               }`}
             >
               <span className="font-extrabold">{day.dayName}</span>
@@ -188,7 +188,11 @@ export function TimelineGridPanel({
                     }`}
                   >
                     {blocks.map((b, idx) => {
-                      const pillLabel = `${b.formattedTotal} (${b.firstIn ? b.firstIn.slice(0, 5) : '??:??'}...)`;
+                      const firstTime = b.firstIn ? b.firstIn.slice(0, 5) : '';
+                      const lastTime = b.lastOut ? b.lastOut.slice(0, 5) : '';
+                      const pillLabel = lastTime 
+                        ? `${firstTime || '??:??'} - ${lastTime}`
+                        : `${firstTime || '??:??'}`;
 
                       return (
                         <div
