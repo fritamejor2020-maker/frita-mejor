@@ -11,5 +11,11 @@ createRoot(document.getElementById('root')).render(
 )
 
 // ── Service Worker PWA ──────────────────────────────────────────────────────
-registerSW({ immediate: true });
+registerSW({
+  immediate: true,
+  onNeedRefresh() {
+    console.log('[PWA] Nueva versión detectada, actualizando...');
+    window.location.reload();
+  },
+});
 
