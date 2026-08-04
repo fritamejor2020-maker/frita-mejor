@@ -1429,6 +1429,19 @@ export function PosView() {
                           </span>
                         );
                       }
+                      const isVariable = item.variablePrice === true || !item.price || item.price <= 0;
+                      if (isVariable) {
+                        const refPrice = (item.referencePrice && Number(item.referencePrice) > 0) ? Number(item.referencePrice) : (eff.originalPrice && Number(eff.originalPrice) > 0) ? Number(eff.originalPrice) : 0;
+                        if (refPrice > 0) {
+                          return (
+                            <span className="text-amber-400 font-bold flex items-center gap-1">
+                              <span>{formatMoney(refPrice)}</span>
+                              <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded border border-amber-500/30">Ref</span>
+                            </span>
+                          );
+                        }
+                        return <span className="text-amber-400 font-bold text-xs">Precio Variable</span>;
+                      }
                       return formatMoney(item.price);
                     })()}
                   </span>
