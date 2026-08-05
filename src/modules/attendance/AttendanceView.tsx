@@ -37,7 +37,6 @@ export function AttendanceView() {
 
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [syncToast, setSyncToast] = useState<string | null>(null);
 
   // Modales
   const [activeDetail, setActiveDetail] = useState<{
@@ -59,8 +58,6 @@ export function AttendanceView() {
   const handleClearLogs = () => {
     if (window.confirm('¿Estás seguro de borrar todos los registros de asistencia mostrados? Se limpiará la pantalla.')) {
       clearAllAttendanceLogs();
-      setSyncToast('🗑️ Se han borrado todos los registros de asistencia.');
-      setTimeout(() => setSyncToast(null), 4000);
     }
   };
 
@@ -76,28 +73,16 @@ export function AttendanceView() {
 
   const handleSyncTerminal = async () => {
     setIsSyncing(true);
-    setSyncToast('Conectando y realizando extracción completa del biométrico (Usuarios + Marcaciones ISAPI Digest)...');
 
     const term = terminals[0];
     if (term) {
       // 1. Sincronizar usuarios completos
-      const userRes = await fetchTerminalUsers(term.id);
+      await fetchTerminalUsers(term.id);
       // 2. Sincronizar marcaciones de asistencia (entradas/salidas manuales)
-      const eventRes = await syncTerminalEvents(term.id);
-
-      const currentContracts = useAttendanceStore.getState().employeeContracts;
-      const currentLogs = useAttendanceStore.getState().attendanceLogs;
-
-      const usersCount = userRes.users?.length || currentContracts.length;
-      const eventsCount = typeof eventRes.count === 'number' ? eventRes.count : currentLogs.length;
-
-      setSyncToast(`✅ Sincronización completa exitosa con ${term.name}: ${usersCount} usuarios y ${eventsCount} marcaciones de asistencia cargadas.`);
-    } else {
-      setSyncToast('No hay biométricos registrados en esta sede.');
+      await syncTerminalEvents(term.id);
     }
 
     setIsSyncing(false);
-    setTimeout(() => setSyncToast(null), 5000);
   };
 
   // El módulo inicia de forma limpia. La sincronización se ejecuta manualmente al presionar el botón "Sincronizar Biométrico".
@@ -146,15 +131,7 @@ export function AttendanceView() {
         </div>
       </div>
 
-      {/* Banner de Estado de Sincronización */}
-      {syncToast && (
-        <div className="mb-4 bg-emerald-600 text-white font-black text-xs sm:text-sm p-3.5 rounded-2xl shadow-md flex items-center justify-between animate-in fade-in slide-in-from-top duration-200">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={18} />
-            <span>{syncToast}</span>
-          </div>
-        </div>
-      )}
+
 
       {/* Toolbar de Navegación y Filtros */}
       <AttendanceToolbar
