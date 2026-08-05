@@ -211,7 +211,8 @@ import {
   HikvisionDeviceConfig,
 } from '../services/hikvisionIsapiService';
 
-export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
+import cleanSeed from '../data/cleanBiometricSeed.json';
+export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = cleanSeed as RawAttendanceLog[];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
@@ -237,6 +238,15 @@ function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[
 
   (existing || []).forEach((l) => {
     if (!isDeleted(l)) {
+      map.set(l.id, {
+        ...l,
+        attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
+      });
+    }
+  });
+
+  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
+    if (!map.has(l.id) && !isDeleted(l)) {
       map.set(l.id, {
         ...l,
         attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
@@ -695,7 +705,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v3',
+      name: 'frita_attendance_store_v4',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
