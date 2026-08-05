@@ -529,7 +529,7 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia Paginados (Eventos Recientes + Histórico) ─────────
+// ── 6. Extracción COMPLETA Y TOTAL de Registros de Asistencia Paginados (100% de la información) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string; maxEvents?: number }
@@ -542,8 +542,9 @@ export async function fetchAllEvents(
 
   const startTime = options?.startTime;
   const endTime = options?.endTime;
+  const maxLimit = options?.maxEvents || Infinity;
 
-  // 1. Primera llamada rápida para obtener totalMatches de la memoria del biométrico
+  // 1. Obtener primera página y totalMatches exacto del biométrico
   try {
     const initCond: any = {
       searchID: "1",
@@ -570,14 +571,9 @@ export async function fetchAllEvents(
     console.error('[Hikvision ISAPI] Error al iniciar consulta de eventos:', err);
   }
 
-  // 2. Si hay más de 300 eventos acumulados y no hay startTime explícito, saltar directamente a los últimos 300 eventos (los más recientes del día)
-  if (totalMatches > 300 && !startTime) {
-    posicion = Math.max(0, totalMatches - 300);
-  } else {
-    posicion = allEventsMap.size;
-  }
+  posicion = allEventsMap.size;
 
-  // 3. Descargar el bloque reciente completo hasta la última marcación registrada
+  // 2. Descargar toda la lista de marcaciones desde la primera hasta la última sin recortes
   while (posicion < totalMatches) {
     const acsCond: any = {
       searchID: "1",
@@ -604,6 +600,7 @@ export async function fetchAllEvents(
       });
 
       posicion += loteActual.length;
+      if (allEventsMap.size >= maxLimit) break;
     } catch (err) {
       console.error(`[Hikvision ISAPI] Error al descargar marcaciones en posición ${posicion}:`, err);
       break;
