@@ -85,9 +85,9 @@ export function AttendanceView() {
     setIsSyncing(false);
   };
 
-  // El módulo inicia de forma limpia. La sincronización se ejecuta manualmente al presionar el botón "Sincronizar Biométrico".
+  // Auto-Sincronizar Biométrico de forma transparente al entrar al módulo Asistencia & Turnos
   React.useEffect(() => {
-    // No auto-sincronizar al montar para evitar precargar marcas indeseadas automáticamente
+    handleSyncTerminal();
   }, []);
 
   return (
