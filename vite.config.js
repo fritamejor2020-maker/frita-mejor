@@ -6,6 +6,15 @@ import { readFileSync } from 'fs'
 const pkg = JSON.parse(readFileSync('./package.json', 'utf-8'))
 
 export default defineConfig({
+  server: {
+    proxy: {
+      '/isapi-proxy': {
+        target: 'http://192.168.3.220:80',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/isapi-proxy/, ''),
+      },
+    },
+  },
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version),
     __APP_BUILD_DATE__: JSON.stringify(new Date().toISOString().split('T')[0]),

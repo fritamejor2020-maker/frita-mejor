@@ -347,10 +347,10 @@ export async function isapiDigestFetch(
   const method = (options.method || 'GET').toUpperCase();
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   
-  // Probar IP directa del dispositivo, proxy local de Vite y proxies locales
+  // Probar proxy local de Vite (/isapi-proxy), IP directa del dispositivo y proxies locales
   const urlsToTry = [
-    `http://${config.ipAddress}:${config.port}${path}`,
     `${origin}/isapi-proxy${path}`,
+    `http://${config.ipAddress}:${config.port}${path}`,
     `http://localhost:8080${path}`,
     `http://127.0.0.1:8080${path}`,
     `http://localhost:9099/isapi${path}`
