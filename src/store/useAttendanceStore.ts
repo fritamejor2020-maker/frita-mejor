@@ -403,30 +403,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 // Descartar eventos anónimos de teclado (contraseña sin empleado identificado)
                 if (rawNo === '18446744073709551613' || rawNo === '') return false;
 
-                // Verificar que el rawNo corresponda a un empleado conocido
-                const isKnownEmployee = knownEmployeeNos.has(rawNo);
-
-                const isExplicitCheckInOrOut =
-                  status === 'checkin' ||
-                  status === 'entry' ||
-                  status === 'check_in' ||
-                  status === 'in' ||
-                  status === 'checkout' ||
-                  status === 'exit' ||
-                  status === 'check_out' ||
-                  status === 'out' ||
-                  status === 'overtimein' ||
-                  status === 'overtime_in' ||
-                  status === 'overtimeout' ||
-                  status === 'overtime_out' ||
-                  ev.statusValue === 1 ||
-                  ev.statusValue === 2 ||
-                  ev.statusValue === 5 ||
-                  ev.statusValue === 6;
-
-                // EXCLUSIVAMENTE Marcaciones de Asistencia (Check-In / Check-Out)
-                // Se descartan aperturas de portón/puerta sin marca de asistencia (statusValue = 0 / status = undefined)
-                return rawNo.length > 0 && isExplicitCheckInOrOut;
+                // Aceptar cualquier marcación válida asociada a un número de empleado
+                return rawNo.length > 0;
               })
               .map((ev: any) => {
                 const status = String(ev.attendanceStatus || '').toLowerCase();
