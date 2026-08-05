@@ -238,13 +238,19 @@ function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[
 
   (existing || []).forEach((l) => {
     if (!isDeleted(l)) {
-      map.set(l.id, l);
+      map.set(l.id, {
+        ...l,
+        attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
+      });
     }
   });
 
   INITIAL_BIOMETRIC_LOGS.forEach((l) => {
     if (!map.has(l.id) && !isDeleted(l)) {
-      map.set(l.id, l);
+      map.set(l.id, {
+        ...l,
+        attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
+      });
     }
   });
 
@@ -481,7 +487,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,
                   serialNo: ev.serialNo ? Number(ev.serialNo) : undefined,
-                  attendanceStatus: ev.attendanceStatus || (isExit ? 'checkOut' : 'checkIn'),
+                  attendanceStatus: (isExit || ev.attendanceStatus === 'checkOut') ? 'checkOut' : 'checkIn',
                 };
               });
 

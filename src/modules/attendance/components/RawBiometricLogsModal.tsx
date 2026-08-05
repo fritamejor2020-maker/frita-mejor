@@ -204,6 +204,7 @@ export function RawBiometricLogsModal({ onClose }: RawBiometricLogsModalProps) {
                   <th className="px-3 py-2.5">#</th>
                   <th className="px-3 py-2.5">Empleado</th>
                   <th className="px-3 py-2.5">ID Biométrico</th>
+                  <th className="px-3 py-2.5">Tipo Marcación</th>
                   <th className="px-3 py-2.5">Fecha y Hora Exacta</th>
                   <th className="px-3 py-2.5">Método Verificación</th>
                   <th className="px-3 py-2.5">ID Evento / Serial</th>
@@ -214,12 +215,24 @@ export function RawBiometricLogsModal({ onClose }: RawBiometricLogsModalProps) {
                 {filteredLogs.map((log, idx) => {
                   const empName = contractMap[log.employeeNo] || contractMap[log.employeeId] || 'Sin Nombre';
                   const isDeleted = deletedLogIds.includes(log.id);
+                  const isExit = log.attendanceStatus === 'checkOut' || log.type === 'EXIT';
 
                   return (
                     <tr key={log.id} className={`hover:bg-amber-50/40 transition-colors ${isDeleted ? 'bg-red-50/50 opacity-60' : ''}`}>
                       <td className="px-3 py-2 font-mono text-[11px] text-gray-400">{idx + 1}</td>
                       <td className="px-3 py-2 font-black text-gray-900">{empName}</td>
                       <td className="px-3 py-2 font-mono font-bold text-gray-600">#{log.employeeNo}</td>
+                      <td className="px-3 py-2">
+                        {isExit ? (
+                          <span className="inline-flex items-center gap-1 bg-blue-100 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-lg text-[10px] font-extrabold">
+                            🚪 checkOut (Salida)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-800 border border-emerald-200 px-2 py-0.5 rounded-lg text-[10px] font-extrabold">
+                            🟢 checkIn (Entrada)
+                          </span>
+                        )}
+                      </td>
                       <td className="px-3 py-2 font-mono font-bold text-emerald-700">
                         {log.timestamp.replace('T', ' ').slice(0, 19)}
                       </td>
