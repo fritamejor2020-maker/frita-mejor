@@ -523,22 +523,56 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia Paginados (0, 10, 20...) ─────────
+// ── 6. Extracción TOTAL de Registros de Asistencia Paginados (Eventos Recientes + Histórico) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string; maxEvents?: number }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
-  const pageSize = 10;
+  const pageSize = 30;
   let posicion = 0;
   let totalMatches = Infinity;
   const allEventsMap = new Map<string, AcsEvent>();
 
   const startTime = options?.startTime;
   const endTime = options?.endTime;
-  const maxLimit = options?.maxEvents || Infinity;
 
-  do {
+  // 1. Primera llamada rápida para obtener totalMatches de la memoria del biométrico
+  try {
+    const initCond: any = {
+      searchID: "1",
+      searchResultPosition: 0,
+      maxResults: pageSize,
+      major: 0,
+      minor: 0,
+    };
+    if (startTime) initCond.startTime = startTime;
+    if (endTime) initCond.endTime = endTime;
+
+    const res = await isapiDigestFetch(config, path, { method: 'POST', body: JSON.stringify({ AcsEventCond: initCond }) });
+    if (res.ok && res.text) {
+      const data = JSON.parse(res.text);
+      totalMatches = data.AcsEvent?.totalMatches || 0;
+      let lote = data.AcsEvent?.InfoList || [];
+      if (!Array.isArray(lote)) lote = [lote];
+      lote.forEach((ev: AcsEvent) => {
+        const key = ev.serialNo ? `S-${ev.serialNo}` : `T-${ev.employeeNoString || ev.cardNo}-${ev.time}`;
+        allEventsMap.set(key, ev);
+      });
+    }
+  } catch (err) {
+    console.error('[Hikvision ISAPI] Error al iniciar consulta de eventos:', err);
+  }
+
+  // 2. Si hay más de 300 eventos acumulados y no hay startTime explícito, saltar directamente a los últimos 300 eventos (los más recientes del día)
+  if (totalMatches > 300 && !startTime) {
+    posicion = Math.max(0, totalMatches - 300);
+  } else {
+    posicion = allEventsMap.size;
+  }
+
+  // 3. Descargar el bloque reciente completo hasta la última marcación registrada
+  while (posicion < totalMatches) {
     const acsCond: any = {
       searchID: "1",
       searchResultPosition: posicion,
@@ -546,22 +580,16 @@ export async function fetchAllEvents(
       major: 0,
       minor: 0,
     };
-
     if (startTime) acsCond.startTime = startTime;
     if (endTime) acsCond.endTime = endTime;
 
-    const payload = JSON.stringify({ AcsEventCond: acsCond });
-
     try {
-      const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
+      const res = await isapiDigestFetch(config, path, { method: 'POST', body: JSON.stringify({ AcsEventCond: acsCond }) });
       if (!res.ok || !res.text) break;
 
       const data = JSON.parse(res.text);
-      totalMatches = data.AcsEvent?.totalMatches || 0;
-
       let loteActual = data.AcsEvent?.InfoList || [];
       if (!Array.isArray(loteActual)) loteActual = [loteActual];
-
       if (loteActual.length === 0) break;
 
       loteActual.forEach((ev: AcsEvent) => {
@@ -570,13 +598,11 @@ export async function fetchAllEvents(
       });
 
       posicion += loteActual.length;
-
-      if (allEventsMap.size >= maxLimit) break;
     } catch (err) {
       console.error(`[Hikvision ISAPI] Error al descargar marcaciones en posición ${posicion}:`, err);
       break;
     }
-  } while (posicion < totalMatches);
+  }
 
   const result = Array.from(allEventsMap.values());
   return result.sort((a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime());
