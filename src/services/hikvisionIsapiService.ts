@@ -573,9 +573,14 @@ export async function fetchAllEvents(
     console.error('[Hikvision ISAPI] Error al iniciar consulta de eventos:', err);
   }
 
-  posicion = allEventsMap.size;
+  // 2. Si hay miles de registros guardados en la memoria del equipo, consultar las últimas 500 marcaciones más recientes
+  if (totalMatches > 500 && !startTime) {
+    posicion = Math.max(0, totalMatches - 500);
+  } else {
+    posicion = allEventsMap.size;
+  }
 
-  // 2. Descargar toda la lista de marcaciones desde la primera hasta la última sin recortes
+  // 3. Descargar el lote más reciente hasta la última marcación registrada
   while (posicion < totalMatches) {
     const acsCond: any = {
       searchID: "1",
