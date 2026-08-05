@@ -476,13 +476,14 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
-                // Descartar eventos anónimos de teclado (contraseña sin empleado identificado)
                 if (rawNo === '18446744073709551613' || rawNo === '') return false;
 
-                // Conservar ÚNICAMENTE las marcaciones que tengan attendanceStatus definido explícitamente (checkIn, checkOut, overtimeIn, etc.)
-                const hasExplicitStatus = Boolean(ev.attendanceStatus && String(ev.attendanceStatus).trim() !== '');
+                const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
+                const isValidStatus = rawStatus !== '' && rawStatus !== 'undefined';
+                const isAuthEvent = ev.minor === 38 || ev.minor === 1 || ev.minor === 75 || ev.minor === 2;
+                const hasStatusValue = typeof ev.statusValue === 'number' && ev.statusValue > 0;
 
-                return rawNo.length > 0 && hasExplicitStatus;
+                return rawNo.length > 0 && (isValidStatus || isAuthEvent || hasStatusValue);
               })
               .map((ev: any) => {
                 const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
