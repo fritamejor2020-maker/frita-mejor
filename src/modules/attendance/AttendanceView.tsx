@@ -3,6 +3,7 @@ import { AttendanceToolbar } from './components/AttendanceToolbar';
 import { TimelineGridPanel } from './components/TimelineGridPanel';
 import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
+import { RawBiometricLogsModal } from './components/RawBiometricLogsModal';
 import { AdminEmployeeBiometricsModal } from '../admin/AdminEmployeeBiometricsModal';
 import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hooks/useAttendanceData';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
@@ -46,6 +47,7 @@ export function AttendanceView() {
   } | null>(null);
 
   const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [showRawLogsModal, setShowRawLogsModal] = useState(false);
   const [selectedPayrollEmp, setSelectedPayrollEmp] = useState<EmployeeWeeklyPayroll | undefined>(undefined);
 
   const [showBioModal, setShowBioModal] = useState(false);
@@ -158,6 +160,7 @@ export function AttendanceView() {
         toggleFullscreen={toggleFullscreen}
         onSyncTerminal={handleSyncTerminal}
         isSyncing={isSyncing}
+        onOpenRawLogs={() => setShowRawLogsModal(true)}
       />
 
       {/* Layout de Cuadrícula Unificado (Nombres + Fechas Sincronizados al 100%) */}
@@ -206,6 +209,10 @@ export function AttendanceView() {
           selectedEmployee={selectedPayrollEmp}
           onClose={() => setShowPayrollModal(false)}
         />
+      )}
+
+      {showRawLogsModal && (
+        <RawBiometricLogsModal onClose={() => setShowRawLogsModal(false)} />
       )}
     </div>
   );
