@@ -705,13 +705,13 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v8',
+      name: 'frita_attendance_store_v9',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
         employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
-        attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs, persistedState?.deletedLogIds),
-        deletedLogIds: Array.from(new Set([...(currentState?.deletedLogIds || []), ...(persistedState?.deletedLogIds || [])])),
+        attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs, []),
+        deletedLogIds: [],
       }),
     }
   )
