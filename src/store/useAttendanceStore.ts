@@ -706,7 +706,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v5',
+      name: 'frita_attendance_store_v6',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
