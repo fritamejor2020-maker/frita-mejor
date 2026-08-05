@@ -354,10 +354,18 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
 
       deleteAttendanceLogsForDate: (employeeNo, dateStr) => {
+        const cleanEmpNo = String(employeeNo || '').replace('EMP-', '').trim();
+        const cleanDate = (dateStr || '').slice(0, 10);
+
         set((s) => {
-          const toRemove = s.attendanceLogs.filter(
-            (l) => (l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr)
-          );
+          const toRemove = s.attendanceLogs.filter((l) => {
+            const lEmpNo = String(l.employeeNo || '').replace('EMP-', '').trim();
+            const lEmpId = String(l.employeeId || '').replace('EMP-', '').trim();
+            const matchEmp = lEmpNo === cleanEmpNo || lEmpId === cleanEmpNo;
+            const matchDate = (l.timestamp || '').slice(0, 10) === cleanDate;
+            return matchEmp && matchDate;
+          });
+
           const newDeleted: string[] = [];
           toRemove.forEach((l) => {
             newDeleted.push(l.id);
@@ -365,12 +373,18 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               newDeleted.push(String(l.serialNo));
               newDeleted.push(`LOG-TERM-001-${l.serialNo}`);
               newDeleted.push(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`);
+              newDeleted.push(`LOG-${l.terminalId || 'TERM-001'}-${l.serialNo}`);
             }
           });
+
           return {
-            attendanceLogs: s.attendanceLogs.filter(
-              (l) => !((l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr))
-            ),
+            attendanceLogs: s.attendanceLogs.filter((l) => {
+              const lEmpNo = String(l.employeeNo || '').replace('EMP-', '').trim();
+              const lEmpId = String(l.employeeId || '').replace('EMP-', '').trim();
+              const matchEmp = lEmpNo === cleanEmpNo || lEmpId === cleanEmpNo;
+              const matchDate = (l.timestamp || '').slice(0, 10) === cleanDate;
+              return !(matchEmp && matchDate);
+            }),
             deletedLogIds: Array.from(new Set([...(s.deletedLogIds || []), ...newDeleted])),
           };
         });
@@ -679,7 +693,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store',
+      name: 'frita_attendance_store_v3',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
