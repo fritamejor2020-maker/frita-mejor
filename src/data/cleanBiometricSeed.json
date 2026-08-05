@@ -323,5 +323,18 @@
     "doorNo": 1,
     "serialNo": 26017,
     "attendanceStatus": "checkIn"
+  },
+  {
+    "id": "LOG-TERM-001-26031",
+    "employeeId": "EMP-24",
+    "employeeNo": "24",
+    "branchId": "BRANCH-001",
+    "terminalId": "TERM-001",
+    "timestamp": "2026-08-05T12:19:48-05:00",
+    "type": "EXIT",
+    "verifyMethod": "BIOMETRIC",
+    "doorNo": 1,
+    "serialNo": 26031,
+    "attendanceStatus": "checkOut"
   }
 ]

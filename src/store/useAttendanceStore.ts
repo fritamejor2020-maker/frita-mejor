@@ -476,25 +476,36 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
+                // Si es un pase exitoso de huella (minor 21, 22, 38, 1, 75) y viene sin ID, mapear a '24' (Arlin)
+                const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75;
+                if ((!rawNo || rawNo === '0') && isAuthEvent) {
+                  rawNo = '24';
+                  ev.employeeNoString = '24';
+                }
+
                 if (rawNo === '18446744073709551613' || rawNo === '') return false;
 
                 const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
                 const isValidStatus = rawStatus !== '' && rawStatus !== 'undefined';
-                const isAuthEvent = ev.minor === 38 || ev.minor === 1 || ev.minor === 75 || ev.minor === 2;
                 const hasStatusValue = typeof ev.statusValue === 'number' && ev.statusValue > 0;
 
                 return rawNo.length > 0 && (isValidStatus || isAuthEvent || hasStatusValue);
               })
               .map((ev: any) => {
+                let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
+                if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
+                if ((!rawNo || rawNo === '0') && (ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75)) {
+                  rawNo = '24';
+                }
+
                 const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit =
                   rawStatus === 'checkout' ||
                   rawStatus === 'exit' ||
                   rawStatus === 'check_out' ||
                   rawStatus === 'out' ||
-                  ev.statusValue === 2;
-                let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
-                if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
+                  ev.statusValue === 2 ||
+                  ev.minor === 22; // Minor 22 en marcaciones continuas = CheckOut
 
                 const finalTimestamp = ev.time || new Date().toISOString();
 
@@ -512,7 +523,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,
                   serialNo: ev.serialNo ? Number(ev.serialNo) : undefined,
-                  attendanceStatus: (isExit || ev.attendanceStatus === 'checkOut') ? 'checkOut' : 'checkIn',
+                  attendanceStatus: isExit ? 'checkOut' : 'checkIn',
                 };
               });
 
@@ -706,7 +717,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v6',
+      name: 'frita_attendance_store_v7',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,

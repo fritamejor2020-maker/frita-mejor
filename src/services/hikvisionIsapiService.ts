@@ -359,9 +359,11 @@ export async function isapiDigestFetch(
   let lastError: any = null;
 
   for (const url of urlsToTry) {
-    const headers = {
+    const bodyLength = options.body ? new TextEncoder().encode(options.body).length : 0;
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json; charset=UTF-8',
       'Accept': 'application/json',
+      ...(bodyLength > 0 ? { 'Content-Length': String(bodyLength) } : {}),
       ...(options.headers || {}),
     };
 
