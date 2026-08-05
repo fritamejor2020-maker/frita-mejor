@@ -14,7 +14,6 @@ interface AttendanceToolbarProps {
   toggleFullscreen: () => void;
   onSyncTerminal: () => void;
   isSyncing: boolean;
-  onOpenRawLogs?: () => void;
 }
 
 export function AttendanceToolbar({
@@ -28,7 +27,6 @@ export function AttendanceToolbar({
   toggleFullscreen,
   onSyncTerminal,
   isSyncing,
-  onOpenRawLogs,
 }: AttendanceToolbarProps) {
   const { branches = [] } = useBranchStore();
   const { user } = useAuthStore();
@@ -161,18 +159,6 @@ export function AttendanceToolbar({
           <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
           <span className="hidden md:inline">Sincronizar Biométrico</span>
         </button>
-
-        {/* Botón Inspeccionar Eventos ISAPI Crudos */}
-        {onOpenRawLogs && (
-          <button
-            onClick={onOpenRawLogs}
-            className="bg-gray-900 hover:bg-black text-amber-400 border border-amber-400/30 font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
-            title="Inspeccionar eventos ISAPI crudos leídos del equipo"
-          >
-            <Database size={14} className="text-amber-400" />
-            <span className="hidden md:inline">Eventos Crudos (ISAPI)</span>
-          </button>
-        )}
 
         {/* Botón Pantalla Completa */}
         <button

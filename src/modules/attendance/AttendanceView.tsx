@@ -160,7 +160,6 @@ export function AttendanceView() {
         toggleFullscreen={toggleFullscreen}
         onSyncTerminal={handleSyncTerminal}
         isSyncing={isSyncing}
-        onOpenRawLogs={() => setShowRawLogsModal(true)}
       />
 
       {/* Layout de Cuadrícula Unificado (Nombres + Fechas Sincronizados al 100%) */}
@@ -209,10 +208,6 @@ export function AttendanceView() {
           selectedEmployee={selectedPayrollEmp}
           onClose={() => setShowPayrollModal(false)}
         />
-      )}
-
-      {showRawLogsModal && (
-        <RawBiometricLogsModal onClose={() => setShowRawLogsModal(false)} />
       )}
     </div>
   );
