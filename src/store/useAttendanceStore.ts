@@ -211,8 +211,7 @@ import {
   HikvisionDeviceConfig,
 } from '../services/hikvisionIsapiService';
 
-import cleanSeed from '../data/cleanBiometricSeed.json';
-export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = cleanSeed as RawAttendanceLog[];
+export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
@@ -447,18 +446,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             console.warn('[ISAPI Fetch Fallback to local DB]', err);
           }
 
-          // Si el biométrico no responde por red (ej. desplegado en nube Vercel sin proxy local activo),
-          // se usan los datos locales precargados de marcaciones
-          if (parsedEvents.length === 0 && INITIAL_BIOMETRIC_LOGS.length > 0) {
-            parsedEvents = INITIAL_BIOMETRIC_LOGS.map((l) => ({
-              employeeNoString: l.employeeNo,
-              serialNo: l.serialNo,
-              attendanceStatus: l.attendanceStatus || (l.type === 'EXIT' ? 'checkOut' : 'checkIn'),
-              time: l.timestamp,
-              type: l.type,
-              doorNo: l.doorNo || 1,
-            }));
-          }
+
 
           let logsAdded = 0;
           if (parsedEvents.length > 0) {
@@ -717,7 +705,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v7',
+      name: 'frita_attendance_store_v8',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
