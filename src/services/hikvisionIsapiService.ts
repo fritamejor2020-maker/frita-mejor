@@ -345,10 +345,12 @@ export async function isapiDigestFetch(
   options: { method?: string; body?: string; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; text: string; ok: boolean; headers: any }> {
   const method = (options.method || 'GET').toUpperCase();
+  const origin = typeof window !== 'undefined' ? window.location.origin : '';
   
-  // Probar IP directa del dispositivo y luego proxies locales (en caso de restricciones CORS o red local en el navegador)
+  // Probar IP directa del dispositivo, proxy local de Vite y proxies locales
   const urlsToTry = [
     `http://${config.ipAddress}:${config.port}${path}`,
+    `${origin}/isapi-proxy${path}`,
     `http://localhost:8080${path}`,
     `http://127.0.0.1:8080${path}`,
     `http://localhost:9099/isapi${path}`
@@ -372,11 +374,10 @@ export async function isapiDigestFetch(
       });
     } catch (err: any) {
       lastError = err;
-      // Si falla la conexión a este endpoint/proxy, intentar con la siguiente URL
       continue;
     }
 
-    // Si nos devuelve 401 Unauthorized, procesamos el challenge Digest (RFC 2617)
+    // Si nos devuelve 401 Unauthorized, procesamos el challenge Digest (RFC 2617) con el nonce original
     if (response.status === 401) {
       const wwwAuth = response.headers.get('www-authenticate');
       const challenge = parseWwwAuthenticate(wwwAuth);
@@ -386,10 +387,11 @@ export async function isapiDigestFetch(
         const urisToTry = [path, basePath];
         const qopVariants = [challenge.qop, 'auth', ''];
 
+        let successResponse: Response | null = null;
+
         for (const uriCandidate of urisToTry) {
           for (const qopCandidate of qopVariants) {
-            const freshChallenge = (await getFreshChallenge(url, method, headers, options.body)) || challenge;
-            const testChallenge = { ...freshChallenge, qop: qopCandidate };
+            const testChallenge = { ...challenge, qop: qopCandidate };
 
             const digestHeader = generateDigestAuthHeader(
               config.username,
@@ -410,14 +412,18 @@ export async function isapiDigestFetch(
               });
 
               if (retryRes.status !== 401) {
-                response = retryRes;
+                successResponse = retryRes;
                 break;
               }
-            } catch (e) {
-              // continuar probando
+            } catch (err) {
+              /* retry attempt error */
             }
           }
-          if (response.status !== 401) break;
+          if (successResponse) break;
+        }
+
+        if (successResponse) {
+          response = successResponse;
         }
       }
     }
