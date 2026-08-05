@@ -388,26 +388,6 @@ export async function isapiDigestFetch(
           );
 
           try {
-            const isExplicitCheckInOrOut =
-              status === 'checkin' ||
-              status === 'entry' ||
-              status === 'check_in' ||
-              status === 'in' ||
-              status === 'checkout' ||
-              status === 'exit' ||
-              status === 'check_out' ||
-              status === 'out' ||
-              status === 'overtimein' ||
-              status === 'overtime_in' ||
-              status === 'overtimeout' ||
-              status === 'overtime_out' ||
-              sVal === 1 ||
-              sVal === 2 ||
-              sVal === 5 ||
-              sVal === 6;
-
-            // Descartar aperturas de portón/puerta sin marca de asistencia (statusValue = 0 / status = undefined)
-            return rawNo.length > 0 && isExplicitCheckInOrOut;
             const retryRes = await fetch(url, {
               method,
               headers: {

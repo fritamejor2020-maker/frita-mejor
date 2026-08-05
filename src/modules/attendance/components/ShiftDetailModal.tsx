@@ -47,9 +47,9 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
     }
   };
 
-  const handleDeleteSingleLog = (logId: string) => {
+  const handleDeleteSingleLog = (logId: string, serialNo?: number) => {
     if (confirm('¿Deseas eliminar únicamente esta marcación? (No volverá a aparecer al sincronizar)')) {
-      deleteSingleAttendanceLog(logId);
+      deleteSingleAttendanceLog(logId, serialNo);
       onClose();
     }
   };
@@ -111,7 +111,7 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
                           </span>
                         </div>
                         <button
-                          onClick={() => handleDeleteSingleLog(log.id)}
+                          onClick={() => handleDeleteSingleLog(log.id, log.serialNo)}
                           className="p-1 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
                           title="Eliminar únicamente esta marcación"
                         >

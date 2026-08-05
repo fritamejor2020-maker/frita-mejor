@@ -50,6 +50,7 @@ export interface RawAttendanceLog {
   type: 'ENTRY' | 'EXIT' | 'UNKNOWN';
   verifyMethod?: string;
   doorNo?: number;
+  serialNo?: number;
 }
 
 export interface ShiftOverride {
@@ -88,7 +89,7 @@ interface AttendanceStoreState {
 
   // Logs & Overrides
   addAttendanceLogs: (logs: RawAttendanceLog[]) => void;
-  deleteSingleAttendanceLog: (logId: string) => void;
+  deleteSingleAttendanceLog: (logId: string, serialNo?: number) => void;
   deleteAttendanceLogsForDate: (employeeNo: string, dateStr: string) => void;
   upsertShiftOverride: (override: ShiftOverride) => void;
   deleteShiftOverride: (id: string) => void;
@@ -211,8 +212,9 @@ import {
 import extractedLogs from '../data/extractedBiometricLogs.json';
 export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAttendanceLog[];
 
-function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
+function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
+  const deletedSet = new Set(deletedLogIds || []);
   // IDs de aperturas de portón descartadas (no son marcaciones de asistencia Check In)
   const INVALID_GATE_OPENING_IDS = new Set([
     'LOG-TERM-001-25650',
@@ -221,14 +223,26 @@ function mergeBiometricLogs(existing: RawAttendanceLog[]): RawAttendanceLog[] {
     'LOG-TERM-001-25641',
   ]);
 
+  const isDeleted = (l: RawAttendanceLog) => {
+    if (!l || !l.id) return true;
+    if (INVALID_GATE_OPENING_IDS.has(l.id)) return true;
+    if (deletedSet.has(l.id)) return true;
+    if (l.serialNo != null) {
+      if (deletedSet.has(String(l.serialNo))) return true;
+      if (deletedSet.has(`LOG-TERM-001-${l.serialNo}`)) return true;
+      if (deletedSet.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return true;
+    }
+    return false;
+  };
+
   (existing || []).forEach((l) => {
-    if (l && l.id && !INVALID_GATE_OPENING_IDS.has(l.id)) {
+    if (!isDeleted(l)) {
       map.set(l.id, l);
     }
   });
 
   INITIAL_BIOMETRIC_LOGS.forEach((l) => {
-    if (!map.has(l.id) && !INVALID_GATE_OPENING_IDS.has(l.id)) {
+    if (!map.has(l.id) && !isDeleted(l)) {
       map.set(l.id, l);
     }
   });
@@ -321,11 +335,24 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         push('attendance_logs', get().attendanceLogs);
       },
 
-      deleteSingleAttendanceLog: (logId) => {
-        set((s) => ({
-          attendanceLogs: s.attendanceLogs.filter((l) => l.id !== logId),
-          deletedLogIds: [...(s.deletedLogIds || []), logId],
-        }));
+      deleteSingleAttendanceLog: (logId, serialNo) => {
+        set((s) => {
+          const targetLog = s.attendanceLogs.find((l) => l.id === logId);
+          const serial = serialNo || targetLog?.serialNo;
+          const newDeleted = [logId];
+          if (serial != null) {
+            newDeleted.push(String(serial));
+            newDeleted.push(`LOG-TERM-001-${serial}`);
+            if (targetLog?.employeeNo) {
+              newDeleted.push(`LOG-TERM-001-${targetLog.employeeNo}-${serial}`);
+            }
+          }
+          const updatedLogs = s.attendanceLogs.filter((l) => l.id !== logId && (!serial || l.serialNo !== serial));
+          return {
+            attendanceLogs: updatedLogs,
+            deletedLogIds: Array.from(new Set([...(s.deletedLogIds || []), ...newDeleted])),
+          };
+        });
         push('attendance_logs', get().attendanceLogs);
       },
 
@@ -334,12 +361,20 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           const toRemove = s.attendanceLogs.filter(
             (l) => (l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr)
           );
-          const removedIds = toRemove.map((l) => l.id);
+          const newDeleted: string[] = [];
+          toRemove.forEach((l) => {
+            newDeleted.push(l.id);
+            if (l.serialNo != null) {
+              newDeleted.push(String(l.serialNo));
+              newDeleted.push(`LOG-TERM-001-${l.serialNo}`);
+              newDeleted.push(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`);
+            }
+          });
           return {
             attendanceLogs: s.attendanceLogs.filter(
               (l) => !((l.employeeNo === employeeNo || l.employeeId === `EMP-${employeeNo}` || l.employeeId === employeeNo) && (l.timestamp || '').startsWith(dateStr))
             ),
-            deletedLogIds: [...(s.deletedLogIds || []), ...removedIds],
+            deletedLogIds: Array.from(new Set([...(s.deletedLogIds || []), ...newDeleted])),
           };
         });
         push('attendance_logs', get().attendanceLogs);
