@@ -79,11 +79,7 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function useAttendanceData(
-  selectedBranchId: string | null,
-  weekStartDate: Date,
-  onlyCompletePairs: boolean = true
-) {
+export function useAttendanceData(selectedBranchId: string | null, weekStartDate: Date) {
   const {
     employeeContracts,
     shiftTemplates,
@@ -187,37 +183,60 @@ export function useAttendanceData(
             logs: dayLogs,
           });
         } else {
-          let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
+          // Verificar si alguna marca tiene el tipo EXPLÍCITO 'EXIT' / 'CHECKOUT'
+          const hasExplicitExits = dayLogs.some(
+            (l) => l.type === 'EXIT' || (l.type as string).toUpperCase() === 'CHECKOUT'
+          );
 
-          dayLogs.forEach((log) => {
-            const isEntry = log.type === 'ENTRY' || (log.type as string).toUpperCase() === 'CHECKIN';
-            const isExit  = log.type === 'EXIT'  || (log.type as string).toUpperCase() === 'CHECKOUT';
-
-            if (isEntry) {
-              if (currentPair && !currentPair.lastOut) {
-                shiftPairs.push(currentPair);
+          if (hasExplicitExits) {
+            let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
+            dayLogs.forEach((log) => {
+              const isExit = log.type === 'EXIT' || (log.type as string).toUpperCase() === 'CHECKOUT';
+              if (!isExit) {
+                if (currentPair && !currentPair.lastOut) {
+                  shiftPairs.push(currentPair);
+                }
+                currentPair = {
+                  firstIn: getTimeString(log.timestamp),
+                  logs: [log],
+                };
+              } else {
+                if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
+                  currentPair.lastOut = getTimeString(log.timestamp);
+                  currentPair.logs.push(log);
+                  shiftPairs.push(currentPair);
+                  currentPair = null;
+                } else {
+                  shiftPairs.push({
+                    lastOut: getTimeString(log.timestamp),
+                    logs: [log],
+                  });
+                }
               }
-              currentPair = {
-                firstIn: getTimeString(log.timestamp),
-                logs: [log],
-              };
-            } else if (isExit) {
-              if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
-                currentPair.lastOut = getTimeString(log.timestamp);
-                currentPair.logs.push(log);
-                shiftPairs.push(currentPair);
-                currentPair = null;
+            });
+            if (currentPair) {
+              shiftPairs.push(currentPair);
+            }
+          } else {
+            // Comportamiento Biométrico Estándar (Todas las marcaciones son registros de huella/PIN)
+            // Agrupar cronológicamente de 2 en 2: Par 1 = (Marcación 1: Entrada, Marcación 2: Salida), Par 2 = (Marcación 3: Entrada, Marcación 4: Salida), etc.
+            for (let i = 0; i < dayLogs.length; i += 2) {
+              const inLog = dayLogs[i];
+              const outLog = dayLogs[i + 1];
+
+              if (outLog) {
+                shiftPairs.push({
+                  firstIn: getTimeString(inLog.timestamp),
+                  lastOut: getTimeString(outLog.timestamp),
+                  logs: [inLog, outLog],
+                });
               } else {
                 shiftPairs.push({
-                  lastOut: getTimeString(log.timestamp),
-                  logs: [log],
+                  firstIn: getTimeString(inLog.timestamp),
+                  logs: [inLog],
                 });
               }
             }
-          });
-
-          if (currentPair) {
-            shiftPairs.push(currentPair);
           }
         }
 
@@ -260,11 +279,6 @@ export function useAttendanceData(
 
           // Evaluación de Marcas Faltantes y Tardanza
           const isMissingMarks = !rawFirstIn || !rawLastOut;
-
-          // Si la opción de filtrar solo entradas con Check in + Check out está activa, ignorar pares incompletos
-          if (onlyCompletePairs && isMissingMarks) {
-            return;
-          }
 
           let isTardy = false;
 
@@ -364,5 +378,5 @@ export function useAttendanceData(
       endWeekStr,
       payrollList,
     };
-  }, [selectedBranchId, weekStartDate, onlyCompletePairs, employeeContracts, shiftTemplates, attendanceLogs, shiftOverrides]);
+  }, [selectedBranchId, weekStartDate, employeeContracts, shiftTemplates, attendanceLogs, shiftOverrides]);
 }
