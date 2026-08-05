@@ -711,7 +711,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         ...currentState,
         ...persistedState,
         employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
-        attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs),
+        attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs, persistedState?.deletedLogIds),
+        deletedLogIds: Array.from(new Set([...(currentState?.deletedLogIds || []), ...(persistedState?.deletedLogIds || [])])),
       }),
     }
   )
