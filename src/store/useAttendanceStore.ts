@@ -92,6 +92,7 @@ interface AttendanceStoreState {
   addAttendanceLogs: (logs: RawAttendanceLog[]) => void;
   deleteSingleAttendanceLog: (logId: string, serialNo?: number) => void;
   deleteAttendanceLogsForDate: (employeeNo: string, dateStr: string) => void;
+  clearAllAttendanceLogs: () => void;
   upsertShiftOverride: (override: ShiftOverride) => void;
   deleteShiftOverride: (id: string) => void;
 
@@ -210,13 +211,11 @@ import {
   HikvisionDeviceConfig,
 } from '../services/hikvisionIsapiService';
 
-import extractedLogs from '../data/extractedBiometricLogs.json';
-export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = extractedLogs as RawAttendanceLog[];
+export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
 
 function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
   const map = new Map<string, RawAttendanceLog>();
   const deletedSet = new Set(deletedLogIds || []);
-  // IDs de aperturas de portón descartadas (no son marcaciones de asistencia Check In)
   const INVALID_GATE_OPENING_IDS = new Set([
     'LOG-TERM-001-25650',
     'LOG-TERM-001-25647',
@@ -238,15 +237,6 @@ function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[
 
   (existing || []).forEach((l) => {
     if (!isDeleted(l)) {
-      map.set(l.id, {
-        ...l,
-        attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
-      });
-    }
-  });
-
-  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
-    if (!map.has(l.id) && !isDeleted(l)) {
       map.set(l.id, {
         ...l,
         attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
@@ -385,6 +375,14 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           };
         });
         push('attendance_logs', get().attendanceLogs);
+      },
+
+      clearAllAttendanceLogs: () => {
+        set({ attendanceLogs: [], deletedLogIds: [] });
+        push('attendance_logs', []);
+        try {
+          localStorage.removeItem('frita_attendance_store');
+        } catch (e) {}
       },
 
       upsertShiftOverride: (override) => {

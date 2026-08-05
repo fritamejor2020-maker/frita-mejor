@@ -54,7 +54,15 @@ export function AttendanceView() {
   const [selectedBioEmpNo, setSelectedBioEmpNo] = useState<string | undefined>(undefined);
 
   const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate);
-  const { terminals, syncTerminalEvents, fetchTerminalUsers } = useAttendanceStore();
+  const { terminals, syncTerminalEvents, fetchTerminalUsers, clearAllAttendanceLogs } = useAttendanceStore();
+
+  const handleClearLogs = () => {
+    if (window.confirm('¿Estás seguro de borrar todos los registros de asistencia mostrados? Se limpiará la pantalla.')) {
+      clearAllAttendanceLogs();
+      setSyncToast('🗑️ Se han borrado todos los registros de asistencia.');
+      setTimeout(() => setSyncToast(null), 4000);
+    }
+  };
 
   const toggleFullscreen = () => {
     if (!document.fullscreenElement) {
@@ -159,6 +167,7 @@ export function AttendanceView() {
         isFullscreen={isFullscreen}
         toggleFullscreen={toggleFullscreen}
         onSyncTerminal={handleSyncTerminal}
+        onClearLogs={handleClearLogs}
         isSyncing={isSyncing}
       />
 

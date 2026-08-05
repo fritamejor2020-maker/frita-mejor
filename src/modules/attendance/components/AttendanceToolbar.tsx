@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building, Database } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building, Database, Trash2 } from 'lucide-react';
 import { useBranchStore } from '../../../store/useBranchStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 
@@ -13,6 +13,7 @@ interface AttendanceToolbarProps {
   isFullscreen: boolean;
   toggleFullscreen: () => void;
   onSyncTerminal: () => void;
+  onClearLogs?: () => void;
   isSyncing: boolean;
 }
 
@@ -26,6 +27,7 @@ export function AttendanceToolbar({
   isFullscreen,
   toggleFullscreen,
   onSyncTerminal,
+  onClearLogs,
   isSyncing,
 }: AttendanceToolbarProps) {
   const { branches = [] } = useBranchStore();
@@ -159,6 +161,18 @@ export function AttendanceToolbar({
           <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
           <span className="hidden md:inline">Sincronizar Biométrico</span>
         </button>
+
+        {/* Botón Limpiar Registros */}
+        {onClearLogs && (
+          <button
+            onClick={onClearLogs}
+            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs px-2.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+            title="Borrar todas las marcaciones mostradas"
+          >
+            <Trash2 size={14} />
+            <span className="hidden lg:inline">Borrar Registros</span>
+          </button>
+        )}
 
         {/* Botón Pantalla Completa */}
         <button
