@@ -1,6 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
 import { AttendanceToolbar } from './components/AttendanceToolbar';
-import { EmployeeStickyPanel } from './components/EmployeeStickyPanel';
 import { TimelineGridPanel } from './components/TimelineGridPanel';
 import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
@@ -161,33 +160,27 @@ export function AttendanceView() {
         isSyncing={isSyncing}
       />
 
-      {/* Layout Split-Pane Principal (Panel Izquierdo Sticky + Cuadrícula Derecha Scrollable) */}
-      <div className="bg-white rounded-3xl shadow-sm border border-gray-200 flex flex-col md:flex-row relative max-h-[calc(100vh-210px)] min-h-[500px] overflow-auto">
-        <EmployeeStickyPanel
-          payrollList={payrollList}
-          onSelectEmployee={(emp) => {
-            setSelectedBioEmpNo(emp.employeeNo);
-            setShowBioModal(true);
-          }}
-          onManageEmployees={() => {
-            setSelectedBioEmpNo(undefined);
-            setShowBioModal(true);
-          }}
-        />
-
-        <TimelineGridPanel
-          viewMode={viewMode}
-          selectedDateStr={selectedDateStr}
-          weekDays={viewMode === 'week' ? weekDays : [weekDays[0]]}
-          payrollList={payrollList}
-          onSelectBlock={(emp, dateStr, block) => {
-            setActiveDetail({ emp, dateStr, block });
-          }}
-          onAddBlock={(emp, dateStr) => {
-            setActiveDetail({ emp, dateStr });
-          }}
-        />
-      </div>
+      {/* Layout de Cuadrícula Unificado (Nombres + Fechas Sincronizados al 100%) */}
+      <TimelineGridPanel
+        viewMode={viewMode}
+        selectedDateStr={selectedDateStr}
+        weekDays={viewMode === 'week' ? weekDays : [weekDays[0]]}
+        payrollList={payrollList}
+        onSelectEmployee={(emp) => {
+          setSelectedBioEmpNo(emp.employeeNo);
+          setShowBioModal(true);
+        }}
+        onManageEmployees={() => {
+          setSelectedBioEmpNo(undefined);
+          setShowBioModal(true);
+        }}
+        onSelectBlock={(emp, dateStr, block) => {
+          setActiveDetail({ emp, dateStr, block });
+        }}
+        onAddBlock={(emp, dateStr) => {
+          setActiveDetail({ emp, dateStr });
+        }}
+      />
 
       {/* Modales */}
       {showBioModal && (
