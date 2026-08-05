@@ -36,14 +36,29 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
     onClose();
   };
 
-  const handleDeleteAllForDay = () => {
-    if (confirm(`¿Estás seguro de eliminar todas las marcaciones y el turno de ${employee.fullName} para el día ${dateStr}? (No volverán a cargarse al sincronizar)`)) {
-      if (existingOverride) {
-        deleteShiftOverride(existingOverride.id);
+  const handleDeleteBlockLogs = () => {
+    const logsToDelete = block?.rawLogs || [];
+    const logCount = logsToDelete.length;
+
+    if (logCount > 0) {
+      if (confirm(`¿Estás seguro de eliminar únicamente las ${logCount} marcaciones (números de serie) asignadas a este bloque de ${employee.fullName}? (No volverán a cargarse al sincronizar)`)) {
+        logsToDelete.forEach((log) => {
+          deleteSingleAttendanceLog(log.id, log.serialNo);
+        });
+        if (existingOverride) {
+          deleteShiftOverride(existingOverride.id);
+        }
+        onClose();
       }
-      deleteAttendanceLogsForDate(employee.employeeNo, dateStr);
-      deleteAttendanceLogsForDate(employee.employeeId, dateStr);
-      onClose();
+    } else {
+      if (confirm(`¿Estás seguro de eliminar el turno y marcaciones de ${employee.fullName} para el día ${dateStr}?`)) {
+        if (existingOverride) {
+          deleteShiftOverride(existingOverride.id);
+        }
+        deleteAttendanceLogsForDate(employee.employeeNo, dateStr);
+        deleteAttendanceLogsForDate(employee.employeeId, dateStr);
+        onClose();
+      }
     }
   };
 
@@ -197,12 +212,12 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
         {/* Acciones */}
         <div className="flex items-center justify-between gap-3 pt-5 mt-4 border-t border-gray-100">
           <button
-            onClick={handleDeleteAllForDay}
+            onClick={handleDeleteBlockLogs}
             className="px-3 py-2 text-xs font-black text-red-600 hover:bg-red-50 hover:text-red-700 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-red-200 shadow-2xs"
-            title="Borrar todas las marcas del día para este trabajador"
+            title="Borrar únicamente los registros con el número de serie asignado a este bloque"
           >
             <Trash2 size={15} />
-            Borrar Todo el Día
+            Borrar Marcaciones del Bloque
           </button>
 
           <div className="flex items-center gap-2">
