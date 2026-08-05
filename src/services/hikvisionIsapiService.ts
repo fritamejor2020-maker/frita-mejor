@@ -345,83 +345,98 @@ export async function isapiDigestFetch(
   options: { method?: string; body?: string; headers?: Record<string, string> } = {}
 ): Promise<{ status: number; text: string; ok: boolean; headers: any }> {
   const method = (options.method || 'GET').toUpperCase();
-  const url = `http://${config.ipAddress}:${config.port}${path}`;
-  const headers = {
-    'Content-Type': 'application/json; charset=UTF-8',
-    'Accept': 'application/json',
-    ...(options.headers || {}),
-  };
+  
+  // Probar IP directa del dispositivo y luego proxies locales (en caso de restricciones CORS o red local en el navegador)
+  const urlsToTry = [
+    `http://${config.ipAddress}:${config.port}${path}`,
+    `http://localhost:8080${path}`,
+    `http://127.0.0.1:8080${path}`,
+    `http://localhost:9099/isapi${path}`
+  ];
 
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method,
-      headers,
-      body: options.body,
-    });
-  } catch (err: any) {
-    console.error(`[ISAPI Digest Fetch Error] No se pudo conectar a ${url}:`, err.message || err);
-    throw err;
-  }
+  let lastError: any = null;
 
-  // Si nos devuelve 401 Unauthorized, procesamos el challenge Digest (RFC 2617)
-  if (response.status === 401) {
-    const wwwAuth = response.headers.get('www-authenticate');
-    const challenge = parseWwwAuthenticate(wwwAuth);
+  for (const url of urlsToTry) {
+    const headers = {
+      'Content-Type': 'application/json; charset=UTF-8',
+      'Accept': 'application/json',
+      ...(options.headers || {}),
+    };
 
-    if (challenge && challenge.realm && challenge.nonce) {
-      const basePath = path.split('?')[0];
-      const urisToTry = [path, basePath];
-      const qopVariants = [challenge.qop, 'auth', ''];
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method,
+        headers,
+        body: options.body,
+      });
+    } catch (err: any) {
+      lastError = err;
+      // Si falla la conexión a este endpoint/proxy, intentar con la siguiente URL
+      continue;
+    }
 
-      for (const uriCandidate of urisToTry) {
-        for (const qopCandidate of qopVariants) {
-          const freshChallenge = (await getFreshChallenge(url, method, headers, options.body)) || challenge;
-          const testChallenge = { ...freshChallenge, qop: qopCandidate };
+    // Si nos devuelve 401 Unauthorized, procesamos el challenge Digest (RFC 2617)
+    if (response.status === 401) {
+      const wwwAuth = response.headers.get('www-authenticate');
+      const challenge = parseWwwAuthenticate(wwwAuth);
 
-          const digestHeader = generateDigestAuthHeader(
-            config.username,
-            config.password,
-            method,
-            uriCandidate,
-            testChallenge
-          );
+      if (challenge && challenge.realm && challenge.nonce) {
+        const basePath = path.split('?')[0];
+        const urisToTry = [path, basePath];
+        const qopVariants = [challenge.qop, 'auth', ''];
 
-          try {
-            const retryRes = await fetch(url, {
+        for (const uriCandidate of urisToTry) {
+          for (const qopCandidate of qopVariants) {
+            const freshChallenge = (await getFreshChallenge(url, method, headers, options.body)) || challenge;
+            const testChallenge = { ...freshChallenge, qop: qopCandidate };
+
+            const digestHeader = generateDigestAuthHeader(
+              config.username,
+              config.password,
               method,
-              headers: {
-                ...headers,
-                'Authorization': digestHeader,
-              },
-              body: options.body,
-            });
+              uriCandidate,
+              testChallenge
+            );
 
-            if (retryRes.status !== 401) {
-              response = retryRes;
-              break;
+            try {
+              const retryRes = await fetch(url, {
+                method,
+                headers: {
+                  ...headers,
+                  'Authorization': digestHeader,
+                },
+                body: options.body,
+              });
+
+              if (retryRes.status !== 401) {
+                response = retryRes;
+                break;
+              }
+            } catch (e) {
+              // continuar probando
             }
-          } catch (e) {
-            // continuar probando
           }
+          if (response.status !== 401) break;
         }
-        if (response.status !== 401) break;
       }
     }
+
+    const text = await response.text();
+
+    if (text.includes('<lockStatus>lock</lockStatus>') || text.includes('"lockStatus":"lock"')) {
+      console.warn('⚠️ [Hikvision ISAPI] El equipo está en bloqueo de seguridad temporal (lockStatus: lock). Espere el tiempo de desbloqueo.');
+    }
+
+    return {
+      status: response.status,
+      ok: response.ok,
+      text,
+      headers: response.headers,
+    };
   }
 
-  const text = await response.text();
-
-  if (text.includes('<lockStatus>lock</lockStatus>') || text.includes('"lockStatus":"lock"')) {
-    console.warn('⚠️ [Hikvision ISAPI] El equipo está en bloqueo de seguridad temporal (lockStatus: lock). Espere el tiempo de desbloqueo.');
-  }
-
-  return {
-    status: response.status,
-    ok: response.ok,
-    text,
-    headers: response.headers,
-  };
+  throw lastError || new Error(`No se pudo conectar al biométrico en ${config.ipAddress}:${config.port} ni a los proxies locales.`);
 }
 
 // ── 4. Obtención de Información del Dispositivo (DeviceInfo) ───────────────────
@@ -508,89 +523,60 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción TOTAL de Registros de Asistencia por Huella, Clave, Tarjeta y Facial ─────────
+// ── 6. Extracción TOTAL de Registros de Asistencia Paginados (0, 10, 20...) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
-  options?: { startTime?: string; endTime?: string }
+  options?: { startTime?: string; endTime?: string; maxEvents?: number }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
   const pageSize = 10;
-  // Si no se especifica fecha de inicio, buscar por defecto los últimos 30 días
-  // para evitar que totalMatches cuente 25,000+ eventos históricos desde 2020 y recorte los eventos recientes
-  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
-  const defaultStart = thirtyDaysAgo.toISOString().slice(0, 10) + 'T00:00:00-05:00';
-
-  const startTime = options?.startTime || defaultStart;
-  const endTime = options?.endTime || '2030-12-31T23:59:59-05:00';
-
+  let posicion = 0;
+  let totalMatches = Infinity;
   const allEventsMap = new Map<string, AcsEvent>();
 
-  const fetchEventsForCond = async (majorCode: number, minorCode: number, maxCount: number) => {
+  const startTime = options?.startTime;
+  const endTime = options?.endTime;
+  const maxLimit = options?.maxEvents || Infinity;
+
+  do {
+    const acsCond: any = {
+      searchID: "1",
+      searchResultPosition: posicion,
+      maxResults: pageSize,
+      major: 0,
+      minor: 0,
+    };
+
+    if (startTime) acsCond.startTime = startTime;
+    if (endTime) acsCond.endTime = endTime;
+
+    const payload = JSON.stringify({ AcsEventCond: acsCond });
+
     try {
-      const probePayload = JSON.stringify({
-        AcsEventCond: {
-          searchID: "1",
-          searchResultPosition: 0,
-          maxResults: 1,
-          major: majorCode,
-          minor: minorCode,
-          startTime,
-          endTime,
-        },
+      const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
+      if (!res.ok || !res.text) break;
+
+      const data = JSON.parse(res.text);
+      totalMatches = data.AcsEvent?.totalMatches || 0;
+
+      let loteActual = data.AcsEvent?.InfoList || [];
+      if (!Array.isArray(loteActual)) loteActual = [loteActual];
+
+      if (loteActual.length === 0) break;
+
+      loteActual.forEach((ev: AcsEvent) => {
+        const key = ev.serialNo ? `S-${ev.serialNo}` : `T-${ev.employeeNoString || ev.cardNo}-${ev.time}`;
+        allEventsMap.set(key, ev);
       });
 
-      const probeRes = await isapiDigestFetch(config, path, { method: 'POST', body: probePayload });
-      if (!probeRes.ok || !probeRes.text) return;
+      posicion += loteActual.length;
 
-      const probeData = JSON.parse(probeRes.text);
-      const totalMatches = probeData.AcsEvent?.totalMatches || 0;
-      if (totalMatches <= 0) return;
-
-      let currentPos = Math.max(0, totalMatches - pageSize);
-      let fetchedCount = 0;
-
-      while (currentPos >= 0 && fetchedCount < maxCount) {
-        const payload = JSON.stringify({
-          AcsEventCond: {
-            searchID: "1",
-            searchResultPosition: currentPos,
-            maxResults: pageSize,
-            major: majorCode,
-            minor: minorCode,
-            startTime,
-            endTime,
-          },
-        });
-
-        const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
-        if (!res.ok || !res.text) break;
-
-        const data = JSON.parse(res.text);
-        let infoList = data.AcsEvent?.InfoList || [];
-        if (!Array.isArray(infoList)) infoList = [infoList];
-        if (infoList.length === 0) break;
-
-        infoList.forEach((ev: AcsEvent) => {
-          const key = ev.serialNo ? `S-${ev.serialNo}` : `T-${ev.employeeNoString || ev.cardNo}-${ev.time}`;
-          allEventsMap.set(key, ev);
-        });
-
-        fetchedCount += infoList.length;
-        if (currentPos === 0) break;
-        currentPos = Math.max(0, currentPos - pageSize);
-      }
+      if (allEventsMap.size >= maxLimit) break;
     } catch (err) {
-      console.warn(`[Hikvision ISAPI] Error al buscar eventos major=${majorCode} minor=${minorCode}:`, err);
+      console.error(`[Hikvision ISAPI] Error al descargar marcaciones en posición ${posicion}:`, err);
+      break;
     }
-  };
-
-  // 1. Extraer los últimos eventos globales (major: 0, minor: 0) en la ventana de 30 días
-  await fetchEventsForCond(0, 0, 1000);
-
-  // 2. Extraer eventos específicos por minor de autenticación (1: Tarjeta/Clave, 9: Tarjeta, 38: Huella, 75: Facial)
-  for (const mCode of [1, 9, 38, 75]) {
-    await fetchEventsForCond(5, mCode, 500);
-  }
+  } while (posicion < totalMatches);
 
   const result = Array.from(allEventsMap.values());
   return result.sort((a, b) => new Date(a.time || 0).getTime() - new Date(b.time || 0).getTime());

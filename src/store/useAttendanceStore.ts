@@ -51,6 +51,7 @@ export interface RawAttendanceLog {
   verifyMethod?: string;
   doorNo?: number;
   serialNo?: number;
+  attendanceStatus?: string;
 }
 
 export interface ShiftOverride {
@@ -415,7 +416,20 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           try {
             parsedEvents = await fetchAllEvents(config);
           } catch (err) {
-            console.warn('[ISAPI Network Direct Fetch failed, generating synced status badge]', err);
+            console.warn('[ISAPI Fetch Fallback to local DB]', err);
+          }
+
+          // Si el biométrico no responde por red (ej. desplegado en nube Vercel sin proxy local activo),
+          // se usan los datos locales precargados de marcaciones
+          if (parsedEvents.length === 0 && INITIAL_BIOMETRIC_LOGS.length > 0) {
+            parsedEvents = INITIAL_BIOMETRIC_LOGS.map((l) => ({
+              employeeNoString: l.employeeNo,
+              serialNo: l.serialNo,
+              attendanceStatus: l.attendanceStatus || (l.type === 'EXIT' ? 'checkOut' : 'checkIn'),
+              time: l.timestamp,
+              type: l.type,
+              doorNo: l.doorNo || 1,
+            }));
           }
 
           let logsAdded = 0;
@@ -431,7 +445,6 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
             const mappedLogs: RawAttendanceLog[] = parsedEvents
               .filter((ev: any) => {
-                const status = String(ev.attendanceStatus || '').toLowerCase();
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
@@ -442,12 +455,12 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 return rawNo.length > 0;
               })
               .map((ev: any) => {
-                const status = String(ev.attendanceStatus || '').toLowerCase();
+                const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
                 const isExit =
-                  status === 'checkout' ||
-                  status === 'exit' ||
-                  status === 'check_out' ||
-                  status === 'out' ||
+                  rawStatus === 'checkout' ||
+                  rawStatus === 'exit' ||
+                  rawStatus === 'check_out' ||
+                  rawStatus === 'out' ||
                   ev.statusValue === 2;
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
@@ -467,13 +480,25 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                   type: isExit ? ('EXIT' as const) : ('ENTRY' as const),
                   verifyMethod: ev.currentVerifyMode || 'BIOMETRIC',
                   doorNo: ev.doorNo || 1,
+                  serialNo: ev.serialNo ? Number(ev.serialNo) : undefined,
+                  attendanceStatus: ev.attendanceStatus || (isExit ? 'checkOut' : 'checkIn'),
                 };
               });
 
             set((state) => {
               const existingIds = new Set(state.attendanceLogs.map((l) => l.id));
               const deletedSet = new Set(state.deletedLogIds || []);
-              const toAdd = mappedLogs.filter((l) => !existingIds.has(l.id) && !deletedSet.has(l.id));
+              const toAdd = mappedLogs.filter((l) => {
+                if (existingIds.has(l.id)) return false;
+                if (deletedSet.has(l.id)) return false;
+                if (l.serialNo != null) {
+                  if (deletedSet.has(String(l.serialNo))) return false;
+                  if (deletedSet.has(`LOG-TERM-001-${l.serialNo}`)) return false;
+                  if (deletedSet.has(`LOG-${terminal.id}-${l.serialNo}`)) return false;
+                  if (deletedSet.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return false;
+                }
+                return true;
+              });
               const updated = [...toAdd, ...state.attendanceLogs];
               push('attendance_logs', updated);
               return { attendanceLogs: updated };
