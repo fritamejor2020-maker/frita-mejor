@@ -469,8 +469,10 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 // Descartar eventos anónimos de teclado (contraseña sin empleado identificado)
                 if (rawNo === '18446744073709551613' || rawNo === '') return false;
 
-                // Aceptar cualquier marcación válida asociada a un número de empleado
-                return rawNo.length > 0;
+                // Conservar ÚNICAMENTE las marcaciones que tengan attendanceStatus definido explícitamente (checkIn, checkOut, overtimeIn, etc.)
+                const hasExplicitStatus = Boolean(ev.attendanceStatus && String(ev.attendanceStatus).trim() !== '');
+
+                return rawNo.length > 0 && hasExplicitStatus;
               })
               .map((ev: any) => {
                 const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
