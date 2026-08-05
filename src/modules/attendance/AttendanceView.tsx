@@ -51,8 +51,9 @@ export function AttendanceView() {
 
   const [showBioModal, setShowBioModal] = useState(false);
   const [selectedBioEmpNo, setSelectedBioEmpNo] = useState<string | undefined>(undefined);
+  const [onlyCompletePairs, setOnlyCompletePairs] = useState(true);
 
-  const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate);
+  const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate, onlyCompletePairs);
   const { terminals, syncTerminalEvents, fetchTerminalUsers } = useAttendanceStore();
 
   const toggleFullscreen = () => {
@@ -159,6 +160,8 @@ export function AttendanceView() {
         toggleFullscreen={toggleFullscreen}
         onSyncTerminal={handleSyncTerminal}
         isSyncing={isSyncing}
+        onlyCompletePairs={onlyCompletePairs}
+        setOnlyCompletePairs={setOnlyCompletePairs}
       />
 
       {/* Layout Split-Pane Principal (Panel Izquierdo Sticky + Cuadrícula Derecha Scrollable) */}

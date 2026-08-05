@@ -72,7 +72,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
   // Generar bytes ESC/POS de apertura de cajón como caracteres invisibles
   let drawerKickHtml = '';
   if (cashDrawerCode) {
-    const bytes = cashDrawerCode.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+    const bytes = parseDrawerCode(cashDrawerCode);
     if (bytes.length > 0) {
       const escChars = bytes.map(b => `&#${b};`).join('');
       drawerKickHtml = `<span style="font-size:0;line-height:0;overflow:hidden;display:block;height:0;">${escChars}</span>`;

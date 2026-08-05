@@ -42,16 +42,42 @@ export async function checkAgent() {
   }
 }
 
+export function parseDrawerCode(code) {
+  if (!code) return [27, 112, 48, 55, 121];
+  if (Array.isArray(code)) return code.map(Number).filter(n => !isNaN(n));
+  if (typeof code !== 'string') return [27, 112, 48, 55, 121];
+  const trimmed = code.trim();
+  if (!trimmed) return [27, 112, 48, 55, 121];
+
+  if (trimmed.includes('\\x') || trimmed.includes('\x1b')) {
+    const parts = trimmed.split(/\\x|\x1b/i).filter(Boolean);
+    const hexBytes = parts.map(p => parseInt(p.substring(0, 2), 16)).filter(n => !isNaN(n));
+    if (hexBytes.length > 0) return hexBytes;
+  }
+
+  if (trimmed.charCodeAt(0) === 27 || Array.from(trimmed).some(c => c.charCodeAt(0) < 32 && c.charCodeAt(0) !== 10 && c.charCodeAt(0) !== 13)) {
+    return Array.from(trimmed).map(c => c.charCodeAt(0));
+  }
+
+  const parts = trimmed.split(/[\s,]+/);
+  const decimalBytes = parts.map(p => parseInt(p.trim(), 10)).filter(n => !isNaN(n));
+  if (decimalBytes.length > 0) return decimalBytes;
+
+  return [27, 112, 48, 55, 121];
+}
+
 /**
  * Abre el cajón de dinero
  * @param {string} [code] - Código ESC/POS opcional (ej: "27,112,48,55,121")
  * @returns {Promise<boolean>} - true si se envió correctamente
  */
 export async function openDrawer(code) {
+  const parsedCode = parseDrawerCode(code).join(',');
+
   // 1. Si estamos en Electron, abrir nativamente vía IPC
   if (window.cajeroAPI && window.cajeroAPI.openDrawer) {
     try {
-      const res = await window.cajeroAPI.openDrawer(code);
+      const res = await window.cajeroAPI.openDrawer(parsedCode);
       if (res.ok) {
         console.log('[PrinterAgent] ✅ Cajón abierto (Electron nativo)');
         return true;
@@ -72,7 +98,7 @@ export async function openDrawer(code) {
     const res = await fetch(`${AGENT_URL}/open-drawer`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: code ? JSON.stringify({ code }) : '{}',
+      body: JSON.stringify({ code: parsedCode }),
       signal: controller.signal,
     });
     clearTimeout(timeout);

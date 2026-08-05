@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building, CheckCheck, Filter } from 'lucide-react';
 import { useBranchStore } from '../../../store/useBranchStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 
@@ -14,6 +14,8 @@ interface AttendanceToolbarProps {
   toggleFullscreen: () => void;
   onSyncTerminal: () => void;
   isSyncing: boolean;
+  onlyCompletePairs: boolean;
+  setOnlyCompletePairs: (val: boolean) => void;
 }
 
 export function AttendanceToolbar({
@@ -27,6 +29,8 @@ export function AttendanceToolbar({
   toggleFullscreen,
   onSyncTerminal,
   isSyncing,
+  onlyCompletePairs,
+  setOnlyCompletePairs,
 }: AttendanceToolbarProps) {
   const { branches = [] } = useBranchStore();
   const { user } = useAuthStore();
@@ -148,6 +152,24 @@ export function AttendanceToolbar({
             ))}
           </select>
         </div>
+
+        {/* Botón Filtro Solo In + Out (Marcaciones Completas) */}
+        <button
+          onClick={() => setOnlyCompletePairs(!onlyCompletePairs)}
+          className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer border ${
+            onlyCompletePairs
+              ? 'bg-amber-100 border-amber-300 text-amber-950 shadow-xs hover:bg-amber-200'
+              : 'bg-gray-100 border-gray-200 text-gray-600 hover:bg-gray-200'
+          }`}
+          title={
+            onlyCompletePairs
+              ? 'Filtrado activado: Solo muestra turnos con Check In + Check Out'
+              : 'Mostrar todas las marcaciones (incluyendo registros incompletos)'
+          }
+        >
+          <Filter size={14} className={onlyCompletePairs ? 'text-amber-700' : 'text-gray-500'} />
+          <span>{onlyCompletePairs ? 'Solo In + Out' : 'Todos'}</span>
+        </button>
 
         {/* Botón Sincronizar Biométrico */}
         <button

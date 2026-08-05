@@ -79,7 +79,11 @@ function getInitials(name: string): string {
   return name.slice(0, 2).toUpperCase();
 }
 
-export function useAttendanceData(selectedBranchId: string | null, weekStartDate: Date) {
+export function useAttendanceData(
+  selectedBranchId: string | null,
+  weekStartDate: Date,
+  onlyCompletePairs: boolean = true
+) {
   const {
     employeeContracts,
     shiftTemplates,
@@ -256,6 +260,12 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
 
           // Evaluación de Marcas Faltantes y Tardanza
           const isMissingMarks = !rawFirstIn || !rawLastOut;
+
+          // Si la opción de filtrar solo entradas con Check in + Check out está activa, ignorar pares incompletos
+          if (onlyCompletePairs && isMissingMarks) {
+            return;
+          }
+
           let isTardy = false;
 
           if (rawFirstIn && assignedShift) {
@@ -354,5 +364,5 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       endWeekStr,
       payrollList,
     };
-  }, [selectedBranchId, weekStartDate, employeeContracts, shiftTemplates, attendanceLogs, shiftOverrides]);
+  }, [selectedBranchId, weekStartDate, onlyCompletePairs, employeeContracts, shiftTemplates, attendanceLogs, shiftOverrides]);
 }

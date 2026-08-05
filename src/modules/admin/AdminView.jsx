@@ -6,6 +6,7 @@ import { Button } from '../../components/ui/Button';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { uploadProductImage } from '../../lib/storageUtils';
 import { useInventoryStore, INITIAL_ITEM_TYPES } from '../../store/useInventoryStore';
+import { parseDrawerCode } from '../../services/printerAgent';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { usePayrollStore } from '../../store/usePayrollStore';
@@ -3229,7 +3230,7 @@ function PosConfigPanel() {
               onClick={() => {
                 const code = cashDrawerCode || '27,112,48,55,121';
                 console.log(`--- PROBANDO APERTURA DE CAJÓN: ${code} ---`);
-                const bytes = code.split(',').map(b => parseInt(b.trim(), 10)).filter(n => !isNaN(n));
+                const bytes = parseDrawerCode(code);
                 const escChars = bytes.map(b => String.fromCharCode(b)).join('');
                 const iframe = document.createElement('iframe');
                 iframe.style.cssText = 'position:fixed;right:0;bottom:0;width:1px;height:1px;border:none;opacity:0.01;';
