@@ -531,19 +531,20 @@ export async function fetchAllUsers(config: HikvisionDeviceConfig = DEFAULT_DEVI
   return allUsers;
 }
 
-// ── 6. Extracción Rápida y Directa de Eventos del Biométrico (Sin Bloqueos de Socket) ─────────
+// ── 6. Método Oficial de Extracción Paginada Hikvision (`descargarTodasLasMarcacionesHikvision`) ─────────
 export async function fetchAllEvents(
   config: HikvisionDeviceConfig = DEFAULT_DEVICE_CONFIG,
   options?: { startTime?: string; endTime?: string; maxEvents?: number }
 ): Promise<AcsEvent[]> {
   const path = '/ISAPI/AccessControl/AcsEvent?format=json';
+  const pageSize = 30;
   const allEventsMap = new Map<string, AcsEvent>();
 
   const startTime = options?.startTime;
   const endTime = options?.endTime;
 
   try {
-    // 1. Obtener primera página y totalMatches exacto del biométrico
+    // 1. Obtener primera página y totalEnMemoria del biométrico
     const initCond: any = {
       searchID: "1",
       searchResultPosition: 0,
@@ -558,33 +559,48 @@ export async function fetchAllEvents(
     if (!res1.ok || !res1.text) return [];
 
     const data1 = JSON.parse(res1.text);
-    const totalMatches = data1.AcsEvent?.totalMatches || 0;
-    if (totalMatches === 0) return [];
+    const totalEnMemoria = data1.AcsEvent?.totalMatches || 0;
+    if (totalEnMemoria === 0) return [];
 
-    // 2. Traer el lote completo de las últimas 200 marcaciones recientes en 1 sola petición HTTP
-    const startPos = Math.max(0, totalMatches - 200);
-    const batchCond: any = {
-      searchID: "1",
-      searchResultPosition: startPos,
-      maxResults: 200,
-      major: 0,
-      minor: 0,
-    };
-    if (startTime) batchCond.startTime = startTime;
-    if (endTime) batchCond.endTime = endTime;
+    // 2. Posición dinámica (searchResultPosition): avanzamos por lotes desde las marcaciones más recientes
+    let posicion = Math.max(0, totalEnMemoria - 200);
 
-    const res2 = await isapiDigestFetch(config, path, { method: 'POST', body: JSON.stringify({ AcsEventCond: batchCond }) });
-    if (res2.ok && res2.text) {
-      const data2 = JSON.parse(res2.text);
-      let lote = data2.AcsEvent?.InfoList || [];
-      if (!Array.isArray(lote)) lote = [lote];
-      lote.forEach((ev: AcsEvent) => {
+    do {
+      const payload = JSON.stringify({
+        AcsEventCond: {
+          searchID: "1",
+          searchResultPosition: posicion, // <-- Posición dinámica (avanza 0, 30, 60...)
+          maxResults: pageSize,           // <-- Paginación estable
+          major: 0,
+          minor: 0,
+          ...(startTime ? { startTime } : {}),
+          ...(endTime ? { endTime } : {}),
+        }
+      });
+
+      const res = await isapiDigestFetch(config, path, { method: 'POST', body: payload });
+      if (!res.ok || !res.text) break;
+
+      const data = JSON.parse(res.text);
+      const loteActual = data.AcsEvent?.InfoList || [];
+      const lista = Array.isArray(loteActual) ? loteActual : [loteActual];
+
+      if (lista.length === 0) break;
+
+      lista.forEach((ev: AcsEvent) => {
         const key = ev.serialNo ? `S-${ev.serialNo}` : `T-${ev.employeeNoString || ev.cardNo}-${ev.time}`;
         allEventsMap.set(key, ev);
       });
-    }
+
+      posicion += lista.length;
+
+      // Breve pausa de 20ms entre llamadas HTTP para evitar caídas de socket en el biométrico
+      await new Promise((r) => setTimeout(r, 20));
+
+    } while (posicion < totalEnMemoria);
+
   } catch (err) {
-    console.error('[Hikvision ISAPI] Error en consulta directa de eventos:', err);
+    console.error('[Hikvision ISAPI] Error en descargarTodasLasMarcacionesHikvision:', err);
   }
 
   const result = Array.from(allEventsMap.values());
