@@ -142,14 +142,37 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
 
       const getTimeString = (ts?: string) => {
         if (!ts) return '';
+        try {
+          const d = new Date(ts);
+          if (!isNaN(d.getTime())) {
+            const h = String(d.getHours()).padStart(2, '0');
+            const m = String(d.getMinutes()).padStart(2, '0');
+            const s = String(d.getSeconds()).padStart(2, '0');
+            return `${h}:${m}:${s}`;
+          }
+        } catch {}
         if (ts.includes('T')) return ts.slice(11, 19);
         if (ts.includes(' ')) return ts.split(' ')[1] || ts.slice(11, 19);
         return ts.slice(11, 19);
       };
 
+      const getLogDateStr = (ts?: string) => {
+        if (!ts) return '';
+        try {
+          const d = new Date(ts);
+          if (!isNaN(d.getTime())) {
+            const y = d.getFullYear();
+            const m = String(d.getMonth() + 1).padStart(2, '0');
+            const day = String(d.getDate()).padStart(2, '0');
+            return `${y}-${m}-${day}`;
+          }
+        } catch {}
+        return ts.slice(0, 10);
+      };
+
       // Verificar si está "En Turno" hoy (última marca de hoy fue ENTRY)
       const todayLogs = empLogs
-        .filter((l) => (l.timestamp || '').slice(0, 10) === todayStr)
+        .filter((l) => getLogDateStr(l.timestamp) === todayStr)
         .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
       if (todayLogs.length > 0) {
@@ -162,7 +185,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       // Procesar cada día de la semana
       weekDays.forEach((wDay) => {
         const dayLogs = empLogs
-          .filter((l) => (l.timestamp || '').slice(0, 10) === wDay.dateStr)
+          .filter((l) => getLogDateStr(l.timestamp) === wDay.dateStr)
           .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
 
         // Verificar si hay modificación manual de turno para este día

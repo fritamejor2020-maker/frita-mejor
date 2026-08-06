@@ -214,6 +214,9 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ inventory: merged });
     };
     if (!applicators['contrataPayments']) applicators['contrataPayments'] = (v) => useInventoryStore.setState({ contrataPayments: v });
+    if (!applicators['attendance_logs'])   applicators['attendance_logs']   = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ attendanceLogs: v }); };
+    if (!applicators['attendance_contracts']) applicators['attendance_contracts'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ employeeContracts: v }); };
+    if (!applicators['attendance_overrides']) applicators['attendance_overrides'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ shiftOverrides: v }); };
   }
 
   return applicators;
