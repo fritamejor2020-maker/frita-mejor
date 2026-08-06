@@ -206,61 +206,28 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
             logs: dayLogs,
           });
         } else {
-          // Verificar si alguna marca tiene el tipo EXPLÍCITO 'EXIT' / 'CHECKOUT'
-          const hasExplicitExits = dayLogs.some(
-            (l) => l.type === 'EXIT' || (l.type as string).toUpperCase() === 'CHECKOUT'
-          );
+          // Tomar la PRIMERA marcación del día (Primera Entrada) y la ÚLTIMA marcación del día (Última Salida)
+          const firstLog = dayLogs[0];
+          const lastLog = dayLogs.length > 1 ? dayLogs[dayLogs.length - 1] : undefined;
 
-          if (hasExplicitExits) {
-            let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
-            dayLogs.forEach((log) => {
-              const isExit = log.type === 'EXIT' || (log.type as string).toUpperCase() === 'CHECKOUT';
-              if (!isExit) {
-                if (currentPair && !currentPair.lastOut) {
-                  shiftPairs.push(currentPair);
-                }
-                currentPair = {
-                  firstIn: getTimeString(log.timestamp),
-                  logs: [log],
-                };
-              } else {
-                if (currentPair && currentPair.firstIn && !currentPair.lastOut) {
-                  currentPair.lastOut = getTimeString(log.timestamp);
-                  currentPair.logs.push(log);
-                  shiftPairs.push(currentPair);
-                  currentPair = null;
-                } else {
-                  shiftPairs.push({
-                    lastOut: getTimeString(log.timestamp),
-                    logs: [log],
-                  });
-                }
-              }
-            });
-            if (currentPair) {
-              shiftPairs.push(currentPair);
-            }
-          } else {
-            // Comportamiento Biométrico Estándar (Todas las marcaciones son registros de huella/PIN)
-            // Agrupar cronológicamente de 2 en 2: Par 1 = (Marcación 1: Entrada, Marcación 2: Salida), Par 2 = (Marcación 3: Entrada, Marcación 4: Salida), etc.
-            for (let i = 0; i < dayLogs.length; i += 2) {
-              const inLog = dayLogs[i];
-              const outLog = dayLogs[i + 1];
+          const firstInStr = firstLog ? getTimeString(firstLog.timestamp) : undefined;
+          let lastOutStr = lastLog ? getTimeString(lastLog.timestamp) : undefined;
 
-              if (outLog) {
-                shiftPairs.push({
-                  firstIn: getTimeString(inLog.timestamp),
-                  lastOut: getTimeString(outLog.timestamp),
-                  logs: [inLog, outLog],
-                });
-              } else {
-                shiftPairs.push({
-                  firstIn: getTimeString(inLog.timestamp),
-                  logs: [inLog],
-                });
-              }
+          // Si solo hay 1 marca o si la última marca es idéntica al minuto a la primera marca
+          if (dayLogs.length === 1 || (firstInStr && lastOutStr && firstInStr.slice(0, 5) === lastOutStr.slice(0, 5))) {
+            const explicitExit = [...dayLogs].reverse().find(
+              (l) => l.type === 'EXIT' || (l.type as string).toUpperCase() === 'CHECKOUT'
+            );
+            if (explicitExit && getTimeString(explicitExit.timestamp) !== firstInStr) {
+              lastOutStr = getTimeString(explicitExit.timestamp);
             }
           }
+
+          shiftPairs.push({
+            firstIn: firstInStr,
+            lastOut: lastOutStr && lastOutStr !== firstInStr ? lastOutStr : (dayLogs.length > 1 ? lastOutStr : undefined),
+            logs: dayLogs,
+          });
         }
 
         const dayBlocks: DailyShiftBlock[] = [];
