@@ -76,10 +76,13 @@ export function AttendanceView() {
 
     const term = terminals[0];
     if (term) {
-      // 1. Sincronizar usuarios completos
+      // 1. Sincronizar usuarios completos del biométrico
       await fetchTerminalUsers(term.id);
-      // 2. Sincronizar marcaciones de asistencia (entradas/salidas manuales)
-      await syncTerminalEvents(term.id);
+      // 2. Sincronizar marcaciones de asistencia en tiempo real
+      const res = await syncTerminalEvents(term.id);
+      if (res && res.message) {
+        console.log('[Sync Terminal Result]', res);
+      }
     }
 
     setIsSyncing(false);
