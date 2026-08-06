@@ -347,9 +347,10 @@ export async function isapiDigestFetch(
   const method = (options.method || 'GET').toUpperCase();
   const origin = typeof window !== 'undefined' ? window.location.origin : '';
   
-  // Probar IP directa del dispositivo, proxy local de Vite y proxies locales
+  // Probar IP directa del dispositivo, DDNS global, proxy local de Vite y proxies locales
   const urlsToTry = [
     `http://${config.ipAddress}:${config.port}${path}`,
+    `http://fritamejor.duckdns.org:8000${path}`,
     `${origin}/isapi-proxy${path}`,
     `http://localhost:8080${path}`,
     `http://127.0.0.1:8080${path}`,
@@ -562,8 +563,8 @@ export async function fetchAllEvents(
     const totalEnMemoria = data1.AcsEvent?.totalMatches || 0;
     if (totalEnMemoria === 0) return [];
 
-    // 2. Posición dinámica (searchResultPosition): avanzamos por lotes desde las marcaciones más recientes
-    let posicion = Math.max(0, totalEnMemoria - 200);
+    // 2. Posición dinámica (searchResultPosition): avanzamos por lotes (0, 30, 60...) recorriendo las marcaciones
+    let posicion = options?.maxEvents ? Math.max(0, totalEnMemoria - options.maxEvents) : 0;
 
     do {
       const payload = JSON.stringify({
