@@ -44,8 +44,8 @@ export const BRANCH_KEYS = [
   'vehicles',
   // Plantillas de carga — por sede
   'loadTemplates',
-  // Nómina — por sede
-  'payrollRecords',
+  // Nómina y Asistencias — por sede
+  'payrollRecords', 'attendance_logs', 'attendance_contracts', 'attendance_overrides',
   // GPS vendedores — por sede
   'vendorLocations',
   // Transferencias bancarias del vendedor — por sede

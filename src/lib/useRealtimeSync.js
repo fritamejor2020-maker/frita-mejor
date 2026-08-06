@@ -13,6 +13,7 @@ import { useTaskStore } from '../store/useTaskStore';
 import { useTransferStore } from '../store/useTransferStore';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
 import { useChatStore } from '../store/useChatStore';
+import { useAttendanceStore } from '../store/useAttendanceStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -96,6 +97,21 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const state = useInventoryStore.getState();
       const merged = mergeArrays(state.posExpenses || [], v || [], 'posExpenses');
       useInventoryStore.setState({ posExpenses: merged });
+    };
+    applicators[`attendance_logs_${bid}`] = (v) => {
+      if (Array.isArray(v)) {
+        useAttendanceStore.setState({ attendanceLogs: v });
+      }
+    };
+    applicators[`attendance_contracts_${bid}`] = (v) => {
+      if (Array.isArray(v)) {
+        useAttendanceStore.setState({ employeeContracts: v });
+      }
+    };
+    applicators[`attendance_overrides_${bid}`] = (v) => {
+      if (Array.isArray(v)) {
+        useAttendanceStore.setState({ shiftOverrides: v });
+      }
     };
     applicators[`inventory_${bid}`]        = (v) => {
       const state = useInventoryStore.getState();
