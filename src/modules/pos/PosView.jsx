@@ -1405,16 +1405,6 @@ export function PosView() {
                 )}
 
                 <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
-                
-                {item.type !== 'PRODUCTO' && (
-                  <span className={`absolute top-3 right-3 z-20 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider shadow-md ${
-                    item.type === 'FRITO' ? 'bg-yellow-400 text-yellow-950' :
-                    item.type === 'CRUDO' ? 'bg-orange-500 text-white' :
-                    item.type === 'BEBIDA' ? 'bg-blue-500 text-white' : 'bg-gray-700 text-white'
-                  }`}>
-                    {item.type}
-                  </span>
-                )}
 
                 <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
                   <span className={`font-bold leading-tight line-clamp-2 text-white ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
@@ -1436,7 +1426,6 @@ export function PosView() {
                           return (
                             <span className="text-amber-400 font-bold flex items-center gap-1">
                               <span>{formatMoney(refPrice)}</span>
-                              <span className="text-[9px] font-black bg-amber-500/20 text-amber-300 px-1 py-0.2 rounded border border-amber-500/30">Ref</span>
                             </span>
                           );
                         }
