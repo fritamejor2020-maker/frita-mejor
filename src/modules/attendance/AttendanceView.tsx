@@ -74,6 +74,17 @@ export function AttendanceView() {
   const handleSyncTerminal = async () => {
     setIsSyncing(true);
 
+    // 0. Si se ejecuta dentro de la app de escritorio Electron, ejecutar extracción nativa IPC
+    if ((window as any).cajeroAPI?.syncBiometric) {
+      try {
+        console.log('[AttendanceView] Invocando extracción nativa de biométrico vía cajeroAPI IPC...');
+        const res = await (window as any).cajeroAPI.syncBiometric();
+        console.log('[AttendanceView IPC Result]', res);
+      } catch (err: any) {
+        console.error('[AttendanceView IPC Error]', err);
+      }
+    }
+
     const term = terminals[0];
     if (term) {
       // 1. Sincronizar usuarios completos del biométrico
