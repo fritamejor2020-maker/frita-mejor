@@ -539,14 +539,22 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           }
 
           get().updateTerminal(terminalId, {
-            status: 'ONLINE',
+            status: mappedLogs.length > 0 ? 'ONLINE' : 'OFFLINE',
             lastSyncAt: new Date().toISOString(),
           });
+
+          if (parsedEvents.length === 0) {
+            const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+            const msg = isHttps
+              ? `No se pudo conectar a la IP ${terminal.ipAddress} desde HTTPS en Vercel (Chromium bloquea IPs locales por Private Network Access). Utiliza el Agente Local o la redirección DDNS.`
+              : `No se obtuvieron marcas del biométrico ${terminal.ipAddress}. Verifica la conexión de red.`;
+            return { ok: false, count: 0, message: msg };
+          }
 
           return {
             ok: true,
             count: logsAdded,
-            message: `Sincronización Digest exitosa con ${terminal.name}. Se procesaron ${logsAdded} marcaciones.`,
+            message: `Sincronización exitosa con ${terminal.name}. Se procesaron ${logsAdded} marcaciones.`,
           };
         } catch (error: any) {
           get().updateTerminal(terminalId, { status: 'OFFLINE' });
