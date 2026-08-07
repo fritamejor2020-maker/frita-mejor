@@ -206,33 +206,39 @@ export function PosView() {
   const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
   const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
   const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
+  const [pendingDeliveryInfo, setPendingDeliveryInfo] = useState(null);
 
   const heldSales = usePosStore(s => s.heldSales || []);
   const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
   const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
   const suspendedSales = (posSales || []).filter(s => s.status === 'SUSPENDED');
-  const allHeldAndSuspended = [
-    ...(heldSales || []).map(h => ({
-      ...h,
-      isOlaClick: h.isOlaClick,
-      source: 'local',
-      heldAt: h.heldAt || new Date().toISOString()
-    })),
-    ...suspendedSales.map(s => {
-      const cust = (customers || []).find(c => c.id === s.customerId);
-      return {
-        id: s.id,
-        customerName: cust?.name || 'Cliente General',
-        items: s.items,
-        total: s.total,
-        heldAt: s.timestamp || new Date().toISOString(),
-        isOlaClick: false,
-        source: 'db',
-        customerId: s.customerId
-      };
-    })
-  ].sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
+  
+  // Unificar ventas en espera locales y de base de datos evitando duplicados por ID
+  const combinedSales = [...(heldSales || [])];
+  suspendedSales.forEach(s => {
+    if (!combinedSales.some(h => h.id === s.id || (h.originalOlaClickId && h.originalOlaClickId === s.originalOlaClickId))) {
+      combinedSales.push(s);
+    }
+  });
+
+  const allHeldAndSuspended = combinedSales.map(s => {
+    const cust = (customers || []).find(c => c.id === s.customerId);
+    return {
+      id: s.id,
+      customerName: s.customerName || cust?.name || (s.customerId ? 'Cliente' : 'Venta Pausada'),
+      customerId: s.customerId || '',
+      customerPhone: s.customerPhone || cust?.phone || '',
+      deliveryAddress: s.deliveryAddress || cust?.address || '',
+      serviceType: s.serviceType || 'DELIVERY',
+      items: s.items || [],
+      subtotal: s.subtotal || 0,
+      total: s.total || 0,
+      heldAt: s.heldAt || s.timestamp || new Date().toISOString(),
+      isOlaClick: !!s.isOlaClick,
+      publicId: s.publicId || (s.id ? s.id.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').slice(-6) : 'N/A')
+    };
+  }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
 
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const loadPendingCount = async () => {
@@ -662,8 +668,15 @@ export function PosView() {
 
   const handleSaveSale = () => {
     if (ticketItems.length === 0) return;
+    const c = customers?.find(cust => cust.id === selectedCustomer);
     const saleData = {
-      customerId: selectedCustomer,
+      customerId: selectedCustomer || null,
+      customerName: c?.name || pendingDeliveryInfo?.customerName || 'Venta Pausada',
+      customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
+      deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
+      serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+      isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+      publicId: pendingDeliveryInfo?.publicId || null,
       items: ticketItems,
       subtotal,
       discountPercent,
@@ -674,12 +687,16 @@ export function PosView() {
     };
     if (activeSuspendedId) {
       updatePosSale(activeSuspendedId, saleData);
+      toast.success('Venta en espera actualizada');
     } else {
       addPosSale(saleData);
+      toast.success('Venta guardada en espera');
     }
     // Clear ticket
     setTicketItems([]);
     setActiveSuspendedId(null);
+    setPendingDeliveryInfo(null);
+    setSelectedCustomer('');
   };
 
   const handlePrintOrder = () => {
@@ -718,10 +735,20 @@ export function PosView() {
   };
 
   const handleLoadSuspended = (sale) => {
-    setTicketItems(sale.items);
-    setSelectedCustomer(sale.customerId);
+    setTicketItems(sale.items || []);
+    setSelectedCustomer(sale.customerId || '');
     setActiveSuspendedId(sale.id);
+    setPendingDeliveryInfo({
+      customerName: sale.customerName || '',
+      customerPhone: sale.customerPhone || '',
+      deliveryAddress: sale.deliveryAddress || '',
+      serviceType: sale.serviceType || 'DELIVERY',
+      isOlaClick: !!sale.isOlaClick,
+      publicId: sale.publicId || ''
+    });
     setShowSuspendedModal(false);
+    setShowHeldSalesModal(false);
+    toast.success(`Venta de ${sale.customerName || 'Cliente'} cargada al carrito`, { icon: '🛒' });
   };
 
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
@@ -739,7 +766,13 @@ export function PosView() {
 
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
-      customerId: selectedCustomer,
+      customerId: selectedCustomer || null,
+      customerName: saleCustomer?.name || pendingDeliveryInfo?.customerName || (selectedCustomer ? 'Cliente' : 'Cliente General'),
+      customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
+      deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
+      serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+      isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+      publicId: pendingDeliveryInfo?.publicId || null,
       items: ticketItems,
       subtotal,
       discountPercent,
@@ -762,10 +795,9 @@ export function PosView() {
       } : {}),
     };
     
-    // Add logic here to deduct from bodega using dispatchItem (Phase 4 later)
-    
     if (activeSuspendedId) {
       updatePosSale(activeSuspendedId, saleData);
+      deleteHeldSale(activeSuspendedId);
     } else {
       addPosSale(saleData);
     }
@@ -1246,6 +1278,32 @@ export function PosView() {
 
         {/* Ticket Items List */}
         <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
+          {activeSuspendedId && (
+            <div className="mx-1 mb-2.5 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between gap-2 shadow-sm animate-fade-in">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-base animate-pulse">✏️</span>
+                <div className="min-w-0">
+                  <p className="text-xs font-black text-amber-400 truncate">
+                    Editando Venta en Espera {pendingDeliveryInfo?.customerName ? `(${pendingDeliveryInfo.customerName})` : ''}
+                  </p>
+                  <p className="text-[10px] text-amber-300/70 font-semibold truncate">
+                    ID: #{activeSuspendedId.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').slice(-6)}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setActiveSuspendedId(null);
+                  setPendingDeliveryInfo(null);
+                  toast.info('Venta desvinculada. Los productos se mantienen en el carrito como una nueva venta.');
+                }}
+                className="shrink-0 px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-black active:scale-95 transition-all"
+                title="Desvincular para guardar como nueva venta"
+              >
+                Desvincular
+              </button>
+            </div>
+          )}
           {ticketItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-600 opacity-50">
               <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
@@ -1312,7 +1370,7 @@ export function PosView() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); }}>
               <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
@@ -1917,21 +1975,7 @@ export function PosView() {
                       <div className="flex items-center gap-2 mt-4 pt-3 border-t border-gray-800">
                         <button
                           onClick={() => {
-                            if (sale.source === 'local') {
-                              const saleToLoad = heldSales.find(h => h.id === sale.id);
-                              if (saleToLoad) {
-                                setTicketItems(saleToLoad.items);
-                                deleteHeldSale(sale.id);
-                                setShowHeldSalesModal(false);
-                                toast.success(`Venta de ${sale.customerName} cargada al carrito`, { icon: '🛒' });
-                              }
-                            } else {
-                              setTicketItems(sale.items);
-                              setSelectedCustomer(sale.customerId || '');
-                              setActiveSuspendedId(sale.id);
-                              setShowHeldSalesModal(false);
-                              toast.success(`Venta de ${sale.customerName} recuperada`, { icon: '🛒' });
-                            }
+                            handleLoadSuspended(sale);
                           }}
                           className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
                         >
@@ -1939,11 +1983,8 @@ export function PosView() {
                         </button>
                         <button
                           onClick={() => {
-                            if (sale.source === 'local') {
-                              deleteHeldSale(sale.id);
-                            } else {
-                              deletePosSale(sale.id);
-                            }
+                            deleteHeldSale(sale.id);
+                            deletePosSale(sale.id);
                             toast.error('Venta en espera eliminada');
                           }}
                           className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs p-2.5 rounded-xl border border-red-500/20 active:scale-95 transition-all"
@@ -2743,6 +2784,31 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
   const totalBonus = goalMet ? Math.round(excess * (activeGoal.bonusPercent / 100)) : 0;
 
+  // Separación Local vs Contratas
+  const { customers = [], customerTypes = [] } = useInventoryStore();
+  const contrataCustomers = customers.filter(c => c.typeId);
+  const contrataIds = new Set(contrataCustomers.map(c => c.id));
+
+  const contrataSales = sales.filter(s => s.customerId && contrataIds.has(s.customerId));
+  const localSales    = sales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
+
+  // Local
+  const localCash     = localSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+  const localBancol   = localSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((acc, s) => acc + s.total, 0);
+  const localTarjeta  = localSales.filter(s => s.paymentMethod === 'TARJETA').reduce((acc, s) => acc + s.total, 0);
+  const localNequi    = localSales.filter(s => s.paymentMethod === 'NEQUI').reduce((acc, s) => acc + s.total, 0);
+  const localTransfers = localBancol + localTarjeta + localNequi;
+  const localTotal    = localCash + localTransfers;
+
+  // Contratas
+  const contrataCash     = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
+  const contrataBancol   = contrataSales.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
+  const contrataTarjeta  = contrataSales.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
+  const contrataNequi    = contrataSales.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
+  const contrataCredit   = contrataSales.filter(s => s.contrataPaymentMethod === 'credit').reduce((acc, s) => acc + (s.creditAmount || s.total), 0);
+  const contrataTransfers = contrataBancol + contrataTarjeta + contrataNequi;
+  const contrataTotal    = contrataCash + contrataTransfers + contrataCredit;
+
   // Calculate expected
   const initial = shift.initialAmount || 0;
   const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
@@ -2759,23 +2825,55 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   return (
      <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
-        <div className="p-6 border-b border-gray-800">
+        <div className="p-6 border-b border-gray-800 flex items-center justify-between">
           <h2 className="text-2xl font-black text-white flex items-center gap-2">
             <span className="animate-pulse">🔴</span> Cierre de Caja (Reporte Z)
           </h2>
+          <span className="text-xs font-black bg-blue-500/20 text-blue-400 border border-blue-500/30 px-3 py-1 rounded-full">Resumen en Vivo</span>
         </div>
         
         <div className="p-6 overflow-y-auto space-y-6">
+           {/* Resumen Principal Financiero */}
            <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-3 text-sm font-bold text-gray-300 shadow-inner">
-              <div className="flex justify-between"><span>Base Inicial:</span> <span>{formatMoney(initial)}</span></div>
-              <div className="flex justify-between text-green-400"><span>Ventas Efectivo:</span> <span>+{formatMoney(cashSales)}</span></div>
-              <div className="flex justify-between text-blue-400"><span>Ventas Electrónicas:</span> <span>+{formatMoney(otherSales)}</span></div>
+              <div className="flex justify-between"><span>Base Inicial Caja:</span> <span>{formatMoney(initial)}</span></div>
+              <div className="flex justify-between text-green-400"><span>Ventas Efectivo Total:</span> <span>+{formatMoney(cashSales)}</span></div>
+              <div className="flex justify-between text-blue-400"><span>Ventas Transferencias Total:</span> <span>+{formatMoney(otherSales)}</span></div>
               <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
               {totalDepositos > 0 && (
                 <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
               )}
               <div className="border-t border-gray-700 pt-3 flex justify-between text-xl text-white font-black mt-2">
                  <span>Efectivo Esperado en Cajón:</span> <span>{formatMoney(expectedCashInDrawer)}</span>
+              </div>
+           </div>
+
+           {/* Desglose separado: Ventas Local vs Contratas */}
+           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs font-bold">
+              {/* Bloque Local */}
+              <div className="bg-[#16171d] border border-emerald-500/30 rounded-[20px] p-4 space-y-2">
+                <div className="flex justify-between items-center text-emerald-400 border-b border-emerald-500/20 pb-1 font-black text-sm">
+                  <span>🏪 Ventas Local</span>
+                  <span>{formatMoney(localTotal)}</span>
+                </div>
+                <div className="flex justify-between text-gray-300"><span>Efectivo:</span> <span>{formatMoney(localCash)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Bancolombia:</span> <span>{formatMoney(localBancol)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Tarjeta:</span> <span>{formatMoney(localTarjeta)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Nequi:</span> <span>{formatMoney(localNequi)}</span></div>
+                <div className="flex justify-between text-emerald-300 border-t border-gray-800 pt-1 font-black"><span>Transferencias:</span> <span>{formatMoney(localTransfers)}</span></div>
+              </div>
+
+              {/* Bloque Contratas */}
+              <div className="bg-[#16171d] border border-purple-500/30 rounded-[20px] p-4 space-y-2">
+                <div className="flex justify-between items-center text-purple-400 border-b border-purple-500/20 pb-1 font-black text-sm">
+                  <span>🤝 Ventas Contratas</span>
+                  <span>{formatMoney(contrataTotal)}</span>
+                </div>
+                <div className="flex justify-between text-gray-300"><span>Efectivo:</span> <span>{formatMoney(contrataCash)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Bancolombia:</span> <span>{formatMoney(contrataBancol)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Tarjeta:</span> <span>{formatMoney(contrataTarjeta)}</span></div>
+                <div className="flex justify-between text-gray-400"><span>Nequi:</span> <span>{formatMoney(contrataNequi)}</span></div>
+                {contrataCredit > 0 && <div className="flex justify-between text-red-400 font-bold"><span>A Crédito:</span> <span>{formatMoney(contrataCredit)}</span></div>}
+                <div className="flex justify-between text-purple-300 border-t border-gray-800 pt-1 font-black"><span>Transferencias:</span> <span>{formatMoney(contrataTransfers)}</span></div>
               </div>
            </div>
 
@@ -3627,36 +3725,130 @@ function LogoutPromptModal({ onContinue, onLogout }) {
 function PinPromptModal({ message, expectedPin, onSuccess, onClose }) {
   const [pin, setPin] = useState('');
   const [error, setError] = useState(false);
+  const inputRef = useRef(null);
+
+  // Forzar enfoque inmediato y persistente al montar el modal
+  useEffect(() => {
+    const focusInput = () => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+        inputRef.current.select?.();
+      }
+    };
+    
+    // Intentos de enfoque multinivel para garantizar captura en Electron y navegadores
+    focusInput();
+    const rafId = requestAnimationFrame(focusInput);
+    const t1 = setTimeout(focusInput, 50);
+    const t2 = setTimeout(focusInput, 200);
+
+    return () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(t1);
+      clearTimeout(t2);
+    };
+  }, []);
 
   const handleSubmit = (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (pin === expectedPin) {
       onSuccess();
     } else {
       setError(true);
       setPin('');
       setTimeout(() => setError(false), 2000);
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
     }
   };
 
+  const handleKeyPadClick = (num) => {
+    const newPin = pin + num;
+    setPin(newPin);
+    if (inputRef.current) inputRef.current.focus();
+    if (newPin === expectedPin) {
+      setTimeout(() => onSuccess(), 50);
+    }
+  };
+
+  const handleBackspace = () => {
+    setPin(prev => prev.slice(0, -1));
+    if (inputRef.current) inputRef.current.focus();
+  };
+
+  const handleClear = () => {
+    setPin('');
+    if (inputRef.current) inputRef.current.focus();
+  };
+
   return (
-    <div className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center">
-        <h2 className="text-xl font-black text-white mb-2">{message}</h2>
-        <p className="text-gray-400 text-sm font-bold mb-6 text-center">Ingresa la clave numérica de acceso.</p>
+    <div 
+      className="fixed inset-0 z-[90] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      onClick={() => inputRef.current?.focus()}
+    >
+      <div 
+        className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-sm overflow-hidden shadow-2xl p-6 flex flex-col items-center animate-fade-in"
+        onClick={(e) => {
+          e.stopPropagation();
+          inputRef.current?.focus();
+        }}
+      >
+        <h2 className="text-xl font-black text-white mb-1 text-center">{message}</h2>
+        <p className="text-gray-400 text-xs font-bold mb-4 text-center">Ingresa la clave numérica de acceso.</p>
         
         <form onSubmit={handleSubmit} className="w-full">
-          <div className="w-full relative mb-6">
-            <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-500">🔒</span>
+          <div className="w-full relative mb-4">
+            <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-amber-500">🔒</span>
             <input 
+              ref={inputRef}
               autoFocus 
               type="password" 
-              className={`w-full bg-[#0c0d11] border-2 rounded-[24px] py-5 pl-14 pr-6 text-3xl font-black text-white outline-none text-center shadow-inner transition-colors ${error ? 'border-red-500 text-red-500' : 'border-gray-700 focus:border-chunky-main'}`}
+              inputMode="numeric"
+              pattern="[0-9]*"
+              className={`w-full bg-[#0c0d11] border-2 rounded-[24px] py-4 pl-14 pr-6 text-3xl font-black text-white outline-none text-center tracking-widest shadow-inner transition-colors ${error ? 'border-red-500 text-red-500' : 'border-gray-700 focus:border-chunky-main'}`}
               value={pin}
               onChange={(e) => setPin(e.target.value)}
               placeholder="****"
             />
-            {error && <p className="text-red-500 text-xs font-bold text-center mt-2 absolute w-full">Clave incorrecta</p>}
+            {error && <p className="text-red-500 text-xs font-bold text-center mt-1.5 absolute w-full left-0">Clave incorrecta</p>}
+          </div>
+
+          {/* Teclado Numérico Táctil / Teclas Rápidas */}
+          <div className="grid grid-cols-3 gap-2 my-4 w-full">
+            {['1', '2', '3', '4', '5', '6', '7', '8', '9'].map((n) => (
+              <button
+                key={n}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); handleKeyPadClick(n); }}
+                className="h-12 rounded-xl bg-[#2a2c36] hover:bg-[#343744] active:scale-95 text-white font-black text-xl transition-all border border-gray-700/50 shadow-sm flex items-center justify-center"
+              >
+                {n}
+              </button>
+            ))}
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleClear(); }}
+              className="h-12 rounded-xl bg-red-950/40 hover:bg-red-900/60 active:scale-95 text-red-400 font-black text-sm transition-all border border-red-800/40 flex items-center justify-center"
+              title="Borrar todo"
+            >
+              C
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleKeyPadClick('0'); }}
+              className="h-12 rounded-xl bg-[#2a2c36] hover:bg-[#343744] active:scale-95 text-white font-black text-xl transition-all border border-gray-700/50 shadow-sm flex items-center justify-center"
+            >
+              0
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); handleBackspace(); }}
+              className="h-12 rounded-xl bg-amber-950/40 hover:bg-amber-900/60 active:scale-95 text-amber-400 font-black text-lg transition-all border border-amber-800/40 flex items-center justify-center"
+              title="Borrar último"
+            >
+              ⌫
+            </button>
           </div>
 
           <div className="flex gap-3 mt-2">
