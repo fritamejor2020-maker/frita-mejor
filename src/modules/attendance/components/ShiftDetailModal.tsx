@@ -111,6 +111,13 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
                   {block.rawLogs.map((log) => {
                     const timeOnly = log.timestamp ? (log.timestamp.includes('T') ? log.timestamp.slice(11, 19) : log.timestamp.split(' ')[1] || log.timestamp) : '??:??';
                     const isEntry = log.type === 'ENTRY' || (log.type as string).toUpperCase() === 'CHECKIN';
+                    const methodUpper = String(log.verifyMethod || '').toUpperCase();
+                    let methodLabel = 'Biométrico';
+                    if (methodUpper === 'CARD' || methodUpper === 'CARD_PASS') methodLabel = 'Tarjeta';
+                    else if (methodUpper === 'PASSWORD' || methodUpper === 'PIN' || methodUpper === 'PWD') methodLabel = 'Contraseña/PIN';
+                    else if (methodUpper === 'FACE') methodLabel = 'Reconocimiento Facial';
+                    else if (methodUpper === 'FINGERPRINT' || methodUpper === 'BIOMETRIC') methodLabel = 'Huella';
+
                     return (
                       <div
                         key={log.id}
@@ -122,7 +129,7 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
                           />
                           <span className="font-black text-gray-900">{timeOnly}</span>
                           <span className="text-[10px] font-bold text-gray-500">
-                            ({isEntry ? 'Entrada' : 'Salida'} • {log.verifyMethod || 'Biométrico'})
+                            ({isEntry ? 'Entrada' : 'Salida'} • {methodLabel})
                           </span>
                         </div>
                         <button
