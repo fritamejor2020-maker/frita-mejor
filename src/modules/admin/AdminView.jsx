@@ -3264,15 +3264,7 @@ function PosConfigPanel() {
           </div>
         </div>
 
-        <div>
-          <label className="text-sm font-bold text-gray-400 block mb-2">Nombre de Impresora Principal</label>
-          <input 
-            type="text" 
-            className="w-full max-w-sm bg-gray-50 border-2 border-gray-200 rounded-xl px-4 py-3 font-bold text-chunky-dark outline-none focus:border-chunky-main"
-            value={printerName}
-            onChange={(e) => setPrinterName(e.target.value)}
-          />
-        </div>
+
 
         <div>
           <label className="text-sm font-bold text-gray-400 block mb-2">Clave de Seguridad para Editar Ventas (Supervisores)</label>
