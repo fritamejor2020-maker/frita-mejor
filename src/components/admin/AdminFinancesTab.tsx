@@ -1104,239 +1104,217 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                           </div>
                         </td>
                       </tr>
-                    )}
-                  </React.Fragment>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>               >
-                    {isExpanded ? 'Ocultar' : 'Ver Detalles'}
-                    <svg
-                      xmlns="http://www.w3.org/2000/svg"
-                      width="14"
-                      height="14"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2.5"
-                      className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
-                    >
-                      <polyline points="6 9 12 15 18 9" />
-                    </svg>
-                  </button>
-                </div>
+                      {/* ─── Accordion Details (inside the .map) ──────────────── */}
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={9} className="p-0">
+                            <div className="mx-4 my-3 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
 
-                {/* ─── Accordion Details ──────────────── */}
-                {isExpanded && (
-                  <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
-
-                    {/* Banner: Valor Editado manualmente */}
-                    {(closing as any)._raw?.editedAt && (
-                      <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
-                        <span className="text-sm">✏️</span>
-                        <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
-                        <span className="text-[10px] font-bold text-blue-400 ml-auto">
-                          {new Date((closing as any)._raw.editedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Bloque Anotador / Dejador */}
-                    {((closing as any).anotadorName || (closing as any).dejadorName) && (
-                      <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex flex-wrap gap-3 items-center">
-                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Equipo Jornada:</span>
-                        {(closing as any).anotadorName && (
-                          <span className="inline-flex items-center gap-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
-                            📋 Anotador: {(closing as any).anotadorName}
-                          </span>
-                        )}
-                        {(closing as any).dejadorName && (
-                          <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full">
-                            🛵 Dejador: {(closing as any).dejadorName}
-                          </span>
-                        )}
-                      </div>
-                    )}
-
-                     {/* ── Historial de Envíos (colapsable) ── */}
-                     {closing._raw?.pointId && (() => {
-                       const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
-                       // Inyectar entrada virtual si el cierre fue editado manualmente
-                       // Inyectar entradas del editHistory (una por cada edicion)
-                       const rawHistory = closing._raw?.editHistory;
-                       const buildDiffItems = (snap: any) => {
-                         const items: any[] = [];
-                         if (!snap) return items;
-                         const beforeDetails = snap.before?.details || (Array.isArray(snap.before) ? snap.before : []);
-                         const afterDetails  = snap.after?.details  || (Array.isArray(snap.after)  ? snap.after  : []);
-                         afterDetails.forEach((d: any) => {
-                           const prev = beforeDetails.find((b: any) => b.product === d.product);
-                           items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
-                         });
-                         if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
-                           items.push({ name: '💵 Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
-                         if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
-                           items.push({ name: '📲 Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
-                         if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
-                           items.push({ name: '📌 Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
-                         return items;
-                       };
-                       if (rawHistory && rawHistory.length > 0) {
-                         rawHistory.forEach((hist: any, hIdx: number) => {
-                           timeline.push({
-                             id: 'edit-' + closing.id + '-' + hIdx,
-                             type: 'edicion',
-                             timestamp: hist.editedAt,
-                             items: buildDiffItems(hist),
-                           });
-                         });
-                       } else if (closing._raw?.editedAt) {
-                         // Backward compat: snapshot antiguo de una sola edición
-                         timeline.push({
-                           id: 'edit-' + closing.id,
-                           type: 'edicion',
-                           timestamp: closing._raw.editedAt,
-                           items: buildDiffItems(closing._raw.editSnapshot),
-                         });
-                         timeline.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                       }
-                       if (timeline.length === 0) return null;
-                       const isHistorialOpen = expandedHistorialId === closing.id;
-                       let surtidoCount = 0;
-                       return (
-                         <div className="border-b border-gray-100">
-                           {/* Toggle button */}
-                           <button
-                             onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
-                             className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
-                           >
-                             <span>📋 Historial de Envíos ({timeline.length})</span>
-                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                               className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
-                               <polyline points="6 9 12 15 18 9" />
-                             </svg>
-                           </button>
-
-                           {/* Content (collapsed by default) */}
-                           {isHistorialOpen && (
-                             <div className="px-5 pb-4 bg-gray-50/30">
-                               <div className="flex flex-col gap-2.5">
-                                 {timeline.map((entry: any, idx: number) => {
-                                   if (entry.type === 'surtido') surtidoCount++;
-                                   const icon = entry.type === 'carga' ? '📦'
-                                     : entry.type === 'surtido' ? '🔄'
-                                     : entry.type === 'edicion' ? '✏️'
-                                     : '📬';
-                                   const label = entry.type === 'carga' ? 'Carga Inicial'
-                                     : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
-                                     : entry.type === 'edicion' ? 'Valor Editado por Admin'
-                                     : 'Productos Recibidos';
-                                   const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
-                                     : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
-                                     : entry.type === 'edicion' ? 'bg-blue-50 border-blue-200'
-                                     : 'bg-indigo-50 border-indigo-100';
-                                   const textColor = entry.type === 'carga' ? 'text-red-600'
-                                     : entry.type === 'surtido' ? 'text-amber-700'
-                                     : entry.type === 'edicion' ? 'text-blue-700'
-                                     : 'text-indigo-600';
-                                   const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-                                   return (
-                                     <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
-                                       <div className="flex items-center gap-2 mb-2">
-                                         <span>{icon}</span>
-                                         <span className={`font-black text-sm ${textColor}`}>{label}</span>
-                                         <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
-                                       </div>
-                                       <div className="flex flex-wrap gap-2">
-                                         {entry.type === 'edicion' ? (() => {
-                                           const diffs = (entry.items || []).filter((item: any) => String(item.before) !== String(item.qty));
-                                           const fmtV = (v: any, fin: boolean) => fin ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(v)) : String(v);
-                                           return diffs.length === 0
-                                             ? <span className="text-xs text-gray-400 italic">Sin cambios en valores</span>
-                                             : diffs.map((item: any, ii: number) => (
-                                               <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-1">
-                                                 <span className="text-gray-500">{item.name}:</span>
-                                                 <span className="text-red-400 line-through">{fmtV(item.before, item.financial)}</span>
-                                                 <span className="text-gray-300 mx-0.5">&#x2192;</span>
-                                                 <span className="text-blue-700 font-black">{fmtV(item.qty, item.financial)}</span>
-                                               </span>
-                                             ));
-                                         })() : (entry.items || []).map((item: any, ii: number) => (
-                                           <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
-                                             <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
-                                             <span className="text-gray-900">{item.qty}</span>
-                                           </span>
-                                         ))}
-                                       </div>
-                                     </div>
-                                   );
-                                 })}
-                               </div>
-                             </div>
-                           )}
-                         </div>
-                       );
-                     })()}
-
-                    <table className="w-full text-left text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-100 bg-gray-50">
-                          <th className="py-3 px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Producto</th>
-                          <th className="py-3 px-5 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">Enviado</th>
-                          <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Quedó</th>
-                          <th className="py-3 px-5 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Venta</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {closing.details.map((d, i) => {
-                          const ventaQty = Math.max(0, d.sent - d.returned);
-                          const ventaTotal = ventaQty * d.unitPrice;
-                          return (
-                            <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                              <td className="py-3.5 px-5">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
-                                    {(d.product || '??').substring(0, 3).toUpperCase()}
+                              {/* Banner: Valor Editado manualmente */}
+                              {(closing as any)._raw?.editedAt && (
+                                <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                                  <span className="text-sm">✏️</span>
+                                  <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
+                                  <span className="text-[10px] font-bold text-blue-400 ml-auto">
+                                    {new Date((closing as any)._raw.editedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
                                   </span>
-                                  <span className="font-bold text-gray-800">{d.product}</span>
-                                  {(d as any).stringCounts && Object.entries((d as any).stringCounts).map(([sv, n]: [string, any]) => (
-                                    <span key={sv} className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
-                                      {Number(n) > 1 ? `${sv} x${n}` : sv}
-                                    </span>
-                                  ))}
                                 </div>
-                              </td>
-                              <td className="py-3.5 px-5 text-center">
-                                <span className="bg-blue-100 text-blue-700 font-black text-xs px-2 py-0.5 rounded-full">{d.sent}</span>
-                              </td>
-                              <td className="py-3.5 px-5 text-center">
-                                {d.returned > 0
-                                  ? <span className="bg-indigo-100 text-indigo-600 font-black text-xs px-2 py-0.5 rounded-full">{d.returned}</span>
-                                  : <span className="text-gray-300 font-bold text-xs">—</span>
-                                }
-                              </td>
-                              <td className="py-3.5 px-5 text-right">
-                                <span className="font-black text-gray-800">{ventaQty}</span>
-                                <p className="text-[11px] text-gray-400 font-bold">{fmt(ventaTotal)}</p>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
+                              )}
 
-                    {/* Total Calculado */}
-                    <div className="border-t border-gray-100 py-4 px-5 flex justify-end items-center gap-3 bg-gray-50/50">
-                      <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
-                      <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                              {/* Bloque Anotador / Dejador */}
+                              {((closing as any).anotadorName || (closing as any).dejadorName) && (
+                                <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex flex-wrap gap-3 items-center">
+                                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Equipo Jornada:</span>
+                                  {(closing as any).anotadorName && (
+                                    <span className="inline-flex items-center gap-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
+                                      📋 Anotador: {(closing as any).anotadorName}
+                                    </span>
+                                  )}
+                                  {(closing as any).dejadorName && (
+                                    <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full">
+                                      🛵 Dejador: {(closing as any).dejadorName}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* ── Historial de Envíos (colapsable) ── */}
+                              {closing._raw?.pointId && (() => {
+                                const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
+                                const rawHistory = closing._raw?.editHistory;
+                                const buildDiffItems = (snap: any) => {
+                                  const items: any[] = [];
+                                  if (!snap) return items;
+                                  const beforeDetails = snap.before?.details || (Array.isArray(snap.before) ? snap.before : []);
+                                  const afterDetails  = snap.after?.details  || (Array.isArray(snap.after)  ? snap.after  : []);
+                                  afterDetails.forEach((d: any) => {
+                                    const prev = beforeDetails.find((b: any) => b.product === d.product);
+                                    items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
+                                  });
+                                  if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
+                                    items.push({ name: '💵 Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
+                                  if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
+                                    items.push({ name: '📲 Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
+                                  if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
+                                    items.push({ name: '📌 Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
+                                  return items;
+                                };
+                                if (rawHistory && rawHistory.length > 0) {
+                                  rawHistory.forEach((hist: any, hIdx: number) => {
+                                    timeline.push({
+                                      id: 'edit-' + closing.id + '-' + hIdx,
+                                      type: 'edicion',
+                                      timestamp: hist.editedAt,
+                                      items: buildDiffItems(hist),
+                                    });
+                                  });
+                                } else if (closing._raw?.editedAt) {
+                                  timeline.push({
+                                    id: 'edit-' + closing.id,
+                                    type: 'edicion',
+                                    timestamp: closing._raw.editedAt,
+                                    items: buildDiffItems(closing._raw.editSnapshot),
+                                  });
+                                  timeline.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                                }
+                                if (timeline.length === 0) return null;
+                                const isHistorialOpen = expandedHistorialId === closing.id;
+                                let surtidoCount = 0;
+                                return (
+                                  <div className="border-b border-gray-100">
+                                    <button
+                                      onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
+                                      className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
+                                    >
+                                      <span>📋 Historial de Envíos ({timeline.length})</span>
+                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                                        className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
+                                        <polyline points="6 9 12 15 18 9" />
+                                      </svg>
+                                    </button>
+                                    {isHistorialOpen && (
+                                      <div className="px-5 pb-4 bg-gray-50/30">
+                                        <div className="flex flex-col gap-2.5">
+                                          {timeline.map((entry: any, idx: number) => {
+                                            if (entry.type === 'surtido') surtidoCount++;
+                                            const icon = entry.type === 'carga' ? '📦'
+                                              : entry.type === 'surtido' ? '🔄'
+                                              : entry.type === 'edicion' ? '✏️'
+                                              : '📬';
+                                            const label = entry.type === 'carga' ? 'Carga Inicial'
+                                              : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
+                                              : entry.type === 'edicion' ? 'Valor Editado por Admin'
+                                              : 'Productos Recibidos';
+                                            const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
+                                              : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
+                                              : entry.type === 'edicion' ? 'bg-blue-50 border-blue-200'
+                                              : 'bg-indigo-50 border-indigo-100';
+                                            const textColor = entry.type === 'carga' ? 'text-red-600'
+                                              : entry.type === 'surtido' ? 'text-amber-700'
+                                              : entry.type === 'edicion' ? 'text-blue-700'
+                                              : 'text-indigo-600';
+                                            const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                                            return (
+                                              <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
+                                                <div className="flex items-center gap-2 mb-2">
+                                                  <span>{icon}</span>
+                                                  <span className={`font-black text-sm ${textColor}`}>{label}</span>
+                                                  <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
+                                                </div>
+                                                <div className="flex flex-wrap gap-2">
+                                                  {entry.type === 'edicion' ? (() => {
+                                                    const diffs = (entry.items || []).filter((item: any) => String(item.before) !== String(item.qty));
+                                                    const fmtV = (v: any, fin: boolean) => fin ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(v)) : String(v);
+                                                    return diffs.length === 0
+                                                      ? <span className="text-xs text-gray-400 italic">Sin cambios en valores</span>
+                                                      : diffs.map((item: any, ii: number) => (
+                                                        <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-1">
+                                                          <span className="text-gray-500">{item.name}:</span>
+                                                          <span className="text-red-400 line-through">{fmtV(item.before, item.financial)}</span>
+                                                          <span className="text-gray-300 mx-0.5">&#x2192;</span>
+                                                          <span className="text-blue-700 font-black">{fmtV(item.qty, item.financial)}</span>
+                                                        </span>
+                                                      ));
+                                                  })() : (entry.items || []).map((item: any, ii: number) => (
+                                                    <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
+                                                      <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
+                                                      <span className="text-gray-900">{item.qty}</span>
+                                                    </span>
+                                                  ))}
+                                                </div>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                );
+                              })()}
+
+                              <table className="w-full text-left text-sm">
+                                <thead>
+                                  <tr className="border-b border-gray-100 bg-gray-50">
+                                    <th className="py-3 px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Producto</th>
+                                    <th className="py-3 px-5 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">Enviado</th>
+                                    <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Quedó</th>
+                                    <th className="py-3 px-5 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Venta</th>
+                                  </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                  {closing.details.map((d, i) => {
+                                    const ventaQty = Math.max(0, d.sent - d.returned);
+                                    const ventaTotal = ventaQty * d.unitPrice;
+                                    return (
+                                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                                        <td className="py-3.5 px-5">
+                                          <div className="flex items-center gap-2 flex-wrap">
+                                            <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
+                                              {(d.product || '??').substring(0, 3).toUpperCase()}
+                                            </span>
+                                            <span className="font-bold text-gray-800">{d.product}</span>
+                                            {(d as any).stringCounts && Object.entries((d as any).stringCounts).map(([sv, n]: [string, any]) => (
+                                              <span key={sv} className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
+                                                {Number(n) > 1 ? `${sv} x${n}` : sv}
+                                              </span>
+                                            ))}
+                                          </div>
+                                        </td>
+                                        <td className="py-3.5 px-5 text-center">
+                                          <span className="bg-blue-100 text-blue-700 font-black text-xs px-2 py-0.5 rounded-full">{d.sent}</span>
+                                        </td>
+                                        <td className="py-3.5 px-5 text-center">
+                                          {d.returned > 0
+                                            ? <span className="bg-indigo-100 text-indigo-600 font-black text-xs px-2 py-0.5 rounded-full">{d.returned}</span>
+                                            : <span className="text-gray-300 font-bold text-xs">—</span>
+                                          }
+                                        </td>
+                                        <td className="py-3.5 px-5 text-right">
+                                          <span className="font-black text-gray-800">{ventaQty}</span>
+                                          <p className="text-[11px] text-gray-400 font-bold">{fmt(ventaTotal)}</p>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+
+                              {/* Total Calculado */}
+                              <div className="border-t border-gray-100 py-4 px-5 flex justify-end items-center gap-3 bg-gray-50/50">
+                                <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
+                                <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
+                              </div>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* ─── Edit Closing Modal ────────────────────────────────── */}
