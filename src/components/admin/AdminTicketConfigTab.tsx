@@ -35,9 +35,9 @@ const DEFAULTS = {
   zShowContratasBreakdown: true,
   zShowLocalVsContratas: true,
   zShowCashRegisterMatch: true,
-  zShowProductsSold: true,
+  zShowProductsSold: false,
   zShowExpensesDetail: true,
-  zShowSignatureLine: true,
+  zShowSignatureLine: false,
   zShowPaymentMethods: true,
   // ── Z-Report Granular Lines ──
   zShowShiftId: true,
