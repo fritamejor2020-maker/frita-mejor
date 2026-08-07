@@ -181,20 +181,31 @@ export const usePosStore = create((set, get) => ({
     const newHeldSale = {
       id: `HELD-OLA-${order.id}`,
       originalOlaClickId: order.id,
-      publicId: order.public_id || order.id?.substring(0, 8),
+      publicId: order.public_id || String(order.id)?.substring(0, 8),
       customerName: order.customer_name || 'Cliente OlaClick',
       customerPhone: order.customer_phone || '',
       deliveryAddress: order.delivery_address || '',
       serviceType: order.service_type || 'DELIVERY',
       items: normalizedCartItems,
+      subtotal: calculateCartTotal(normalizedCartItems),
       total: order.total_amount || calculateCartTotal(normalizedCartItems),
+      status: 'SUSPENDED',
+      timestamp: new Date().toISOString(),
       heldAt: new Date().toISOString(),
       isOlaClick: true
     };
 
+    // 1. Guardar en memoria local
     set((state) => ({
       heldSales: [newHeldSale, ...state.heldSales.filter(h => h.originalOlaClickId !== order.id)]
     }));
+
+    // 2. Persistir en posSales para sincronización con Supabase y localStorage
+    try {
+      useInventoryStore.getState().addPosSale(newHeldSale);
+    } catch (e) {
+      console.warn('[usePosStore] Error al agregar a posSales:', e);
+    }
   },
 
   /**
@@ -208,7 +219,10 @@ export const usePosStore = create((set, get) => ({
       id: `HELD-MANUAL-${Date.now()}`,
       customerName: label,
       items: [...cart],
+      subtotal: total,
       total: total,
+      status: 'SUSPENDED',
+      timestamp: new Date().toISOString(),
       heldAt: new Date().toISOString(),
       isOlaClick: false
     };
@@ -219,30 +233,50 @@ export const usePosStore = create((set, get) => ({
       total: 0
     }));
 
+    // Persistir en posSales para Supabase y localStorage
+    try {
+      useInventoryStore.getState().addPosSale(newHeldSale);
+    } catch (e) {
+      console.warn('[usePosStore] Error al agregar a posSales:', e);
+    }
+
     return true;
   },
 
   /**
-   * Carga una venta en espera al carrito activo del POS y la remueve de la lista
+   * Carga una venta en espera al carrito activo del POS y la remueve de la lista de pendientes
    */
   loadHeldSaleToCart: (heldSaleId) => {
-    const heldSale = get().heldSales.find(h => h.id === heldSaleId);
+    const state = get();
+    const heldSale = (state.heldSales || []).find(h => h.id === heldSaleId || h.originalOlaClickId === heldSaleId) ||
+      (useInventoryStore.getState().posSales || []).find(s => s.id === heldSaleId);
     if (!heldSale) return;
 
-    set((state) => ({
-      cart: [...heldSale.items],
-      total: calculateCartTotal(heldSale.items),
-      heldSales: state.heldSales.filter(h => h.id !== heldSaleId)
-    }));
+    set({
+      cart: [...(heldSale.items || [])],
+      total: calculateCartTotal(heldSale.items || []),
+      heldSales: (state.heldSales || []).filter(h => h.id !== heldSaleId && h.originalOlaClickId !== heldSaleId)
+    });
+
+    try {
+      useInventoryStore.getState().deletePosSale(heldSaleId);
+    } catch (e) {
+      console.warn('[usePosStore] Error al remover venta cargada de posSales:', e);
+    }
   },
 
   /**
-   * Elimina una venta en espera
+   * Elimina una venta en espera (local y persistida)
    */
   deleteHeldSale: (heldSaleId) => {
     set((state) => ({
-      heldSales: state.heldSales.filter(h => h.id !== heldSaleId)
+      heldSales: (state.heldSales || []).filter(h => h.id !== heldSaleId && h.originalOlaClickId !== heldSaleId)
     }));
+    try {
+      useInventoryStore.getState().deletePosSale(heldSaleId);
+    } catch (e) {
+      console.warn('[usePosStore] Error al eliminar de posSales:', e);
+    }
   },
 
   /**

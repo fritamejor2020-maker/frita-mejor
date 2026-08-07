@@ -21,6 +21,16 @@ import { QuickTaskDrawer } from '../../components/ui/QuickTaskDrawer';
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [appZoom, setAppZoom] = useState(() => {
+    const saved = localStorage.getItem('pos_app_zoom');
+    return saved ? parseInt(saved, 10) : 100;
+  });
+
+  const handleZoomChange = (newZoom) => {
+    const clamped = Math.max(70, Math.min(150, newZoom));
+    setAppZoom(clamped);
+    localStorage.setItem('pos_app_zoom', String(clamped));
+  };
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
   const [showContratasPanel, setShowContratasPanel] = useState(false);
@@ -746,6 +756,9 @@ export function PosView() {
       isOlaClick: !!sale.isOlaClick,
       publicId: sale.publicId || ''
     });
+    // Eliminar de la lista de pendientes para evitar duplicados en Ventas en Espera
+    deleteHeldSale(sale.id);
+    deletePosSale(sale.id);
     setShowSuspendedModal(false);
     setShowHeldSalesModal(false);
     toast.success(`Venta de ${sale.customerName || 'Cliente'} cargada al carrito`, { icon: '🛒' });
@@ -946,7 +959,7 @@ export function PosView() {
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans">
+    <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans" style={{ zoom: `${appZoom}%` }}>
 
       {/* ══════ HEADER GLOBAL ══════ */}
       {/* Overlay para cerrar hamburguesa al click fuera */}
@@ -1018,9 +1031,9 @@ export function PosView() {
               ))}
               {customer?.typeId && (
                 <button
-                  className="shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px] bg-red-700 active:bg-red-800 text-red-100"
-                  onClick={() => ticketItems.length > 0 && handleProcessPayment('CRÉDITO', 0, true)}
-                >⚠️ CRÉDITO</button>
+                  className="shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black bg-purple-700 active:bg-purple-800 text-purple-100 border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+                  onClick={() => ticketItems.length > 0 && handleProcessPayment('EFECTIVO', total, true)}
+                >🤝 CRÉDITO CONTRATA</button>
               )}
               <button
                 className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
@@ -1030,12 +1043,16 @@ export function PosView() {
           )}
         </div>
 
-        {/* ── Hamburguesa ── */}
+        {/* ── Botón Hamburguesa ── */}
         <div className="relative shrink-0">
           <button
-            className="w-11 h-11 flex flex-col items-center justify-center gap-[5px] border border-gray-600 text-gray-300 bg-gray-800/50 rounded-xl active:scale-95 active:bg-gray-700 transition-all relative"
+            className={`w-11 h-11 flex flex-col items-center justify-center gap-1 rounded-xl border transition-all relative ${
+              showHamburgerMenu 
+                ? 'bg-chunky-main text-gray-950 border-yellow-300 scale-95 shadow-lg' 
+                : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+            }`}
             onClick={() => setShowHamburgerMenu(v => !v)}
-            title="Más opciones"
+            title="Menú de Opciones"
           >
             <span className="w-5 h-[2px] bg-current rounded-full" />
             <span className="w-5 h-[2px] bg-current rounded-full" />
@@ -1049,7 +1066,31 @@ export function PosView() {
 
           {/* Dropdown */}
           {showHamburgerMenu && (
-            <div className="absolute right-0 top-[calc(100%+8px)] z-[46] bg-[#1e1f26] border border-gray-700 rounded-2xl shadow-2xl shadow-black/60 min-w-[200px] overflow-hidden animate-modal-in">
+            <div className="absolute right-0 top-[calc(100%+8px)] z-[46] bg-[#1e1f26] border border-gray-700 rounded-2xl shadow-2xl shadow-black/60 min-w-[220px] overflow-hidden animate-modal-in">
+              {/* Widget de Control de Zoom */}
+              <div className="px-4 py-2.5 flex flex-col gap-1.5 bg-gray-900/80 border-b border-gray-800">
+                <div className="flex items-center justify-between text-[11px] font-black text-gray-300">
+                  <span>🔍 Zoom Pantalla POS:</span>
+                  <span className="text-amber-400 font-mono text-xs">{appZoom}%</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 active:scale-95 text-white font-black py-1.5 px-2 rounded-lg border border-gray-700 text-xs transition-all text-center"
+                    onClick={() => handleZoomChange(appZoom - 10)}
+                    title="Alejar (-10%)"
+                  >-</button>
+                  <button
+                    className="bg-gray-800 hover:bg-gray-700 active:scale-95 text-amber-300 font-bold py-1.5 px-2.5 rounded-lg border border-gray-700 text-[10px] transition-all text-center"
+                    onClick={() => handleZoomChange(100)}
+                    title="Restablecer zoom a 100%"
+                  >100%</button>
+                  <button
+                    className="flex-1 bg-gray-800 hover:bg-gray-700 active:scale-95 text-white font-black py-1.5 px-2 rounded-lg border border-gray-700 text-xs transition-all text-center"
+                    onClick={() => handleZoomChange(appZoom + 10)}
+                    title="Acercar (+10%)"
+                  >+</button>
+                </div>
+              </div>
               {/* Cierre Z / Abrir caja */}
               {!activeShift ? (
                 <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-red-400 hover:bg-red-950/40 transition-colors" onClick={() => { setShowShiftModal(true); setShowHamburgerMenu(false); }}>
