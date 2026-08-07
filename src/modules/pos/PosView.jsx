@@ -30,7 +30,16 @@ export function PosView() {
     const clamped = Math.max(70, Math.min(150, newZoom));
     setAppZoom(clamped);
     localStorage.setItem('pos_app_zoom', String(clamped));
+    if (window.cajeroAPI?.setZoomLevel) {
+      window.cajeroAPI.setZoomLevel(clamped);
+    }
   };
+
+  useEffect(() => {
+    if (window.cajeroAPI?.setZoomLevel && appZoom) {
+      window.cajeroAPI.setZoomLevel(appZoom);
+    }
+  }, []);
   const [showAddClientModal, setShowAddClientModal] = useState(false);
   const [showClientAccountModal, setShowClientAccountModal] = useState(false);
   const [showContratasPanel, setShowContratasPanel] = useState(false);
@@ -959,7 +968,10 @@ export function PosView() {
   const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
 
   return (
-    <div className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans" style={{ zoom: `${appZoom}%` }}>
+    <div 
+      className="flex flex-col h-screen w-full bg-[#1e1f26] text-white overflow-hidden font-sans" 
+      style={typeof window !== 'undefined' && window.cajeroAPI?.setZoomLevel ? {} : { zoom: `${appZoom}%`, minHeight: `${(100 * 100) / appZoom}vh`, backgroundColor: '#1e1f26' }}
+    >
 
       {/* ══════ HEADER GLOBAL ══════ */}
       {/* Overlay para cerrar hamburguesa al click fuera */}
