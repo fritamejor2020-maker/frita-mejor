@@ -761,7 +761,7 @@ export function PosView() {
     deletePosSale(sale.id);
     setShowSuspendedModal(false);
     setShowHeldSalesModal(false);
-    toast.success(`Venta de ${sale.customerName || 'Cliente'} cargada al carrito`, { icon: '🛒' });
+    toast.success(`Pedido de ${sale.customerName || 'Cliente'} retomado`, { icon: '▶️' });
   };
 
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
@@ -2020,7 +2020,7 @@ export function PosView() {
                           }}
                           className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
                         >
-                          🛒 Cargar al Carrito
+                          ▶️ Retomar Pedido
                         </button>
                         <button
                           onClick={() => {
