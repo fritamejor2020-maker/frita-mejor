@@ -191,14 +191,14 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
 
-      <!-- 🏪 1. VENTAS LOCAL -->
+      <!-- 1. VENTAS LOCAL -->
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">🏪 Ventas Local</h3>
-        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💵 Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
-        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>🏦 Bancolombia Local:</span><span>${formatMoney(localBancol)}</span></div>` : ''}
-        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💳 Tarjeta Local:</span><span>${formatMoney(localTarjeta)}</span></div>` : ''}
-        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>📱 Nequi Local:</span><span>${formatMoney(localNequi)}</span></div>` : ''}
-        ${localOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>🌐 Otros Métodos Local:</span><span>${formatMoney(localOther)}</span></div>` : ''}
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Ventas Local</h3>
+        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
+        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Local:</span><span>${formatMoney(localBancol)}</span></div>` : ''}
+        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Local:</span><span>${formatMoney(localTarjeta)}</span></div>` : ''}
+        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Local:</span><span>${formatMoney(localNequi)}</span></div>` : ''}
+        ${localOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Local:</span><span>${formatMoney(localOther)}</span></div>` : ''}
         <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
           <span>Total Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span>
         </div>
@@ -209,15 +209,15 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
 
-      <!-- 🤝 2. VENTAS CONTRATAS -->
+      <!-- 2. VENTAS CONTRATAS -->
       ${tc.zShowContratasBreakdown !== false ? `
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">🤝 Ventas Contratas</h3>
-        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💵 Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
-        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>🏦 Bancolombia Contratas:</span><span>${formatMoney(contrataBancol)}</span></div>` : ''}
-        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💳 Tarjeta Contratas:</span><span>${formatMoney(contrataTarjeta)}</span></div>` : ''}
-        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>📱 Nequi Contratas:</span><span>${formatMoney(contrataNequi)}</span></div>` : ''}
-        ${contrataOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>🌐 Otros Métodos Contratas:</span><span>${formatMoney(contrataOther)}</span></div>` : ''}
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Ventas Contratas</h3>
+        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
+        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Contratas:</span><span>${formatMoney(contrataBancol)}</span></div>` : ''}
+        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Contratas:</span><span>${formatMoney(contrataTarjeta)}</span></div>` : ''}
+        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Contratas:</span><span>${formatMoney(contrataNequi)}</span></div>` : ''}
+        ${contrataOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Contratas:</span><span>${formatMoney(contrataOther)}</span></div>` : ''}
         <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
           <span>Total Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span>
         </div>
