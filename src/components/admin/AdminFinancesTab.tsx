@@ -853,7 +853,7 @@ export const AdminFinancesTab = ({
             value={filterShift}
             onChange={(e) => setFilterShift(e.target.value)}
             className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer appearance-none pr-6"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
+style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
           >
             <option value="">Todas las Jornadas</option>
             <option value="AM">AM</option>
@@ -879,250 +879,238 @@ export const AdminFinancesTab = ({
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100">
         <h3 className="text-xl font-black text-gray-800 mb-6">📊 Historial de Cierres Z</h3>
 
-        {filteredClosings.length === 0 && (
+        {filteredClosings.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
             <p className="text-5xl mb-3">📭</p>
             <p className="font-bold">No hay cierres para los filtros seleccionados.</p>
           </div>
-        )}
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm bg-white">
+            <table className="w-full text-left text-xs whitespace-nowrap">
+              <thead className="bg-gray-100/90 text-gray-500 font-black border-b border-gray-200 text-[10.5px] uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-4">Fecha / Turno</th>
+                  <th className="py-3 px-4">Cajero / Caja</th>
+                  <th className="py-3 px-4 text-right">Teórico (App)</th>
+                  <th className="py-3 px-4 text-right">Real (Caja)</th>
+                  <th className="py-3 px-4 text-center">Efectivo</th>
+                  <th className="py-3 px-4 text-center">Transferencia</th>
+                  <th className="py-3 px-4 text-center">Salidas</th>
+                  <th className="py-3 px-4 text-center">Estado / Cuadre</th>
+                  <th className="py-3 px-4 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-bold text-gray-700">
+                {filteredClosings.map((closing) => {
+                  const isExpanded = expandedId === closing.id;
 
-        <div className="divide-y divide-gray-100">
-          {filteredClosings.map((closing) => {
-            const isExpanded = expandedId === closing.id;
-            const calculatedTheoretical = closing.details.reduce(
-              (sum: number, d: any) => sum + d.sold * d.unitPrice,
-              0
-            );
+                  const handleDownloadZReport = (c: any) => {
+                    const shift = c._raw;
+                    if (!shift) {
+                      alert('No hay datos brutos del cierre.');
+                      return;
+                    }
+                    const storeState = useInventoryStore.getState();
+                    const posSales = storeState.posSales || [];
+                    const posExpenses = storeState.posExpenses || [];
+                    const customers = storeState.customers || [];
+                    const customerTypes = storeState.customerTypes || [];
+                    const posSettings = storeState.posSettings || {};
 
-            const handleDownloadZReport = (c: any) => {
-              const shift = c._raw;
-              if (!shift) {
-                alert('No hay datos brutos del cierre.');
-                return;
-              }
-              const storeState = useInventoryStore.getState();
-              const posSales = storeState.posSales || [];
-              const posExpenses = storeState.posExpenses || [];
-              const customers = storeState.customers || [];
-              const customerTypes = storeState.customerTypes || [];
-              const posSettings = storeState.posSettings || {};
+                    const shiftSales = posSales.filter((s: any) => {
+                      if (s.shiftId === shift.id) return true;
+                      if (shift.openedAt && shift.closedAt) {
+                        const t = new Date(s.timestamp).getTime();
+                        return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                      }
+                      return false;
+                    });
 
-              const shiftSales = posSales.filter((s: any) => {
-                if (s.shiftId === shift.id) return true;
-                if (shift.openedAt && shift.closedAt) {
-                  const t = new Date(s.timestamp).getTime();
-                  return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
-                }
-                return false;
-              });
+                    const shiftExpenses = posExpenses.filter((e: any) => {
+                      if (e.shiftId === shift.id) return true;
+                      if (shift.openedAt && shift.closedAt) {
+                        const t = new Date(e.timestamp || e.date).getTime();
+                        return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                      }
+                      return false;
+                    });
 
-              const shiftExpenses = posExpenses.filter((e: any) => {
-                if (e.shiftId === shift.id) return true;
-                if (shift.openedAt && shift.closedAt) {
-                  const t = new Date(e.timestamp || e.date).getTime();
-                  return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
-                }
-                return false;
-              });
+                    const html = generateZReportHTML(
+                      shift,
+                      shiftSales,
+                      shiftExpenses,
+                      customers,
+                      customerTypes,
+                      posSettings.ticketConfig || {},
+                      posSettings.cashDrawerCode || ''
+                    );
 
-              const html = generateZReportHTML(
-                shift,
-                shiftSales,
-                shiftExpenses,
-                customers,
-                customerTypes,
-                posSettings.ticketConfig || {},
-                posSettings.cashDrawerCode || ''
-              );
+                    const win = window.open('', '_blank', 'width=450,height=850');
+                    if (win) {
+                      win.document.write(html);
+                      win.document.close();
+                      setTimeout(() => {
+                        win.print();
+                      }, 350);
+                    } else {
+                      alert('Por favor permita ventanas emergentes para imprimir o descargar el Cierre Z.');
+                    }
+                  };
 
-              const win = window.open('', '_blank', 'width=450,height=850');
-              if (win) {
-                win.document.write(html);
-                win.document.close();
-                setTimeout(() => {
-                  win.print();
-                }, 350);
-              } else {
-                alert('Por favor permita ventanas emergentes para imprimir o descargar el Cierre Z.');
-              }
-            };
+                  return (
+                    <React.Fragment key={closing.id}>
+                      <tr className="hover:bg-amber-50/40 transition-colors">
+                        {/* Fecha / Turno */}
+                        <td className="py-3.5 px-4">
+                          <div className="font-black text-gray-900 text-xs">{closing.date}</div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">{closing.shift}</div>
+                        </td>
 
-            return (
-              <div key={closing.id} className="py-6 first:pt-0 last:pb-0">
-                {/* ─── Row Header ─────────────────────── */}
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    {/* Initials circle */}
-                    <div className="w-11 h-11 rounded-full border-2 border-red-400 flex items-center justify-center text-red-500 font-black text-sm shrink-0">
-                      {closing.initials}
-                    </div>
-                    <div>
-                       <div className="flex items-center gap-2">
-                         <span className="font-black text-gray-800 text-base">{closing.pointName}</span>
-                         {closing.pointLabel && (
-                           <span className="bg-red-50 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.pointLabel}</span>
-                         )}
-                         <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.shift}</span>
-                       </div>
-                       <p className="text-xs text-gray-400 font-bold mt-0.5">{closing.date}</p>
-                       {/* Anotador / Dejador badges */}
-                       {(closing.anotadorName || closing.dejadorName) && (
-                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                           {closing.anotadorName && (
-                             <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100">
-                               📋 {closing.anotadorName}
-                             </span>
-                           )}
-                           {closing.dejadorName && (
-                             <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                               🛵 {closing.dejadorName}
-                             </span>
-                           )}
-                         </div>
-                       )}
-                     </div>
-                  </div>
+                        {/* Cajero / Caja */}
+                        <td className="py-3.5 px-4">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full border border-red-400 text-red-500 font-black text-xs flex items-center justify-center shrink-0">
+                              {closing.initials}
+                            </div>
+                            <div>
+                              <div className="font-black text-gray-800 text-xs">{closing.pointName}</div>
+                              {closing.pointLabel && (
+                                <span className="bg-red-50 text-red-400 text-[9px] font-bold px-1.5 py-0.2 rounded uppercase">{closing.pointLabel}</span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                  {/* Action buttons */}
-                  {closing._raw && (
-                    <div className="flex items-center gap-2">
-                      <button
-                        className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-blue-200 shadow-sm active:scale-95 transition-all"
-                        title="Imprimir o Descargar Ticket Cierre Z"
-                        onClick={() => handleDownloadZReport(closing)}
-                      >
-                        <span>📊</span> Ticket Z
-                      </button>
-                      <button
-                        className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 hover:bg-red-50 rounded-lg"
-                        title="Editar cierre"
-                        onClick={() => {
-                          setEditingClosing(closing);
-                          setEditCash(String(closing._raw.cashAmount || closing.real || 0));
-                          setEditTransfer(String(closing._raw.transferAmount || 0));
-                          setEditExpenses(String(closing.expenses || 0));
-                          setEditExpensesDesc(closing._raw.expensesDesc || "");
-                           // Si los detalles tienen enviado=0 (datos corruptos de edit antigua),
-                           // reconstruir desde logística para que el form muestre datos reales.
-                           const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
-                           let _initDetails = closing.details.map((d: any) => ({ ...d }));
-                           if (!_hasRealLogistics) {
-                             const _vid = closing._raw?.pointId;
-                             if (_vid) {
-                               const _tl = buildLogisticsTimeline(_vid, closing.date);
-                               const _cM: Record<string,number> = {};
-                               const _sM: Record<string,number> = {};
-                               const _rM: Record<string,number> = {};
-                               _tl.forEach((e: any) => {
-                                 (e.items || []).forEach((item: any) => {
-                                   const n = item.name || item.productId || '';
-                                   if (e.type === 'carga')    _cM[n] = (_cM[n] || 0) + (item.qty || 0);
-                                   else if (e.type === 'surtido')  _sM[n] = (_sM[n] || 0) + (item.qty || 0);
-                                   else if (e.type === 'recepcion') _rM[n] = (_rM[n] || 0) + (item.qty || 0);
-                                 });
-                               });
-                               _initDetails = closing.details.map((d: any) => {
-                                 const logSent = (_cM[d.product] || 0) + (_sM[d.product] || 0);
-                                 const logRet  = _rM[d.product] || 0;
-                                 if (logSent > 0) return { ...d, sent: logSent, returned: logRet, sold: String(Math.max(0, logSent - logRet)) };
-                                 return { ...d };
-                               });
-                             }
-                           }
-                           setEditDetails(_initDetails);
-                          const vehicleId = closing._raw?.pointId;
-                          setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
-                        }}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                      </button>
-                      {closing._raw && allowDelete && (
-                        <button
-                          className="text-gray-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
-                          title="Eliminar conciliacion"
-                          onClick={() => {
-                            if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
-                            deletePosShift(closing._raw.id);
-                            const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
-                            const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
-                            const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
-                            useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
-                            // Persistir en localStorage para que otras tabs vean la eliminación
-                            try {
-                              const logKey = 'frita-mejor-logistics';
-                              const raw = localStorage.getItem(logKey);
-                              if (raw) {
-                                const parsed = JSON.parse(raw);
-                                if (parsed?.state) {
-                                  parsed.state.loadHistory = newLH;
-                                  parsed.state.completedRequests = newCR;
-                                  localStorage.setItem(logKey, JSON.stringify(parsed));
-                                }
-                              }
-                            } catch(_e) {}
-                          }}
-                        >
-                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-                        </button>
-                      )}
-                    </div>
-                  )}
-                </div>
+                        {/* Teórico */}
+                        <td className="py-3.5 px-4 text-right font-black text-gray-900 text-xs">
+                          {fmt(closing.theoretical)}
+                        </td>
 
-                {/* ─── Comparison Block ────────────────── */}
-                <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4 overflow-hidden">
-                  {/* Fila principal: Teórico vs Real */}
-                  <div className="grid grid-cols-2 divide-x divide-gray-200">
-                    <div className="py-5 px-6 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
-                      <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
-                      <p className="text-[10px] font-bold text-gray-300 mt-1">
-                        {mode === 'POS' ? 'Calc. por ventas' : 'Calc. por logística'}
-                      </p>
-                    </div>
-                    <div className="py-5 px-6 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
-                      <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
-                      <p className="text-[10px] font-bold text-gray-300 mt-1">Total recibido</p>
-                    </div>
-                  </div>
-                  {/* Desglose de Real */}
-                  <div className="grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-200 bg-white">
-                    <div className="py-3 px-4 text-center">
-                      <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">💵 Efectivo</p>
-                      <p className="text-base font-black text-green-700">{fmt(closing.cashAmount)}</p>
-                    </div>
-                    <button
-                      className="py-3 px-4 text-center group hover:bg-blue-50/60 rounded-xl transition-colors cursor-pointer w-full"
-                      onClick={() => setTransfersModal({ transfers: closing.shiftTransfers || [], pointName: closing.pointName })}
-                      title="Ver transferencias"
-                    >
-                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
-                      <p className="text-base font-black text-blue-600 group-hover:text-blue-700 transition-colors">{fmt(closing.transferAmount)}</p>
-                      <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
-                    </button>
-                     <button
-                       className="py-3 px-4 text-center group hover:bg-red-50/60 rounded-xl transition-colors cursor-pointer w-full"
-                       onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
-                       title="Ver descripción del gasto"
-                     >
-                       <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
-                       <p className="text-base font-black text-red-500 group-hover:text-red-600 transition-colors">{fmt(closing.expenses)}</p>
-                       {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== ''
-                         ? <p className="text-[8px] font-bold text-red-300 mt-0.5 truncate max-w-[80px] mx-auto">{closing._raw.expensesDesc}</p>
-                         : <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
-                       }
-                     </button>
-                   </div>
-                 </div>
+                        {/* Real */}
+                        <td className="py-3.5 px-4 text-right font-black text-gray-900 text-xs">
+                          {fmt(closing.real)}
+                        </td>
 
-                {/* ─── Footer: Badge + Toggle ─────────── */}
-                <div className="flex items-center justify-between">
-                  {renderBadge(closing)}
-                  <button
-                    onClick={() => setExpandedId(isExpanded ? null : closing.id)}
-                    className="text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors flex items-center gap-1"
-                  >
+                        {/* Efectivo */}
+                        <td className="py-3.5 px-4 text-center font-bold text-green-700 text-xs">
+                          {fmt(closing.cashAmount)}
+                        </td>
+
+                        {/* Transferencia */}
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            className="font-bold text-blue-600 hover:underline text-xs"
+                            onClick={() => setTransfersModal({ transfers: closing.shiftTransfers || [], pointName: closing.pointName })}
+                            title="Ver transferencias"
+                          >
+                            {fmt(closing.transferAmount)}
+                          </button>
+                        </td>
+
+                        {/* Salidas */}
+                        <td className="py-3.5 px-4 text-center">
+                          <button
+                            className="font-bold text-red-500 hover:underline text-xs"
+                            onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
+                            title="Ver descripción de salidas"
+                          >
+                            {fmt(closing.expenses)}
+                          </button>
+                        </td>
+
+                        {/* Estado / Cuadre */}
+                        <td className="py-3.5 px-4 text-center">
+                          {renderBadge(closing)}
+                        </td>
+
+                        {/* Acciones */}
+                        <td className="py-3.5 px-4 text-center">
+                          <div className="flex items-center justify-center gap-1.5">
+                            {closing._raw && (
+                              <button
+                                className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-black text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 shadow-xs active:scale-95 transition-all"
+                                title="Imprimir o Descargar Ticket Cierre Z"
+                                onClick={() => handleDownloadZReport(closing)}
+                              >
+                                <span>📊</span> Ticket Z
+                              </button>
+                            )}
+                            <button
+                              className="text-gray-400 hover:text-amber-500 transition-colors p-1.5 hover:bg-amber-50 rounded-lg"
+                              title="Ver detalles"
+                              onClick={() => setExpandedId(isExpanded ? null : closing.id)}
+                            >
+                              <svg className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                            </button>
+                            {closing._raw && (
+                              <button
+                                className="text-gray-400 hover:text-[#FF4040] transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                                title="Editar cierre"
+                                onClick={() => {
+                                  setEditingClosing(closing);
+                                  setEditCash(String(closing._raw.cashAmount || closing.real || 0));
+                                  setEditTransfer(String(closing._raw.transferAmount || 0));
+                                  setEditExpenses(String(closing.expenses || 0));
+                                  setEditExpensesDesc(closing._raw.expensesDesc || "");
+                                  const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
+                                  let _initDetails = closing.details.map((d: any) => ({ ...d }));
+                                  if (!_hasRealLogistics) {
+                                    const _vid = closing._raw?.pointId;
+                                    if (_vid) {
+                                      const _tl = buildLogisticsTimeline(_vid, closing.date);
+                                      const _cM: Record<string,number> = {};
+                                      const _sM: Record<string,number> = {};
+                                      const _rM: Record<string,number> = {};
+                                      _tl.forEach((e: any) => {
+                                        (e.items || []).forEach((item: any) => {
+                                          const n = item.name || item.productId || '';
+                                          if (e.type === 'carga')    _cM[n] = (_cM[n] || 0) + (item.qty || 0);
+                                          else if (e.type === 'surtido')  _sM[n] = (_sM[n] || 0) + (item.qty || 0);
+                                          else if (e.type === 'recepcion') _rM[n] = (_rM[n] || 0) + (item.qty || 0);
+                                        });
+                                      });
+                                      _initDetails = closing.details.map((d: any) => {
+                                        const logSent = (_cM[d.product] || 0) + (_sM[d.product] || 0);
+                                        const logRet  = _rM[d.product] || 0;
+                                        if (logSent > 0) return { ...d, sent: logSent, returned: logRet, sold: String(Math.max(0, logSent - logRet)) };
+                                        return { ...d };
+                                      });
+                                    }
+                                  }
+                                  setEditDetails(_initDetails);
+                                  const vehicleId = closing._raw?.pointId;
+                                  setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
+                                }}
+                              >
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                              </button>
+                            )}
+                            {closing._raw && allowDelete && (
+                              <button
+                                className="text-gray-400 hover:text-red-600 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                                title="Eliminar cierre"
+                                onClick={() => {
+                                  if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
+                                  deletePosShift(closing._raw.id);
+                                  const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
+                                  const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
+                                  const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
+                                  useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
+                                }}
+                              >
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>               >
                     {isExpanded ? 'Ocultar' : 'Ver Detalles'}
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
