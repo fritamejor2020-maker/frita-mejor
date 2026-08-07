@@ -2,7 +2,7 @@ import React from 'react';
 import { LOGO_BASE64 } from './logoBase64';
 import { parseDrawerCode } from '../../services/printerAgent';
 
-const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
 
 export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '') => {
   if (!shift) return '';
@@ -51,57 +51,78 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const initial = shift.initialAmount || 0;
 
-  // ── Contratas: agrupar ventas por cliente contrata ──────────────────────────
+  // ── Separación entre Ventas Local y Ventas Contratas ──────────────────────────
   const contrataCustomers = (customers || []).filter(c => c.typeId);
   const contrataIds = new Set(contrataCustomers.map(c => c.id));
 
-  const contrataSales = sales.filter(s => s.customerId && contrataIds.has(s.customerId));
-  const localSales    = sales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
+  const safeSales = sales || [];
+  const contrataSales = safeSales.filter(s => s.customerId && contrataIds.has(s.customerId));
+  const localSales    = safeSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
 
+  // 1. DESGLOSE MEDIOS DE PAGO — LOCAL
+  const localCash     = localSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((a, s) => a + (s.total || 0), 0);
+  const localBancol   = localSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((a, s) => a + (s.total || 0), 0);
+  const localTarjeta  = localSales.filter(s => s.paymentMethod === 'TARJETA').reduce((a, s) => a + (s.total || 0), 0);
+  const localNequi    = localSales.filter(s => s.paymentMethod === 'NEQUI').reduce((a, s) => a + (s.total || 0), 0);
+  const localOther    = localSales.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod)).reduce((a, s) => a + (s.total || 0), 0);
+
+  const localTotalTransfer = localBancol + localTarjeta + localNequi + localOther;
+  const localTotalSales    = localCash + localTotalTransfer;
+
+  // 2. DESGLOSE MEDIOS DE PAGO — CONTRATAS
+  const contrataCash     = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+  const contrataBancol   = contrataSales.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+  const contrataTarjeta  = contrataSales.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+  const contrataNequi    = contrataSales.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+  const contrataOther    = contrataSales.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+  const contrataCredit   = contrataSales.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
+
+  const contrataTotalTransfer = contrataBancol + contrataTarjeta + contrataNequi + contrataOther;
+  const contrataTotalSales    = contrataCash + contrataTotalTransfer + contrataCredit;
+
+  // 3. DESGLOSE DETALLADO POR CLIENTE CONTRATA
   const contrataByClient = contrataCustomers
     .map(c => {
       const cs = contrataSales.filter(s => s.customerId === c.id);
       if (cs.length === 0) return null;
       const type = (customerTypes || []).find(t => t.id === c.typeId);
-      const cash     = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
-      const transfer = cs.filter(s => s.paymentMethod !== 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
-      const credit   = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total), 0);
-      return { name: c.name, typeName: type?.name || '', cash, transfer, credit, total: cash + transfer + credit };
+      const cash     = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+      const bancol   = cs.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+      const tarjeta  = cs.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+      const nequi    = cs.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+      const other    = cs.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
+      const transfer = bancol + tarjeta + nequi + other;
+      const credit   = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
+      return { name: c.name, typeName: type?.name || '', cash, bancol, tarjeta, nequi, transfer, credit, total: cash + transfer + credit };
     })
     .filter(Boolean);
 
-  const totalContrataCash     = contrataByClient.reduce((a, c) => a + c.cash, 0);
-  const totalContrataTransfer = contrataByClient.reduce((a, c) => a + c.transfer, 0);
-  const totalContrataCredit   = contrataByClient.reduce((a, c) => a + c.credit, 0);
+  // 4. TOTALES GENERALES DEL TURNO
+  const cashSalesTotal     = localCash + contrataCash;
+  const bancSalesTotal     = localBancol + contrataBancol;
+  const cardSalesTotal     = localTarjeta + contrataTarjeta;
+  const nequiSalesTotal    = localNequi + contrataNequi;
+  const transferSalesTotal = localTotalTransfer + contrataTotalTransfer;
+  const totalSales         = localTotalSales + contrataTotalSales;
 
-  // Calculate Totals By Method (full shift)
-  const cashSalesTotal     = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
-  const cardSalesTotal     = sales.filter(s => s.paymentMethod === 'TARJETA').reduce((acc, s) => acc + s.total, 0);
-  const nequiSalesTotal    = sales.filter(s => s.paymentMethod === 'NEQUI').reduce((acc, s) => acc + s.total, 0);
-  const bancSalesTotal     = sales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((acc, s) => acc + s.total, 0);
-  const transferSalesTotal = nequiSalesTotal + bancSalesTotal;
-
-  const localCash = cashSalesTotal - totalContrataCash;
-
-  const totalSales    = cashSalesTotal + cardSalesTotal + transferSalesTotal;
-  const totalDiscounts = sales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
-  const retiros  = (expenses || []).filter(e => e.type !== 'deposito');
-  const depositos = (expenses || []).filter(e => e.type === 'deposito');
+  const totalDiscounts = safeSales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
+  const retiros        = (expenses || []).filter(e => e.type !== 'deposito');
+  const depositos      = (expenses || []).filter(e => e.type === 'deposito');
   const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
 
   const expectedCash = initial + cashSalesTotal - totalExpenses + totalDeposits;
-  const countedCash = shift.realAmount || 0;
-  const difference = countedCash - expectedCash;
+  const countedCash  = shift.realAmount || 0;
+  const difference   = countedCash - expectedCash;
 
   // Items sold summary
   const itemsSold = {};
-  sales.forEach(sale => {
-      (sale.items || []).forEach(item => {
-          if (!itemsSold[item.name]) itemsSold[item.name] = { qty: 0, total: 0 };
-          itemsSold[item.name].qty += item.qty;
-          itemsSold[item.name].total += (item.price * item.qty);
-      });
+  safeSales.forEach(sale => {
+    (sale.items || []).forEach(item => {
+      if (!itemsSold[item.name]) itemsSold[item.name] = { qty: 0, total: 0 };
+      itemsSold[item.name].qty += item.qty;
+      itemsSold[item.name].total += (item.price * item.qty);
+    });
   });
 
   const discountsHtml = (tc.zShowDiscountsLine !== false && totalDiscounts > 0) ? `
@@ -170,39 +191,89 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
 
+      <!-- 🏪 1. VENTAS LOCAL -->
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">🏪 Ventas Local</h3>
+        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💵 Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
+        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>🏦 Bancolombia Local:</span><span>${formatMoney(localBancol)}</span></div>` : ''}
+        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💳 Tarjeta Local:</span><span>${formatMoney(localTarjeta)}</span></div>` : ''}
+        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>📱 Nequi Local:</span><span>${formatMoney(localNequi)}</span></div>` : ''}
+        ${localOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>🌐 Otros Métodos Local:</span><span>${formatMoney(localOther)}</span></div>` : ''}
+        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
+          <span>Total Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 4px; margin-top: 4px; font-weight: 900; font-size: 13px;">
+          <span>= TOTAL VENTA LOCAL:</span><span>${formatMoney(localTotalSales)}</span>
+        </div>
+      </div>
+
+      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+
+      <!-- 🤝 2. VENTAS CONTRATAS -->
+      ${tc.zShowContratasBreakdown !== false ? `
+      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">🤝 Ventas Contratas</h3>
+        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💵 Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
+        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>🏦 Bancolombia Contratas:</span><span>${formatMoney(contrataBancol)}</span></div>` : ''}
+        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>💳 Tarjeta Contratas:</span><span>${formatMoney(contrataTarjeta)}</span></div>` : ''}
+        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>📱 Nequi Contratas:</span><span>${formatMoney(contrataNequi)}</span></div>` : ''}
+        ${contrataOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>🌐 Otros Métodos Contratas:</span><span>${formatMoney(contrataOther)}</span></div>` : ''}
+        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
+          <span>Total Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span>
+        </div>
+        ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 3px;"><span>** A Crédito (Por Cobrar):</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 4px; margin-top: 4px; font-weight: 900; font-size: 13px;">
+          <span>= TOTAL CONTRATAS:</span><span>${formatMoney(contrataTotalSales)}</span>
+        </div>
+      </div>
+
+      <!-- DESGLOSE POR CLIENTE CONTRATA -->
+      ${contrataByClient.length > 0 ? `
+      <div style="font-size: 11px; font-weight: bold; margin-bottom: 12px; border: 1px solid black; padding: 6px;">
+        <h4 style="text-align: center; border-bottom: 1px solid black; padding-bottom: 3px; margin-bottom: 6px; font-weight: 900; text-transform: uppercase;">Detalle por Cliente Contrata</h4>
+        ${contrataByClient.map(c => `
+          <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed black;">
+            <div style="font-weight: 900; margin-bottom: 2px;">${c.name} <span style="font-weight: normal; font-size: 10px;">(${c.typeName})</span></div>
+            ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
+            ${c.bancol > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Bancolombia:</span><span>${formatMoney(c.bancol)}</span></div>` : ''}
+            ${c.tarjeta > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Tarjeta:</span><span>${formatMoney(c.tarjeta)}</span></div>` : ''}
+            ${c.nequi > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Nequi:</span><span>${formatMoney(c.nequi)}</span></div>` : ''}
+            ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span>  · A Crédito:</span><span>${formatMoney(c.credit)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid black;margin-top:2px;padding-top:2px;"><span>  TOTAL CLIENTE:</span><span>${formatMoney(c.total)}</span></div>
+          </div>
+        `).join('')}
+      </div>
+      ` : ''}
+
+      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      ` : ''}
+
+      <!-- 📊 3. RESUMEN GENERAL DEL TURNO -->
       ${tc.zShowFinancialSummary !== false ? `
-      <!-- Financials -->
       <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Resumen Financiero</h3>
+        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Resumen Financiero del Turno</h3>
         
         ${tc.zShowInitialBase !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Base Inicial:</span>
+          <span>Base Inicial Caja:</span>
           <span>${formatMoney(initial)}</span>
         </div>` : ''}
-        ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Ventas Efectivo:</span>
+        
+        <div style="display: flex; justify-content: space-between;">
+          <span>Total Efectivo Caja (Local + Contratas):</span>
           <span>${formatMoney(cashSalesTotal)}</span>
-        </div>` : ''}
-        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Ventas Tarjeta:</span>
-          <span>${formatMoney(cardSalesTotal)}</span>
-        </div>` : ''}
-        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Ventas NEQUI:</span>
-          <span>${formatMoney(nequiSalesTotal)}</span>
-        </div>` : ''}
-        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Ventas BANCOLOMBIA:</span>
-          <span>${formatMoney(bancSalesTotal)}</span>
-        </div>` : ''}
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span>Total Transferencias / Digital (Local + Contratas):</span>
+          <span>${formatMoney(transferSalesTotal)}</span>
+        </div>
 
         ${tc.zShowTotalSales !== false ? `<div style="border-top: 1px solid black; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
-          <span>Total Ventas:</span>
+          <span>TOTAL GENERAL VENTAS:</span>
           <span>${formatMoney(totalSales)}</span>
         </div>` : ''}
 
         ${tc.zShowExpensesLine !== false ? `<div style="display: flex; justify-content: space-between; margin-top: 8px;">
-          <span>Retiros:</span>
+          <span>Retiros / Gastos:</span>
           <span>-${formatMoney(totalExpenses)}</span>
         </div>` : ''}
 
@@ -248,52 +319,17 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
       ` : ''}
 
-      ${tc.zShowContratasBreakdown !== false && contrataByClient.length > 0 ? `
-      <!-- Contratas Breakdown -->
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Desglose Contratas</h3>
-        ${contrataByClient.map(c => `
-          <div style="margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px dashed black;">
-            <div style="font-weight: 900; margin-bottom: 3px;">${c.name} <span style="font-weight: normal; font-size: 11px;">(${c.typeName})</span></div>
-            ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
-            ${c.transfer > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  Transferencia:</span><span>${formatMoney(c.transfer)}</span></div>` : ''}
-            ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span>  ** A credito (por cobrar):</span><span>${formatMoney(c.credit)}</span></div>` : ''}
-            <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid black;margin-top:2px;padding-top:2px;"><span>  TOTAL:</span><span>${formatMoney(c.total)}</span></div>
-          </div>
-        `).join('')}
-        <div style="border: 2px solid black; padding: 6px 4px; margin-top: 4px;">
-          <div style="display:flex;justify-content:space-between;"><span>Total Contratas Efectivo:</span><span>${formatMoney(totalContrataCash)}</span></div>
-          <div style="display:flex;justify-content:space-between;"><span>Total Contratas Transfer:</span><span>${formatMoney(totalContrataTransfer)}</span></div>
-          ${totalContrataCredit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span>** Total A Credito:</span><span>${formatMoney(totalContrataCredit)}</span></div>` : ''}
-        </div>
-      </div>
-
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
-
-      ${tc.zShowLocalVsContratas !== false ? `
-      <!-- Cuadre Local vs Contratas -->
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; border: 2px solid black; padding: 8px;">
-        <h3 style="text-align: center; border-bottom: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Efectivo: Local vs Contratas</h3>
-        <div style="display:flex;justify-content:space-between;"><span>Efectivo Total Caja:</span><span>${formatMoney(cashSalesTotal)}</span></div>
-        <div style="display:flex;justify-content:space-between;"><span>- Efectivo Contratas:</span><span>-${formatMoney(totalContrataCash)}</span></div>
-        <div style="display:flex;justify-content:space-between;font-weight:900;font-size:14px;border-top:2px solid black;padding-top:4px;margin-top:4px;"><span>= Efectivo LOCAL:</span><span>${formatMoney(localCash)}</span></div>
-      </div>
-
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
-      ` : ''}
-      ` : ''}
-
       ${tc.zShowCashRegisterMatch !== false ? `
       <!-- Cash Register Match -->
       <div style="font-size: 12px; font-weight: bold; margin-top: 8px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
         <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Cuadre de Caja (Efectivo)</h3>
         
         <div style="display: flex; justify-content: space-between;">
-          <span>Efectivo Esperado:</span>
+          <span>Efectivo Esperado en Caja:</span>
           <span>${formatMoney(expectedCash)}</span>
         </div>
         ${tc.zShowCurrentMoney === true ? `<div style="display: flex; justify-content: space-between;">
-          <span>Efectivo Contado:</span>
+          <span>Efectivo Real Contado:</span>
           <span>${formatMoney(countedCash)}</span>
         </div>` : ''}
         
