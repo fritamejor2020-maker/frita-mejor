@@ -4,9 +4,9 @@ import { useBranchStore } from '../../store/useBranchStore';
 
 const DEFAULTS = {
   businessName: 'Frita Mejor',
-  nit: '900.000.000-1',
-  phone: '300 123 4567',
-  address: 'Cali, Colombia',
+  nit: '12233346-7',
+  phone: '314379377',
+  address: 'Pitalito, Huila',
   // ── Sale Ticket Toggles ──
   showLogo: true,
   showBarcode: true,
@@ -26,8 +26,8 @@ const DEFAULTS = {
   showPaymentInfo: true,
   // ── Sale Ticket Messages ──
   saleFooterMsg: '¡GRACIAS POR SU COMPRA!',
-  saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
-  saleBottomLine: 'Sistema POS • fritamejor.com',
+  saleSubFooterMsg: 'Si desea factura electrónica escriba al 3138015176',
+  saleBottomLine: 'Dios los bendiga',
   // ── Z-Report Sections ──
   zCustomTitle: 'REPORTE Z — CIERRE DE TURNO',
   zReportFooterMsg: 'FIN DE INFORME Z',
