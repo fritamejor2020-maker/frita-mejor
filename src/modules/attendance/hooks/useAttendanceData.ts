@@ -206,28 +206,52 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
             logs: dayLogs,
           });
         } else {
-          // Tomar la PRIMERA marcación del día (Primera Entrada) y la ÚLTIMA marcación del día (Última Salida)
-          const firstLog = dayLogs[0];
-          const lastLog = dayLogs.length > 1 ? dayLogs[dayLogs.length - 1] : undefined;
+          // Pareo secuencial inteligente de entradas y salidas para detectar MÚLTIPLES TURNOS en el mismo día
+          let currentPair: { firstIn?: string; lastOut?: string; logs: RawAttendanceLog[] } | null = null;
 
-          const firstInStr = firstLog ? getTimeString(firstLog.timestamp) : undefined;
-          let lastOutStr = lastLog ? getTimeString(lastLog.timestamp) : undefined;
+          dayLogs.forEach((log) => {
+            const timeStr = getTimeString(log.timestamp);
+            const isExit = log.attendanceStatus === 'checkOut' || log.type === 'EXIT';
 
-          // Si solo hay 1 marca o si la última marca es idéntica al minuto a la primera marca
-          if (dayLogs.length === 1 || (firstInStr && lastOutStr && firstInStr.slice(0, 5) === lastOutStr.slice(0, 5))) {
-            const explicitExit = [...dayLogs].reverse().find(
-              (l) => l.type === 'EXIT' || (l.type as string).toUpperCase() === 'CHECKOUT'
-            );
-            if (explicitExit && getTimeString(explicitExit.timestamp) !== firstInStr) {
-              lastOutStr = getTimeString(explicitExit.timestamp);
+            if (!currentPair) {
+              if (!isExit) {
+                currentPair = { firstIn: timeStr, lastOut: undefined, logs: [log] };
+              } else {
+                currentPair = { firstIn: undefined, lastOut: timeStr, logs: [log] };
+              }
+            } else {
+              if (isExit) {
+                if (currentPair.lastOut) {
+                  currentPair.logs.push(log);
+                  currentPair.lastOut = timeStr;
+                } else {
+                  currentPair.lastOut = timeStr;
+                  currentPair.logs.push(log);
+                  shiftPairs.push(currentPair);
+                  currentPair = null;
+                }
+              } else {
+                // Nueva marca de Entrada (checkIn)
+                if (currentPair.firstIn && !currentPair.lastOut) {
+                  const prevMins = timeToMinutes(currentPair.firstIn.slice(0, 5));
+                  const currMins = timeToMinutes(timeStr.slice(0, 5));
+                  if (Math.abs(currMins - prevMins) <= 5) {
+                    currentPair.logs.push(log);
+                  } else {
+                    shiftPairs.push(currentPair);
+                    currentPair = { firstIn: timeStr, lastOut: undefined, logs: [log] };
+                  }
+                } else {
+                  shiftPairs.push(currentPair);
+                  currentPair = { firstIn: timeStr, lastOut: undefined, logs: [log] };
+                }
+              }
             }
-          }
-
-          shiftPairs.push({
-            firstIn: firstInStr,
-            lastOut: lastOutStr && lastOutStr !== firstInStr ? lastOutStr : (dayLogs.length > 1 ? lastOutStr : undefined),
-            logs: dayLogs,
           });
+
+          if (currentPair) {
+            shiftPairs.push(currentPair);
+          }
         }
 
         const dayBlocks: DailyShiftBlock[] = [];

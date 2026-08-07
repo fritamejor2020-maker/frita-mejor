@@ -74,29 +74,31 @@ export function AttendanceView() {
   const handleSyncTerminal = async () => {
     setIsSyncing(true);
 
-    // 0. Si se ejecuta dentro de la app de escritorio Electron, ejecutar extracción nativa IPC
-    if ((window as any).cajeroAPI?.syncBiometric) {
-      try {
+    try {
+      // 0. Si se ejecuta dentro de la app de escritorio Electron, ejecutar extracción nativa IPC y finalizar de inmediato
+      if ((window as any).cajeroAPI?.syncBiometric) {
         console.log('[AttendanceView] Invocando extracción nativa de biométrico vía cajeroAPI IPC...');
         const res = await (window as any).cajeroAPI.syncBiometric();
         console.log('[AttendanceView IPC Result]', res);
-      } catch (err: any) {
-        console.error('[AttendanceView IPC Error]', err);
+        setIsSyncing(false);
+        return;
       }
-    }
 
-    const term = terminals[0];
-    if (term) {
-      // 1. Sincronizar usuarios completos del biométrico
-      await fetchTerminalUsers(term.id);
-      // 2. Sincronizar marcaciones de asistencia en tiempo real
-      const res = await syncTerminalEvents(term.id);
-      if (res && res.message) {
-        console.log('[Sync Terminal Result]', res);
+      const term = terminals[0];
+      if (term) {
+        // 1. Sincronizar usuarios completos del biométrico
+        await fetchTerminalUsers(term.id);
+        // 2. Sincronizar marcaciones de asistencia en tiempo real
+        const res = await syncTerminalEvents(term.id);
+        if (res && res.message) {
+          console.log('[Sync Terminal Result]', res);
+        }
       }
+    } catch (err: any) {
+      console.error('[AttendanceView Sync Error]', err);
+    } finally {
+      setIsSyncing(false);
     }
-
-    setIsSyncing(false);
   };
 
   // Auto-Sincronizar Biométrico de forma transparente al entrar al módulo Asistencia & Turnos
