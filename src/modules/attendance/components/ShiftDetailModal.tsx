@@ -105,7 +105,7 @@ export function ShiftDetailModal({ employee, dateStr, block, onClose }: ShiftDet
             {block.rawLogs && block.rawLogs.length > 0 && (
               <div className="pt-2 border-t border-gray-200 space-y-1.5">
                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-wider block">
-                  Marcaciones del día ({block.rawLogs.length})
+                  Marcaciones del bloque ({block.rawLogs.length})
                 </span>
                 <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
                   {block.rawLogs.map((log) => {
