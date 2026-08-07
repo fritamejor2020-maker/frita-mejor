@@ -435,7 +435,10 @@ export const useInventoryStore = create(
 
             for (const key of BRANCH_STORE_KEYS) {
               const branchKeyName = `${key}_${effectiveBranch}`;
-              const val = remote[branchKeyName] ?? remote[key];
+              const rawBranchVal = remote[branchKeyName];
+              const val = (Array.isArray(rawBranchVal) && rawBranchVal.length === 0) 
+                ? (remote[key] ?? rawBranchVal) 
+                : (rawBranchVal ?? remote[key]);
               if (val !== undefined && val !== null) {
                 const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
                 if (isNonEmpty) {
