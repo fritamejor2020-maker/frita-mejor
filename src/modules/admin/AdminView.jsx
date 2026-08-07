@@ -3172,9 +3172,10 @@ function PosConfigPanel() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-100 text-gray-500 font-bold border-b border-gray-200">
                 <tr>
-                  <th className="py-3 px-4 w-1/2">Nombre del Método (ej. EFECTIVO)</th>
+                  <th className="py-3 px-4">Nombre del Método (ej. EFECTIVO)</th>
                   <th className="py-3 px-4 text-center">¿Abre Cajón?</th>
                   <th className="py-3 px-4 text-center">¿Imprime Ticket?</th>
+                  <th className="py-3 px-4 text-center">¿Es Transferencia / Digital?</th>
                   <th className="py-3 px-4 w-12 text-center"></th>
                 </tr>
               </thead>
@@ -3202,6 +3203,14 @@ function PosConfigPanel() {
                         className="w-5 h-5 accent-chunky-main cursor-pointer"
                         checked={method.printReceipt}
                         onChange={(e) => handleUpdateMethod(method.id, 'printReceipt', e.target.checked)}
+                      />
+                    </td>
+                    <td className="py-2 px-4 text-center">
+                      <input 
+                        type="checkbox" 
+                        className="w-5 h-5 accent-blue-600 cursor-pointer"
+                        checked={method.isTransfer !== false && method.name !== 'EFECTIVO'}
+                        onChange={(e) => handleUpdateMethod(method.id, 'isTransfer', e.target.checked)}
                       />
                     </td>
                     <td className="py-2 px-4 text-center">
