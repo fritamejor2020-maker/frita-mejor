@@ -386,14 +386,8 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       };
     });
 
-    // Ordenar: primero empleados con marcaciones/asistencias registradas en la semana
+    // Ordenar estrictamente por número de código de empleado (#1, #2, #3, #4...)
     payrollList.sort((a, b) => {
-      const aHasBlocks = Object.values(a.dailyBlocks).some(blocks => blocks.length > 0) || a.isPresentNow;
-      const bHasBlocks = Object.values(b.dailyBlocks).some(blocks => blocks.length > 0) || b.isPresentNow;
-
-      if (aHasBlocks && !bHasBlocks) return -1;
-      if (!aHasBlocks && bHasBlocks) return 1;
-
       const numA = parseInt(a.employeeNo, 10) || 9999;
       const numB = parseInt(b.employeeNo, 10) || 9999;
       return numA - numB;
