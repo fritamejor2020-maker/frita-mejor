@@ -50,8 +50,8 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['recipes']           = (v) => useInventoryStore.setState({ recipes: v });
   applicators['fritadoRecipes']    = (v) => useInventoryStore.setState({ fritadoRecipes: v });
   applicators['posCategories']     = (v) => useInventoryStore.setState({ posCategories: v });
-  applicators['customers']         = (v) => useInventoryStore.setState({ customers: v });
-  applicators['customerTypes']     = (v) => useInventoryStore.setState({ customerTypes: v });
+  applicators['customers']         = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
+  applicators['customerTypes']     = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
   applicators['loadTemplates']     = (v) => useInventoryStore.setState({ loadTemplates: v });
   applicators['vehicles']          = (v) => useVehicleStore.setState({ vehicles: v });
   applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
