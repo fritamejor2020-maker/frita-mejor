@@ -9,9 +9,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const tc = {
     businessName: 'Frita Mejor',
-    nit: '900.000.000-1',
-    phone: '300 123 4567',
-    address: 'Cali, Colombia',
+    nit: '12233346-7',
+    phone: '314379377',
+    address: 'Pitalito, Huila',
     showLogo: true,
     showCashier: true,
     showNit: true,
@@ -24,9 +24,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
     zShowContratasBreakdown: true,
     zShowLocalVsContratas: true,
     zShowCashRegisterMatch: true,
-    zShowProductsSold: true,
+    zShowProductsSold: false,
     zShowExpensesDetail: true,
-    zShowSignatureLine: true,
+    zShowSignatureLine: false,
     zShowPaymentMethods: true,
     // Header lines
     zShowShiftId: true,
@@ -126,32 +126,32 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   });
 
   const discountsHtml = (tc.zShowDiscountsLine !== false && totalDiscounts > 0) ? `
-    <div style="display: flex; justify-content: space-between; margin-top: 4px;">
+    <div style="display: flex; justify-content: space-between; margin-top: 2px;">
       <span>Total Descuentos:</span>
       <span>${formatMoney(totalDiscounts)}</span>
     </div>
   ` : '';
 
   const itemsHtml = Object.entries(itemsSold).sort((a,b) => b[1].qty - a[1].qty).map(([name, data]) => `
-    <tr style="border-bottom: 1px dashed black;">
-      <td style="padding: 4px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50mm;">${name}</td>
-      <td style="padding: 4px 0; text-align: right;">${data.qty}</td>
+    <tr style="border-bottom: 1px dashed #aaa;">
+      <td style="padding: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50mm;">${name}</td>
+      <td style="padding: 2px 0; text-align: right; font-weight: bold;">${data.qty}</td>
     </tr>
   `).join('');
 
   const expensesHtml = (tc.zShowExpensesDetail !== false && expenses && expenses.length > 0) ? `
-    <div style="font-size: 12px; font-weight: bold; margin-top: 16px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Retiros y Depositos</h3>
+    <div style="font-size: 10.5px; font-weight: bold; margin-top: 6px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin-bottom: 4px; font-weight: 900; text-transform: uppercase; font-size: 11px;">Retiros y Depositos</h3>
         ${expenses.map(e => `
-            <div style="display: flex; justify-content: space-between; margin-bottom: 4px; border-bottom: 1px dashed black; padding-bottom: 4px;">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 50mm;">${e.type === 'deposito' ? '[+]' : '[-]'} ${e.reason}</span>
+            <div style="display: flex; justify-content: space-between; margin-bottom: 2px; border-bottom: 1px dashed #ccc; padding-bottom: 2px;">
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 48mm;">${e.type === 'deposito' ? '[+]' : '[-]'} ${e.reason}</span>
                 <span style="font-weight: 900;">${e.type === 'deposito' ? '+' : '-'}${formatMoney(e.amount)}</span>
             </div>
         `).join('')}
     </div>
   ` : '';
 
-  // Generar bytes ESC/POS de apertura de cajón como caracteres invisibles
+  // Generar bytes ESC/POS de apertura de cajón
   let drawerKickHtml = '';
   if (cashDrawerCode) {
     const bytes = parseDrawerCode(cashDrawerCode);
@@ -162,96 +162,103 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   }
 
   return `
-    <div style="width: 80mm; color: black; font-family: sans-serif; font-size: 14px; padding: 16px; margin: 0 auto;">
+    <div style="width: 76mm; color: black; font-family: 'Courier New', Courier, monospace; font-size: 11px; line-height: 1.2; padding: 4px; margin: 0 auto;">
       ${drawerKickHtml}
       <style>
-        @page { size: auto; margin: 0; }
-        * { color: black !important; font-weight: bold !important; }
+        @page { size: 80mm auto; margin: 0; }
+        * { color: black !important; font-weight: bold !important; box-sizing: border-box; }
         @media print {
-          body { margin: 0; }
+          body { margin: 0; padding: 0; background: white; }
+          html { background: transparent; }
           * { color: black !important; background: transparent !important; font-weight: bold !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
           img { filter: grayscale(100%) contrast(1000%) !important; }
         }
       </style>
 
-      <!-- Header -->
-      <div style="text-align: center; margin-bottom: 16px;">
-        ${tc.showLogo ? `<img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 100px; height: auto; display: block; margin: 0 auto 6px auto; filter: grayscale(100%) contrast(1000%);" />` : ''}
-        <h1 style="font-weight: 900; font-size: 16px; margin-bottom: 4px; text-transform: uppercase; letter-spacing: 1px;">${tc.zCustomTitle || 'REPORTE Z — CIERRE DE TURNO'}</h1>
-        ${tc.showNit !== false && tc.nit ? `<p style="font-size: 11px; margin: 0;">NIT: ${tc.nit}</p>` : ''}
-        ${tc.showPhone !== false && tc.phone ? `<p style="font-size: 11px; margin: 0;">Tel: ${tc.phone}</p>` : ''}
-        ${tc.showAddress !== false && tc.address ? `<p style="font-size: 11px; margin: 0;">${tc.address}</p>` : ''}
-        <div style="border-bottom: 1px dashed black; margin: 8px 0;"></div>
-        ${shift.registerName ? `<p style="font-size: 13px; font-weight: 900; line-height: 1.25; margin: 0; border: 2px solid black; padding: 3px 6px;">[ ${shift.registerName} ]</p>` : ''}
-        ${tc.zShowShiftId !== false ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 4px 0 0 0;">Turno ID: ${shift.id.slice(-6)}</p>` : ''}
-        ${tc.zShowCashier !== false ? `<p style="font-size: 12px; font-weight: bold; line-height: 1.25; margin: 0;">Cajero: ${shift.userName || 'PRINCIPAL'}</p>` : ''}
-        ${tc.zShowOpenDate !== false ? `<p style="font-size: 12px; margin: 4px 0 0 0;">Apertura: ${dateStrOpened}</p>` : ''}
-        ${tc.zShowCloseDate !== false ? `<p style="font-size: 12px; margin: 0;">Cierre: ${dateStrClosed}</p>` : ''}
+      <!-- Header Compacto -->
+      <div style="text-align: center; margin-bottom: 4px;">
+        ${tc.showLogo ? `<img src="${LOGO_BASE64}" alt="${tc.businessName}" style="width: 90px; height: auto; display: block; margin: 0 auto 2px auto; filter: grayscale(100%) contrast(1000%);" />` : ''}
+        <h2 style="font-weight: 900; font-size: 14px; margin: 0; text-transform: uppercase; letter-spacing: 0.5px;">${tc.zCustomTitle || 'REPORTE Z — CIERRE TURNO'}</h2>
+        <p style="font-size: 9.5px; margin: 1px 0 0 0;">
+          ${tc.businessName} ${tc.showNit && tc.nit ? `· NIT: ${tc.nit}` : ''}
+        </p>
+        <p style="font-size: 9.5px; margin: 0;">
+          ${tc.showPhone && tc.phone ? `Tel: ${tc.phone}` : ''} ${tc.showAddress && tc.address ? `· ${tc.address}` : ''}
+        </p>
+        <div style="border-bottom: 1px dashed black; margin: 3px 0;"></div>
+        <div style="font-size: 10px; font-weight: 900; display: flex; justify-content: space-between;">
+          ${shift.registerName ? `<span>Caja: ${shift.registerName}</span>` : ''}
+          ${tc.zShowShiftId !== false ? `<span>Turno: ${shift.id.slice(-6)}</span>` : ''}
+          ${tc.zShowCashier !== false ? `<span>Cajero: ${shift.userName || 'PRINCIPAL'}</span>` : ''}
+        </div>
+        <div style="font-size: 9.5px; margin-top: 1px;">
+          ${tc.zShowOpenDate !== false ? `Apertura: ${dateStrOpened}` : ''} ${tc.zShowCloseDate !== false ? `· Cierre: ${dateStrClosed}` : ''}
+        </div>
       </div>
 
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
 
-      <!-- 1. VENTAS LOCAL -->
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Ventas Local</h3>
+      <!-- 1. VENTAS LOCAL COMPACTO -->
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Local</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
         ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Local:</span><span>${formatMoney(localBancol)}</span></div>` : ''}
         ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Local:</span><span>${formatMoney(localTarjeta)}</span></div>` : ''}
         ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Local:</span><span>${formatMoney(localNequi)}</span></div>` : ''}
         ${localOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Local:</span><span>${formatMoney(localOther)}</span></div>` : ''}
-        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
+        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 2px; margin-top: 2px; font-weight: 900;">
           <span>Total Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 4px; margin-top: 4px; font-weight: 900; font-size: 13px;">
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 2px; margin-top: 2px; font-weight: 900; font-size: 11.5px;">
           <span>= TOTAL VENTA LOCAL:</span><span>${formatMoney(localTotalSales)}</span>
         </div>
       </div>
 
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
 
-      <!-- 2. VENTAS CONTRATAS -->
+      <!-- 2. VENTAS CONTRATAS COMPACTO -->
       ${tc.zShowContratasBreakdown !== false ? `
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Ventas Contratas</h3>
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Contratas</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
         ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Contratas:</span><span>${formatMoney(contrataBancol)}</span></div>` : ''}
         ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Contratas:</span><span>${formatMoney(contrataTarjeta)}</span></div>` : ''}
         ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Contratas:</span><span>${formatMoney(contrataNequi)}</span></div>` : ''}
         ${contrataOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Contratas:</span><span>${formatMoney(contrataOther)}</span></div>` : ''}
-        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 3px; margin-top: 3px; font-weight: 900;">
+        <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 2px; margin-top: 2px; font-weight: 900;">
           <span>Total Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span>
         </div>
-        ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 3px;"><span>** A Crédito (Por Cobrar):</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
-        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 4px; margin-top: 4px; font-weight: 900; font-size: 13px;">
+        ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900; margin-top: 2px;"><span>** A Crédito (Por Cobrar):</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
+        <div style="display: flex; justify-content: space-between; border-top: 1px solid black; padding-top: 2px; margin-top: 2px; font-weight: 900; font-size: 11.5px;">
           <span>= TOTAL CONTRATAS:</span><span>${formatMoney(contrataTotalSales)}</span>
         </div>
       </div>
 
       <!-- DESGLOSE POR CLIENTE CONTRATA -->
       ${contrataByClient.length > 0 ? `
-      <div style="font-size: 11px; font-weight: bold; margin-bottom: 12px; border: 1px solid black; padding: 6px;">
-        <h4 style="text-align: center; border-bottom: 1px solid black; padding-bottom: 3px; margin-bottom: 6px; font-weight: 900; text-transform: uppercase;">Detalle por Cliente Contrata</h4>
+      <div style="font-size: 10px; font-weight: bold; margin-bottom: 6px; border: 1px solid black; padding: 4px;">
+        <h4 style="text-align: center; border-bottom: 1px solid black; padding-bottom: 2px; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase;">Detalle por Cliente Contrata</h4>
         ${contrataByClient.map(c => `
-          <div style="margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px dashed black;">
-            <div style="font-weight: 900; margin-bottom: 2px;">${c.name} <span style="font-weight: normal; font-size: 10px;">(${c.typeName})</span></div>
-            ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
-            ${c.bancol > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Bancolombia:</span><span>${formatMoney(c.bancol)}</span></div>` : ''}
-            ${c.tarjeta > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Tarjeta:</span><span>${formatMoney(c.tarjeta)}</span></div>` : ''}
-            ${c.nequi > 0 ? `<div style="display:flex;justify-content:space-between;"><span>  · Nequi:</span><span>${formatMoney(c.nequi)}</span></div>` : ''}
-            ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span>  · A Crédito:</span><span>${formatMoney(c.credit)}</span></div>` : ''}
-            <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid black;margin-top:2px;padding-top:2px;"><span>  TOTAL CLIENTE:</span><span>${formatMoney(c.total)}</span></div>
+          <div style="margin-bottom: 4px; padding-bottom: 2px; border-bottom: 1px dashed #ccc;">
+            <div style="font-weight: 900; margin-bottom: 1px;">${c.name} <span style="font-weight: normal; font-size: 9px;">(${c.typeName})</span></div>
+            ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
+            ${c.bancol > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Bancolombia:</span><span>${formatMoney(c.bancol)}</span></div>` : ''}
+            ${c.tarjeta > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Tarjeta:</span><span>${formatMoney(c.tarjeta)}</span></div>` : ''}
+            ${c.nequi > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Nequi:</span><span>${formatMoney(c.nequi)}</span></div>` : ''}
+            ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span> · A Crédito:</span><span>${formatMoney(c.credit)}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid black;margin-top:1px;padding-top:1px;"><span> TOTAL CLIENTE:</span><span>${formatMoney(c.total)}</span></div>
           </div>
         `).join('')}
       </div>
       ` : ''}
 
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       ` : ''}
 
-      <!-- 📊 3. RESUMEN GENERAL DEL TURNO -->
+      <!-- 3. RESUMEN GENERAL DEL TURNO COMPACTO -->
       ${tc.zShowFinancialSummary !== false ? `
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px; display: flex; flex-direction: column; gap: 4px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Resumen Financiero del Turno</h3>
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Resumen Financiero del Turno</h3>
         
         ${tc.zShowInitialBase !== false ? `<div style="display: flex; justify-content: space-between;">
           <span>Base Inicial Caja:</span>
@@ -263,21 +270,21 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <span>${formatMoney(cashSalesTotal)}</span>
         </div>
         <div style="display: flex; justify-content: space-between;">
-          <span>Total Transferencias / Digital (Local + Contratas):</span>
+          <span>Total Transferencias / Digital:</span>
           <span>${formatMoney(transferSalesTotal)}</span>
         </div>
 
-        ${tc.zShowTotalSales !== false ? `<div style="border-top: 1px solid black; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 900; font-size: 14px;">
+        ${tc.zShowTotalSales !== false ? `<div style="border-top: 1px solid black; padding-top: 2px; margin-top: 2px; display: flex; justify-content: space-between; font-weight: 900; font-size: 12.5px;">
           <span>TOTAL GENERAL VENTAS:</span>
           <span>${formatMoney(totalSales)}</span>
         </div>` : ''}
 
-        ${tc.zShowExpensesLine !== false ? `<div style="display: flex; justify-content: space-between; margin-top: 8px;">
+        ${tc.zShowExpensesLine !== false ? `<div style="display: flex; justify-content: space-between; margin-top: 4px;">
           <span>Retiros / Gastos:</span>
           <span>-${formatMoney(totalExpenses)}</span>
         </div>` : ''}
 
-        ${totalDeposits > 0 ? `<div style="display: flex; justify-content: space-between; margin-top: 4px;">
+        ${totalDeposits > 0 ? `<div style="display: flex; justify-content: space-between; margin-top: 2px;">
           <span>Depositos:</span>
           <span>+${formatMoney(totalDeposits)}</span>
         </div>` : ''}
@@ -285,30 +292,30 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         ${discountsHtml}
       </div>
 
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       ` : ''}
 
       ${(shift.earnedBonus && shift.earnedBonus > 0) ? `
       <!-- Metas y Bonos -->
-      <div style="font-size: 12px; font-weight: bold; margin-bottom: 12px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Metas y Bonos</h3>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Metas y Bonos</h3>
+        <div style="display: flex; justify-content: space-between;">
           <span>Meta Turno:</span>
           <span>${formatMoney(shift.bonusGoalAmount || 0)}</span>
         </div>
-        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+        <div style="display: flex; justify-content: space-between;">
           <span>Comisión:</span>
           <span>${shift.bonusPercent || 0}%</span>
         </div>
-        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 13px; border-top: 1px solid black; padding-top: 4px; margin-top: 4px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 11.5px; border-top: 1px solid black; padding-top: 2px; margin-top: 2px;">
           <span>Bono Total Ganado:</span>
           <span>${formatMoney(shift.earnedBonus)}</span>
         </div>
         ${shift.bonusRecipients && shift.bonusRecipients.length > 0 ? `
-          <div style="margin-top: 6px; font-size: 11px; border-top: 1px dashed black; padding-top: 4px;">
-            <span style="font-weight: 900; display: block; margin-bottom: 3px;">Beneficiarios:</span>
+          <div style="margin-top: 4px; font-size: 9.5px; border-top: 1px dashed black; padding-top: 2px;">
+            <span style="font-weight: 900; display: block; margin-bottom: 2px;">Beneficiarios:</span>
             ${shift.bonusRecipients.map(r => `
-              <div style="display: flex; justify-content: space-between; padding-left: 6px; margin-bottom: 2px;">
+              <div style="display: flex; justify-content: space-between; padding-left: 4px; margin-bottom: 1px;">
                 <span>· ${r.name}:</span>
                 <span>${formatMoney(r.bonusAmount)}</span>
               </div>
@@ -316,13 +323,13 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           </div>
         ` : ''}
       </div>
-      <div style="border-bottom: 1px dashed black; margin-bottom: 8px;"></div>
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       ` : ''}
 
       ${tc.zShowCashRegisterMatch !== false ? `
       <!-- Cash Register Match -->
-      <div style="font-size: 12px; font-weight: bold; margin-top: 8px; margin-bottom: 16px; display: flex; flex-direction: column; gap: 4px;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Cuadre de Caja (Efectivo)</h3>
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Cuadre de Caja (Efectivo)</h3>
         
         <div style="display: flex; justify-content: space-between;">
           <span>Efectivo Esperado en Caja:</span>
@@ -333,24 +340,23 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <span>${formatMoney(countedCash)}</span>
         </div>` : ''}
         
-        ${tc.zShowCurrentMoney === true ? `<div style="border-top: 1px solid black; padding-top: 4px; display: flex; justify-content: space-between; font-weight: 900; font-size: 14px; margin-top: 4px;">
+        ${tc.zShowCurrentMoney === true ? `<div style="border-top: 1px solid black; padding-top: 2px; margin-top: 2px; display: flex; justify-content: space-between; font-weight: 900; font-size: 12px;">
           <span>${difference === 0 ? 'CUADRE EXACTO' : (difference > 0 ? 'SOBRANTE' : 'FALTANTE')}:</span>
           <span>${formatMoney(Math.abs(difference))}</span>
         </div>` : ''}
       </div>
       ` : ''}
 
-      <div style="border-bottom: 3px solid black; margin: 12px 0;"></div>
-
       ${tc.zShowProductsSold !== false ? `
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       <!-- Products Sold Summary -->
-      <div style="font-size: 12px; font-weight: bold;">
-        <h3 style="text-align: center; border: 2px solid black; padding: 4px 0; margin-bottom: 8px; font-weight: 900; text-transform: uppercase;">Productos Vendidos</h3>
-        <table style="width: 100%; text-align: left; table-layout: fixed; border-collapse: collapse;">
+      <div style="font-size: 10.5px; font-weight: bold;">
+        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Productos Vendidos</h3>
+        <table style="width: 100%; text-align: left; table-layout: fixed; border-collapse: collapse; font-size: 10px;">
           <thead>
-            <tr style="border-bottom: 1px solid black;">
-              <th style="width: 75%; padding: 4px 0;">Producto</th>
-              <th style="width: 25%; padding: 4px 0; text-align: right;">Cant</th>
+            <tr style="border-bottom: 1px solid black; font-weight: 900;">
+              <th style="width: 75%; padding: 2px 0;">Producto</th>
+              <th style="width: 25%; padding: 2px 0; text-align: right;">Cant</th>
             </tr>
           </thead>
           <tbody>
@@ -362,10 +368,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       ${expensesHtml}
 
-      <!-- Footer -->
-      <div style="text-align: center; font-size: 12px; margin-top: 24px;">
-        ${tc.zShowSignatureLine !== false ? `<p style="border-top: 1px solid black; padding-top: 4px; margin-bottom: 16px; width: 75%; margin-left: auto; margin-right: auto;">Firma Cajero</p>` : ''}
-        <p style="font-weight: bold; margin: 0;">${tc.zReportFooterMsg}</p>
+      <!-- Footer Compacto -->
+      <div style="text-align: center; font-size: 10px; margin-top: 12px;">
+        ${tc.zShowSignatureLine !== false ? `<p style="border-top: 1px solid black; padding-top: 2px; margin-bottom: 8px; width: 70%; margin-left: auto; margin-right: auto;">Firma Cajero</p>` : ''}
+        <p style="font-weight: 900; margin: 0;">${tc.zReportFooterMsg}</p>
       </div>
 
     </div>
