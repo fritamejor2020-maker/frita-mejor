@@ -7,6 +7,7 @@ import { useAuthStore } from '../../store/useAuthStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
 import { useBranchStore } from '../../store/useBranchStore';
 import { useVendorTransferStore } from '../../store/useVendorTransferStore';
+import { generateZReportHTML } from '../../modules/pos/ZReportReceipt';
 import * as XLSX from 'xlsx';
 
 // ─── Helpers ────────────────────────────────────────────────
@@ -876,7 +877,7 @@ export const AdminFinancesTab = ({
 
       {/* Main Card */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100">
-        <h3 className="text-xl font-black text-gray-800 mb-6">Conciliación de Cierres</h3>
+        <h3 className="text-xl font-black text-gray-800 mb-6">📊 Historial de Cierres Z</h3>
 
         {filteredClosings.length === 0 && (
           <div className="text-center py-12 text-gray-400">
@@ -892,6 +893,59 @@ export const AdminFinancesTab = ({
               (sum: number, d: any) => sum + d.sold * d.unitPrice,
               0
             );
+
+            const handleDownloadZReport = (c: any) => {
+              const shift = c._raw;
+              if (!shift) {
+                alert('No hay datos brutos del cierre.');
+                return;
+              }
+              const storeState = useInventoryStore.getState();
+              const posSales = storeState.posSales || [];
+              const posExpenses = storeState.posExpenses || [];
+              const customers = storeState.customers || [];
+              const customerTypes = storeState.customerTypes || [];
+              const posSettings = storeState.posSettings || {};
+
+              const shiftSales = posSales.filter((s: any) => {
+                if (s.shiftId === shift.id) return true;
+                if (shift.openedAt && shift.closedAt) {
+                  const t = new Date(s.timestamp).getTime();
+                  return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                }
+                return false;
+              });
+
+              const shiftExpenses = posExpenses.filter((e: any) => {
+                if (e.shiftId === shift.id) return true;
+                if (shift.openedAt && shift.closedAt) {
+                  const t = new Date(e.timestamp || e.date).getTime();
+                  return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                }
+                return false;
+              });
+
+              const html = generateZReportHTML(
+                shift,
+                shiftSales,
+                shiftExpenses,
+                customers,
+                customerTypes,
+                posSettings.ticketConfig || {},
+                posSettings.cashDrawerCode || ''
+              );
+
+              const win = window.open('', '_blank', 'width=450,height=850');
+              if (win) {
+                win.document.write(html);
+                win.document.close();
+                setTimeout(() => {
+                  win.print();
+                }, 350);
+              } else {
+                alert('Por favor permita ventanas emergentes para imprimir o descargar el Cierre Z.');
+              }
+            };
 
             return (
               <div key={closing.id} className="py-6 first:pt-0 last:pb-0">
@@ -929,9 +983,16 @@ export const AdminFinancesTab = ({
                      </div>
                   </div>
 
-                  {/* Edit + Delete buttons */}
+                  {/* Action buttons */}
                   {closing._raw && (
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-2">
+                      <button
+                        className="flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold text-xs px-3 py-1.5 rounded-xl border border-blue-200 shadow-sm active:scale-95 transition-all"
+                        title="Imprimir o Descargar Ticket Cierre Z"
+                        onClick={() => handleDownloadZReport(closing)}
+                      >
+                        <span>📊</span> Ticket Z
+                      </button>
                       <button
                         className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 hover:bg-red-50 rounded-lg"
                         title="Editar cierre"

@@ -4402,7 +4402,7 @@ export function AdminView() {
       { id: 'POS_CARPETAS',   label: '🗂️ Carpetas POS' },
       { id: 'POS_ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
       { id: 'POS_HISTORY',    label: '🧾 Historial POS' },
-      { id: 'POS_CIERRES',    label: '💰 Cierres Caja' },
+      { id: 'POS_CIERRES',    label: '📊 Historial Cierres Z' },
       { id: 'CONTRATAS',      label: '🤝 Contratas' },
       { id: 'TICKET_CONFIG',  label: '🧾 Diseño Tickets' },
     ],
