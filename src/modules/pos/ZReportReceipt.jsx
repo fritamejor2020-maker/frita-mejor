@@ -4,7 +4,7 @@ import { parseDrawerCode } from '../../services/printerAgent';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
 
-export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '') => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '', paymentMethods = []) => {
   if (!shift) return '';
 
   const tc = {
@@ -51,6 +51,29 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const initial = shift.initialAmount || 0;
 
+  // ── Clasificación Dinámica de Métodos de Pago ──────────────────────────────────
+  const configuredMethods = (paymentMethods && paymentMethods.length > 0) ? paymentMethods : (ticketConfig?.paymentMethods || [
+    { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+    { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '5', name: 'DAVIPLATA', openDrawer: false, printReceipt: false, isTransfer: true }
+  ]);
+
+  const isDigital = (pmName) => {
+    const norm = String(pmName || '').trim().toUpperCase();
+    const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
+    if (!found) {
+      if (norm === 'EFECTIVO' || norm === 'IMPRIMIR' || norm === 'CASH') return false;
+      return true;
+    }
+    if (found.isTransfer === true) return true;
+    if (found.isTransfer === false || found.openDrawer === true) return false;
+    return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+  };
+
+  const digitalMethodsList = configuredMethods.filter(m => isDigital(m.name));
+
   // ── Separación entre Ventas Local y Ventas Contratas ──────────────────────────
   const contrataCustomers = (customers || []).filter(c => c.typeId);
   const contrataIds = new Set(contrataCustomers.map(c => c.id));
@@ -60,24 +83,37 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   const localSales    = safeSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
 
   // 1. DESGLOSE MEDIOS DE PAGO — LOCAL
-  const localCash     = localSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((a, s) => a + (s.total || 0), 0);
-  const localBancol   = localSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((a, s) => a + (s.total || 0), 0);
-  const localTarjeta  = localSales.filter(s => s.paymentMethod === 'TARJETA').reduce((a, s) => a + (s.total || 0), 0);
-  const localNequi    = localSales.filter(s => s.paymentMethod === 'NEQUI').reduce((a, s) => a + (s.total || 0), 0);
-  const localOther    = localSales.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod)).reduce((a, s) => a + (s.total || 0), 0);
+  const localCash = localSales
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((a, s) => a + (s.total || 0), 0);
 
-  const localTotalTransfer = localBancol + localTarjeta + localNequi + localOther;
+  const localMethodTotals = digitalMethodsList.map(m => {
+    const normM = m.name.trim().toUpperCase();
+    const sum = localSales
+      .filter(s => String(s.paymentMethod || '').trim().toUpperCase() === normM)
+      .reduce((a, s) => a + (s.total || 0), 0);
+    return { name: m.name, amount: sum };
+  });
+
+  const localTotalTransfer = localMethodTotals.reduce((a, m) => a + m.amount, 0);
   const localTotalSales    = localCash + localTotalTransfer;
 
   // 2. DESGLOSE MEDIOS DE PAGO — CONTRATAS
-  const contrataCash     = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-  const contrataBancol   = contrataSales.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-  const contrataTarjeta  = contrataSales.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-  const contrataNequi    = contrataSales.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-  const contrataOther    = contrataSales.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-  const contrataCredit   = contrataSales.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
+  const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
+  const contrataCash = contrataNonCredit
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((a, s) => a + (s.total || 0), 0);
 
-  const contrataTotalTransfer = contrataBancol + contrataTarjeta + contrataNequi + contrataOther;
+  const contrataMethodTotals = digitalMethodsList.map(m => {
+    const normM = m.name.trim().toUpperCase();
+    const sum = contrataNonCredit
+      .filter(s => String(s.paymentMethod || '').trim().toUpperCase() === normM)
+      .reduce((a, s) => a + (s.total || 0), 0);
+    return { name: m.name, amount: sum };
+  });
+
+  const contrataCredit       = contrataSales.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
+  const contrataTotalTransfer = contrataMethodTotals.reduce((a, m) => a + m.amount, 0);
   const contrataTotalSales    = contrataCash + contrataTotalTransfer + contrataCredit;
 
   // 3. DESGLOSE DETALLADO POR CLIENTE CONTRATA
@@ -203,10 +239,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Local</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
-        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Local:</span><span>${formatMoney(localBancol)}</span></div>` : ''}
-        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Local:</span><span>${formatMoney(localTarjeta)}</span></div>` : ''}
-        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Local:</span><span>${formatMoney(localNequi)}</span></div>` : ''}
-        ${localOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Local:</span><span>${formatMoney(localOther)}</span></div>` : ''}
+        ${localMethodTotals.map(m => `
+          <div style="display: flex; justify-content: space-between;"><span>${m.name} Local:</span><span>${formatMoney(m.amount)}</span></div>
+        `).join('')}
         <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 2px; margin-top: 2px; font-weight: 900;">
           <span>Total Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span>
         </div>
@@ -223,10 +258,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Contratas</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
-        ${tc.zShowBancolSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Bancolombia Contratas:</span><span>${formatMoney(contrataBancol)}</span></div>` : ''}
-        ${tc.zShowCardSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Tarjeta Contratas:</span><span>${formatMoney(contrataTarjeta)}</span></div>` : ''}
-        ${tc.zShowNequiSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Nequi Contratas:</span><span>${formatMoney(contrataNequi)}</span></div>` : ''}
-        ${contrataOther > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Otros Métodos Contratas:</span><span>${formatMoney(contrataOther)}</span></div>` : ''}
+        ${contrataMethodTotals.map(m => `
+          <div style="display: flex; justify-content: space-between;"><span>${m.name} Contratas:</span><span>${formatMoney(m.amount)}</span></div>
+        `).join('')}
         <div style="display: flex; justify-content: space-between; border-top: 1px dashed black; padding-top: 2px; margin-top: 2px; font-weight: 900;">
           <span>Total Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span>
         </div>

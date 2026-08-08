@@ -942,7 +942,8 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                       customers,
                       customerTypes,
                       posSettings.ticketConfig || {},
-                      posSettings.cashDrawerCode || ''
+                      posSettings.cashDrawerCode || '',
+                      posSettings.paymentMethods || []
                     );
 
                     const win = window.open('', '_blank', 'width=450,height=850');

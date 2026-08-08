@@ -560,7 +560,7 @@ export function PosView() {
       const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
       const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
       
-      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
+      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
       setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
     }
 
@@ -574,7 +574,7 @@ export function PosView() {
   const handleReprintZReport = (shift) => {
     const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
     const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
-    const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig);
+    const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, '', posSettings?.paymentMethods);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
 
@@ -1795,7 +1795,7 @@ export function PosView() {
               const shiftSales = (posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID');
               const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id);
               const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
-              const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode);
+              const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
               setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
               
               setShiftToCompleteCount(null);
@@ -2838,35 +2838,73 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
   const totalBonus = goalMet ? Math.round(excess * (activeGoal.bonusPercent / 100)) : 0;
 
-  // Separación Local vs Contratas
-  const { customers = [], customerTypes = [] } = useInventoryStore();
+  // Separación Local vs Contratas con Métodos Dinámicos
+  const { customers = [], customerTypes = [], posSettings } = useInventoryStore();
   const contrataCustomers = customers.filter(c => c.typeId);
   const contrataIds = new Set(contrataCustomers.map(c => c.id));
 
   const contrataSales = sales.filter(s => s.customerId && contrataIds.has(s.customerId));
   const localSales    = sales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
 
+  const configuredMethods = posSettings?.paymentMethods || [
+    { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+    { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
+  ];
+
+  const isDigital = (pmName) => {
+    const norm = String(pmName || '').trim().toUpperCase();
+    const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
+    if (!found) {
+      if (norm === 'EFECTIVO' || norm === 'IMPRIMIR' || norm === 'CASH') return false;
+      return true;
+    }
+    if (found.isTransfer === true) return true;
+    if (found.isTransfer === false || found.openDrawer === true) return false;
+    return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+  };
+
+  const digitalMethodsList = configuredMethods.filter(m => isDigital(m.name));
+
   // Local
-  const localCash     = localSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
-  const localBancol   = localSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((acc, s) => acc + s.total, 0);
-  const localTarjeta  = localSales.filter(s => s.paymentMethod === 'TARJETA').reduce((acc, s) => acc + s.total, 0);
-  const localNequi    = localSales.filter(s => s.paymentMethod === 'NEQUI').reduce((acc, s) => acc + s.total, 0);
-  const localTransfers = localBancol + localTarjeta + localNequi;
+  const localCash = localSales
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const localMethodTotals = digitalMethodsList.map(m => {
+    const normM = m.name.trim().toUpperCase();
+    const sum = localSales
+      .filter(s => String(s.paymentMethod || '').trim().toUpperCase() === normM)
+      .reduce((acc, s) => acc + s.total, 0);
+    return { name: m.name, amount: sum };
+  });
+
+  const localTransfers = localMethodTotals.reduce((acc, m) => acc + m.amount, 0);
   const localTotal    = localCash + localTransfers;
 
   // Contratas
-  const contrataCash     = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
-  const contrataBancol   = contrataSales.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
-  const contrataTarjeta  = contrataSales.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
-  const contrataNequi    = contrataSales.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((acc, s) => acc + s.total, 0);
+  const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
+  const contrataCash = contrataNonCredit
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const contrataMethodTotals = digitalMethodsList.map(m => {
+    const normM = m.name.trim().toUpperCase();
+    const sum = contrataNonCredit
+      .filter(s => String(s.paymentMethod || '').trim().toUpperCase() === normM)
+      .reduce((acc, s) => acc + s.total, 0);
+    return { name: m.name, amount: sum };
+  });
+
   const contrataCredit   = contrataSales.filter(s => s.contrataPaymentMethod === 'credit').reduce((acc, s) => acc + (s.creditAmount || s.total), 0);
-  const contrataTransfers = contrataBancol + contrataTarjeta + contrataNequi;
+  const contrataTransfers = contrataMethodTotals.reduce((acc, m) => acc + m.amount, 0);
   const contrataTotal    = contrataCash + contrataTransfers + contrataCredit;
 
   // Calculate expected
   const initial = shift.initialAmount || 0;
-  const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
-  const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+  const cashSales = localCash + contrataCash;
+  const otherSales = localTransfers + contrataTransfers;
   const retiros = (expenses || []).filter(e => e.type !== 'deposito');
   const depositos = (expenses || []).filter(e => e.type === 'deposito');
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
@@ -2910,9 +2948,11 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
                   <span>{formatMoney(localTotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-300"><span>Efectivo:</span> <span>{formatMoney(localCash)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Bancolombia:</span> <span>{formatMoney(localBancol)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Tarjeta:</span> <span>{formatMoney(localTarjeta)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Nequi:</span> <span>{formatMoney(localNequi)}</span></div>
+                {localMethodTotals.map(m => (
+                  <div key={m.name} className="flex justify-between text-gray-400">
+                    <span>{m.name}:</span> <span>{formatMoney(m.amount)}</span>
+                  </div>
+                ))}
                 <div className="flex justify-between text-emerald-300 border-t border-gray-800 pt-1 font-black"><span>Transferencias:</span> <span>{formatMoney(localTransfers)}</span></div>
               </div>
 
@@ -2923,9 +2963,11 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
                   <span>{formatMoney(contrataTotal)}</span>
                 </div>
                 <div className="flex justify-between text-gray-300"><span>Efectivo:</span> <span>{formatMoney(contrataCash)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Bancolombia:</span> <span>{formatMoney(contrataBancol)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Tarjeta:</span> <span>{formatMoney(contrataTarjeta)}</span></div>
-                <div className="flex justify-between text-gray-400"><span>Nequi:</span> <span>{formatMoney(contrataNequi)}</span></div>
+                {contrataMethodTotals.map(m => (
+                  <div key={m.name} className="flex justify-between text-gray-400">
+                    <span>{m.name}:</span> <span>{formatMoney(m.amount)}</span>
+                  </div>
+                ))}
                 {contrataCredit > 0 && <div className="flex justify-between text-red-400 font-bold"><span>A Crédito:</span> <span>{formatMoney(contrataCredit)}</span></div>}
                 <div className="flex justify-between text-purple-300 border-t border-gray-800 pt-1 font-black"><span>Transferencias:</span> <span>{formatMoney(contrataTransfers)}</span></div>
               </div>
