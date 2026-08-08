@@ -122,22 +122,39 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       const cs = contrataSales.filter(s => s.customerId === c.id);
       if (cs.length === 0) return null;
       const type = (customerTypes || []).find(t => t.id === c.typeId);
-      const cash     = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-      const bancol   = cs.filter(s => s.paymentMethod === 'BANCOLOMBIA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-      const tarjeta  = cs.filter(s => s.paymentMethod === 'TARJETA' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-      const nequi    = cs.filter(s => s.paymentMethod === 'NEQUI' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-      const other    = cs.filter(s => !['EFECTIVO', 'BANCOLOMBIA', 'TARJETA', 'NEQUI'].includes(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + (s.total || 0), 0);
-      const transfer = bancol + tarjeta + nequi + other;
-      const credit   = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
-      return { name: c.name, typeName: type?.name || '', cash, bancol, tarjeta, nequi, transfer, credit, total: cash + transfer + credit };
+      const csNonCredit = cs.filter(s => s.contrataPaymentMethod !== 'credit');
+
+      const cash = csNonCredit
+        .filter(s => !isDigital(s.paymentMethod))
+        .reduce((a, s) => a + (s.total || 0), 0);
+
+      const methodTotals = digitalMethodsList.map(m => {
+        const normM = m.name.trim().toUpperCase();
+        const sum = csNonCredit
+          .filter(s => String(s.paymentMethod || '').trim().toUpperCase() === normM)
+          .reduce((a, s) => a + (s.total || 0), 0);
+        return { name: m.name, amount: sum };
+      });
+
+      const transfer = methodTotals.reduce((a, m) => a + m.amount, 0);
+      const credit = cs
+        .filter(s => s.contrataPaymentMethod === 'credit')
+        .reduce((a, s) => a + (s.creditAmount || s.total || 0), 0);
+
+      return {
+        name: c.name,
+        typeName: type?.name || '',
+        cash,
+        methodTotals,
+        transfer,
+        credit,
+        total: cash + transfer + credit
+      };
     })
     .filter(Boolean);
 
   // 4. TOTALES GENERALES DEL TURNO
   const cashSalesTotal     = localCash + contrataCash;
-  const bancSalesTotal     = localBancol + contrataBancol;
-  const cardSalesTotal     = localTarjeta + contrataTarjeta;
-  const nequiSalesTotal    = localNequi + contrataNequi;
   const transferSalesTotal = localTotalTransfer + contrataTotalTransfer;
   const totalSales         = localTotalSales + contrataTotalSales;
 
@@ -281,9 +298,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <div style="margin-bottom: 4px; padding-bottom: 2px; border-bottom: 1px dashed #ccc;">
             <div style="font-weight: 900; margin-bottom: 1px;">${c.name} <span style="font-weight: normal; font-size: 9px;">(${c.typeName})</span></div>
             ${c.cash > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Efectivo:</span><span>${formatMoney(c.cash)}</span></div>` : ''}
-            ${c.bancol > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Bancolombia:</span><span>${formatMoney(c.bancol)}</span></div>` : ''}
-            ${c.tarjeta > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Tarjeta:</span><span>${formatMoney(c.tarjeta)}</span></div>` : ''}
-            ${c.nequi > 0 ? `<div style="display:flex;justify-content:space-between;"><span> · Nequi:</span><span>${formatMoney(c.nequi)}</span></div>` : ''}
+            ${c.methodTotals.filter(m => m.amount > 0).map(m => `
+              <div style="display:flex;justify-content:space-between;"><span> · ${m.name}:</span><span>${formatMoney(m.amount)}</span></div>
+            `).join('')}
             ${c.credit > 0 ? `<div style="display:flex;justify-content:space-between;font-weight:900;"><span> · A Crédito:</span><span>${formatMoney(c.credit)}</span></div>` : ''}
             <div style="display:flex;justify-content:space-between;font-weight:900;border-top:1px solid black;margin-top:1px;padding-top:1px;"><span> TOTAL CLIENTE:</span><span>${formatMoney(c.total)}</span></div>
           </div>
