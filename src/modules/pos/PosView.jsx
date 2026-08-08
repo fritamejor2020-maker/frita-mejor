@@ -1420,7 +1420,7 @@ export function PosView() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); setSelectedCustomer(''); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
               <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
