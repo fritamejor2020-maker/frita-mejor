@@ -126,6 +126,8 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(state.contrataPayments || [], v || [], 'contrataPayments');
       useInventoryStore.setState({ contrataPayments: merged });
     };
+    applicators[`customerTypes_${bid}`]   = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
+    applicators[`customers_${bid}`]       = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
     applicators[`deletedShiftIds_${bid}`]  = (v) => {
       // MERGE: no perder tombstones locales al recibir los de otra sede
       const local = useInventoryStore.getState().deletedShiftIds || [];

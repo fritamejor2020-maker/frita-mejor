@@ -41,6 +41,10 @@ function syncKey(key, value) {
   if (BRANCH_KEYS.includes(key)) {
     push(key, value, null).catch(() => {});
   }
+  // Para GLOBAL_KEYS (customerTypes, customers, etc.): también actualizar la llave de la sede activa si existe
+  if (GLOBAL_KEYS.includes(key) && activeBranchId) {
+    push(key, value, activeBranchId).catch(() => {});
+  }
 }
 
 // Helper: realiza un merge inteligente de arrays locales y remotos para evitar
@@ -404,7 +408,9 @@ export const useInventoryStore = create(
 
           // Procesar llaves globales — REMOTO REEMPLAZA LOCAL
           for (const key of GLOBAL_STORE_KEYS) {
-            const val = remote[key];
+            const branchKeyName = branchId ? `${key}_${branchId}` : null;
+            const branchVal = branchKeyName ? remote[branchKeyName] : null;
+            const val = (Array.isArray(branchVal) && branchVal.length > 0) ? branchVal : remote[key];
             if (val !== undefined && val !== null) {
               const isNonEmpty = Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0;
               if (isNonEmpty) {
