@@ -1050,6 +1050,11 @@ export function PosView() {
             )
           ) : (
             <>
+              <button
+                className="flex-1 min-w-[60px] max-w-[95px] shrink-0 sm:shrink bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-bold border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
+                onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}
+                title="Otros métodos de pago"
+              >💳 Pago</button>
               {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
                 <button
                   key={pm.id || pm.name}
@@ -1069,11 +1074,6 @@ export function PosView() {
                   title="Pagar a Crédito Contrata"
                 >CRÉDITO</button>
               )}
-              <button
-                className="flex-1 min-w-[60px] max-w-[95px] shrink-0 sm:shrink bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-bold border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
-                onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}
-                title="Otros métodos de pago"
-              >💳 Pago</button>
             </>
           )}
         </div>
