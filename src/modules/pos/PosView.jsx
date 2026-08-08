@@ -1064,10 +1064,10 @@ export function PosView() {
               ))}
               {customer?.typeId && (
                 <button
-                  className="flex-1 min-w-[85px] max-w-[140px] shrink-0 sm:shrink rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-black bg-purple-700 active:bg-purple-800 text-purple-100 border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
+                  className="flex-1 min-w-[65px] max-w-[125px] shrink-0 sm:shrink rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-black bg-red-600 active:bg-red-700 text-white border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
                   onClick={() => ticketItems.length > 0 && handleProcessPayment('EFECTIVO', total, true)}
-                  title="Pagar con Crédito Contrata"
-                >🤝 CONTRATA</button>
+                  title="Pagar a Crédito Contrata"
+                >CRÉDITO</button>
               )}
               <button
                 className="flex-1 min-w-[60px] max-w-[95px] shrink-0 sm:shrink bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-bold border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
