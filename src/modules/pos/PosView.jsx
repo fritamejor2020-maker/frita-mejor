@@ -1516,14 +1516,14 @@ export function PosView() {
 
                 <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
                   <span className={`font-bold leading-tight line-clamp-2 text-white ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
-                  <span className={`font-bold tracking-tight text-green-400 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
+                  <span className={`font-bold tracking-tight text-amber-500 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
                     {(() => {
                       const eff = getEffectivePrice(item, customer, customerTypes);
                       if (eff.isCustomPrice) {
                         return (
                           <span className="flex items-center gap-1.5 flex-wrap">
                             <span className="line-through text-gray-400 text-xs font-normal">{formatMoney(item.price)}</span>
-                            <span className="text-amber-300 font-black">{formatMoney(eff.price)}</span>
+                            <span className="text-amber-500 font-black">{formatMoney(eff.price)}</span>
                           </span>
                         );
                       }
@@ -1532,12 +1532,12 @@ export function PosView() {
                         const refPrice = (item.referencePrice && Number(item.referencePrice) > 0) ? Number(item.referencePrice) : (eff.originalPrice && Number(eff.originalPrice) > 0) ? Number(eff.originalPrice) : 0;
                         if (refPrice > 0) {
                           return (
-                            <span className="text-amber-300 font-bold flex items-center gap-1">
+                            <span className="text-amber-500 font-bold flex items-center gap-1">
                               <span>{formatMoney(refPrice)}</span>
                             </span>
                           );
                         }
-                        return <span className="text-amber-300 font-bold text-xs">Precio Variable</span>;
+                        return <span className="text-amber-500 font-bold text-xs">Precio Variable</span>;
                       }
                       return formatMoney(item.price);
                     })()}
