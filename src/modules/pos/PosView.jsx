@@ -720,7 +720,13 @@ export function PosView() {
       };
 
       if (currentSuspendedId) {
-        updatePosSale(currentSuspendedId, saleData);
+        const targetId = currentSuspendedId;
+        const existsInStore = (posSales || []).some(s => s.id === targetId);
+        if (existsInStore) {
+          updatePosSale(targetId, { ...saleData, id: targetId });
+        } else {
+          addPosSale({ ...saleData, id: targetId });
+        }
         toast.success('Venta en espera actualizada');
       } else {
         addPosSale(saleData);

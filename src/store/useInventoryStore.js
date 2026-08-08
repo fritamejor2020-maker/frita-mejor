@@ -1051,7 +1051,8 @@ export const useInventoryStore = create(
       // Ventas / Caja
       addPosSale: (sale) => {
         set((s) => {
-          const updatedSales = [{ ...sale, id: `SALE-${Date.now()}` }, ...(s.posSales || [])];
+          const saleId = sale.id || `SALE-${Date.now()}`;
+          const updatedSales = [{ ...sale, id: saleId }, ...(s.posSales || [])];
           let newInventory = s.inventory;
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           if (linkSales && sale.items && sale.status === 'PAID') {
