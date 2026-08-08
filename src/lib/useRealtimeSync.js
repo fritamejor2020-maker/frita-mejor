@@ -100,7 +100,20 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
     applicators[`attendance_logs_${bid}`] = (v) => {
       if (Array.isArray(v)) {
-        useAttendanceStore.setState({ attendanceLogs: v });
+        const deletedIds = new Set(useAttendanceStore.getState().deletedLogIds || []);
+        const filtered = (v || []).filter(l => {
+          if (!l || !l.id) return false;
+          if (deletedIds.has(l.id)) return false;
+          if (l.serialNo != null) {
+            if (deletedIds.has(String(l.serialNo))) return false;
+            if (deletedIds.has(Number(l.serialNo))) return false;
+            if (deletedIds.has(`LOG-TERM-001-${l.serialNo}`)) return false;
+            if (deletedIds.has(`LOG-${l.terminalId || 'TERM-001'}-${l.serialNo}`)) return false;
+            if (deletedIds.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return false;
+          }
+          return true;
+        });
+        useAttendanceStore.setState({ attendanceLogs: filtered });
       }
     };
     applicators[`attendance_contracts_${bid}`] = (v) => {
