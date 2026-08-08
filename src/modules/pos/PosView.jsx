@@ -686,36 +686,50 @@ export function PosView() {
   };
 
   const handleSaveSale = () => {
-    if (ticketItems.length === 0) return;
-    const c = customers?.find(cust => cust.id === selectedCustomer);
-    const saleData = {
-      customerId: selectedCustomer || null,
-      customerName: c?.name || pendingDeliveryInfo?.customerName || 'Venta Pausada',
-      customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
-      deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
-      serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
-      isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
-      publicId: pendingDeliveryInfo?.publicId || null,
-      items: ticketItems,
-      subtotal,
-      discountPercent,
-      discountAmount,
-      total,
-      status: 'SUSPENDED',
-      timestamp: new Date().toISOString()
-    };
-    if (activeSuspendedId) {
-      updatePosSale(activeSuspendedId, saleData);
-      toast.success('Venta en espera actualizada');
-    } else {
-      addPosSale(saleData);
-      toast.success('Venta guardada en espera');
-    }
-    // Clear ticket
+    if (!ticketItems || ticketItems.length === 0) return;
+
+    const itemsToSave = [...ticketItems];
+    const currentCustomer = selectedCustomer;
+    const currentSuspendedId = activeSuspendedId;
+    const c = customers?.find(cust => cust.id === currentCustomer);
+
+    // 1. Limpiar carrito e interfaz INMEDIATAMENTE al presionar Espera
     setTicketItems([]);
     setActiveSuspendedId(null);
     setPendingDeliveryInfo(null);
     setSelectedCustomer('');
+    try { usePosStore.getState().clearCart(); } catch (_) {}
+
+    // 2. Guardar la venta en espera en el store / Supabase
+    try {
+      const saleData = {
+        customerId: currentCustomer || null,
+        customerName: c?.name || pendingDeliveryInfo?.customerName || 'Venta Pausada',
+        customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
+        deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
+        serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+        isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+        publicId: pendingDeliveryInfo?.publicId || null,
+        items: itemsToSave,
+        subtotal,
+        discountPercent,
+        discountAmount,
+        total,
+        status: 'SUSPENDED',
+        timestamp: new Date().toISOString()
+      };
+
+      if (currentSuspendedId) {
+        updatePosSale(currentSuspendedId, saleData);
+        toast.success('Venta en espera actualizada');
+      } else {
+        addPosSale(saleData);
+        toast.success('Venta guardada en espera');
+      }
+    } catch (err) {
+      console.error('[POS] Error guardando venta en espera:', err);
+      toast.error('Error guardando venta en espera');
+    }
   };
 
   const handlePrintOrder = () => {
