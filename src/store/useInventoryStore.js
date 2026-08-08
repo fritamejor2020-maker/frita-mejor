@@ -1328,6 +1328,32 @@ export const useInventoryStore = create(
       // Al rehidratar desde localStorage, filtrar items borrados y duplicados
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+
+        // ── Limpiar customerTypes y customers DEMO del localStorage ──
+        // Si el localStorage tiene datos de plantilla (CTYPE-001, CTYPE-002, CUST-002),
+        // vaciarlos para que loadFromRemote traiga los datos reales de Supabase.
+        const DEMO_CTYPE_IDS = new Set(['CTYPE-001', 'CTYPE-002']);
+        const DEMO_CUST_IDS = new Set(['CUST-002']);
+        if (Array.isArray(state.customerTypes)) {
+          const realTypes = state.customerTypes.filter(ct => ct?.id && !DEMO_CTYPE_IDS.has(ct.id));
+          if (realTypes.length === 0) {
+            state.customerTypes = [];
+          } else {
+            state.customerTypes = realTypes;
+          }
+        }
+        if (Array.isArray(state.customers)) {
+          // Mantener CUST-001 (Cliente General) pero eliminar demos
+          const realCustomers = state.customers.filter(c => c?.id && !DEMO_CUST_IDS.has(c.id));
+          // Si solo queda CUST-001 (sin clientes contrata reales), vaciar para que Supabase los traiga
+          const hasRealContrata = realCustomers.some(c => c.typeId && !DEMO_CTYPE_IDS.has(c.typeId));
+          if (!hasRealContrata) {
+            state.customers = [];
+          } else {
+            state.customers = realCustomers;
+          }
+        }
+
         const deletedShifts = state.deletedShiftIds || [];
         if (deletedShifts.length > 0 && state.posShifts?.length > 0) {
           state.posShifts = state.posShifts.filter(s => !deletedShifts.includes(s.id));
