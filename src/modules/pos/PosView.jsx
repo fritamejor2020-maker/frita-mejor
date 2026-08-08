@@ -1516,7 +1516,7 @@ export function PosView() {
 
                 <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
                   <span className={`font-bold leading-tight line-clamp-2 text-white ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
-                  <span className={`font-bold tracking-tight text-green-400 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
+                  <span className={`font-bold tracking-tight text-amber-400 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
                     {(() => {
                       const eff = getEffectivePrice(item, customer, customerTypes);
                       if (eff.isCustomPrice) {
