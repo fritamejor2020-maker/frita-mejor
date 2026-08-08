@@ -113,6 +113,13 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
         useAttendanceStore.setState({ shiftOverrides: v });
       }
     };
+    applicators[`deleted_attendance_log_ids_${bid}`] = (v) => {
+      if (Array.isArray(v)) {
+        const current = useAttendanceStore.getState().deletedLogIds || [];
+        const merged = Array.from(new Set([...current, ...v]));
+        useAttendanceStore.setState({ deletedLogIds: merged });
+      }
+    };
     applicators[`inventory_${bid}`]        = (v) => {
       const state = useInventoryStore.getState();
       const deletedInv = new Set(state.deletedInventoryIds || []);

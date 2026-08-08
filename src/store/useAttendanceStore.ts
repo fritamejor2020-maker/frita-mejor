@@ -349,6 +349,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           if (serial != null) {
             newDeleted.push(String(serial));
             newDeleted.push(`LOG-TERM-001-${serial}`);
+            if (targetLog?.terminalId) {
+              newDeleted.push(`LOG-${targetLog.terminalId}-${serial}`);
+            }
             if (targetLog?.employeeNo) {
               newDeleted.push(`LOG-TERM-001-${targetLog.employeeNo}-${serial}`);
             }
@@ -360,6 +363,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           };
         });
         push('attendance_logs', get().attendanceLogs);
+        push('deleted_attendance_log_ids', get().deletedLogIds);
       },
 
       deleteAttendanceLogsForDate: (employeeNo, dateStr) => {
@@ -398,6 +402,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           };
         });
         push('attendance_logs', get().attendanceLogs);
+        push('deleted_attendance_log_ids', get().deletedLogIds);
       },
 
       clearAllAttendanceLogs: () => {
