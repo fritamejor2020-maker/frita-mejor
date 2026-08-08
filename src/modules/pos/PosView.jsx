@@ -1014,8 +1014,8 @@ export function PosView() {
 
         <div className="w-px h-7 bg-gray-700 shrink-0" />
 
-        {/* ── Botones de pago — SIEMPRE VISIBLES ── */}
-        <div className="flex items-center gap-1.5 flex-1 flex-wrap">
+        {/* ── Botones de pago — ADAPTATIVOS Y RESPONSIVOS ── */}
+        <div className="flex items-center gap-1 sm:gap-1.5 flex-1 min-w-0 overflow-x-auto no-scrollbar py-1">
           {!activeShift ? (
             !syncReady ? (
               <button
@@ -1033,23 +1033,26 @@ export function PosView() {
               {(posSettings?.paymentMethods || [{ id: '1', name: 'EFECTIVO' }]).map((pm, idx) => (
                 <button
                   key={pm.id || pm.name}
-                  className={`shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px] ${
+                  className={`flex-1 min-w-[65px] max-w-[125px] shrink-0 sm:shrink rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-black border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px] ${
                     idx === 0
                       ? 'bg-[#1c6b3a] active:bg-[#155a30] text-green-100'
                       : 'bg-[#0d6ebd] active:bg-[#0a5fa8] text-blue-100'
                   }`}
                   onClick={() => ticketItems.length > 0 && handleProcessPayment(pm.name, total)}
+                  title={`Pagar con ${pm.name}`}
                 >{pm.name}</button>
               ))}
               {customer?.typeId && (
                 <button
-                  className="shrink-0 rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-black bg-purple-700 active:bg-purple-800 text-purple-100 border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+                  className="flex-1 min-w-[85px] max-w-[140px] shrink-0 sm:shrink rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-black bg-purple-700 active:bg-purple-800 text-purple-100 border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
                   onClick={() => ticketItems.length > 0 && handleProcessPayment('EFECTIVO', total, true)}
-                >🤝 CRÉDITO CONTRATA</button>
+                  title="Pagar con Crédito Contrata"
+                >🤝 CONTRATA</button>
               )}
               <button
-                className="shrink-0 bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-none shadow-md active:scale-95 transition-all whitespace-nowrap min-h-[36px]"
+                className="flex-1 min-w-[60px] max-w-[95px] shrink-0 sm:shrink bg-[#4a4e69] active:bg-[#35384f] text-white rounded-xl px-2 sm:px-3 py-1.5 text-[10.5px] sm:text-xs font-bold border-none shadow-md active:scale-95 transition-all text-center truncate flex items-center justify-center min-h-[36px]"
                 onClick={() => ticketItems.length > 0 && setShowPaymentModal(true)}
+                title="Otros métodos de pago"
               >💳 Pago</button>
             </>
           )}
