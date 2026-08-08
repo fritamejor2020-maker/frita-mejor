@@ -199,6 +199,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
 
       <!-- 1. VENTAS LOCAL COMPACTO -->
+      ${tc.zShowPaymentMethods !== false ? `
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Local</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCash)}</span></div>` : ''}
@@ -215,9 +216,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       </div>
 
       <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
+      ` : ''}
 
       <!-- 2. VENTAS CONTRATAS COMPACTO -->
-      ${tc.zShowContratasBreakdown !== false ? `
+      ${(tc.zShowLocalVsContratas !== false || contrataTotalSales > 0) ? `
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Ventas Contratas</h3>
         ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCash)}</span></div>` : ''}
@@ -234,8 +236,11 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         </div>
       </div>
 
-      <!-- DESGLOSE POR CLIENTE CONTRATA -->
-      ${contrataByClient.length > 0 ? `
+      <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
+      ` : ''}
+
+      <!-- 3. DESGLOSE POR CLIENTE CONTRATA -->
+      ${(tc.zShowContratasBreakdown !== false && contrataByClient.length > 0) ? `
       <div style="font-size: 10px; font-weight: bold; margin-bottom: 6px; border: 1px solid black; padding: 4px;">
         <h4 style="text-align: center; border-bottom: 1px solid black; padding-bottom: 2px; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase;">Detalle por Cliente Contrata</h4>
         ${contrataByClient.map(c => `
@@ -250,7 +255,6 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           </div>
         `).join('')}
       </div>
-      ` : ''}
 
       <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       ` : ''}
