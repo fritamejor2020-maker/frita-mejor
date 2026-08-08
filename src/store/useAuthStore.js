@@ -394,6 +394,14 @@ export const useAuthStore = create(
 
         return state;
       },
+      onRehydrateStorage: () => (state) => {
+        if (!state) return;
+        // Si estamos en entorno Electron, requerir siempre inicio de sesión al abrir la app
+        if (typeof window !== 'undefined' && window.__ELECTRON__) {
+          state.user = null;
+          state.activeBranchId = null;
+        }
+      },
     }
   )
 );
