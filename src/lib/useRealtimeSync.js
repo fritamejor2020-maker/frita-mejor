@@ -148,6 +148,12 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
     applicators[`customerTypes_${bid}`]   = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
     applicators[`customers_${bid}`]       = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
+    applicators[`posSettings_${bid}`]     = (v) => {
+      if (v && typeof v === 'object') {
+        const current = useInventoryStore.getState().posSettings || {};
+        useInventoryStore.setState({ posSettings: { ...current, ...v } });
+      }
+    };
     applicators[`deletedShiftIds_${bid}`]  = (v) => {
       // MERGE: no perder tombstones locales al recibir los de otra sede
       const local = useInventoryStore.getState().deletedShiftIds || [];

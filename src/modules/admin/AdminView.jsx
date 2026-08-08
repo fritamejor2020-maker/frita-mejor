@@ -3146,15 +3146,21 @@ function PosConfigPanel() {
   };
 
   const handleAddMethod = () => {
-    setMethods([...methods, { id: Date.now().toString(), name: 'NUEVO PAGO', openDrawer: false, printReceipt: true }]);
+    const updated = [...methods, { id: Date.now().toString(), name: 'NUEVO PAGO', openDrawer: false, printReceipt: true, isTransfer: true }];
+    setMethods(updated);
+    updatePosSettings({ ...posSettings, paymentMethods: updated, cashDrawerCode, printerName, supervisorPin, gridSize });
   };
 
   const handleUpdateMethod = (id, field, value) => {
-    setMethods(methods.map(m => m.id === id ? { ...m, [field]: value } : m));
+    const updated = methods.map(m => m.id === id ? { ...m, [field]: value } : m);
+    setMethods(updated);
+    updatePosSettings({ ...posSettings, paymentMethods: updated, cashDrawerCode, printerName, supervisorPin, gridSize });
   };
 
   const handleRemoveMethod = (id) => {
-    setMethods(methods.filter(m => m.id !== id));
+    const updated = methods.filter(m => m.id !== id);
+    setMethods(updated);
+    updatePosSettings({ ...posSettings, paymentMethods: updated, cashDrawerCode, printerName, supervisorPin, gridSize });
   };
 
   return (
