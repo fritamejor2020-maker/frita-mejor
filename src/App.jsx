@@ -252,9 +252,21 @@ function App() {
       broadcastState('frita-mejor-inventory', { products, posSettings, posRegisters, loadTemplates, posShifts, posSales });
     });
 
+    // 3. Auto-restaurar foco de teclado en la app Electron al interactuar con campos de texto
+    const handleGlobalPointer = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        if (window.cajeroAPI && typeof window.cajeroAPI.restoreFocus === 'function') {
+          window.cajeroAPI.restoreFocus();
+        }
+      }
+    };
+    document.addEventListener('pointerdown', handleGlobalPointer, true);
+
     return () => {
       unsubLogistics();
       unsubInventory();
+      document.removeEventListener('pointerdown', handleGlobalPointer, true);
     };
   }, []);
 
