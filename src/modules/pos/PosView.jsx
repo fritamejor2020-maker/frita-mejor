@@ -1348,32 +1348,6 @@ export function PosView() {
 
         {/* Ticket Items List */}
         <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
-          {activeSuspendedId && (
-            <div className="mx-1 mb-2.5 p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/40 flex items-center justify-between gap-2 shadow-sm animate-fade-in">
-              <div className="flex items-center gap-2 min-w-0">
-                <span className="text-base animate-pulse">✏️</span>
-                <div className="min-w-0">
-                  <p className="text-xs font-black text-amber-400 truncate">
-                    Editando Venta en Espera {pendingDeliveryInfo?.customerName ? `(${pendingDeliveryInfo.customerName})` : ''}
-                  </p>
-                  <p className="text-[10px] text-amber-300/70 font-semibold truncate">
-                    ID: #{activeSuspendedId.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').slice(-6)}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setActiveSuspendedId(null);
-                  setPendingDeliveryInfo(null);
-                  toast.info('Venta desvinculada. Los productos se mantienen en el carrito como una nueva venta.');
-                }}
-                className="shrink-0 px-2 py-1 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 rounded-lg text-[10px] font-black active:scale-95 transition-all"
-                title="Desvincular para guardar como nueva venta"
-              >
-                Desvincular
-              </button>
-            </div>
-          )}
           {ticketItems.length === 0 ? (
             <div className="h-full flex flex-col items-center justify-center text-gray-600 opacity-50">
               <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
