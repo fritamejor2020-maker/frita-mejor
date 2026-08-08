@@ -796,11 +796,15 @@ export function PosView() {
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
     // Find the method config
     const methods = posSettings?.paymentMethods || [
-      { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: true }
+      { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false }
     ];
+    const normName = String(methodName || '').trim().toUpperCase();
+    const foundMethod = methods.find(m => String(m.name || '').trim().toUpperCase() === normName);
+    const creditMethod = methods.find(m => String(m.name || '').trim().toUpperCase() === 'CRÉDITO');
+
     const methodConfig = isCredit
-      ? { name: 'CRÉDITO', openDrawer: false, printReceipt: true }
-      : (methods.find(m => m.name === methodName) || methods[0]);
+      ? (creditMethod || { name: 'CRÉDITO', openDrawer: false, printReceipt: false })
+      : (foundMethod || { name: methodName, openDrawer: false, printReceipt: false });
 
     // Check if this is a contrata client
     const saleCustomer = customers?.find(c => c.id === selectedCustomer);
@@ -892,14 +896,14 @@ export function PosView() {
     setActiveSuspendedId(null);
     setSelectedCustomer('');
     
-    // Print trigger logic based on config
-    let autoPrint = methodConfig.printReceipt;
-    let autoDrawer = methodConfig.openDrawer;
+    // Print trigger logic strictly based on hardware configuration
+    let autoPrint = !!methodConfig.printReceipt;
+    let autoDrawer = !!methodConfig.openDrawer;
 
     if (autoPrint || autoDrawer) {
       handlePrintReceipt(saleData, autoDrawer, autoPrint);
-    } else if (confirm('Venta cobrada con éxito. ¿Desea imprimir recibo?')) {
-      handlePrintReceipt(saleData, true, true);
+    } else {
+      toast.success(`Venta registrada con éxito (${methodConfig.name})`, { icon: '✅' });
     }
   };
 
