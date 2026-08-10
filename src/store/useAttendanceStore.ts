@@ -104,9 +104,11 @@ interface AttendanceStoreState {
 }
 
 const INITIAL_SHIFTS: ShiftTemplate[] = [
-  { id: 'SHIFT-MANANA', name: 'Turno Mañana', startTime: '06:00', endTime: '14:00', targetMinutes: 480, color: '#3B82F6', isFixed: false },
-  { id: 'SHIFT-TARDE',  name: 'Turno Tarde',  startTime: '14:00', endTime: '22:00', targetMinutes: 480, color: '#F59E0B', isFixed: false },
-  { id: 'SHIFT-NOCHE',  name: 'Turno Noche',  startTime: '22:00', endTime: '06:00', targetMinutes: 480, color: '#6366F1', isFixed: false },
+  { id: 'SHIFT-MANANA-COMPLETO', name: 'Turno Mañana (6am - 2pm)', startTime: '06:00', endTime: '14:00', targetMinutes: 480, color: '#3B82F6', isFixed: false },
+  { id: 'SHIFT-MEDIA-MANANA',     name: 'Turno Media Mañana (6am - 12pm)', startTime: '06:00', endTime: '12:00', targetMinutes: 360, color: '#06B6D4', isFixed: false },
+  { id: 'SHIFT-TARDE-COMPLETO',  name: 'Turno Tarde (2pm - 9pm)', startTime: '14:00', endTime: '21:00', targetMinutes: 420, color: '#F59E0B', isFixed: false },
+  { id: 'SHIFT-PICO-TARDE',      name: 'Turno Pico Tarde (4pm - 9pm)', startTime: '16:00', endTime: '21:00', targetMinutes: 300, color: '#EF4444', isFixed: false },
+  { id: 'SHIFT-INTERMEDIO-TARDE',name: 'Turno Intermedio (3pm - 7pm)', startTime: '15:00', endTime: '19:00', targetMinutes: 240, color: '#8B5CF6', isFixed: false },
 ];
 
 const INITIAL_TERMINALS: BiometricTerminal[] = [

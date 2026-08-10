@@ -276,12 +276,23 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
               assignedShift = shiftTemplates.find((s) => s.id === contract.defaultShiftId);
             } else if (rawFirstIn) {
               const firstInMins = timeToMinutes(rawFirstIn.slice(0, 5));
-              let closestDist = Infinity;
+              const lastOutMins = rawLastOut ? timeToMinutes(rawLastOut.slice(0, 5)) : null;
+
+              let bestScore = Infinity;
               shiftTemplates.forEach((st) => {
                 const stStartMins = timeToMinutes(st.startTime);
-                const dist = Math.abs(firstInMins - stStartMins);
-                if (dist < closestDist) {
-                  closestDist = dist;
+                const stEndMins = timeToMinutes(st.endTime);
+
+                // Distancia a hora de entrada
+                const startDist = Math.abs(firstInMins - stStartMins);
+                // Distancia a hora de salida si existe
+                const endDist = lastOutMins !== null ? Math.abs(lastOutMins - stEndMins) : 0;
+
+                // Score ponderado (la hora de entrada tiene peso 1.0 y salida 0.6)
+                const totalScore = startDist + (lastOutMins !== null ? endDist * 0.6 : 0);
+
+                if (totalScore < bestScore) {
+                  bestScore = totalScore;
                   assignedShift = st;
                 }
               });
