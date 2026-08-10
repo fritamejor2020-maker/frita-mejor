@@ -192,8 +192,9 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   };
 
   const handleDeleteTemplate = (id: string, name: string) => {
-    if (confirm(`¿Estás seguro de eliminar el turno "${name}"?`)) {
+    if (confirm(`¿Estás seguro de eliminar el turno "${name}" del sistema?`)) {
       deleteShiftTemplate(id);
+      setGrpSelectedShiftIds((prev) => prev.filter((item) => item !== id));
     }
   };
 
@@ -397,6 +398,18 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                                 <span className="text-[10px] font-extrabold text-gray-500">🕒 {st.startTime} a {st.endTime}</span>
                               </div>
                             </div>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteTemplate(st.id, st.name);
+                              }}
+                              className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg transition-colors cursor-pointer shrink-0"
+                              title="Eliminar este turno por completo"
+                            >
+                              <Trash2 size={15} />
+                            </button>
                           </label>
                         );
                       })}
