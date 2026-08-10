@@ -29,7 +29,7 @@ const TEMPLATE_EXAMPLE_ROWS = [
 ];
 
 export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeNo }: AdminEmployeeBiometricsModalProps) {
-  const { employeeContracts, shiftTemplates, terminals, upsertEmployeeContract, deleteEmployeeContract, pushUserToTerminal, deleteUserFromTerminal, fetchTerminalUsers } = useAttendanceStore();
+  const { employeeContracts, shiftTemplates, scheduleGroups = [], terminals, upsertEmployeeContract, deleteEmployeeContract, pushUserToTerminal, deleteUserFromTerminal, fetchTerminalUsers } = useAttendanceStore();
   const { branches = [] } = useBranchStore();
 
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
@@ -37,7 +37,8 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   const [fullName, setFullName] = useState('');
   const [branchId, setBranchId] = useState(branches[0]?.id || 'BRANCH-001');
   const [shiftType, setShiftType] = useState<'FIXED' | 'VARIABLE'>('VARIABLE');
-  const [defaultShiftId, setDefaultShiftId] = useState(shiftTemplates[0]?.id || 'SHIFT-MANANA');
+  const [scheduleGroupId, setScheduleGroupId] = useState(scheduleGroups[0]?.id || 'GROUP-LOCAL');
+  const [defaultShiftId, setDefaultShiftId] = useState(shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
   const [weeklyTargetHours, setWeeklyTargetHours] = useState(44);
   const [baseHourlyRate, setBaseHourlyRate] = useState(6500);
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(9750);
@@ -92,7 +93,8 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     setFullName(c.fullName);
     setBranchId(c.branchId);
     setShiftType(c.shiftType);
-    setDefaultShiftId(c.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA');
+    setScheduleGroupId(c.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
+    setDefaultShiftId(c.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
     setWeeklyTargetHours(c.weeklyTargetHours);
     setBaseHourlyRate(c.baseHourlyRate);
     setOvertimeHourlyRate(c.overtimeHourlyRate);
@@ -106,7 +108,8 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     setFullName('');
     setBranchId(branches[0]?.id || 'BRANCH-001');
     setShiftType('VARIABLE');
-    setDefaultShiftId(shiftTemplates[0]?.id || 'SHIFT-MANANA');
+    setScheduleGroupId(scheduleGroups[0]?.id || 'GROUP-LOCAL');
+    setDefaultShiftId(shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
     setWeeklyTargetHours(44);
     setBaseHourlyRate(6500);
     setOvertimeHourlyRate(9750);
@@ -124,6 +127,7 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
       fullName,
       branchId,
       shiftType,
+      scheduleGroupId,
       defaultShiftId,
       weeklyTargetHours: Number(weeklyTargetHours),
       baseHourlyRate: Number(baseHourlyRate),
@@ -593,15 +597,29 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-black text-gray-700">Turno Predeterminado</label>
+                  <label className="block text-xs font-black text-gray-700">Horario Maestro Asignado (Grupo de Turnos)</label>
                   <button
                     type="button"
                     onClick={() => setShowShiftTemplatesSubModal(true)}
                     className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
                   >
-                    ⚙️ Configurar / Crear Turnos
+                    ⚙️ Gestionar Horarios y Turnos
                   </button>
                 </div>
+                <select
+                  value={scheduleGroupId}
+                  onChange={(e) => setScheduleGroupId(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 mb-3"
+                >
+                  {scheduleGroups.map((grp) => (
+                    <option key={grp.id} value={grp.id}>
+                      📅 {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
+                    </option>
+                  ))}
+                  {scheduleGroups.length === 0 && <option value="GROUP-LOCAL">📅 Horario del Local (Variables)</option>}
+                </select>
+
+                <label className="block text-xs font-black text-gray-700 mb-1">Turno Predeterminado (Si es Fijo)</label>
                 <select
                   value={defaultShiftId}
                   onChange={(e) => setDefaultShiftId(e.target.value)}

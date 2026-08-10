@@ -83,6 +83,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
   const {
     employeeContracts,
     shiftTemplates,
+    scheduleGroups,
     attendanceLogs,
     deletedLogIds,
     shiftOverrides,
@@ -278,8 +279,14 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
               const firstInMins = timeToMinutes(rawFirstIn.slice(0, 5));
               const lastOutMins = rawLastOut ? timeToMinutes(rawLastOut.slice(0, 5)) : null;
 
+              // Filtrar únicamente los turnos que pertenecen al Grupo de Horarios asignado al trabajador
+              const empGroup = scheduleGroups?.find((g) => g.id === contract.scheduleGroupId);
+              const candidateTemplates = (empGroup && empGroup.shiftIds && empGroup.shiftIds.length > 0)
+                ? shiftTemplates.filter((st) => empGroup.shiftIds.includes(st.id))
+                : shiftTemplates;
+
               let bestScore = Infinity;
-              shiftTemplates.forEach((st) => {
+              candidateTemplates.forEach((st) => {
                 const stStartMins = timeToMinutes(st.startTime);
                 const stEndMins = timeToMinutes(st.endTime);
 

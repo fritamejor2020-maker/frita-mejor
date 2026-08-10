@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save } from 'lucide-react';
-import { useAttendanceStore, ShiftTemplate, EmployeeContract } from '../../../store/useAttendanceStore';
+import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save, Layers, ListChecks } from 'lucide-react';
+import { useAttendanceStore, ShiftTemplate, ShiftScheduleGroup, EmployeeContract } from '../../../store/useAttendanceStore';
 
 interface ShiftTemplatesModalProps {
   onClose: () => void;
@@ -9,16 +9,27 @@ interface ShiftTemplatesModalProps {
 export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   const {
     shiftTemplates,
+    scheduleGroups = [],
     employeeContracts,
     addShiftTemplate,
     updateShiftTemplate,
     deleteShiftTemplate,
+    addScheduleGroup,
+    updateScheduleGroup,
+    deleteScheduleGroup,
     updateEmployeeContract,
   } = useAttendanceStore();
 
-  const [activeTab, setActiveTab] = useState<'templates' | 'employees'>('templates');
+  const [activeTab, setActiveTab] = useState<'groups' | 'templates' | 'employees'>('groups');
 
-  // Form states for creating/editing template
+  // Form states for ShiftScheduleGroup
+  const [editingGroup, setEditingGroup] = useState<ShiftScheduleGroup | null>(null);
+  const [isCreatingGroup, setIsCreatingGroup] = useState(false);
+  const [grpName, setGrpName] = useState('');
+  const [grpDescription, setGrpDescription] = useState('');
+  const [grpSelectedShiftIds, setGrpSelectedShiftIds] = useState<string[]>([]);
+
+  // Form states for ShiftTemplate
   const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
   const [tplName, setTplName] = useState('');
@@ -26,16 +37,75 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   const [tplEndTime, setTplEndTime] = useState('14:00');
   const [tplColor, setTplColor] = useState('#3B82F6');
 
-  // Form states for editing employee contract
+  // Form states for EmployeeContract
   const [editingEmpContract, setEditingEmpContract] = useState<EmployeeContract | null>(null);
   const [empShiftType, setEmpShiftType] = useState<'FIXED' | 'VARIABLE'>('VARIABLE');
-  const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>('SHIFT-MANANA');
+  const [empScheduleGroupId, setEmpScheduleGroupId] = useState<string>('GROUP-LOCAL');
+  const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>('SHIFT-MANANA-COMPLETO');
   const [empWeeklyTargetHours, setEmpWeeklyTargetHours] = useState<number>(44);
   const [empBaseHourlyRate, setEmpBaseHourlyRate] = useState<number>(6500);
 
-  // Colors preset
   const PRESET_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
 
+  // Handlers for Groups
+  const handleStartCreateGroup = () => {
+    setEditingGroup(null);
+    setGrpName('');
+    setGrpDescription('');
+    setGrpSelectedShiftIds(shiftTemplates.map((s) => s.id));
+    setIsCreatingGroup(true);
+  };
+
+  const handleStartEditGroup = (grp: ShiftScheduleGroup) => {
+    setIsCreatingGroup(false);
+    setEditingGroup(grp);
+    setGrpName(grp.name);
+    setGrpDescription(grp.description || '');
+    setGrpSelectedShiftIds(grp.shiftIds || []);
+  };
+
+  const handleToggleGroupShift = (shiftId: string) => {
+    setGrpSelectedShiftIds((prev) =>
+      prev.includes(shiftId) ? prev.filter((id) => id !== shiftId) : [...prev, shiftId]
+    );
+  };
+
+  const handleSaveGroup = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!grpName.trim()) {
+      alert('Ingresa un nombre para el Horario / Grupo.');
+      return;
+    }
+    if (grpSelectedShiftIds.length === 0) {
+      alert('Selecciona al menos un turno para este Horario.');
+      return;
+    }
+
+    if (editingGroup) {
+      updateScheduleGroup(editingGroup.id, {
+        name: grpName.trim(),
+        description: grpDescription.trim(),
+        shiftIds: grpSelectedShiftIds,
+      });
+    } else {
+      addScheduleGroup({
+        name: grpName.trim(),
+        description: grpDescription.trim(),
+        shiftIds: grpSelectedShiftIds,
+      });
+    }
+
+    setIsCreatingGroup(false);
+    setEditingGroup(null);
+  };
+
+  const handleDeleteGroup = (id: string, name: string) => {
+    if (confirm(`¿Estás seguro de eliminar el horario "${name}"?`)) {
+      deleteScheduleGroup(id);
+    }
+  };
+
+  // Handlers for Templates
   const handleStartCreateTemplate = () => {
     setEditingTemplate(null);
     setTplName('');
@@ -62,7 +132,7 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   const handleSaveTemplate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!tplName.trim()) {
-      alert('Por favor ingresa un nombre para la plantilla.');
+      alert('Por favor ingresa un nombre para el turno.');
       return;
     }
 
@@ -93,15 +163,17 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   };
 
   const handleDeleteTemplate = (id: string, name: string) => {
-    if (confirm(`¿Estás seguro de eliminar la plantilla "${name}"?`)) {
+    if (confirm(`¿Estás seguro de eliminar el turno "${name}"?`)) {
       deleteShiftTemplate(id);
     }
   };
 
+  // Handlers for Contracts
   const handleStartEditEmpContract = (emp: EmployeeContract) => {
     setEditingEmpContract(emp);
     setEmpShiftType(emp.shiftType || 'VARIABLE');
-    setEmpDefaultShiftId(emp.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA');
+    setEmpScheduleGroupId(emp.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
+    setEmpDefaultShiftId(emp.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
     setEmpWeeklyTargetHours(emp.weeklyTargetHours || 44);
     setEmpBaseHourlyRate(emp.baseHourlyRate || 6500);
   };
@@ -113,6 +185,7 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
     updateEmployeeContract({
       ...editingEmpContract,
       shiftType: empShiftType,
+      scheduleGroupId: empScheduleGroupId,
       defaultShiftId: empDefaultShiftId,
       weeklyTargetHours: Number(empWeeklyTargetHours) || 44,
       baseHourlyRate: Number(empBaseHourlyRate) || 6500,
@@ -129,11 +202,11 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
         <div className="bg-gray-900 text-white px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-amber-400 text-gray-950 rounded-2xl">
-              <Clock size={22} />
+              <Layers size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-tight">Gestión de Turnos y Plantillas de Horario</h2>
-              <p className="text-xs text-gray-400 font-medium">Configura catálogos de turnos y asigna tipos de turno a cada trabajador</p>
+              <h2 className="text-xl font-black tracking-tight">Gestión de Horarios y Grupos de Turnos</h2>
+              <p className="text-xs text-gray-400 font-medium">Crea conjuntos de turnos posibles y asígnalos a cada persona para auto-detección automática</p>
             </div>
           </div>
 
@@ -146,43 +219,210 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-2">
+        <div className="flex border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-2 overflow-x-auto">
+          <button
+            onClick={() => { setActiveTab('groups'); setEditingGroup(null); setIsCreatingGroup(false); }}
+            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+              activeTab === 'groups'
+                ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
+                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+            }`}
+          >
+            <Layers size={16} /> 1. Horarios Maestro ({scheduleGroups.length})
+          </button>
+
           <button
             onClick={() => { setActiveTab('templates'); setEditingTemplate(null); setIsCreatingTemplate(false); }}
-            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'templates'
                 ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
-            <Clock size={16} /> Plantillas de Horarios ({shiftTemplates.length})
+            <Clock size={16} /> 2. Catálogo de Turnos ({shiftTemplates.length})
           </button>
 
           <button
             onClick={() => { setActiveTab('employees'); setEditingEmpContract(null); }}
-            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer ${
+            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'employees'
                 ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
                 : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
             }`}
           >
-            <UserCheck size={16} /> Asignación por Trabajador ({employeeContracts.length})
+            <UserCheck size={16} /> 3. Asignación por Persona ({employeeContracts.length})
           </button>
         </div>
 
         {/* Content Body */}
         <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
           
-          {/* TAB 1: PLANTILLAS DE TURNOS */}
+          {/* TAB 1: GRUPOS DE HORARIOS */}
+          {activeTab === 'groups' && (
+            <div className="space-y-6">
+              {(isCreatingGroup || editingGroup) ? (
+                <form onSubmit={handleSaveGroup} className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs space-y-4">
+                  <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
+                    <Layers size={16} className="text-amber-500" />
+                    {editingGroup ? 'Editar Horario Maestro' : 'Crear Nuevo Horario Maestro'}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Nombre del Horario Maestro</label>
+                      <input
+                        type="text"
+                        value={grpName}
+                        onChange={(e) => setGrpName(e.target.value)}
+                        placeholder="Ej. Horario del Local (Variables)"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Descripción / Observación</label>
+                      <input
+                        type="text"
+                        value={grpDescription}
+                        onChange={(e) => setGrpDescription(e.target.value)}
+                        placeholder="Ej. Aplica para personal de punto de venta"
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Selección de turnos que componen este grupo */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 mb-2">
+                      Selecciona los Turnos Posibles que componen este Horario:
+                    </label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                      {shiftTemplates.map((st) => {
+                        const isChecked = grpSelectedShiftIds.includes(st.id);
+                        return (
+                          <label
+                            key={st.id}
+                            className={`p-3 rounded-xl border flex items-center justify-between cursor-pointer transition-all ${
+                              isChecked
+                                ? 'bg-amber-50 border-amber-300 shadow-2xs'
+                                : 'bg-white border-gray-200 opacity-60 hover:opacity-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={() => handleToggleGroupShift(st.id)}
+                                className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                              />
+                              <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: st.color || '#3B82F6' }} />
+                              <div>
+                                <span className="block font-black text-xs text-gray-900">{st.name}</span>
+                                <span className="text-[10px] font-extrabold text-gray-500">🕒 {st.startTime} a {st.endTime}</span>
+                              </div>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                    <button
+                      type="button"
+                      onClick={() => { setIsCreatingGroup(false); setEditingGroup(null); }}
+                      className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl font-bold text-xs cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      type="submit"
+                      className="px-5 py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                    >
+                      <Save size={14} /> Guardar Horario Maestro
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="flex justify-between items-center">
+                  <p className="text-xs text-gray-500 font-bold">Grupos de horarios con sus turnos asignados para auto-detectar según hora de huella.</p>
+                  <button
+                    onClick={handleStartCreateGroup}
+                    className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
+                  >
+                    <Plus size={16} /> Crear Horario Maestro
+                  </button>
+                </div>
+              )}
+
+              {/* Lista de Grupos */}
+              <div className="space-y-3">
+                {scheduleGroups.map((grp) => {
+                  const shiftsInGroup = shiftTemplates.filter((s) => (grp.shiftIds || []).includes(s.id));
+                  return (
+                    <div
+                      key={grp.id}
+                      className="bg-white p-4 rounded-2xl border border-gray-200 shadow-2xs space-y-3 hover:border-amber-300 transition-all"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h4 className="font-black text-base text-gray-900 flex items-center gap-2">
+                            <Layers size={18} className="text-amber-500" />
+                            {grp.name}
+                          </h4>
+                          {grp.description && <p className="text-xs text-gray-500 font-medium">{grp.description}</p>}
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleStartEditGroup(grp)}
+                            className="p-2 hover:bg-gray-100 rounded-lg text-gray-600 cursor-pointer"
+                            title="Editar Horario"
+                          >
+                            <Edit2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteGroup(grp.id, grp.name)}
+                            className="p-2 hover:bg-red-50 text-red-600 rounded-lg cursor-pointer"
+                            title="Eliminar Horario"
+                          >
+                            <Trash2 size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Turnos posibles dentro de este grupo */}
+                      <div className="flex flex-wrap gap-2 pt-2 border-t border-gray-100">
+                        {shiftsInGroup.map((st) => (
+                          <span
+                            key={st.id}
+                            className="px-2.5 py-1 rounded-xl text-xs font-black text-gray-900 border flex items-center gap-1.5 shadow-2xs"
+                            style={{ backgroundColor: `${st.color}15`, borderColor: st.color }}
+                          >
+                            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: st.color }} />
+                            {st.name} ({st.startTime} - {st.endTime})
+                          </span>
+                        ))}
+                        {shiftsInGroup.length === 0 && (
+                          <span className="text-xs text-gray-400 font-bold">Sin turnos asignados a este grupo.</span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* TAB 2: CATÁLOGO DE TURNOS */}
           {activeTab === 'templates' && (
             <div className="space-y-6">
-              
-              {/* Form de creación / edición */}
               {(isCreatingTemplate || editingTemplate) ? (
                 <form onSubmit={handleSaveTemplate} className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs space-y-4">
                   <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
                     <Clock size={16} className="text-amber-500" />
-                    {editingTemplate ? 'Editar Plantilla de Turno' : 'Crear Nueva Plantilla de Turno'}
+                    {editingTemplate ? 'Editar Turno' : 'Crear Nuevo Turno'}
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -192,7 +432,7 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                         type="text"
                         value={tplName}
                         onChange={(e) => setTplName(e.target.value)}
-                        placeholder="Ej. Mañana (06:00 - 14:00)"
+                        placeholder="Ej. Turno Mañana (06:00 - 14:00)"
                         className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
                         required
                       />
@@ -256,17 +496,17 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                 </form>
               ) : (
                 <div className="flex justify-between items-center">
-                  <p className="text-xs text-gray-500 font-bold">Plantillas de turno maestras disponibles para auto-detección y asignación fija.</p>
+                  <p className="text-xs text-gray-500 font-bold">Catálogo individual de turnos para agrupar en horarios maestros.</p>
                   <button
                     onClick={handleStartCreateTemplate}
                     className="px-4 py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-2xs cursor-pointer"
                   >
-                    <Plus size={16} /> Crear Nueva Plantilla
+                    <Plus size={16} /> Crear Nuevo Turno
                   </button>
                 </div>
               )}
 
-              {/* Lista de plantillas existentes */}
+              {/* Lista de turnos */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                 {shiftTemplates.map((st) => {
                   const grossHours = (st.targetMinutes / 60).toFixed(1);
@@ -306,37 +546,49 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                   );
                 })}
               </div>
-
             </div>
           )}
 
-          {/* TAB 2: ASIGNACIÓN DE TURNO POR TRABAJADOR */}
+          {/* TAB 3: ASIGNACIÓN DE HORARIO POR TRABAJADOR */}
           {activeTab === 'employees' && (
             <div className="space-y-6">
-
-              {/* Form de edición de contrato de trabajador */}
               {editingEmpContract ? (
                 <form onSubmit={handleSaveEmpContract} className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs space-y-4">
                   <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
                     <UserCheck size={16} className="text-amber-500" />
-                    Configurar Turno para {editingEmpContract.fullName} (#{editingEmpContract.employeeNo})
+                    Asignar Horario a {editingEmpContract.fullName} (#{editingEmpContract.employeeNo})
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Tipo de Turno</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tipo de Modalidad</label>
                       <select
                         value={empShiftType}
                         onChange={(e) => setEmpShiftType(e.target.value as 'FIXED' | 'VARIABLE')}
                         className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
                       >
-                        <option value="VARIABLE">🔄 Turno Variable / Rotativo (Auto-detectar huella)</option>
+                        <option value="VARIABLE">🔄 Turno Variable (Auto-detectar dentro del Horario Maestro)</option>
                         <option value="FIXED">📌 Turno Fijo (Asignación fija obligatoria)</option>
                       </select>
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Plantilla de Turno por Defecto</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Horario Maestro Asignado</label>
+                      <select
+                        value={empScheduleGroupId}
+                        onChange={(e) => setEmpScheduleGroupId(e.target.value)}
+                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                      >
+                        {scheduleGroups.map((grp) => (
+                          <option key={grp.id} value={grp.id}>
+                            {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Turno Predeterminado (Si es Fijo)</label>
                       <select
                         value={empDefaultShiftId}
                         onChange={(e) => setEmpDefaultShiftId(e.target.value)}
@@ -351,21 +603,11 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                     </div>
 
                     <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Horas Meta Semanales (ej. 44 u 48)</label>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Meta Horas Semanales</label>
                       <input
                         type="number"
                         value={empWeeklyTargetHours}
                         onChange={(e) => setEmpWeeklyTargetHours(Number(e.target.value))}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Tarifa por Hora ($)</label>
-                      <input
-                        type="number"
-                        value={empBaseHourlyRate}
-                        onChange={(e) => setEmpBaseHourlyRate(Number(e.target.value))}
                         className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
                       />
                     </div>
@@ -383,13 +625,13 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                       type="submit"
                       className="px-5 py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
                     >
-                      <Save size={14} /> Guardar Configuración
+                      <Save size={14} /> Guardar Asignación
                     </button>
                   </div>
                 </form>
               ) : (
                 <p className="text-xs text-gray-500 font-bold">
-                  Selecciona cualquier trabajador para definir si tiene Turno Fijo o Turno Rotativo y asignarle su horario oficial.
+                  Selecciona a cualquier persona para asignarle su Horario Maestro (ej. Horarios del Local).
                 </p>
               )}
 
@@ -400,15 +642,14 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                     <tr>
                       <th className="py-3 px-4"># ID</th>
                       <th className="py-3 px-4">Trabajador</th>
-                      <th className="py-3 px-4">Tipo de Turno</th>
-                      <th className="py-3 px-4">Horario por Defecto</th>
-                      <th className="py-3 px-4">Meta Semanal</th>
+                      <th className="py-3 px-4">Modalidad</th>
+                      <th className="py-3 px-4">Horario Maestro Asignado</th>
                       <th className="py-3 px-4 text-right">Acción</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
                     {employeeContracts.map((emp) => {
-                      const defaultShift = shiftTemplates.find((s) => s.id === emp.defaultShiftId);
+                      const grp = scheduleGroups.find((g) => g.id === emp.scheduleGroupId);
                       return (
                         <tr key={emp.employeeId} className="hover:bg-amber-50/40 transition-colors">
                           <td className="py-3 px-4 font-black text-gray-500">#{emp.employeeNo}</td>
@@ -425,16 +666,14 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                             )}
                           </td>
                           <td className="py-3 px-4">
-                            {defaultShift ? (
-                              <span className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: defaultShift.color || '#3B82F6' }} />
-                                <span>{defaultShift.name} ({defaultShift.startTime} - {defaultShift.endTime})</span>
+                            {grp ? (
+                              <span className="font-black text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-200">
+                                📅 {grp.name}
                               </span>
                             ) : (
-                              <span className="text-gray-400">Sin asignar</span>
+                              <span className="text-gray-400">Todos los turnos</span>
                             )}
                           </td>
-                          <td className="py-3 px-4">{emp.weeklyTargetHours || 44} hrs/sem</td>
                           <td className="py-3 px-4 text-right">
                             <button
                               onClick={() => handleStartEditEmpContract(emp)}
@@ -449,7 +688,6 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                   </tbody>
                 </table>
               </div>
-
             </div>
           )}
 

@@ -25,6 +25,13 @@ export interface ShiftTemplate {
   isFixed?: boolean;
 }
 
+export interface ShiftScheduleGroup {
+  id: string;
+  name: string;
+  description?: string;
+  shiftIds: string[];
+}
+
 export interface EmployeeContract {
   employeeId: string;
   employeeNo: string; // ID en el biométrico (ej. "1000")
@@ -32,6 +39,7 @@ export interface EmployeeContract {
   branchId: string;
   shiftType: 'FIXED' | 'VARIABLE';
   defaultShiftId?: string;
+  scheduleGroupId?: string; // ID del Grupo de Horario asignado (ej. "GROUP-LOCAL")
   weeklyTargetHours: number; // e.g. 44 or 48
   baseHourlyRate: number;    // $ / hora ordinaria
   overtimeHourlyRate: number;// $ / hora extra
@@ -68,6 +76,7 @@ export interface ShiftOverride {
 interface AttendanceStoreState {
   terminals: BiometricTerminal[];
   shiftTemplates: ShiftTemplate[];
+  scheduleGroups: ShiftScheduleGroup[];
   employeeContracts: EmployeeContract[];
   attendanceLogs: RawAttendanceLog[];
   deletedLogIds: string[];
@@ -78,10 +87,14 @@ interface AttendanceStoreState {
   updateTerminal: (id: string, data: Partial<BiometricTerminal>) => void;
   deleteTerminal: (id: string) => void;
 
-  // Shift templates
+  // Shift templates & Schedule Groups
   addShiftTemplate: (tpl: Omit<ShiftTemplate, 'id'>) => void;
   updateShiftTemplate: (id: string, data: Partial<ShiftTemplate>) => void;
   deleteShiftTemplate: (id: string) => void;
+
+  addScheduleGroup: (grp: Omit<ShiftScheduleGroup, 'id'>) => void;
+  updateScheduleGroup: (id: string, data: Partial<ShiftScheduleGroup>) => void;
+  deleteScheduleGroup: (id: string) => void;
 
   // Contracts
   upsertEmployeeContract: (contract: EmployeeContract) => void;
@@ -109,6 +122,27 @@ const INITIAL_SHIFTS: ShiftTemplate[] = [
   { id: 'SHIFT-TARDE-COMPLETO',  name: 'Turno Tarde (2pm - 9pm)', startTime: '14:00', endTime: '21:00', targetMinutes: 420, color: '#F59E0B', isFixed: false },
   { id: 'SHIFT-PICO-TARDE',      name: 'Turno Pico Tarde (4pm - 9pm)', startTime: '16:00', endTime: '21:00', targetMinutes: 300, color: '#EF4444', isFixed: false },
   { id: 'SHIFT-INTERMEDIO-TARDE',name: 'Turno Intermedio (3pm - 7pm)', startTime: '15:00', endTime: '19:00', targetMinutes: 240, color: '#8B5CF6', isFixed: false },
+];
+
+export const INITIAL_SCHEDULE_GROUPS: ShiftScheduleGroup[] = [
+  {
+    id: 'GROUP-LOCAL',
+    name: 'Horario del Local (Variables)',
+    description: 'Turnos variables del local: 6am-2pm, 2pm-9pm, 4pm-9pm, 6am-12pm, 3pm-7pm',
+    shiftIds: [
+      'SHIFT-MANANA-COMPLETO',
+      'SHIFT-MEDIA-MANANA',
+      'SHIFT-TARDE-COMPLETO',
+      'SHIFT-PICO-TARDE',
+      'SHIFT-INTERMEDIO-TARDE',
+    ],
+  },
+  {
+    id: 'GROUP-ADMIN',
+    name: 'Horario Administración',
+    description: 'Horario fijo de oficina 8am - 5pm',
+    shiftIds: ['SHIFT-MANANA-COMPLETO'],
+  },
 ];
 
 const INITIAL_TERMINALS: BiometricTerminal[] = [
@@ -305,6 +339,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
     (set, get) => ({
       terminals: INITIAL_TERMINALS,
       shiftTemplates: INITIAL_SHIFTS,
+      scheduleGroups: INITIAL_SCHEDULE_GROUPS,
       employeeContracts: INITIAL_CONTRACTS,
       attendanceLogs: INITIAL_BIOMETRIC_LOGS,
       deletedLogIds: [],
@@ -344,6 +379,26 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       deleteShiftTemplate: (id) => {
         set((s) => ({ shiftTemplates: s.shiftTemplates.filter((t) => t.id !== id) }));
         push('attendance_shifts', get().shiftTemplates);
+      },
+
+      addScheduleGroup: (grpData) => {
+        const newGrp: ShiftScheduleGroup = { ...grpData, id: `GROUP-${Date.now()}` };
+        set((s) => ({ scheduleGroups: [...(s.scheduleGroups || []), newGrp] }));
+        push('attendance_groups', get().scheduleGroups);
+      },
+
+      updateScheduleGroup: (id, data) => {
+        set((s) => ({
+          scheduleGroups: (s.scheduleGroups || []).map((g) => (g.id === id ? { ...g, ...data } : g)),
+        }));
+        push('attendance_groups', get().scheduleGroups);
+      },
+
+      deleteScheduleGroup: (id) => {
+        set((s) => ({
+          scheduleGroups: (s.scheduleGroups || []).filter((g) => g.id !== id),
+        }));
+        push('attendance_groups', get().scheduleGroups);
       },
 
       upsertEmployeeContract: (contract) => {
