@@ -29,6 +29,11 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
   const [grpDescription, setGrpDescription] = useState('');
   const [grpSelectedShiftIds, setGrpSelectedShiftIds] = useState<string[]>([]);
 
+  // Quick-Add Shift inline inside Group form
+  const [quickTplName, setQuickTplName] = useState('');
+  const [quickTplIn, setQuickTplIn] = useState('06:00');
+  const [quickTplOut, setQuickTplOut] = useState('14:00');
+
   // Form states for ShiftTemplate
   const [editingTemplate, setEditingTemplate] = useState<ShiftTemplate | null>(null);
   const [isCreatingTemplate, setIsCreatingTemplate] = useState(false);
@@ -68,6 +73,30 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
     setGrpSelectedShiftIds((prev) =>
       prev.includes(shiftId) ? prev.filter((id) => id !== shiftId) : [...prev, shiftId]
     );
+  };
+
+  const handleQuickAddShiftToGroup = (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (!quickTplName.trim()) {
+      alert('Ingresa el nombre del turno (ej. Turno Mañana 6am - 2pm).');
+      return;
+    }
+    const startMins = parseMins(quickTplIn);
+    const endMins = parseMins(quickTplOut);
+    const targetMinutes = endMins >= startMins ? endMins - startMins : (1440 - startMins) + endMins;
+    const newId = `SHIFT-${Date.now()}`;
+    const newTpl: ShiftTemplate = {
+      id: newId,
+      name: quickTplName.trim(),
+      startTime: quickTplIn,
+      endTime: quickTplOut,
+      targetMinutes,
+      color: PRESET_COLORS[grpSelectedShiftIds.length % PRESET_COLORS.length],
+    };
+
+    addShiftTemplate(newTpl);
+    setGrpSelectedShiftIds((prev) => [...prev, newId]);
+    setQuickTplName('');
   };
 
   const handleSaveGroup = (e: React.FormEvent) => {
@@ -292,6 +321,52 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                     </div>
                   </div>
 
+                  {/* Formulario rápido para agregar turnos directamente con sus horas */}
+                  <div className="bg-amber-50/60 p-3.5 rounded-2xl border border-amber-200/80 space-y-2">
+                    <span className="block text-xs font-black text-amber-950 flex items-center gap-1.5">
+                      <Plus size={14} className="text-amber-600" /> + Crear y Añadir un Nuevo Turno con Horas Exactas a este Horario:
+                    </span>
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-center">
+                      <div className="sm:col-span-5">
+                        <input
+                          type="text"
+                          value={quickTplName}
+                          onChange={(e) => setQuickTplName(e.target.value)}
+                          placeholder="Nombre Ej. Mañana (6am - 2pm)"
+                          className="w-full px-3 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-900 outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div className="sm:col-span-3 flex items-center gap-1">
+                        <span className="text-[10px] font-black text-gray-500 shrink-0">Entrada:</span>
+                        <input
+                          type="time"
+                          value={quickTplIn}
+                          onChange={(e) => setQuickTplIn(e.target.value)}
+                          className="w-full px-2 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-3 flex items-center gap-1">
+                        <span className="text-[10px] font-black text-gray-500 shrink-0">Salida:</span>
+                        <input
+                          type="time"
+                          value={quickTplOut}
+                          onChange={(e) => setQuickTplOut(e.target.value)}
+                          className="w-full px-2 py-2 bg-white border border-amber-300 rounded-xl text-xs font-bold text-gray-900 outline-none"
+                        />
+                      </div>
+                      <div className="sm:col-span-1 flex justify-end">
+                        <button
+                          type="button"
+                          onClick={handleQuickAddShiftToGroup}
+                          className="w-full py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs cursor-pointer shadow-2xs flex items-center justify-center"
+                          title="Añadir este turno"
+                        >
+                          + Añadir
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Selección de turnos que componen este grupo */}
                   <div>
                     <label className="block text-xs font-bold text-gray-800 mb-2">
@@ -325,6 +400,11 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                           </label>
                         );
                       })}
+                      {shiftTemplates.length === 0 && (
+                        <div className="col-span-2 text-center py-4 text-xs font-bold text-gray-400">
+                          Aún no hay turnos guardados. Usa el formulario de arriba para añadir los turnos con sus horas exactas.
+                        </div>
+                      )}
                     </div>
                   </div>
 

@@ -828,10 +828,16 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
     }),
     {
-      name: 'frita_attendance_store_v9',
+      name: 'frita_attendance_store_v10',
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
+        shiftTemplates: (persistedState?.shiftTemplates && persistedState.shiftTemplates.length > 0)
+          ? persistedState.shiftTemplates
+          : INITIAL_SHIFTS,
+        scheduleGroups: (persistedState?.scheduleGroups && persistedState.scheduleGroups.length > 0)
+          ? persistedState.scheduleGroups
+          : INITIAL_SCHEDULE_GROUPS,
         employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
         attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs, []),
         deletedLogIds: [],
