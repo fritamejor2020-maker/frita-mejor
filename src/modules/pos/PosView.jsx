@@ -227,11 +227,18 @@ export function PosView() {
   const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
   const [pendingDeliveryInfo, setPendingDeliveryInfo] = useState(null);
 
-  const heldSales = usePosStore(s => s.heldSales || []);
+  const deletedPosSaleIds = useInventoryStore(s => s.deletedPosSaleIds || []);
+  const deletedSaleSet = new Set(deletedPosSaleIds);
+
+  const heldSales = (usePosStore(s => s.heldSales || [])).filter(
+    h => !deletedSaleSet.has(h.id) && (!h.originalOlaClickId || !deletedSaleSet.has(h.originalOlaClickId))
+  );
   const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
   const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
-  const suspendedSales = (posSales || []).filter(s => s.status === 'SUSPENDED');
+  const suspendedSales = (posSales || []).filter(
+    s => s.status === 'SUSPENDED' && !deletedSaleSet.has(s.id) && (!s.originalOlaClickId || !deletedSaleSet.has(s.originalOlaClickId))
+  );
   
   // Unificar ventas en espera locales y de base de datos evitando duplicados por ID
   const combinedSales = [...(heldSales || [])];
@@ -842,8 +849,9 @@ export function PosView() {
     };
     
     if (activeSuspendedId) {
-      updatePosSale(activeSuspendedId, saleData);
-      deleteHeldSale(activeSuspendedId);
+      try { deleteHeldSale(activeSuspendedId); } catch(e) {}
+      try { deletePosSale(activeSuspendedId); } catch(e) {}
+      addPosSale(saleData);
     } else {
       addPosSale(saleData);
     }
@@ -2747,7 +2755,16 @@ function RegisterSelectModal({ registers, shifts, selectedId, onSelect, onClose,
 // ─── Shift Modals Component ───
 function ShiftOpenModal({ onConfirm, registerName }) {
   const [initialAmount, setInitialAmount] = useState('0');
-  const [jornada, setJornada] = useState('6-10 am');
+  const [jornada, setJornada] = useState(() => {
+    const hour = new Date().getHours();
+    if (hour >= 6 && hour < 10) return '6-10 am';
+    if (hour >= 10 && hour < 12) return '10-12 pm';
+    if (hour >= 12 && hour < 14) return '12-2 pm';
+    if (hour >= 14 && hour < 16) return '2-4 pm';
+    if (hour >= 16 && hour < 19) return '4-7 pm';
+    if (hour >= 19 && hour < 21) return '7-9 pm';
+    return '6-10 am';
+  });
   
   return (
     <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">

@@ -213,39 +213,81 @@ import {
 
 export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
 
-function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
-  const map = new Map<string, RawAttendanceLog>();
-  const deletedSet = new Set(deletedLogIds || []);
+export function isExplicitAttendancePunch(logOrEv: any): boolean {
+  if (!logOrEv) return false;
+  if (logOrEv.minor === 22) return true; // Continuous checkOut
+
+  const st = String(logOrEv.attendanceStatus || '').trim().toLowerCase();
+  if (!st || st === 'undefined' || st === 'null' || st === 'invalid' || st === 'none' || st === '0') {
+    return false;
+  }
+
+  return (
+    st === 'checkin' ||
+    st === 'check_in' ||
+    st === 'checkout' ||
+    st === 'check_out' ||
+    st === 'entry' ||
+    st === 'exit' ||
+    st === 'overtimein' ||
+    st === 'overtimeout' ||
+    st === 'breakin' ||
+    st === 'breakout'
+  );
+}
+
+export function isLogDeleted(
+  log: {
+    id?: string;
+    serialNo?: number | string;
+    employeeNo?: string;
+    employeeId?: string;
+    terminalId?: string;
+    timestamp?: string;
+    attendanceStatus?: string;
+  },
+  deletedSet: Set<string>
+): boolean {
+  if (!log) return true;
   const INVALID_GATE_OPENING_IDS = new Set([
     'LOG-TERM-001-25650',
     'LOG-TERM-001-25647',
     'LOG-TERM-001-25644',
     'LOG-TERM-001-25641',
   ]);
+  if (log.id && (INVALID_GATE_OPENING_IDS.has(log.id) || deletedSet.has(log.id))) return true;
 
-  const isDeleted = (l: RawAttendanceLog) => {
-    if (!l || !l.id) return true;
-    if (INVALID_GATE_OPENING_IDS.has(l.id)) return true;
-    if (deletedSet.has(l.id)) return true;
-    if (l.serialNo != null) {
-      if (deletedSet.has(String(l.serialNo))) return true;
-      if (deletedSet.has(`LOG-TERM-001-${l.serialNo}`)) return true;
-      if (deletedSet.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return true;
+  if (log.serialNo != null) {
+    const sStr = String(log.serialNo);
+    if (deletedSet.has(sStr)) return true;
+    if (deletedSet.has(`LOG-TERM-001-${sStr}`)) return true;
+    if (log.terminalId && deletedSet.has(`LOG-${log.terminalId}-${sStr}`)) return true;
+    if (log.employeeNo) {
+      const cleanEmp = String(log.employeeNo).replace('EMP-', '').trim();
+      if (deletedSet.has(`LOG-TERM-001-${cleanEmp}-${sStr}`)) return true;
+      if (log.terminalId && deletedSet.has(`LOG-${log.terminalId}-${cleanEmp}-${sStr}`)) return true;
     }
-    return false;
-  };
+  }
+
+  // Check date & employee tombstones
+  const empNo = String(log.employeeNo || '').replace('EMP-', '').trim();
+  const empId = String(log.employeeId || '').replace('EMP-', '').trim();
+  const dateStr = log.timestamp ? log.timestamp.slice(0, 10) : '';
+
+  if (dateStr) {
+    if (empNo && (deletedSet.has(`DATE-${empNo}-${dateStr}`) || deletedSet.has(`DATE-EMP-${empNo}-${dateStr}`))) return true;
+    if (empId && (deletedSet.has(`DATE-${empId}-${dateStr}`) || deletedSet.has(`DATE-EMP-${empId}-${dateStr}`))) return true;
+  }
+
+  return false;
+}
+
+function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[] = []): RawAttendanceLog[] {
+  const map = new Map<string, RawAttendanceLog>();
+  const deletedSet = new Set(deletedLogIds || []);
 
   (existing || []).forEach((l) => {
-    if (!isDeleted(l)) {
-      map.set(l.id, {
-        ...l,
-        attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
-      });
-    }
-  });
-
-  INITIAL_BIOMETRIC_LOGS.forEach((l) => {
-    if (!map.has(l.id) && !isDeleted(l)) {
+    if (!isLogDeleted(l, deletedSet) && isExplicitAttendancePunch(l)) {
       map.set(l.id, {
         ...l,
         attendanceStatus: (l.attendanceStatus === 'checkOut' || l.type === 'EXIT') ? 'checkOut' : 'checkIn',
@@ -344,22 +386,28 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       deleteSingleAttendanceLog: (logId, serialNo) => {
         set((s) => {
           const targetLog = s.attendanceLogs.find((l) => l.id === logId);
-          const serial = serialNo || targetLog?.serialNo;
+          const serial = serialNo != null ? serialNo : targetLog?.serialNo;
+          const empNo = targetLog?.employeeNo ? String(targetLog.employeeNo).replace('EMP-', '').trim() : '';
+          const termId = targetLog?.terminalId || 'TERM-001';
+
           const newDeleted = [logId];
           if (serial != null) {
-            newDeleted.push(String(serial));
-            newDeleted.push(`LOG-TERM-001-${serial}`);
-            if (targetLog?.terminalId) {
-              newDeleted.push(`LOG-${targetLog.terminalId}-${serial}`);
-            }
-            if (targetLog?.employeeNo) {
-              newDeleted.push(`LOG-TERM-001-${targetLog.employeeNo}-${serial}`);
+            const sStr = String(serial);
+            newDeleted.push(sStr);
+            newDeleted.push(`LOG-TERM-001-${sStr}`);
+            newDeleted.push(`LOG-${termId}-${sStr}`);
+            if (empNo) {
+              newDeleted.push(`LOG-TERM-001-${empNo}-${sStr}`);
+              newDeleted.push(`LOG-${termId}-${empNo}-${sStr}`);
             }
           }
-          const updatedLogs = s.attendanceLogs.filter((l) => l.id !== logId && (!serial || l.serialNo !== serial));
+
+          const updatedDeletedSet = new Set([...(s.deletedLogIds || []), ...newDeleted]);
+          const updatedLogs = s.attendanceLogs.filter((l) => !isLogDeleted(l, updatedDeletedSet));
+
           return {
             attendanceLogs: updatedLogs,
-            deletedLogIds: Array.from(new Set([...(s.deletedLogIds || []), ...newDeleted])),
+            deletedLogIds: Array.from(updatedDeletedSet),
           };
         });
         push('attendance_logs', get().attendanceLogs);
@@ -380,25 +428,33 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           });
 
           const newDeleted: string[] = [];
+          if (cleanEmpNo && cleanDate) {
+            newDeleted.push(`DATE-${cleanEmpNo}-${cleanDate}`);
+            newDeleted.push(`DATE-EMP-${cleanEmpNo}-${cleanDate}`);
+          }
+
           toRemove.forEach((l) => {
             newDeleted.push(l.id);
             if (l.serialNo != null) {
-              newDeleted.push(String(l.serialNo));
-              newDeleted.push(`LOG-TERM-001-${l.serialNo}`);
-              newDeleted.push(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`);
-              newDeleted.push(`LOG-${l.terminalId || 'TERM-001'}-${l.serialNo}`);
+              const sStr = String(l.serialNo);
+              const termId = l.terminalId || 'TERM-001';
+              const lEmp = String(l.employeeNo || '').replace('EMP-', '').trim();
+              newDeleted.push(sStr);
+              newDeleted.push(`LOG-TERM-001-${sStr}`);
+              newDeleted.push(`LOG-${termId}-${sStr}`);
+              if (lEmp) {
+                newDeleted.push(`LOG-TERM-001-${lEmp}-${sStr}`);
+                newDeleted.push(`LOG-${termId}-${lEmp}-${sStr}`);
+              }
             }
           });
 
+          const updatedDeletedSet = new Set([...(s.deletedLogIds || []), ...newDeleted]);
+          const updatedLogs = s.attendanceLogs.filter((l) => !isLogDeleted(l, updatedDeletedSet));
+
           return {
-            attendanceLogs: s.attendanceLogs.filter((l) => {
-              const lEmpNo = String(l.employeeNo || '').replace('EMP-', '').trim();
-              const lEmpId = String(l.employeeId || '').replace('EMP-', '').trim();
-              const matchEmp = lEmpNo === cleanEmpNo || lEmpId === cleanEmpNo;
-              const matchDate = (l.timestamp || '').slice(0, 10) === cleanDate;
-              return !(matchEmp && matchDate);
-            }),
-            deletedLogIds: Array.from(new Set([...(s.deletedLogIds || []), ...newDeleted])),
+            attendanceLogs: updatedLogs,
+            deletedLogIds: Array.from(updatedDeletedSet),
           };
         });
         push('attendance_logs', get().attendanceLogs);
@@ -408,6 +464,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       clearAllAttendanceLogs: () => {
         set({ attendanceLogs: [], deletedLogIds: [] });
         push('attendance_logs', []);
+        push('attendance_logs_BRANCH-001', []);
+        push('deleted_attendance_log_ids', []);
+        push('deleted_attendance_log_ids_BRANCH-001', []);
         try {
           localStorage.removeItem('frita_attendance_store');
         } catch (e) {}
@@ -469,7 +528,6 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
-                // Si es un pase exitoso de huella (minor 21, 22, 38, 1, 75) y viene sin ID, mapear a '24' (Arlin)
                 const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75;
                 if ((!rawNo || rawNo === '0') && isAuthEvent) {
                   rawNo = '24';
@@ -525,16 +583,11 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               const deletedSet = new Set(state.deletedLogIds || []);
               const toAdd = mappedLogs.filter((l) => {
                 if (existingIds.has(l.id)) return false;
-                if (deletedSet.has(l.id)) return false;
-                if (l.serialNo != null) {
-                  if (deletedSet.has(String(l.serialNo))) return false;
-                  if (deletedSet.has(`LOG-TERM-001-${l.serialNo}`)) return false;
-                  if (deletedSet.has(`LOG-${terminal.id}-${l.serialNo}`)) return false;
-                  if (deletedSet.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return false;
-                }
+                if (isLogDeleted(l, deletedSet)) return false;
                 return true;
               });
-              const updated = [...toAdd, ...state.attendanceLogs];
+              const cleanExisting = state.attendanceLogs.filter((l) => !isLogDeleted(l, deletedSet));
+              const updated = [...toAdd, ...cleanExisting];
               push('attendance_logs', updated);
               return { attendanceLogs: updated };
             });

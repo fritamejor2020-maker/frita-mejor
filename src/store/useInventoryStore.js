@@ -71,7 +71,10 @@ export function mergeArrays(localArr, remoteArr, key) {
             merged.push({ ...localItem, ...remoteVersion });
           }
         } else if (key === 'posSales') {
-          if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
+          const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
+          if (deletedSet.has(localItem.id) || deletedSet.has(remoteVersion.id) || (localItem.originalOlaClickId && deletedSet.has(localItem.originalOlaClickId)) || (remoteVersion.originalOlaClickId && deletedSet.has(remoteVersion.originalOlaClickId))) {
+            // Ignorar ventas eliminadas
+          } else if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
             merged.push(remoteVersion);
           } else if (localItem.status === 'PAID' || localItem.status === 'REJECTED') {
             merged.push(localItem);
@@ -84,7 +87,10 @@ export function mergeArrays(localArr, remoteArr, key) {
         }
       } else {
         // Solo existe localmente (ej: venta offline)
-        merged.push(localItem);
+        const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
+        if (key !== 'posSales' || (!deletedSet.has(localItem.id) && (!localItem.originalOlaClickId || !deletedSet.has(localItem.originalOlaClickId)))) {
+          merged.push(localItem);
+        }
       }
       addedIds.add(localItem.id);
     } else {
@@ -92,8 +98,13 @@ export function mergeArrays(localArr, remoteArr, key) {
     }
   });
 
+  const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
+      if (key === 'posSales' && (deletedSet.has(remoteItem.id) || (remoteItem.originalOlaClickId && deletedSet.has(remoteItem.originalOlaClickId)))) {
+        // Ignorar de remoto si está en la tumba de eliminadas
+        return;
+      }
       merged.push(remoteItem);
       addedIds.add(remoteItem.id);
     }
@@ -317,6 +328,7 @@ export const useInventoryStore = create(
       posExpenses:        [],
       loadTemplates:      INITIAL_LOAD_TEMPLATES,
       deletedShiftIds:    [],  // tombstone: IDs de cierres eliminados por el admin
+      deletedPosSaleIds:  [],  // tombstone: IDs de ventas / pedidos en espera eliminados o procesados
       vendorLocations:    {},  // { [vendorId]: { lat, lng, name, pointId, updatedAt } }
       // Pagos y abonos de clientes contrata
       // { id, customerId, customerName, amount, method, note, shiftId, date }
@@ -359,7 +371,7 @@ export const useInventoryStore = create(
           const BRANCH_STORE_KEYS = [
             'warehouses', 'inventory', 'movements',
             'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
-            'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds',
+            'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds',
             'loadTemplates', 'vendorLocations',
           ];
 
@@ -471,7 +483,7 @@ export const useInventoryStore = create(
           } else {
             // Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
-            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds'];
+            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds'];
             for (const key of BRANCH_STORE_KEYS) {
               let merged = [];
               const addedIds = new Set();
@@ -1160,7 +1172,7 @@ export const useInventoryStore = create(
       },
       deletePosSale: (id) => {
         set((s) => {
-          const saleToDelete = (s.posSales || []).find((sale) => sale.id === id);
+          const saleToDelete = (s.posSales || []).find((sale) => sale.id === id || sale.originalOlaClickId === id);
           let newInventory = s.inventory;
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           if (linkSales && saleToDelete && saleToDelete.status === 'PAID' && saleToDelete.items) {
@@ -1172,17 +1184,22 @@ export const useInventoryStore = create(
               return invItem;
             });
           }
-          const updatedSales = (s.posSales || []).filter((sale) => sale.id !== id);
-          return { posSales: updatedSales, inventory: newInventory };
+          const updatedSales = (s.posSales || []).filter((sale) => sale.id !== id && sale.originalOlaClickId !== id);
+          const extraIds = [];
+          if (id) extraIds.push(id);
+          if (saleToDelete?.id) extraIds.push(saleToDelete.id);
+          if (saleToDelete?.originalOlaClickId) extraIds.push(saleToDelete.originalOlaClickId);
+          if (saleToDelete?.publicId) extraIds.push(saleToDelete.publicId);
+
+          const newDeleted = [...new Set([...(s.deletedPosSaleIds || []), ...extraIds])];
+          return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
+        syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
       },
 
       addPosShift: (shift) => {
-        // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) ──
-        // Solo aplica a turnos de VENDEDOR/DEJADOR que tienen type, pointId y shift.
-        // Los turnos POS de caja NO tienen esos campos y usan registerId en su lugar.
         const current = useInventoryStore.getState().posShifts || [];
         if (shift.type && shift.pointId && shift.shift) {
           const duplicate = current.find(
@@ -1197,12 +1214,41 @@ export const useInventoryStore = create(
           }
         }
 
+        // Generar ID determinista por fecha, sede, caja y jornada
+        const dateStr = shift.openedAt ? shift.openedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+        const branch = shift.branchId || 'BRANCH-001';
+        const reg = shift.registerId || 'REG-001';
+        const jornadaLabel = shift.jornada || shift.shift || '6-10 am';
+        const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+
+        const deterministicId = `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`;
+
+        // Verificar si ya existe un turno abierto con este ID determinista o para esta combinación
+        const existingOpenShift = current.find(
+          s => !s.closedAt && (
+            s.id === deterministicId ||
+            (s.branchId === branch && s.registerId === reg && (s.openedAt || '').startsWith(dateStr) && (s.jornada === jornadaLabel || s.shift === jornadaLabel))
+          )
+        );
+
+        if (existingOpenShift) {
+          console.log(`[Shift] Re-asociando a turno activo existente: ${existingOpenShift.id}`);
+          return existingOpenShift;
+        }
+
         const deleted = useInventoryStore.getState().deletedShiftIds || [];
-        const newShift = { ...shift, id: `SHIFT-${Date.now()}` };
+        const newShift = { 
+          ...shift, 
+          id: shift.id || deterministicId, 
+          date: dateStr, 
+          branchId: branch, 
+          registerId: reg, 
+          jornada: jornadaLabel 
+        };
         set((s) => ({
           posShifts: [
             newShift,
-            ...(s.posShifts || []).filter(sh => !deleted.includes(sh.id))
+            ...(s.posShifts || []).filter(sh => !deleted.includes(sh.id) && sh.id !== newShift.id)
           ]
         }));
         syncKey('posShifts', useInventoryStore.getState().posShifts);

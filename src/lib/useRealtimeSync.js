@@ -13,7 +13,7 @@ import { useTaskStore } from '../store/useTaskStore';
 import { useTransferStore } from '../store/useTransferStore';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
 import { useChatStore } from '../store/useChatStore';
-import { useAttendanceStore } from '../store/useAttendanceStore';
+import { useAttendanceStore, isLogDeleted, isExplicitAttendancePunch } from '../store/useAttendanceStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -90,7 +90,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
     applicators[`posSales_${bid}`]         = (v) => {
       const state = useInventoryStore.getState();
-      const merged = mergeArrays(state.posSales || [], v || [], 'posSales');
+      const deletedSales = new Set(state.deletedPosSaleIds || []);
+      const localSales = (state.posSales || []).filter(s => !deletedSales.has(s.id) && (!s.originalOlaClickId || !deletedSales.has(s.originalOlaClickId)));
+      const remoteSales = (v || []).filter(s => !deletedSales.has(s.id) && (!s.originalOlaClickId || !deletedSales.has(s.originalOlaClickId)));
+      const merged = mergeArrays(localSales, remoteSales, 'posSales');
       useInventoryStore.setState({ posSales: merged });
     };
     applicators[`posExpenses_${bid}`]      = (v) => {
@@ -101,18 +104,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`attendance_logs_${bid}`] = (v) => {
       if (Array.isArray(v)) {
         const deletedIds = new Set(useAttendanceStore.getState().deletedLogIds || []);
-        const filtered = (v || []).filter(l => {
-          if (!l || !l.id) return false;
-          if (deletedIds.has(l.id)) return false;
-          if (l.serialNo != null) {
-            if (deletedIds.has(String(l.serialNo))) return false;
-            if (deletedIds.has(Number(l.serialNo))) return false;
-            if (deletedIds.has(`LOG-TERM-001-${l.serialNo}`)) return false;
-            if (deletedIds.has(`LOG-${l.terminalId || 'TERM-001'}-${l.serialNo}`)) return false;
-            if (deletedIds.has(`LOG-TERM-001-${l.employeeNo}-${l.serialNo}`)) return false;
-          }
-          return true;
-        });
+        const filtered = (v || []).filter(l => !isLogDeleted(l, deletedIds) && isExplicitAttendancePunch(l));
         useAttendanceStore.setState({ attendanceLogs: filtered });
       }
     };
@@ -229,7 +221,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const deleted = new Set(useInventoryStore.getState().deletedShiftIds || []);
       useInventoryStore.setState({ posShifts: (v || []).filter(s => !deleted.has(s.id)) });
     };
-    if (!applicators['posSales'])         applicators['posSales']         = (v) => useInventoryStore.setState({ posSales: v });
+    if (!applicators['posSales'])         applicators['posSales']         = (v) => {
+      const state = useInventoryStore.getState();
+      const deletedSales = new Set(state.deletedPosSaleIds || []);
+      const localSales = (state.posSales || []).filter(s => !deletedSales.has(s.id) && (!s.originalOlaClickId || !deletedSales.has(s.originalOlaClickId)));
+      const remoteSales = (v || []).filter(s => !deletedSales.has(s.id) && (!s.originalOlaClickId || !deletedSales.has(s.originalOlaClickId)));
+      const merged = mergeArrays(localSales, remoteSales, 'posSales');
+      useInventoryStore.setState({ posSales: merged });
+    };
     if (!applicators['posExpenses'])      applicators['posExpenses']      = (v) => useInventoryStore.setState({ posExpenses: v });
     if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => useInventoryStore.setState({ posRegisters: v });
     if (!applicators['posSettings'])      applicators['posSettings']      = (v) => useInventoryStore.setState({ posSettings: v });
@@ -242,7 +241,13 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ inventory: merged });
     };
     if (!applicators['contrataPayments']) applicators['contrataPayments'] = (v) => useInventoryStore.setState({ contrataPayments: v });
-    if (!applicators['attendance_logs'])   applicators['attendance_logs']   = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ attendanceLogs: v }); };
+    if (!applicators['attendance_logs'])   applicators['attendance_logs']   = (v) => {
+      if (Array.isArray(v)) {
+        const deletedIds = new Set(useAttendanceStore.getState().deletedLogIds || []);
+        const filtered = (v || []).filter(l => !isLogDeleted(l, deletedIds) && isExplicitAttendancePunch(l));
+        useAttendanceStore.setState({ attendanceLogs: filtered });
+      }
+    };
     if (!applicators['attendance_contracts']) applicators['attendance_contracts'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ employeeContracts: v }); };
     if (!applicators['attendance_overrides']) applicators['attendance_overrides'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ shiftOverrides: v }); };
   }

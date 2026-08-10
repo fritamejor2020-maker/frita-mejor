@@ -14,6 +14,7 @@ interface AttendanceToolbarProps {
   toggleFullscreen: () => void;
   onSyncTerminal: () => void;
   onClearLogs?: () => void;
+  onOpenShiftTemplates?: () => void;
   isSyncing: boolean;
 }
 
@@ -28,6 +29,7 @@ export function AttendanceToolbar({
   toggleFullscreen,
   onSyncTerminal,
   onClearLogs,
+  onOpenShiftTemplates,
   isSyncing,
 }: AttendanceToolbarProps) {
   const { branches = [] } = useBranchStore();
@@ -161,6 +163,18 @@ export function AttendanceToolbar({
           <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
           <span className="hidden md:inline">Sincronizar Biométrico</span>
         </button>
+
+        {/* Botón Gestionar Horarios y Turnos */}
+        {onOpenShiftTemplates && (
+          <button
+            onClick={onOpenShiftTemplates}
+            className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
+            title="Gestionar plantillas de turno y asignación por trabajador"
+          >
+            <Calendar size={14} />
+            <span className="hidden sm:inline">Turnos & Horarios</span>
+          </button>
+        )}
 
         {/* Botón Limpiar Registros */}
         {onClearLogs && (

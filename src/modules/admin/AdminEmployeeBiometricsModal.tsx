@@ -2,6 +2,7 @@ import React, { useState, useRef } from 'react';
 import { X, UserCheck, Key, Shield, DollarSign, Download, Upload, CheckCircle2, FileSpreadsheet, AlertTriangle, Users, Trash2 } from 'lucide-react';
 import { useAttendanceStore, EmployeeContract } from '../../store/useAttendanceStore';
 import { useBranchStore } from '../../store/useBranchStore';
+import { ShiftTemplatesModal } from '../attendance/components/ShiftTemplatesModal';
 import * as XLSX from 'xlsx';
 
 interface AdminEmployeeBiometricsModalProps {
@@ -41,6 +42,7 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   const [baseHourlyRate, setBaseHourlyRate] = useState(6500);
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(9750);
   const [pinPassword, setPinPassword] = useState('123456');
+  const [showShiftTemplatesSubModal, setShowShiftTemplatesSubModal] = useState(false);
 
   // Preseleccionar si viene por prop
   React.useEffect(() => {
@@ -590,7 +592,16 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
               </div>
 
               <div>
-                <label className="block text-xs font-black text-gray-700 mb-1">Turno Predeterminado</label>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-black text-gray-700">Turno Predeterminado</label>
+                  <button
+                    type="button"
+                    onClick={() => setShowShiftTemplatesSubModal(true)}
+                    className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                  >
+                    ⚙️ Configurar / Crear Turnos
+                  </button>
+                </div>
                 <select
                   value={defaultShiftId}
                   onChange={(e) => setDefaultShiftId(e.target.value)}
@@ -705,6 +716,10 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
           </div>
         )}
       </div>
+
+      {showShiftTemplatesSubModal && (
+        <ShiftTemplatesModal onClose={() => setShowShiftTemplatesSubModal(false)} />
+      )}
     </div>
   );
 }

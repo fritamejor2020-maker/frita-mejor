@@ -3,8 +3,7 @@ import { AttendanceToolbar } from './components/AttendanceToolbar';
 import { TimelineGridPanel } from './components/TimelineGridPanel';
 import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
-import { RawBiometricLogsModal } from './components/RawBiometricLogsModal';
-import { AdminEmployeeBiometricsModal } from '../admin/AdminEmployeeBiometricsModal';
+import { ShiftTemplatesModal } from './components/ShiftTemplatesModal';
 import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hooks/useAttendanceData';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { useAuthStore } from '../../store/useAuthStore';
@@ -47,6 +46,7 @@ export function AttendanceView() {
 
   const [showPayrollModal, setShowPayrollModal] = useState(false);
   const [showRawLogsModal, setShowRawLogsModal] = useState(false);
+  const [showShiftTemplatesModal, setShowShiftTemplatesModal] = useState(false);
   const [selectedPayrollEmp, setSelectedPayrollEmp] = useState<EmployeeWeeklyPayroll | undefined>(undefined);
 
   const [showBioModal, setShowBioModal] = useState(false);
@@ -129,6 +129,13 @@ export function AttendanceView() {
 
         <div className="flex items-center gap-2">
           <button
+            onClick={() => setShowShiftTemplatesModal(true)}
+            className="px-4 py-2.5 bg-gray-900 hover:bg-black text-amber-400 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer border border-gray-800"
+          >
+            📅 Turnos & Horarios
+          </button>
+
+          <button
             onClick={() => {
               setSelectedPayrollEmp(undefined);
               setShowPayrollModal(true);
@@ -161,6 +168,7 @@ export function AttendanceView() {
         toggleFullscreen={toggleFullscreen}
         onSyncTerminal={handleSyncTerminal}
         onClearLogs={handleClearLogs}
+        onOpenShiftTemplates={() => setShowShiftTemplatesModal(true)}
         isSyncing={isSyncing}
       />
 
@@ -187,6 +195,12 @@ export function AttendanceView() {
       />
 
       {/* Modales */}
+      {showShiftTemplatesModal && (
+        <ShiftTemplatesModal
+          onClose={() => setShowShiftTemplatesModal(false)}
+        />
+      )}
+
       {showBioModal && (
         <AdminEmployeeBiometricsModal
           initialSelectedEmployeeNo={selectedBioEmpNo}

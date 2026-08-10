@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useAttendanceStore, ShiftTemplate, EmployeeContract, RawAttendanceLog } from '../../../store/useAttendanceStore';
+import { useAttendanceStore, ShiftTemplate, EmployeeContract, RawAttendanceLog, isLogDeleted, isExplicitAttendancePunch } from '../../../store/useAttendanceStore';
 
 export interface DailyShiftBlock {
   shiftId: string;
@@ -84,10 +84,18 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
     employeeContracts,
     shiftTemplates,
     attendanceLogs,
+    deletedLogIds,
     shiftOverrides,
   } = useAttendanceStore();
 
   return useMemo(() => {
+    const deletedSet = new Set(deletedLogIds || []);
+    const validAttendanceLogs = (attendanceLogs || []).filter((l) => {
+      if (!l) return false;
+      if (isLogDeleted(l, deletedSet)) return false;
+      return isExplicitAttendancePunch(l);
+    });
+
     // 1. Generar los 7 días de la semana (Lunes a Domingo)
     const weekDays: { dateStr: string; dayLabel: string; dayName: string; isToday: boolean }[] = [];
     const todayStr = new Date().toISOString().slice(0, 10);
@@ -128,7 +136,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       let isPresentNow = false;
 
       // Obtener logs del empleado en el rango de la semana (con coincidencia robusta de ID/número)
-      const empLogs = attendanceLogs.filter((l) => {
+      const empLogs = validAttendanceLogs.filter((l) => {
         const logNo = String(l.employeeNo || '').trim();
         const contractNo = String(contract.employeeNo || '').trim();
         const logEmpId = String(l.employeeId || '').trim();
