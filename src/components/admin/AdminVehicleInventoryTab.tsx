@@ -389,30 +389,62 @@ export function AdminVehicleInventoryTab() {
     [posShifts]
   );
 
-  // Fuente 2: sesión activa LOCAL del vendedor (puede no estar en posShifts aún)
-  const liveShift: any | null = useMemo(() => {
-    if (!sellerSession?.isSetupComplete || !sellerSession?.pointId) return null;
-    // Verificar si ya está en posShifts para no duplicar
-    const alreadyStored = storedShifts.some(
-      (s: any) => !s.closedAt && s.pointId === sellerSession.pointId && s.openedAt === sellerSession.openedAt
-    );
-    if (alreadyStored) return null;
-    // Sintetizar un registro temporal basado en la sesión activa
-    return {
-      id: `LIVE-${sellerSession.pointId}`,
-      pointId: sellerSession.pointId,
-      shift: sellerSession.shift,
-      responsibleName: sellerSession.responsibleName,
-      openedAt: sellerSession.openedAt,
-      closedAt: null,
-      type: 'VENDEDOR',
-      _isLive: true, // marcador para la UI
-    };
-  }, [sellerSession, storedShifts]);
+  // Fecha de hoy local
+  const today = dateOf(new Date().toISOString());
 
-  // Combinar: sesión live primero, luego historial almacenado (ordenado desc)
+  // Fuente 2: Sesiones activas detectadas desde sellerSession LOCAL o vendorLocations GPS en tiempo real
+  const liveShifts: any[] = useMemo(() => {
+    const lives: any[] = [];
+
+    // a) Sesión local si estamos en la misma app
+    if (sellerSession?.isSetupComplete && sellerSession?.pointId) {
+      const pId = sellerSession.pointId;
+      const alreadyStored = storedShifts.some(
+        (s: any) => !s.closedAt && matchVehicleId(s.pointId, pId)
+      );
+      if (!alreadyStored) {
+        lives.push({
+          id: `LIVE-${pId}`,
+          pointId: pId,
+          shift: sellerSession.shift || 'AM',
+          responsibleName: sellerSession.responsibleName || 'Vendedor',
+          openedAt: sellerSession.openedAt || new Date().toISOString(),
+          closedAt: null,
+          type: 'VENDEDOR',
+          _isLive: true,
+        });
+      }
+    }
+
+    // b) Ubicaciones GPS en tiempo real desde Supabase (para PCs Admin y Dejador)
+    const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
+    Object.values(vendorLocs).forEach((loc: any) => {
+      const pId = loc?.pointId || loc?.name;
+      if (!pId) return;
+      const alreadyStored = storedShifts.some(
+        (s: any) => !s.closedAt && matchVehicleId(s.pointId, pId)
+      );
+      const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
+      if (!alreadyStored && !alreadyInLives) {
+        lives.push({
+          id: `LIVE-GPS-${pId}`,
+          pointId: pId,
+          shift: loc.shift || 'AM',
+          responsibleName: loc.name || 'Vendedor en Ruta',
+          openedAt: loc.openedAt || (today + 'T00:00:00'),
+          closedAt: null,
+          type: 'VENDEDOR',
+          _isLive: true,
+        });
+      }
+    });
+
+    return lives;
+  }, [sellerSession, storedShifts, today]);
+
+  // Combinar: sesiones live primero, luego historial almacenado (ordenado desc)
   const allShifts: any[] = useMemo(() => {
-    const combined = liveShift ? [liveShift, ...storedShifts] : [...storedShifts];
+    const combined = [...liveShifts, ...storedShifts];
     return combined.sort((a: any, b: any) => {
       // Activos primero
       if (!a.closedAt && b.closedAt) return -1;
@@ -421,7 +453,7 @@ export function AdminVehicleInventoryTab() {
       const tB = new Date(b.closedAt || b.openedAt || 0).getTime();
       return tB - tA;
     });
-  }, [liveShift, storedShifts]);
+  }, [liveShifts, storedShifts]);
 
   // Aplicar filtros fecha/jornada
   const filteredShifts = useMemo(() => {
@@ -579,24 +611,52 @@ export function VehicleShiftCard({
   // Fecha de hoy en formato YYYY-MM-DD
   const today = dateOf(new Date().toISOString());
 
-  // Sesión live del vendedor (puede no estar aún en posShifts)
+  // Sesión live del vendedor (desde sellerSession local O desde vendorLocations en tiempo real)
   const liveShift = useMemo(() => {
-    if (!sellerSession?.isSetupComplete || !matchVehicleId(sellerSession?.pointId, vehicleId)) return null;
-    const alreadyStored = (posShifts || []).some(
-      (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId) && s.openedAt === sellerSession.openedAt
+    // a) sellerSession local
+    if (sellerSession?.isSetupComplete && matchVehicleId(sellerSession?.pointId, vehicleId)) {
+      const alreadyStored = (posShifts || []).some(
+        (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId) && s.openedAt === sellerSession.openedAt
+      );
+      if (!alreadyStored) {
+        return {
+          id: `LIVE-${vehicleId}`,
+          pointId: vehicleId,
+          shift: sellerSession.shift || 'AM',
+          responsibleName: sellerSession.responsibleName || 'Vendedor',
+          openedAt: sellerSession.openedAt || new Date().toISOString(),
+          closedAt: null,
+          type: 'VENDEDOR',
+          _isLive: true,
+        };
+      }
+    }
+
+    // b) Realtime vendorLocations (para PCs de Admin / Dejador)
+    const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
+    const matchedLoc: any = Object.values(vendorLocs).find((loc: any) =>
+      matchVehicleId(loc?.pointId || loc?.name, vehicleId)
     );
-    if (alreadyStored) return null;
-    return {
-      id: `LIVE-${vehicleId}`,
-      pointId: vehicleId,
-      shift: sellerSession.shift || 'AM',
-      responsibleName: sellerSession.responsibleName || 'Vendedor',
-      openedAt: sellerSession.openedAt || new Date().toISOString(),
-      closedAt: null,
-      type: 'VENDEDOR',
-      _isLive: true,
-    };
-  }, [sellerSession, posShifts, vehicleId]);
+    if (matchedLoc) {
+      const alreadyStored = (posShifts || []).some(
+        (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId)
+      );
+      if (!alreadyStored) {
+        return {
+          id: `LIVE-GPS-${vehicleId}`,
+          pointId: vehicleId,
+          shift: matchedLoc.shift || 'AM',
+          responsibleName: matchedLoc.name || 'Vendedor en Ruta',
+          openedAt: matchedLoc.openedAt || (today + 'T00:00:00'),
+          closedAt: null,
+          type: 'VENDEDOR',
+          _isLive: true,
+        };
+      }
+    }
+
+    return null;
+  }, [sellerSession, posShifts, vehicleId, today]);
 
   // Buscar el turno correcto con prioridad:
   // 1. Sesión live del vendedor
