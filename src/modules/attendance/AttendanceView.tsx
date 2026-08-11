@@ -9,7 +9,7 @@ import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hoo
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useNavigate } from 'react-router-dom';
-import { DollarSign, Clock, CheckCircle2, AlertCircle, LogOut, ArrowLeft } from 'lucide-react';
+import { DollarSign, Clock, CheckCircle2, AlertCircle, LogOut, ArrowLeft, RefreshCw, Calendar } from 'lucide-react';
 
 export function AttendanceView() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,6 +18,22 @@ export function AttendanceView() {
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [activeDate, setActiveDate] = useState<Date>(new Date());
+  const [weekStartDate, setWeekStartDate] = useState<Date>(() => {
+    const d = new Date();
+    const day = d.getDay();
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Lunes
+    return new Date(d.setDate(diff));
+  });
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const [selectedBlock, setSelectedBlock] = useState<DailyShiftBlock | null>(null);
+  const [showPayrollModal, setShowPayrollModal] = useState(false);
+  const [showShiftTemplatesModal, setShowShiftTemplatesModal] = useState(false);
+  const [selectedPayrollEmp, setSelectedPayrollEmp] = useState<EmployeeWeeklyPayroll | undefined>(undefined);
+
+  const [showBioModal, setShowBioModal] = useState(false);
+  const [selectedBioEmpNo, setSelectedBioEmpNo] = useState<string | undefined>(undefined);
 
   const selectedDateStr = useMemo(() => {
     const year = activeDate.getFullYear();
@@ -26,17 +42,7 @@ export function AttendanceView() {
     return `${year}-${month}-${day}`;
   }, [activeDate]);
 
-  const weekStartDate = useMemo(() => {
-    const day = activeDate.getDay();
-    const diff = day === 0 ? 6 : day - 1; // Lunes como primer día de la semana
-    const monday = new Date(activeDate);
-    monday.setDate(activeDate.getDate() - diff);
-    monday.setHours(0, 0, 0, 0);
-    return monday;
-  }, [activeDate]);
-
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
 
   // Modales
   const [activeDetail, setActiveDetail] = useState<{
@@ -44,14 +50,6 @@ export function AttendanceView() {
     dateStr: string;
     block?: DailyShiftBlock;
   } | null>(null);
-
-  const [showPayrollModal, setShowPayrollModal] = useState(false);
-  const [showRawLogsModal, setShowRawLogsModal] = useState(false);
-  const [showShiftTemplatesModal, setShowShiftTemplatesModal] = useState(false);
-  const [selectedPayrollEmp, setSelectedPayrollEmp] = useState<EmployeeWeeklyPayroll | undefined>(undefined);
-
-  const [showBioModal, setShowBioModal] = useState(false);
-  const [selectedBioEmpNo, setSelectedBioEmpNo] = useState<string | undefined>(undefined);
 
   const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate);
   const { terminals, syncTerminalEvents, fetchTerminalUsers, clearAllAttendanceLogs } = useAttendanceStore();
@@ -109,7 +107,7 @@ export function AttendanceView() {
 
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">
-      {/* Header Superior con Botón de Nómina */}
+      {/* Header Superior con Botones Unificados */}
       <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
         <div className="flex items-center gap-3">
           <button
@@ -128,12 +126,22 @@ export function AttendanceView() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={handleSyncTerminal}
+            disabled={isSyncing}
+            className="h-10 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+            title="Sincronizar marcaciones del biométrico"
+          >
+            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+            <span>Sincronizar Biométrico</span>
+          </button>
+
           <button
             onClick={() => setShowShiftTemplatesModal(true)}
-            className="px-4 py-2.5 bg-gray-900 hover:bg-black text-amber-400 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer border border-gray-800"
+            className="h-10 px-3.5 bg-gray-900 hover:bg-black text-amber-400 font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer border border-gray-800"
           >
-            📅 Turnos & Horarios
+            <Calendar size={16} /> <span>Turnos & Horarios</span>
           </button>
 
           <button
@@ -141,21 +149,20 @@ export function AttendanceView() {
               setSelectedPayrollEmp(undefined);
               setShowPayrollModal(true);
             }}
-            className="px-4 py-2.5 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-2xl font-black text-xs sm:text-sm flex items-center gap-2 shadow-sm transition-all cursor-pointer border border-amber-300"
+            className="h-10 px-3.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer border border-amber-300"
           >
-            <DollarSign size={18} /> Ver Liquidación Semanal ($)
+            <DollarSign size={16} /> <span>Ver Liquidación Semanal ($)</span>
           </button>
+
           <button
             onClick={signOut}
-            className="p-2.5 text-red-600 hover:bg-red-50 rounded-2xl transition-colors border border-red-200 cursor-pointer flex items-center gap-1 text-xs font-bold"
+            className="h-10 px-3.5 bg-white hover:bg-red-50 text-red-600 font-extrabold text-xs sm:text-sm rounded-xl border border-red-200 cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
             title="Cerrar Sesión"
           >
             <LogOut size={16} /> <span className="hidden sm:inline">Cerrar Sesión</span>
           </button>
         </div>
       </div>
-
-
 
       {/* Toolbar de Navegación y Filtros */}
       <AttendanceToolbar

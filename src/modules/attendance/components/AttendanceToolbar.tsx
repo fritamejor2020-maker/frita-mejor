@@ -153,45 +153,22 @@ export function AttendanceToolbar({
           </select>
         </div>
 
-        {/* Botón Sincronizar Biométrico */}
-        <button
-          onClick={onSyncTerminal}
-          disabled={isSyncing}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-sm cursor-pointer disabled:opacity-50"
-          title="Sincronizar marcaciones del biométrico"
-        >
-          <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
-          <span className="hidden md:inline">Sincronizar Biométrico</span>
-        </button>
-
-        {/* Botón Gestionar Horarios y Turnos */}
-        {onOpenShiftTemplates && (
-          <button
-            onClick={onOpenShiftTemplates}
-            className="bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs px-3 py-2 rounded-xl flex items-center gap-1.5 transition-all shadow-2xs cursor-pointer"
-            title="Gestionar plantillas de turno y asignación por trabajador"
-          >
-            <Calendar size={14} />
-            <span className="hidden sm:inline">Turnos & Horarios</span>
-          </button>
-        )}
-
         {/* Botón Limpiar Registros */}
         {onClearLogs && (
           <button
             onClick={onClearLogs}
-            className="bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs px-2.5 py-2 rounded-xl flex items-center gap-1.5 transition-all cursor-pointer"
+            className="h-10 px-3 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs"
             title="Borrar todas las marcaciones mostradas"
           >
-            <Trash2 size={14} />
-            <span className="hidden lg:inline">Borrar Registros</span>
+            <Trash2 size={15} />
+            <span className="hidden sm:inline">Borrar Registros</span>
           </button>
         )}
 
         {/* Botón Pantalla Completa */}
         <button
           onClick={toggleFullscreen}
-          className="p-2 bg-gray-100 hover:bg-gray-200 rounded-xl text-gray-700 transition-colors cursor-pointer"
+          className="h-10 px-3 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-gray-200 text-xs"
           title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
         >
           {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
