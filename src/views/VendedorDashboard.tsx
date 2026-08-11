@@ -709,7 +709,7 @@ export const VendedorDashboard = () => {
                   {p.name}
                 </span>
                 <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
-                  {formatMoney(p.price)}
+                  {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
                 </span>
               </button>
             ))}
