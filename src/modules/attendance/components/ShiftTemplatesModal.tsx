@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save, Layers, ListChecks, Zap } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save, Layers, ListChecks, Zap, CheckCircle2 } from 'lucide-react';
 import { useAttendanceStore, ShiftTemplate, ShiftScheduleGroup, EmployeeContract } from '../../../store/useAttendanceStore';
 
 interface ShiftTemplatesModalProps {
@@ -51,6 +51,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
   const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>('SHIFT-MANANA-COMPLETO');
   const [empWeeklyTargetHours, setEmpWeeklyTargetHours] = useState<number>(44);
   const [empBaseHourlyRate, setEmpBaseHourlyRate] = useState<number>(6500);
+  const [bulkSuccessMsg, setBulkSuccessMsg] = useState<string | null>(null);
 
   const PRESET_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
 
@@ -214,6 +215,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     e.preventDefault();
     if (!editingEmpContract) return;
 
+    const empName = editingEmpContract.fullName;
     upsertEmployeeContract({
       ...editingEmpContract,
       shiftType: empShiftType,
@@ -224,6 +226,8 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     });
 
     setEditingEmpContract(null);
+    setBulkSuccessMsg(`✅ Asignación guardada correctamente para ${empName}.`);
+    setTimeout(() => setBulkSuccessMsg(null), 5000);
   };
 
   const handleToggleSelectAllEmps = () => {
@@ -243,6 +247,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
   const handleApplyBulkAssignment = () => {
     if (selectedEmpNos.length === 0) return;
 
+    const count = selectedEmpNos.length;
     selectedEmpNos.forEach((empNo) => {
       const emp = employeeContracts.find((e) => e.employeeNo === empNo);
       if (emp) {
@@ -258,6 +263,8 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     });
 
     setSelectedEmpNos([]);
+    setBulkSuccessMsg(`✅ ¡Asignación masiva exitosa! Se actualizó el horario a los ${count} trabajador(es) seleccionado(s).`);
+    setTimeout(() => setBulkSuccessMsg(null), 5000);
   };
 
   return (
@@ -681,6 +688,19 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
           {/* TAB 3: ASIGNACIÓN DE HORARIO POR TRABAJADOR */}
           {activeTab === 'employees' && (
             <div className="space-y-6">
+              {/* Mensaje de confirmación de éxito */}
+              {bulkSuccessMsg && (
+                <div className="bg-emerald-600 text-white font-black text-xs px-4 py-3 rounded-2xl shadow-md flex items-center justify-between animate-in fade-in zoom-in-95">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={18} className="shrink-0 text-emerald-200" />
+                    <span>{bulkSuccessMsg}</span>
+                  </div>
+                  <button onClick={() => setBulkSuccessMsg(null)} className="hover:opacity-80 p-1 cursor-pointer">
+                    <X size={16} />
+                  </button>
+                </div>
+              )}
+
               {/* Panel de Asignación Masiva cuando hay seleccionados */}
               {selectedEmpNos.length > 0 ? (
                 <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs space-y-4 animate-in fade-in zoom-in-95">
