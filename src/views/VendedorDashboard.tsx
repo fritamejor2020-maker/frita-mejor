@@ -608,10 +608,10 @@ export const VendedorDashboard = () => {
       )}
 
       {/* HEADER ULTRA COMPACTO */}
-      <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-2 pb-2 relative">
-          <div className="pr-12 flex items-center gap-2 flex-wrap">
-            <h1 className="text-base sm:text-xl font-black text-gray-900 tracking-tight leading-tight">
+      <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl overflow-hidden">
+        <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
+            <h1 className="text-base sm:text-xl font-black text-gray-900 tracking-tight leading-tight shrink-0">
               {getHeaderTitle()}
             </h1>
             {(shift || pointId || responsibleName) && (
@@ -640,16 +640,14 @@ export const VendedorDashboard = () => {
             )}
           </div>
 
-          {/* Botón salir */}
-          <div className="absolute top-2 right-3">
-            <button
-               onClick={() => signOut()}
-               title="Salir (el turno sigue activo)"
-               className="w-8 h-8 bg-white border border-red-100 rounded-full flex items-center justify-center shadow-sm text-[#FF4040] hover:bg-red-50 transition-all active:scale-95"
-            >
-              <LogOut size={14} strokeWidth={2.5} className="ml-0.5" />
-            </button>
-          </div>
+          {/* Botón salir alineado dentro del flujo flex */}
+          <button
+             onClick={() => signOut()}
+             title="Salir (el turno sigue activo)"
+             className="w-8 h-8 bg-red-50/80 border border-red-100 rounded-full flex items-center justify-center text-[#FF4040] hover:bg-red-100 transition-all active:scale-95 shrink-0 ml-1"
+          >
+            <LogOut size={14} strokeWidth={2.5} className="ml-0.5" />
+          </button>
         </div>
       </div>
 
