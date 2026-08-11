@@ -5,6 +5,7 @@ import { useSellerSessionStore } from '../../store/useSellerSessionStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { usePayrollStore } from '../../store/usePayrollStore';
+import { supabase } from '../../lib/supabase';
 import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw, AlertTriangle } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -550,22 +551,23 @@ export function AdminVehicleInventoryTab() {
               priceMap={priceMap}
               isExpanded={expandedId === shift.id}
               onToggle={() => setExpandedId(expandedId === shift.id ? null : shift.id)}
-              onForceClose={!shift.closedAt ? () => {
+              onForceClose={!shift.closedAt ? async () => {
+                const vendedorName = shift.responsibleName || 'desconocido';
                 const confirm = window.confirm(
-                  `¿Confirmas el CIERRE FORZADO del turno ${shift.pointId} (${shift.shift}) de "${shift.responsibleName || 'desconocido'}"?\n\nEsta acción cerrará la sesión activa del Vendedor desde el panel Admin.`
+                  `¿Confirmas el CIERRE FORZADO del turno ${shift.pointId} (${shift.shift}) de "${vendedorName}"?\n\nEsta acción cerrará la sesión activa del Vendedor desde el panel Admin.`
                 );
                 if (!confirm) return;
 
                 const closedAt = new Date().toISOString();
+                const targetPointId = shift.pointId;
 
-                // Si el turno ya está en posShifts, actualizarlo; si es un turno LIVE sintético, registrarlo
+                // 1. Si el turno ya está en posShifts, actualizarlo; si es sintético LIVE, agregarlo como cerrado
                 const existingShift = (posShifts || []).find(
-                  (s: any) => s.type === 'VENDEDOR' && !s.closedAt && s.pointId === shift.pointId
+                  (s: any) => s.type === 'VENDEDOR' && !s.closedAt && matchVehicleId(s.pointId, targetPointId)
                 );
                 if (existingShift) {
                   updatePosShift(existingShift.id, { closedAt, forcedByAdmin: true });
                 } else {
-                  // Registrar el turno como cerrado directamente
                   addPosShift({
                     ...shift,
                     id: shift.id.startsWith('LIVE-') ? `SHIFT-FORCED-${Date.now()}` : shift.id,
@@ -575,7 +577,32 @@ export function AdminVehicleInventoryTab() {
                   });
                 }
 
-                // Limpiar la sesión local del vendedor
+                // 2. Limpiar y desactivar las ubicaciones GPS / vendorLocations en tiempo real
+                try {
+                  const store = useInventoryStore.getState() as any;
+                  const currentLocs = { ...(store.vendorLocations || {}) };
+                  let locationChanged = false;
+                  Object.keys(currentLocs).forEach((key) => {
+                    const loc = currentLocs[key];
+                    if (matchVehicleId(loc?.pointId || loc?.name || key, targetPointId)) {
+                      delete currentLocs[key];
+                      locationChanged = true;
+                    }
+                  });
+                  if (locationChanged) {
+                    useInventoryStore.setState({ vendorLocations: currentLocs });
+                  }
+
+                  // Actualizar estado is_active = false en Supabase DB
+                  await supabase
+                    .from('vendor_locations')
+                    .update({ is_active: false })
+                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%`);
+                } catch (e) {
+                  console.warn('[ForzarCierre] Warning al desactivar vendor_locations:', e);
+                }
+
+                // 3. Limpiar la sesión local del vendedor si coincide
                 forceEndShift();
               } : undefined}
             />
