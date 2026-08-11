@@ -353,16 +353,19 @@ export function PosView() {
     }
   }, [customers, selectedCustomer]);
 
-  // Keep focus on the search barcode input unless user interacts with something else
+  // Auto-foco inteligente para escáner de código de barras sin robar clic a otros campos de texto
   useEffect(() => {
-    const focusInput = () => {
-      const activeTag = document.activeElement.tagName;
-      if (activeTag !== 'INPUT' && activeTag !== 'TEXTAREA' && activeTag !== 'SELECT') {
+    const handleKeyDown = (e) => {
+      const activeTag = document.activeElement?.tagName;
+      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+
+      // Si hay teclas imprimibles (como las del scanner) y el usuario no está en otro input
+      if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
         searchInputRef.current?.focus();
       }
     };
-    document.addEventListener('click', focusInput);
-    return () => document.removeEventListener('click', focusInput);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
   // -- CALCULATIONS --
