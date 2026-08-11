@@ -1240,29 +1240,74 @@ export const useInventoryStore = create(
 
       addPosShift: (shift) => {
         const current = useInventoryStore.getState().posShifts || [];
-        if (shift.type && shift.pointId && shift.shift) {
-          const duplicate = current.find(
-            s => s.type === shift.type &&
-                 s.pointId === shift.pointId &&
-                 s.shift === shift.shift &&
-                 !s.closedAt
-          );
-          if (duplicate) {
-            console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — omitiendo duplicado`);
-            return duplicate;
-          }
-        }
+        const deleted = useInventoryStore.getState().deletedShiftIds || [];
 
         // Generar ID determinista por fecha, sede, caja y jornada
         const dateStr = shift.openedAt ? shift.openedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
         const branch = shift.branchId || 'BRANCH-001';
         const reg = shift.registerId || 'REG-001';
-        const jornadaLabel = shift.jornada || shift.shift || '6-10 am';
+        const jornadaLabel = shift.jornada || shift.shift || 'AM';
         const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+        const deterministicId = shift.id || `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`;
 
-        const deterministicId = `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`;
+        // ── CASO 1: CIERRE DE TURNO (shift.closedAt presente) ──
+        if (shift.closedAt) {
+          // Buscar turno existente (abierto o por id) para aplicar la información del cierre
+          const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
+          const existingIdx = current.findIndex(s =>
+            s.id === shift.id ||
+            s.id === deterministicId ||
+            (!s.closedAt && (
+              (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint) ||
+              (s.branchId === branch && s.registerId === reg)
+            ))
+          );
 
-        // Verificar si ya existe un turno abierto con este ID determinista o para esta combinación
+          if (existingIdx >= 0) {
+            const updatedShift = { ...current[existingIdx], ...shift, closedAt: shift.closedAt };
+            const nextShifts = [...current];
+            nextShifts[existingIdx] = updatedShift;
+            set({ posShifts: nextShifts });
+            syncKey('posShifts', nextShifts);
+            console.log(`[Shift] Cierre aplicado exitosamente sobre turno existente: ${updatedShift.id}`);
+            return updatedShift;
+          }
+
+          // Si no existía turno previo, registrar el nuevo turno cerrado
+          const closedShift = {
+            ...shift,
+            id: deterministicId,
+            date: dateStr,
+            branchId: branch,
+            registerId: reg,
+            jornada: jornadaLabel
+          };
+          set((s) => ({
+            posShifts: [
+              closedShift,
+              ...(s.posShifts || []).filter(sh => !deleted.includes(sh.id) && sh.id !== closedShift.id)
+            ]
+          }));
+          syncKey('posShifts', useInventoryStore.getState().posShifts);
+          console.log(`[Shift] Nuevo turno cerrado registrado: ${closedShift.id}`);
+          return closedShift;
+        }
+
+        // ── CASO 2: APERTURA DE TURNO (sin closedAt) ──
+        if (shift.type && shift.pointId && shift.shift) {
+          const cleanPoint = String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          const duplicate = current.find(
+            s => s.type === shift.type &&
+                 String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+                 s.shift === shift.shift &&
+                 !s.closedAt
+          );
+          if (duplicate) {
+            console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — reusando turno existente`);
+            return duplicate;
+          }
+        }
+
         const existingOpenShift = current.find(
           s => !s.closedAt && (
             s.id === deterministicId ||
@@ -1275,10 +1320,9 @@ export const useInventoryStore = create(
           return existingOpenShift;
         }
 
-        const deleted = useInventoryStore.getState().deletedShiftIds || [];
         const newShift = { 
           ...shift, 
-          id: shift.id || deterministicId, 
+          id: deterministicId, 
           date: dateStr, 
           branchId: branch, 
           registerId: reg, 
@@ -1337,21 +1381,40 @@ export const useInventoryStore = create(
        * Guarda la última ubicación conocida del vendedor en app_state.
        * Esto permite mostrarla en el mapa aunque la app esté cerrada.
        */
-      updateVendorLocation: (vendorId, lat, lng, name, pointId) => {
+      updateVendorLocation: (vendorId, lat, lng, name, pointId, openedAt, shift) => {
         const now = new Date().toISOString();
         set((s) => ({
           vendorLocations: {
             ...(s.vendorLocations || {}),
-            [vendorId]: { lat, lng, name, pointId, updatedAt: now, isActive: true },
+            [vendorId]: {
+              lat,
+              lng,
+              name,
+              pointId,
+              updatedAt: now,
+              openedAt: openedAt || s.vendorLocations?.[vendorId]?.openedAt || now,
+              shift: shift || s.vendorLocations?.[vendorId]?.shift || 'AM',
+              isActive: true,
+            },
           }
         }));
         syncKey('vendorLocations', useInventoryStore.getState().vendorLocations);
       },
 
-      clearVendorLocation: (vendorId) => {
+      clearVendorLocation: (vendorIdOrPointId) => {
+        if (!vendorIdOrPointId) return;
+        const cleanTarget = String(vendorIdOrPointId).toLowerCase().replace(/[^a-z0-9]/g, '');
         set((s) => {
           const locs = { ...(s.vendorLocations || {}) };
-          if (locs[vendorId]) locs[vendorId] = { ...locs[vendorId], isActive: false };
+          Object.keys(locs).forEach((k) => {
+            const loc = locs[k];
+            const cleanK = String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanP = String(loc?.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const cleanN = String(loc?.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            if (cleanK === cleanTarget || cleanP === cleanTarget || cleanN === cleanTarget || cleanTarget.includes(cleanP) || cleanP.includes(cleanTarget)) {
+              delete locs[k];
+            }
+          });
           return { vendorLocations: locs };
         });
         syncKey('vendorLocations', useInventoryStore.getState().vendorLocations);

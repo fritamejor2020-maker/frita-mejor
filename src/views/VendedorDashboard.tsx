@@ -476,18 +476,12 @@ export const VendedorDashboard = () => {
       const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
       const shiftKey = shiftData.shift; // "AM" o "PM"
 
-      // 1. Buscar turno abierto (sin closedAt) para este triciclo hoy
+      // 1. Buscar turno abierto (sin closedAt) para este triciclo hoy usando matchVehicleId
+      const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       let activeShiftRecord = (posShifts || []).find(
-        (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && !s.closedAt
-          && s.openedAt?.startsWith(today)
+        (s: any) => s.type === 'VENDEDOR' && !s.closedAt &&
+          (String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint || (s.openedAt && s.openedAt.slice(0, 10) === today))
       );
-
-      // 2. Si no hay abierto, buscar por openedAt exacto (el del session store)
-      if (!activeShiftRecord) {
-        activeShiftRecord = (posShifts || []).find(
-          (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.openedAt === openedAt
-        );
-      }
 
       if (activeShiftRecord) {
         updatePosShift(activeShiftRecord.id, finalShift);
@@ -495,7 +489,17 @@ export const VendedorDashboard = () => {
         addPosShift(finalShift);
       }
 
-      // Marcar GPS inactivo inmediatamente — el vendedor desaparece del mapa
+      // Marcar GPS inactivo inmediatamente en el mapa local y Supabase DB
+      try {
+        useInventoryStore.getState().clearVendorLocation(pointId);
+        await supabase
+          .from('vendor_locations')
+          .update({ is_active: false })
+          .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`);
+      } catch (e) {
+        console.warn('[VendedorClose] Error limpiando GPS:', e);
+      }
+
       await gpsStop();
       endShift();
       signOut();
