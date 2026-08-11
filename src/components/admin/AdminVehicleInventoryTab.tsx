@@ -2,9 +2,35 @@ import React, { useState, useMemo } from 'react';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useSellerSessionStore } from '../../store/useSellerSessionStore';
+import { useVehicleStore } from '../../store/useVehicleStore';
 import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw, AlertTriangle } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
+export const matchVehicleId = (sPointId: string | null | undefined, targetId: string | null | undefined) => {
+  if (!sPointId || !targetId) return false;
+  const cleanS = String(sPointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+  const cleanT = String(targetId).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!cleanS || !cleanT) return false;
+  if (cleanS === cleanT) return true;
+  if (cleanS.includes(cleanT) || cleanT.includes(cleanS)) return true;
+
+  const vehicles = useVehicleStore.getState().vehicles || [];
+  const targetVeh = vehicles.find((v: any) => {
+    const vId = (v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const vAbbr = (v.abbreviation || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const vName = (v.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    return cleanT === vId || cleanT === vAbbr || cleanT === vName;
+  });
+
+  if (targetVeh) {
+    const vAbbr = (targetVeh.abbreviation || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const vName = (targetVeh.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const vId = (targetVeh.id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (cleanS === vAbbr || cleanS === vName || cleanS === vId) return true;
+  }
+  return false;
+};
+
 const dateOf = (iso: string) => {
   if (!iso) return '';
   const d = new Date(iso);
@@ -47,7 +73,7 @@ function buildShiftLogistics(
   const cargaMap: Record<string, { name: string; qty: number }> = {};
   const seenCargas = new Set<string>();
   loadHistory
-    .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId
+    .filter((e: any) => e.type === 'carga' && matchVehicleId(e.vehicleId, vehicleId)
       && inWindow(e.timestamp) && !seenCargas.has(e.id) && (seenCargas.add(e.id) || true))
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
@@ -60,7 +86,7 @@ function buildShiftLogistics(
   const surtidoMap: Record<string, { name: string; qty: number }> = {};
   const seenSurtidos = new Set<string>();
   completedRequests
-    .filter((r: any) => r.requester_point_id === vehicleId
+    .filter((r: any) => matchVehicleId(r.requester_point_id, vehicleId)
       && inWindow(r.completed_at || r.created_at)
       && !seenSurtidos.has(r.id) && (seenSurtidos.add(r.id) || true))
     .forEach((r: any) => {
@@ -74,7 +100,7 @@ function buildShiftLogistics(
   const sobranteMap: Record<string, { name: string; qty: number }> = {};
   const seenRecepciones = new Set<string>();
   loadHistory
-    .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId
+    .filter((e: any) => e.type === 'recepcion' && matchVehicleId(e.vehicleId, vehicleId)
       && inWindow(e.timestamp) && !seenRecepciones.has(e.id) && (seenRecepciones.add(e.id) || true))
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
@@ -496,43 +522,42 @@ export function VehicleShiftCard({
 
   // Sesión live del vendedor (puede no estar aún en posShifts)
   const liveShift = useMemo(() => {
-    if (!sellerSession?.isSetupComplete || sellerSession?.pointId !== vehicleId) return null;
-    if (currentShift && sellerSession?.shift !== currentShift) return null;
+    if (!sellerSession?.isSetupComplete || !matchVehicleId(sellerSession?.pointId, vehicleId)) return null;
     const alreadyStored = (posShifts || []).some(
-      (s: any) => !s.closedAt && s.pointId === vehicleId && s.openedAt === sellerSession.openedAt
+      (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId) && s.openedAt === sellerSession.openedAt
     );
     if (alreadyStored) return null;
     return {
       id: `LIVE-${vehicleId}`,
       pointId: vehicleId,
-      shift: sellerSession.shift,
-      responsibleName: sellerSession.responsibleName,
-      openedAt: sellerSession.openedAt,
+      shift: sellerSession.shift || 'AM',
+      responsibleName: sellerSession.responsibleName || 'Vendedor',
+      openedAt: sellerSession.openedAt || new Date().toISOString(),
       closedAt: null,
       type: 'VENDEDOR',
       _isLive: true,
     };
-  }, [sellerSession, posShifts, vehicleId, currentShift]);
+  }, [sellerSession, posShifts, vehicleId]);
 
   // Buscar el turno correcto con prioridad:
   // 1. Sesión live del vendedor
-  // 2. Turno activo que coincida con jornada actual
+  // 2. PRIMERA PRIORIDAD: Cualquier turno abierto (!closedAt) que coincida con el vehículo
   // 3. Turno de hoy que coincida con jornada actual (solo si !activeOnly)
-  // 4. Cualquier turno activo
+  // 4. Turno de hoy (si !activeOnly)
   // 5. El más reciente (fallback — solo si !activeOnly)
+  // 6. Si activeOnly=true y hay cargas/surtidos hoy para este vehículo, inyectar turno activo sintético
   const shift = useMemo(() => {
     if (liveShift) return liveShift;
 
     const forVehicle = (posShifts || []).filter(
-      (s: any) => s.type === 'VENDEDOR' && s.pointId === vehicleId
+      (s: any) => s.type === 'VENDEDOR' && matchVehicleId(s.pointId, vehicleId)
     );
 
-    if (currentShift) {
-      const activeMatchingShift = forVehicle.find(
-        (s: any) => !s.closedAt && s.shift === currentShift
-      );
-      if (activeMatchingShift) return activeMatchingShift;
+    // 1. CUALQUIER TURNO ACTIVO ABIERTO (!closedAt) TIENE MÁXIMA PRIORIDAD
+    const anyActiveOpen = forVehicle.find((s: any) => !s.closedAt);
+    if (anyActiveOpen) return anyActiveOpen;
 
+    if (currentShift) {
       if (!activeOnly) {
         // Hoy + jornada actual (aunque esté cerrado)
         const todayMatchingShift = forVehicle
@@ -547,23 +572,48 @@ export function VehicleShiftCard({
       }
     }
 
-    // Cualquier turno activo (sin filtro de jornada)
-    // Solo si NO hay currentShift (sin contexto de jornada)
-    if (!currentShift) {
-      const anyActive = forVehicle.find((s: any) => !s.closedAt);
-      if (anyActive) return anyActive;
-    }
+    // Fallback: cualquier turno de hoy (cerrado) si !activeOnly
+    if (!activeOnly) {
+      const todayShift = forVehicle
+        .filter((s: any) => {
+          const sDate = s.fecha || dateOf(s.closedAt || s.openedAt || '');
+          return sDate === today;
+        })
+        .sort((a: any, b: any) =>
+          new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
+        )[0];
+      if (todayShift) return todayShift;
 
-    // Fallback: el más reciente — SOLO si no hay contexto de jornada y !activeOnly
-    // Con currentShift definido, NO hacer fallback a otra jornada
-    if (!activeOnly && !currentShift) {
+      // Fallback final al más reciente
       return forVehicle.sort((a: any, b: any) =>
         new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime()
       )[0] || null;
     }
 
+    // Si activeOnly es true, pero hay movimientos logísticos hoy para este vehículo, inyectar turno sintético activo
+    if (activeOnly) {
+      const hasLoadsToday = (loadHistory || []).some(
+        (e: any) => matchVehicleId(e.vehicleId, vehicleId) && dateOf(e.timestamp) === today
+      );
+      const hasRequestsToday = (completedRequests || []).some(
+        (r: any) => matchVehicleId(r.requester_point_id, vehicleId) && dateOf(r.completed_at || r.created_at) === today
+      );
+      if (hasLoadsToday || hasRequestsToday) {
+        return {
+          id: `AUTO-ACTIVE-${vehicleId}`,
+          pointId: vehicleId,
+          shift: currentShift || 'AM',
+          responsibleName: 'Vendedor en Ruta',
+          openedAt: today + 'T00:00:00',
+          closedAt: null,
+          type: 'VENDEDOR',
+          _isLive: true,
+        };
+      }
+    }
+
     return null;
-  }, [posShifts, vehicleId, liveShift, currentShift, activeOnly, today]);
+  }, [posShifts, vehicleId, liveShift, currentShift, activeOnly, today, loadHistory, completedRequests]);
 
   if (!vehicleId) return null;
 
