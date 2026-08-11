@@ -608,8 +608,17 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
                 </div>
                 <select
                   value={scheduleGroupId}
-                  onChange={(e) => setScheduleGroupId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 mb-3"
+                  onChange={(e) => {
+                    const newGrpId = e.target.value;
+                    setScheduleGroupId(newGrpId);
+                    const grp = scheduleGroups.find((g) => g.id === newGrpId);
+                    if (grp && grp.shiftIds && grp.shiftIds.length > 0) {
+                      if (!grp.shiftIds.includes(defaultShiftId)) {
+                        setDefaultShiftId(grp.shiftIds[0]);
+                      }
+                    }
+                  }}
+                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 mb-1"
                 >
                   {scheduleGroups.map((grp) => (
                     <option key={grp.id} value={grp.id}>
@@ -619,17 +628,36 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
                   {scheduleGroups.length === 0 && <option value="GROUP-LOCAL">📅 Horario del Local (Variables)</option>}
                 </select>
 
-                <label className="block text-xs font-black text-gray-700 mb-1">Turno Predeterminado (Si es Fijo)</label>
+                {shiftType === 'VARIABLE' ? (
+                  <p className="text-[11px] text-amber-800 font-extrabold bg-amber-50 border border-amber-200 p-2 rounded-xl mb-3">
+                    🔄 <b>Modalidad Variable:</b> El sistema auto-detectará automáticamente cuál turno cumplió el empleado (entre los {(scheduleGroups.find((g) => g.id === scheduleGroupId)?.shiftIds || []).length} turnos de este Horario Maestro).
+                  </p>
+                ) : (
+                  <p className="text-[11px] text-blue-800 font-extrabold bg-blue-50 border border-blue-200 p-2 rounded-xl mb-3">
+                    📌 <b>Modalidad Fija:</b> El empleado tendrá obligatoriamente el turno predeterminado seleccionado abajo.
+                  </p>
+                )}
+
+                <label className="block text-xs font-black text-gray-700 mb-1">
+                  Turno Predeterminado {shiftType === 'FIXED' ? '(Obligatorio para Modalidad Fija)' : '(Solo relevante si cambia a Modalidad Fija)'}
+                </label>
                 <select
                   value={defaultShiftId}
                   onChange={(e) => setDefaultShiftId(e.target.value)}
                   className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 outline-none focus:border-amber-500"
                 >
-                  {shiftTemplates.map((st) => (
-                    <option key={st.id} value={st.id}>
-                      {st.name} ({st.startTime} - {st.endTime})
-                    </option>
-                  ))}
+                  {(() => {
+                    const selGroup = scheduleGroups.find((g) => g.id === scheduleGroupId);
+                    const groupShifts = (selGroup && selGroup.shiftIds && selGroup.shiftIds.length > 0)
+                      ? shiftTemplates.filter((st) => selGroup.shiftIds.includes(st.id))
+                      : shiftTemplates;
+                    
+                    return groupShifts.map((st) => (
+                      <option key={st.id} value={st.id}>
+                        {st.name} ({st.startTime} - {st.endTime})
+                      </option>
+                    ));
+                  })()}
                 </select>
               </div>
 
