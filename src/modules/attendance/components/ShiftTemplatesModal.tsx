@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save, Layers, ListChecks } from 'lucide-react';
+import { X, Plus, Edit2, Trash2, Clock, UserCheck, Shield, Check, Save, Layers, ListChecks, Zap } from 'lucide-react';
 import { useAttendanceStore, ShiftTemplate, ShiftScheduleGroup, EmployeeContract } from '../../../store/useAttendanceStore';
 
 interface ShiftTemplatesModalProps {
@@ -44,6 +44,7 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
 
   // Form states for EmployeeContract
   const [editingEmpContract, setEditingEmpContract] = useState<EmployeeContract | null>(null);
+  const [selectedEmpNos, setSelectedEmpNos] = useState<string[]>([]);
   const [empShiftType, setEmpShiftType] = useState<'FIXED' | 'VARIABLE'>('VARIABLE');
   const [empScheduleGroupId, setEmpScheduleGroupId] = useState<string>('GROUP-LOCAL');
   const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>('SHIFT-MANANA-COMPLETO');
@@ -222,6 +223,40 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
     });
 
     setEditingEmpContract(null);
+  };
+
+  const handleToggleSelectAllEmps = () => {
+    if (selectedEmpNos.length === employeeContracts.length) {
+      setSelectedEmpNos([]);
+    } else {
+      setSelectedEmpNos(employeeContracts.map((e) => e.employeeNo));
+    }
+  };
+
+  const handleToggleSelectEmp = (empNo: string) => {
+    setSelectedEmpNos((prev) =>
+      prev.includes(empNo) ? prev.filter((id) => id !== empNo) : [...prev, empNo]
+    );
+  };
+
+  const handleApplyBulkAssignment = () => {
+    if (selectedEmpNos.length === 0) return;
+
+    selectedEmpNos.forEach((empNo) => {
+      const emp = employeeContracts.find((e) => e.employeeNo === empNo);
+      if (emp) {
+        updateEmployeeContract({
+          ...emp,
+          shiftType: empShiftType,
+          scheduleGroupId: empScheduleGroupId,
+          defaultShiftId: empDefaultShiftId,
+          weeklyTargetHours: Number(empWeeklyTargetHours) || 44,
+          baseHourlyRate: Number(empBaseHourlyRate) || 6500,
+        });
+      }
+    });
+
+    setSelectedEmpNos([]);
   };
 
   return (
@@ -645,7 +680,111 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
           {/* TAB 3: ASIGNACIÓN DE HORARIO POR TRABAJADOR */}
           {activeTab === 'employees' && (
             <div className="space-y-6">
-              {editingEmpContract ? (
+              {/* Panel de Asignación Masiva cuando hay seleccionados */}
+              {selectedEmpNos.length > 0 ? (
+                <div className="bg-amber-50 border-2 border-amber-300 rounded-2xl p-5 shadow-xs space-y-4 animate-in fade-in zoom-in-95">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
+                    <div>
+                      <h3 className="font-black text-amber-950 text-sm flex items-center gap-2">
+                        <Zap className="text-amber-600 fill-amber-500" size={18} />
+                        ⚡ Asignación Masiva para <span className="underline decoration-amber-500 decoration-2">{selectedEmpNos.length}</span> Trabajador(es) Seleccionado(s)
+                      </h3>
+                      <p className="text-xs text-amber-800 font-bold mt-0.5">
+                        Define los parámetros abajo y aplícalos a todos los trabajadores marcados simultáneamente.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEmpNos(employeeContracts.map((e) => e.employeeNo))}
+                        className="text-xs font-black text-amber-900 bg-amber-200/90 px-3 py-1.5 rounded-xl hover:bg-amber-300 transition-colors cursor-pointer"
+                      >
+                        ✓ Seleccionar los {employeeContracts.length}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedEmpNos([])}
+                        className="text-xs font-bold text-gray-500 hover:text-gray-900 px-2 py-1 cursor-pointer"
+                      >
+                        Deseleccionar todos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Tipo de Modalidad</label>
+                      <select
+                        value={empShiftType}
+                        onChange={(e) => setEmpShiftType(e.target.value as 'FIXED' | 'VARIABLE')}
+                        className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+                      >
+                        <option value="VARIABLE">🔄 Turno Variable (Auto-detectar en Horario Maestro)</option>
+                        <option value="FIXED">📌 Turno Fijo (Asignación fija obligatoria)</option>
+                      </select>
+                    </div>
+
+                    {empShiftType === 'VARIABLE' ? (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Horario Maestro a Asignar</label>
+                        <select
+                          value={empScheduleGroupId}
+                          onChange={(e) => setEmpScheduleGroupId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+                        >
+                          {scheduleGroups.map((grp) => (
+                            <option key={grp.id} value={grp.id}>
+                              📅 {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Turno Fijo a Asignar</label>
+                        <select
+                          value={empDefaultShiftId}
+                          onChange={(e) => setEmpDefaultShiftId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+                        >
+                          {shiftTemplates.map((st) => (
+                            <option key={st.id} value={st.id}>
+                              📌 {st.name} ({st.startTime} - {st.endTime})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">Meta Horas Semanales</label>
+                      <input
+                        type="number"
+                        value={empWeeklyTargetHours}
+                        onChange={(e) => setEmpWeeklyTargetHours(Number(e.target.value))}
+                        className="w-full px-3.5 py-2.5 bg-white border border-amber-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500 shadow-2xs"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end gap-2 pt-2 border-t border-amber-200/80">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmpNos([])}
+                      className="px-4 py-2 bg-white hover:bg-gray-100 text-gray-700 rounded-xl font-bold text-xs cursor-pointer border border-gray-300"
+                    >
+                      Cancelar Selección
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleApplyBulkAssignment}
+                      className="px-6 py-2.5 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-xl font-black text-xs flex items-center gap-2 shadow-sm cursor-pointer transition-transform active:scale-95"
+                    >
+                      <Zap size={16} className="fill-gray-950" /> Aplicar Horario a los {selectedEmpNos.length} Seleccionados
+                    </button>
+                  </div>
+                </div>
+              ) : editingEmpContract ? (
                 <form onSubmit={handleSaveEmpContract} className="bg-white p-5 rounded-2xl border border-amber-200 shadow-xs space-y-4">
                   <h3 className="font-black text-gray-900 text-sm flex items-center gap-2">
                     <UserCheck size={16} className="text-amber-500" />
@@ -725,9 +864,18 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                   </div>
                 </form>
               ) : (
-                <p className="text-xs text-gray-500 font-bold">
-                  Selecciona a cualquier persona para asignarle su Horario Maestro (ej. Horarios del Local).
-                </p>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-100/70 p-3.5 rounded-2xl border border-gray-200/80">
+                  <p className="text-xs text-gray-600 font-bold flex items-center gap-1.5">
+                    💡 Marca las casillas para asignar horarios en lote o haz clic en <b>"⚙️ Asignar Horario"</b> individualmente.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleToggleSelectAllEmps}
+                    className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 transition-transform active:scale-95"
+                  >
+                    <Zap size={14} /> {selectedEmpNos.length === employeeContracts.length ? 'Deseleccionar Todos' : `Seleccionar Todos (${employeeContracts.length})`}
+                  </button>
+                </div>
               )}
 
               {/* Tabla de trabajadores */}
@@ -735,6 +883,14 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                 <table className="w-full text-left text-xs">
                   <thead className="bg-gray-100 text-gray-600 font-black uppercase text-[10px]">
                     <tr>
+                      <th className="py-3 px-4 w-10 text-center">
+                        <input
+                          type="checkbox"
+                          checked={employeeContracts.length > 0 && selectedEmpNos.length === employeeContracts.length}
+                          onChange={handleToggleSelectAllEmps}
+                          className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                        />
+                      </th>
                       <th className="py-3 px-4"># ID</th>
                       <th className="py-3 px-4">Trabajador</th>
                       <th className="py-3 px-4">Modalidad</th>
@@ -745,8 +901,22 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                   <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
                     {employeeContracts.map((emp) => {
                       const grp = scheduleGroups.find((g) => g.id === emp.scheduleGroupId);
+                      const isSelected = selectedEmpNos.includes(emp.employeeNo);
                       return (
-                        <tr key={emp.employeeId} className="hover:bg-amber-50/40 transition-colors">
+                        <tr
+                          key={emp.employeeId}
+                          className={`transition-colors ${
+                            isSelected ? 'bg-amber-100/70 border-l-4 border-amber-500' : 'hover:bg-amber-50/40'
+                          }`}
+                        >
+                          <td className="py-3 px-4 text-center">
+                            <input
+                              type="checkbox"
+                              checked={isSelected}
+                              onChange={() => handleToggleSelectEmp(emp.employeeNo)}
+                              className="w-4 h-4 accent-amber-500 rounded cursor-pointer"
+                            />
+                          </td>
                           <td className="py-3 px-4 font-black text-gray-500">#{emp.employeeNo}</td>
                           <td className="py-3 px-4 font-black text-gray-900">{emp.fullName}</td>
                           <td className="py-3 px-4">
