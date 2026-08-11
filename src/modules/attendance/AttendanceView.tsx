@@ -4,6 +4,7 @@ import { TimelineGridPanel } from './components/TimelineGridPanel';
 import { ShiftDetailModal } from './components/ShiftDetailModal';
 import { WeeklyPayrollModal } from './components/WeeklyPayrollModal';
 import { ShiftTemplatesModal } from './components/ShiftTemplatesModal';
+import { AdminEmployeeBiometricsModal } from '../admin/AdminEmployeeBiometricsModal';
 import { useAttendanceData, EmployeeWeeklyPayroll, DailyShiftBlock } from './hooks/useAttendanceData';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { useAuthStore } from '../../store/useAuthStore';
