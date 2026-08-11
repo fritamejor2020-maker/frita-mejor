@@ -18,7 +18,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     addScheduleGroup,
     updateScheduleGroup,
     deleteScheduleGroup,
-    updateEmployeeContract,
+    upsertEmployeeContract,
   } = useAttendanceStore();
 
   const [activeTab, setActiveTab] = useState<'groups' | 'templates' | 'employees'>(initialTab);
@@ -214,7 +214,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     e.preventDefault();
     if (!editingEmpContract) return;
 
-    updateEmployeeContract({
+    upsertEmployeeContract({
       ...editingEmpContract,
       shiftType: empShiftType,
       scheduleGroupId: empScheduleGroupId,
@@ -246,7 +246,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     selectedEmpNos.forEach((empNo) => {
       const emp = employeeContracts.find((e) => e.employeeNo === empNo);
       if (emp) {
-        updateEmployeeContract({
+        upsertEmployeeContract({
           ...emp,
           shiftType: empShiftType,
           scheduleGroupId: empScheduleGroupId,
@@ -687,8 +687,8 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-amber-200/80 pb-3">
                     <div>
                       <h3 className="font-black text-amber-950 text-sm flex items-center gap-2">
-                        <Zap className="text-amber-600 fill-amber-500" size={18} />
-                        ⚡ Asignación Masiva para <span className="underline decoration-amber-500 decoration-2">{selectedEmpNos.length}</span> Trabajador(es) Seleccionado(s)
+                        <Zap className="text-amber-600 fill-amber-500 shrink-0" size={18} />
+                        <span>Asignación Masiva ({selectedEmpNos.length} {selectedEmpNos.length === 1 ? 'trabajador seleccionado' : 'trabajadores seleccionados'})</span>
                       </h3>
                       <p className="text-xs text-amber-800 font-bold mt-0.5">
                         Define los parámetros abajo y aplícalos a todos los trabajadores marcados simultáneamente.
