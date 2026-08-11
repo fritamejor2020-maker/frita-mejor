@@ -1132,7 +1132,8 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
     const q = searchQuery.toLowerCase().trim();
     filtered = filtered.filter(i => 
       i.name.toLowerCase().includes(q) || 
-      (i.barcode && i.barcode.toLowerCase().includes(q))
+      (i.barcode && String(i.barcode).toLowerCase().includes(q)) ||
+      String(i.id).toLowerCase().includes(q)
     );
   }
 

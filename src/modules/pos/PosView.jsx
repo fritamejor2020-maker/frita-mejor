@@ -353,15 +353,26 @@ export function PosView() {
     }
   }, [customers, selectedCustomer]);
 
-  // Auto-foco inteligente para escáner de código de barras sin robar clic a otros campos de texto
+  // Auto-foco inteligente y captura global para escáner de códigos de barras (Electron / Web)
   useEffect(() => {
     const handleKeyDown = (e) => {
-      const activeTag = document.activeElement?.tagName;
-      if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+      const activeEl = document.activeElement;
+      const activeTag = activeEl?.tagName;
 
-      // Si hay teclas imprimibles (como las del scanner) y el usuario no está en otro input
+      // Si el foco está en un input/textarea/select DIFERENTE al buscador principal
+      if (activeEl && activeEl !== searchInputRef.current) {
+        if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') {
+          return;
+        }
+      }
+
+      // Si hay teclas imprimibles (teclas del scanner o teclado) sin modificadores
       if (e.key && e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-        searchInputRef.current?.focus();
+        if (activeEl !== searchInputRef.current) {
+          e.preventDefault(); // Evita perder el primer dígito del escaneo
+          setSearchTerm(prev => prev + e.key);
+          searchInputRef.current?.focus();
+        }
       }
     };
     window.addEventListener('keydown', handleKeyDown);
@@ -683,15 +694,33 @@ export function PosView() {
 
   const handleBarcodeSearch = (e) => {
     if (e.key === 'Enter' && searchTerm.trim()) {
+      e.preventDefault();
       const term = searchTerm.trim().toLowerCase();
-      // Find matching item by barcode or name
-      const found = inventory.find(i => (i.barcode === term) || i.name.toLowerCase().includes(term));
+
+      // 1. Buscar coincidencia exacta por código de barras o id
+      let found = inventory.find(i => {
+        const bc = String(i.barcode || '').trim().toLowerCase();
+        const pid = String(i.id || '').trim().toLowerCase();
+        return bc === term || pid === term;
+      });
+
+      // 2. Si no hay coincidencia exacta, buscar por código parcial o nombre
+      if (!found) {
+        found = inventory.find(i => {
+          const bc = String(i.barcode || '').trim().toLowerCase();
+          const nm = String(i.name || '').toLowerCase();
+          const pid = String(i.id || '').toLowerCase();
+          return (bc && bc.includes(term)) || nm.includes(term) || pid.includes(term);
+        });
+      }
+
       if (found) {
         handleItemAdd(found);
+        setSearchTerm('');
       } else {
-        alert('Producto no encontrado');
+        alert(`Producto con código o nombre "${searchTerm.trim()}" no encontrado`);
+        setSearchTerm('');
       }
-      setSearchTerm('');
     }
   };
 
@@ -961,10 +990,12 @@ export function PosView() {
     // Búsqueda global: busca en TODO el inventario vendible por nombre o código de barras,
     // ignorando la carpeta seleccionada o los productos fijados en el feed principal
     const term = searchTerm.toLowerCase().trim();
-    displayedItems = sellableItems.filter(i => 
-      i.name.toLowerCase().includes(term) || 
-      (i.barcode && i.barcode.toLowerCase().includes(term))
-    ).sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
+    displayedItems = sellableItems.filter(i => {
+      const bc = String(i.barcode || '').toLowerCase().trim();
+      const nm = String(i.name || '').toLowerCase();
+      const pid = String(i.id || '').toLowerCase();
+      return nm.includes(term) || (bc && bc.includes(term)) || pid.includes(term);
+    }).sort((a, b) => (a.sortOrder || 999) - (b.sortOrder || 999) || a.name.localeCompare(b.name));
   } else if (currentFolder) {
     // Dentro de una categoría: todos sus productos ordenados por sortOrder o alfabéticamente
     displayedItems = sellableItems
