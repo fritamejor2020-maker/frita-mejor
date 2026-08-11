@@ -877,7 +877,9 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
       {/* Main Card */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100">
-        <h3 className="text-xl font-black text-gray-800 mb-6">
+        {mode === 'POS' ? (
+          <>
+            <h3 className="text-xl font-black text-gray-800 mb-6">
           {mode === 'POS' ? '📊 Historial de Cierres Z' : '💰 Historial de Cierres Finanzas'}
         </h3>
 
@@ -1318,7 +1320,423 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
             </table>
           </div>
         )}
-      </div>
+          </>
+        ) : (
+          <>
+            <h3 className="text-xl font-black text-gray-800 mb-6">Conciliaci+�n de Cierres</h3>
+
+        {filteredClosings.length === 0 && (
+          <div className="text-center py-12 text-gray-400">
+            <p className="text-5xl mb-3">����</p>
+            <p className="font-bold">No hay cierres para los filtros seleccionados.</p>
+          </div>
+        )}
+
+        <div className="divide-y divide-gray-100">
+          {filteredClosings.map((closing) => {
+            const isExpanded = expandedId === closing.id;
+            const calculatedTheoretical = closing.details.reduce(
+              (sum: number, d: any) => sum + d.sold * d.unitPrice,
+              0
+            );
+
+            return (
+              <div key={closing.id} className="py-6 first:pt-0 last:pb-0">
+                {/* ��������� Row Header ��������������������������������������������������������������������� */}
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-center gap-3">
+                    {/* Initials circle */}
+                    <div className="w-11 h-11 rounded-full border-2 border-red-400 flex items-center justify-center text-red-500 font-black text-sm shrink-0">
+                      {closing.initials}
+                    </div>
+                    <div>
+                       <div className="flex items-center gap-2">
+                         <span className="font-black text-gray-800 text-base">{closing.pointName}</span>
+                         {closing.pointLabel && (
+                           <span className="bg-red-50 text-red-400 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.pointLabel}</span>
+                         )}
+                         <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.shift}</span>
+                       </div>
+                       <p className="text-xs text-gray-400 font-bold mt-0.5">{closing.date}</p>
+                       {/* Anotador / Dejador badges */}
+                       {(closing.anotadorName || closing.dejadorName) && (
+                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                           {closing.anotadorName && (
+                             <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100">
+                               ���� {closing.anotadorName}
+                             </span>
+                           )}
+                           {closing.dejadorName && (
+                             <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
+                               ���� {closing.dejadorName}
+                             </span>
+                           )}
+                         </div>
+                       )}
+                     </div>
+                  </div>
+
+                  {/* Edit + Delete buttons */}
+                  {closing._raw && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        className="text-gray-300 hover:text-[#FF4040] transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                        title="Editar cierre"
+                        onClick={() => {
+                          setEditingClosing(closing);
+                          setEditCash(String(closing._raw.cashAmount || closing.real || 0));
+                          setEditTransfer(String(closing._raw.transferAmount || 0));
+                          setEditExpenses(String(closing.expenses || 0));
+                          setEditExpensesDesc(closing._raw.expensesDesc || "");
+                           // Si los detalles tienen enviado=0 (datos corruptos de edit antigua),
+                           // reconstruir desde log+�stica para que el form muestre datos reales.
+                           const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
+                           let _initDetails = closing.details.map((d: any) => ({ ...d }));
+                           if (!_hasRealLogistics) {
+                             const _vid = closing._raw?.pointId;
+                             if (_vid) {
+                               const _tl = buildLogisticsTimeline(_vid, closing.date);
+                               const _cM: Record<string,number> = {};
+                               const _sM: Record<string,number> = {};
+                               const _rM: Record<string,number> = {};
+                               _tl.forEach((e: any) => {
+                                 (e.items || []).forEach((item: any) => {
+                                   const n = item.name || item.productId || '';
+                                   if (e.type === 'carga')    _cM[n] = (_cM[n] || 0) + (item.qty || 0);
+                                   else if (e.type === 'surtido')  _sM[n] = (_sM[n] || 0) + (item.qty || 0);
+                                   else if (e.type === 'recepcion') _rM[n] = (_rM[n] || 0) + (item.qty || 0);
+                                 });
+                               });
+                               _initDetails = closing.details.map((d: any) => {
+                                 const logSent = (_cM[d.product] || 0) + (_sM[d.product] || 0);
+                                 const logRet  = _rM[d.product] || 0;
+                                 if (logSent > 0) return { ...d, sent: logSent, returned: logRet, sold: String(Math.max(0, logSent - logRet)) };
+                                 return { ...d };
+                               });
+                             }
+                           }
+                           setEditDetails(_initDetails);
+                          const vehicleId = closing._raw?.pointId;
+                          setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
+                        }}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                      </button>
+                      {closing._raw && allowDelete && (
+                        <button
+                          className="text-gray-300 hover:text-red-500 transition-colors p-1.5 hover:bg-red-50 rounded-lg"
+                          title="Eliminar conciliacion"
+                          onClick={() => {
+                            if (!window.confirm(`Eliminar cierre de ${closing.pointName} (${closing.shift} - ${closing.date})?`)) return;
+                            deletePosShift(closing._raw.id);
+                            const { loadHistory: lh, completedRequests: cr } = useLogisticsStore.getState();
+                            const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
+                            const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
+                            useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
+                            // Persistir en localStorage para que otras tabs vean la eliminaci+�n
+                            try {
+                              const logKey = 'frita-mejor-logistics';
+                              const raw = localStorage.getItem(logKey);
+                              if (raw) {
+                                const parsed = JSON.parse(raw);
+                                if (parsed?.state) {
+                                  parsed.state.loadHistory = newLH;
+                                  parsed.state.completedRequests = newCR;
+                                  localStorage.setItem(logKey, JSON.stringify(parsed));
+                                }
+                              }
+                            } catch(_e) {}
+                          }}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* ��������� Comparison Block ������������������������������������������������������ */}
+                <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4 overflow-hidden">
+                  {/* Fila principal: Te+�rico vs Real */}
+                  <div className="grid grid-cols-2 divide-x divide-gray-200">
+                    <div className="py-5 px-6 text-center">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Te+�rico (APP)</p>
+                      <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">
+                        {mode === 'POS' ? 'Calc. por ventas' : 'Calc. por log+�stica'}
+                      </p>
+                    </div>
+                    <div className="py-5 px-6 text-center">
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Real (Caja)</p>
+                      <p className="text-2xl font-black text-gray-800">{fmt(closing.real)}</p>
+                      <p className="text-[10px] font-bold text-gray-300 mt-1">Total recibido</p>
+                    </div>
+                  </div>
+                  {/* Desglose de Real */}
+                  <div className="grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-200 bg-white">
+                    <div className="py-3 px-4 text-center">
+                      <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">���� Efectivo</p>
+                      <p className="text-base font-black text-green-700">{fmt(closing.cashAmount)}</p>
+                    </div>
+                    <button
+                      className="py-3 px-4 text-center group hover:bg-blue-50/60 rounded-xl transition-colors cursor-pointer w-full"
+                      onClick={() => setTransfersModal({ transfers: closing.shiftTransfers || [], pointName: closing.pointName })}
+                      title="Ver transferencias"
+                    >
+                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">���� Transferencia</p>
+                      <p className="text-base font-black text-blue-600 group-hover:text-blue-700 transition-colors">{fmt(closing.transferAmount)}</p>
+                      <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
+                    </button>
+                     <button
+                       className="py-3 px-4 text-center group hover:bg-red-50/60 rounded-xl transition-colors cursor-pointer w-full"
+                       onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
+                       title="Ver descripci+�n del gasto"
+                     >
+                       <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">���� Salidas</p>
+                       <p className="text-base font-black text-red-500 group-hover:text-red-600 transition-colors">{fmt(closing.expenses)}</p>
+                       {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== ''
+                         ? <p className="text-[8px] font-bold text-red-300 mt-0.5 truncate max-w-[80px] mx-auto">{closing._raw.expensesDesc}</p>
+                         : <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
+                       }
+                     </button>
+                   </div>
+                 </div>
+
+                {/* ��������� Footer: Badge + Toggle ��������������������������������� */}
+                <div className="flex items-center justify-between">
+                  {renderBadge(closing)}
+                  <button
+                    onClick={() => setExpandedId(isExpanded ? null : closing.id)}
+                    className="text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors flex items-center gap-1"
+                  >
+                    {isExpanded ? 'Ocultar' : 'Ver Detalles'}
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="14"
+                      height="14"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      className={`transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                    >
+                      <polyline points="6 9 12 15 18 9" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* ��������� Accordion Details ������������������������������������������������ */}
+                {isExpanded && (
+                  <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+
+                    {/* Banner: Valor Editado manualmente */}
+                    {(closing as any)._raw?.editedAt && (
+                      <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                        <span className="text-sm">ԣŴ��</span>
+                        <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
+                        <span className="text-[10px] font-bold text-blue-400 ml-auto">
+                          {new Date((closing as any)._raw.editedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Bloque Anotador / Dejador */}
+                    {((closing as any).anotadorName || (closing as any).dejadorName) && (
+                      <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex flex-wrap gap-3 items-center">
+                        <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Equipo Jornada:</span>
+                        {(closing as any).anotadorName && (
+                          <span className="inline-flex items-center gap-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
+                            ���� Anotador: {(closing as any).anotadorName}
+                          </span>
+                        )}
+                        {(closing as any).dejadorName && (
+                          <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full">
+                            ���� Dejador: {(closing as any).dejadorName}
+                          </span>
+                        )}
+                      </div>
+                    )}
+
+                     {/* ������ Historial de Env+�os (colapsable) ������ */}
+                     {closing._raw?.pointId && (() => {
+                       const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
+                       // Inyectar entrada virtual si el cierre fue editado manualmente
+                       // Inyectar entradas del editHistory (una por cada edicion)
+                       const rawHistory = closing._raw?.editHistory;
+                       const buildDiffItems = (snap: any) => {
+                         const items: any[] = [];
+                         if (!snap) return items;
+                         const beforeDetails = snap.before?.details || (Array.isArray(snap.before) ? snap.before : []);
+                         const afterDetails  = snap.after?.details  || (Array.isArray(snap.after)  ? snap.after  : []);
+                         afterDetails.forEach((d: any) => {
+                           const prev = beforeDetails.find((b: any) => b.product === d.product);
+                           items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
+                         });
+                         if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
+                           items.push({ name: '���� Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
+                         if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
+                           items.push({ name: '���� Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
+                         if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
+                           items.push({ name: '���� Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
+                         return items;
+                       };
+                       if (rawHistory && rawHistory.length > 0) {
+                         rawHistory.forEach((hist: any, hIdx: number) => {
+                           timeline.push({
+                             id: 'edit-' + closing.id + '-' + hIdx,
+                             type: 'edicion',
+                             timestamp: hist.editedAt,
+                             items: buildDiffItems(hist),
+                           });
+                         });
+                       } else if (closing._raw?.editedAt) {
+                         // Backward compat: snapshot antiguo de una sola edici+�n
+                         timeline.push({
+                           id: 'edit-' + closing.id,
+                           type: 'edicion',
+                           timestamp: closing._raw.editedAt,
+                           items: buildDiffItems(closing._raw.editSnapshot),
+                         });
+                         timeline.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                       }
+                       if (timeline.length === 0) return null;
+                       const isHistorialOpen = expandedHistorialId === closing.id;
+                       let surtidoCount = 0;
+                       return (
+                         <div className="border-b border-gray-100">
+                           {/* Toggle button */}
+                           <button
+                             onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
+                             className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
+                           >
+                             <span>���� Historial de Env+�os ({timeline.length})</span>
+                             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                               className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
+                               <polyline points="6 9 12 15 18 9" />
+                             </svg>
+                           </button>
+
+                           {/* Content (collapsed by default) */}
+                           {isHistorialOpen && (
+                             <div className="px-5 pb-4 bg-gray-50/30">
+                               <div className="flex flex-col gap-2.5">
+                                 {timeline.map((entry: any, idx: number) => {
+                                   if (entry.type === 'surtido') surtidoCount++;
+                                   const icon = entry.type === 'carga' ? '����'
+                                     : entry.type === 'surtido' ? '����'
+                                     : entry.type === 'edicion' ? 'ԣŴ��'
+                                     : '����';
+                                   const label = entry.type === 'carga' ? 'Carga Inicial'
+                                     : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
+                                     : entry.type === 'edicion' ? 'Valor Editado por Admin'
+                                     : 'Productos Recibidos';
+                                   const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
+                                     : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
+                                     : entry.type === 'edicion' ? 'bg-blue-50 border-blue-200'
+                                     : 'bg-indigo-50 border-indigo-100';
+                                   const textColor = entry.type === 'carga' ? 'text-red-600'
+                                     : entry.type === 'surtido' ? 'text-amber-700'
+                                     : entry.type === 'edicion' ? 'text-blue-700'
+                                     : 'text-indigo-600';
+                                   const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
+                                   return (
+                                     <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
+                                       <div className="flex items-center gap-2 mb-2">
+                                         <span>{icon}</span>
+                                         <span className={`font-black text-sm ${textColor}`}>{label}</span>
+                                         <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
+                                       </div>
+                                       <div className="flex flex-wrap gap-2">
+                                         {entry.type === 'edicion' ? (() => {
+                                           const diffs = (entry.items || []).filter((item: any) => String(item.before) !== String(item.qty));
+                                           const fmtV = (v: any, fin: boolean) => fin ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(v)) : String(v);
+                                           return diffs.length === 0
+                                             ? <span className="text-xs text-gray-400 italic">Sin cambios en valores</span>
+                                             : diffs.map((item: any, ii: number) => (
+                                               <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-1">
+                                                 <span className="text-gray-500">{item.name}:</span>
+                                                 <span className="text-red-400 line-through">{fmtV(item.before, item.financial)}</span>
+                                                 <span className="text-gray-300 mx-0.5">&#x2192;</span>
+                                                 <span className="text-blue-700 font-black">{fmtV(item.qty, item.financial)}</span>
+                                               </span>
+                                             ));
+                                         })() : (entry.items || []).map((item: any, ii: number) => (
+                                           <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
+                                             <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
+                                             <span className="text-gray-900">{item.qty}</span>
+                                           </span>
+                                         ))}
+                                       </div>
+                                     </div>
+                                   );
+                                 })}
+                               </div>
+                             </div>
+                           )}
+                         </div>
+                       );
+                     })()}
+
+                    <table className="w-full text-left text-sm">
+                      <thead>
+                        <tr className="border-b border-gray-100 bg-gray-50">
+                          <th className="py-3 px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Producto</th>
+                          <th className="py-3 px-5 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">Enviado</th>
+                          <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Qued+�</th>
+                          <th className="py-3 px-5 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Venta</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {closing.details.map((d, i) => {
+                          const ventaQty = Math.max(0, d.sent - d.returned);
+                          const ventaTotal = ventaQty * d.unitPrice;
+                          return (
+                            <tr key={i} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="py-3.5 px-5">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
+                                    {(d.product || '??').substring(0, 3).toUpperCase()}
+                                  </span>
+                                  <span className="font-bold text-gray-800">{d.product}</span>
+                                  {(d as any).stringCounts && Object.entries((d as any).stringCounts).map(([sv, n]: [string, any]) => (
+                                    <span key={sv} className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
+                                      {Number(n) > 1 ? `${sv} x${n}` : sv}
+                                    </span>
+                                  ))}
+                                </div>
+                              </td>
+                              <td className="py-3.5 px-5 text-center">
+                                <span className="bg-blue-100 text-blue-700 font-black text-xs px-2 py-0.5 rounded-full">{d.sent}</span>
+                              </td>
+                              <td className="py-3.5 px-5 text-center">
+                                {d.returned > 0
+                                  ? <span className="bg-indigo-100 text-indigo-600 font-black text-xs px-2 py-0.5 rounded-full">{d.returned}</span>
+                                  : <span className="text-gray-300 font-bold text-xs">���</span>
+                                }
+                              </td>
+                              <td className="py-3.5 px-5 text-right">
+                                <span className="font-black text-gray-800">{ventaQty}</span>
+                                <p className="text-[11px] text-gray-400 font-bold">{fmt(ventaTotal)}</p>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+
+                    {/* Total Calculado */}
+                    <div className="border-t border-gray-100 py-4 px-5 flex justify-end items-center gap-3 bg-gray-50/50">
+                      <span className="text-sm font-bold text-gray-500">Total Te+�rico Calculado:</span>
+                      <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+          </>
+        )}</div>
 
       {/* ─── Edit Closing Modal ────────────────────────────────── */}
       {editingClosing && (
