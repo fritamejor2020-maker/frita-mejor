@@ -595,71 +595,62 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
                 </div>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-black text-gray-700">Horario Maestro Asignado (Grupo de Turnos)</label>
-                  <button
-                    type="button"
-                    onClick={() => setShowShiftTemplatesSubModal(true)}
-                    className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+              {shiftType === 'VARIABLE' ? (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-black text-gray-700">Horario Maestro Asignado (Grupo de Turnos)</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowShiftTemplatesSubModal(true)}
+                      className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                    >
+                      ⚙️ Gestionar Horarios y Turnos
+                    </button>
+                  </div>
+                  <select
+                    value={scheduleGroupId}
+                    onChange={(e) => setScheduleGroupId(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 mb-1"
                   >
-                    ⚙️ Gestionar Horarios y Turnos
-                  </button>
-                </div>
-                <select
-                  value={scheduleGroupId}
-                  onChange={(e) => {
-                    const newGrpId = e.target.value;
-                    setScheduleGroupId(newGrpId);
-                    const grp = scheduleGroups.find((g) => g.id === newGrpId);
-                    if (grp && grp.shiftIds && grp.shiftIds.length > 0) {
-                      if (!grp.shiftIds.includes(defaultShiftId)) {
-                        setDefaultShiftId(grp.shiftIds[0]);
-                      }
-                    }
-                  }}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-amber-950 outline-none focus:border-amber-500 mb-1"
-                >
-                  {scheduleGroups.map((grp) => (
-                    <option key={grp.id} value={grp.id}>
-                      📅 {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
-                    </option>
-                  ))}
-                  {scheduleGroups.length === 0 && <option value="GROUP-LOCAL">📅 Horario del Local (Variables)</option>}
-                </select>
-
-                {shiftType === 'VARIABLE' ? (
-                  <p className="text-[11px] text-amber-800 font-extrabold bg-amber-50 border border-amber-200 p-2 rounded-xl mb-3">
+                    {scheduleGroups.map((grp) => (
+                      <option key={grp.id} value={grp.id}>
+                        📅 {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
+                      </option>
+                    ))}
+                    {scheduleGroups.length === 0 && <option value="GROUP-LOCAL">📅 Horario del Local (Variables)</option>}
+                  </select>
+                  <p className="text-[11px] text-amber-800 font-extrabold bg-amber-50 border border-amber-200 p-2 rounded-xl">
                     🔄 <b>Modalidad Variable:</b> El sistema auto-detectará automáticamente cuál turno cumplió el empleado (entre los {(scheduleGroups.find((g) => g.id === scheduleGroupId)?.shiftIds || []).length} turnos de este Horario Maestro).
                   </p>
-                ) : (
-                  <p className="text-[11px] text-blue-800 font-extrabold bg-blue-50 border border-blue-200 p-2 rounded-xl mb-3">
-                    📌 <b>Modalidad Fija:</b> El empleado tendrá obligatoriamente el turno predeterminado seleccionado abajo.
-                  </p>
-                )}
-
-                <label className="block text-xs font-black text-gray-700 mb-1">
-                  Turno Predeterminado {shiftType === 'FIXED' ? '(Obligatorio para Modalidad Fija)' : '(Solo relevante si cambia a Modalidad Fija)'}
-                </label>
-                <select
-                  value={defaultShiftId}
-                  onChange={(e) => setDefaultShiftId(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 outline-none focus:border-amber-500"
-                >
-                  {(() => {
-                    const selGroup = scheduleGroups.find((g) => g.id === scheduleGroupId);
-                    const groupShifts = (selGroup && selGroup.shiftIds && selGroup.shiftIds.length > 0)
-                      ? shiftTemplates.filter((st) => selGroup.shiftIds.includes(st.id))
-                      : shiftTemplates;
-                    
-                    return groupShifts.map((st) => (
+                </div>
+              ) : (
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-black text-gray-700">Turno Fijo Asignado (Todos los días)</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowShiftTemplatesSubModal(true)}
+                      className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                    >
+                      ⚙️ Gestionar Turnos
+                    </button>
+                  </div>
+                  <select
+                    value={defaultShiftId}
+                    onChange={(e) => setDefaultShiftId(e.target.value)}
+                    className="w-full bg-gray-50 border border-gray-300 rounded-xl px-3 py-2 text-xs font-bold text-gray-900 outline-none focus:border-amber-500 mb-1"
+                  >
+                    {shiftTemplates.map((st) => (
                       <option key={st.id} value={st.id}>
-                        {st.name} ({st.startTime} - {st.endTime})
+                        📌 {st.name} ({st.startTime} - {st.endTime})
                       </option>
-                    ));
-                  })()}
-                </select>
-              </div>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-blue-800 font-extrabold bg-blue-50 border border-blue-200 p-2 rounded-xl">
+                    📌 <b>Modalidad Fija:</b> El empleado cumplirá obligatoriamente este turno específico todos los días.
+                  </p>
+                </div>
+              )}
 
               <div className="grid grid-cols-3 gap-3">
                 <div>

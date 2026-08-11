@@ -665,51 +665,37 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
                       </select>
                     </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Horario Maestro Asignado</label>
-                      <select
-                        value={empScheduleGroupId}
-                        onChange={(e) => {
-                          const newGrpId = e.target.value;
-                          setEmpScheduleGroupId(newGrpId);
-                          const grp = scheduleGroups.find((g) => g.id === newGrpId);
-                          if (grp && grp.shiftIds && grp.shiftIds.length > 0) {
-                            if (!grp.shiftIds.includes(empDefaultShiftId)) {
-                              setEmpDefaultShiftId(grp.shiftIds[0]);
-                            }
-                          }
-                        }}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
-                      >
-                        {scheduleGroups.map((grp) => (
-                          <option key={grp.id} value={grp.id}>
-                            {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-gray-700 mb-1">Turno Predeterminado (Si es Fijo)</label>
-                      <select
-                        value={empDefaultShiftId}
-                        onChange={(e) => setEmpDefaultShiftId(e.target.value)}
-                        className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
-                      >
-                        {(() => {
-                          const selGroup = scheduleGroups.find((g) => g.id === empScheduleGroupId);
-                          const groupShifts = (selGroup && selGroup.shiftIds && selGroup.shiftIds.length > 0)
-                            ? shiftTemplates.filter((st) => selGroup.shiftIds.includes(st.id))
-                            : shiftTemplates;
-
-                          return groupShifts.map((st) => (
-                            <option key={st.id} value={st.id}>
-                              {st.name} ({st.startTime} - {st.endTime})
+                    {empShiftType === 'VARIABLE' ? (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Horario Maestro Asignado</label>
+                        <select
+                          value={empScheduleGroupId}
+                          onChange={(e) => setEmpScheduleGroupId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                        >
+                          {scheduleGroups.map((grp) => (
+                            <option key={grp.id} value={grp.id}>
+                              {grp.name} ({(grp.shiftIds || []).length} turnos posibles)
                             </option>
-                          ));
-                        })()}
-                      </select>
-                    </div>
+                          ))}
+                        </select>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-bold text-gray-700 mb-1">Turno Fijo Asignado (Todos los días)</label>
+                        <select
+                          value={empDefaultShiftId}
+                          onChange={(e) => setEmpDefaultShiftId(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-bold text-gray-900 outline-none focus:border-amber-500"
+                        >
+                          {shiftTemplates.map((st) => (
+                            <option key={st.id} value={st.id}>
+                              📌 {st.name} ({st.startTime} - {st.endTime})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
 
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1">Meta Horas Semanales</label>
