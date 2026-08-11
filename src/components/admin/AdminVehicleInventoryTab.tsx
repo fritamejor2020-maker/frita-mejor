@@ -3,6 +3,8 @@ import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useSellerSessionStore } from '../../store/useSellerSessionStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
+import { useAttendanceStore } from '../../store/useAttendanceStore';
+import { usePayrollStore } from '../../store/usePayrollStore';
 import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw, AlertTriangle } from 'lucide-react';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -30,6 +32,63 @@ export const matchVehicleId = (sPointId: string | null | undefined, targetId: st
   }
   return false;
 };
+
+export function getVendedorName(
+  shift: any,
+  vehicleId: string,
+  loadHistory: any[] = [],
+  completedRequests: any[] = []
+): string {
+  const isGeneric = (name: string | null | undefined) =>
+    !name || name.trim() === '' || name === '—' || name.toLowerCase().includes('vendedor m') || name.toLowerCase() === 'vendedor';
+
+  // 1. Nombre directo en el turno (si no es genérico)
+  if (!isGeneric(shift?.responsibleName)) return shift.responsibleName;
+  if (!isGeneric(shift?.userName)) return shift.userName;
+  if (!isGeneric(shift?.employeeName)) return shift.employeeName;
+
+  const shiftDate = shift?.fecha || dateOf(shift?.closedAt || shift?.openedAt || '');
+
+  // 2. Buscar en la logística de este turno (loadHistory)
+  for (const e of loadHistory) {
+    if (matchVehicleId(e.vehicleId, vehicleId) && (!shiftDate || dateOf(e.timestamp) === shiftDate)) {
+      const name = e.responsibleName || e.created_by_name || e.userName || e.vendorName;
+      if (!isGeneric(name)) return name;
+    }
+  }
+
+  // 3. Buscar en los surtidos (completedRequests)
+  for (const r of completedRequests) {
+    if (matchVehicleId(r.requester_point_id, vehicleId) && (!shiftDate || dateOf(r.completed_at || r.created_at) === shiftDate)) {
+      const name = r.requester_name || r.created_by_name || r.responsibleName;
+      if (!isGeneric(name)) return name;
+    }
+  }
+
+  // 4. Buscar en los contratos de asistencia (employeeContracts) por vehículo/punto asignado
+  try {
+    const contracts = (useAttendanceStore.getState() as any).employeeContracts || [];
+    const matchedContract = contracts.find((c: any) =>
+      matchVehicleId(c.assignedPointId || c.assignedVehicleId || c.pointId, vehicleId)
+    );
+    if (matchedContract && !isGeneric(matchedContract.employeeName)) {
+      return matchedContract.employeeName;
+    }
+  } catch (e) {}
+
+  // 5. Buscar en los empleados de nómina (payrollEmployees) por punto asignado
+  try {
+    const payroll = (usePayrollStore.getState() as any).payrollEmployees || [];
+    const matchedPayroll = payroll.find((e: any) =>
+      matchVehicleId(e.assignedVehicle || e.pointId, vehicleId)
+    );
+    if (matchedPayroll && !isGeneric(matchedPayroll.name)) {
+      return matchedPayroll.name;
+    }
+  } catch (e) {}
+
+  return shift?.responsibleName || shift?.userName || 'Vendedor Móvil';
+}
 
 const dateOf = (iso: string) => {
   if (!iso) return '';
@@ -138,7 +197,7 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
   const openedAt  = shift.openedAt || shift.start_time || null;
   const closedAt  = shift.closedAt || null;
   const jornada   = shift.shift || '—';
-  const vendedor  = shift.responsibleName || shift.userName || '—';
+  const vendedor  = getVendedorName(shift, vehicleId, loadHistory, completedRequests);
   const isClosed  = !!closedAt;
 
   const { lines, totalCarga, totalSurtido, totalSobrante, totalVendido, totalVendidoPesos } =
