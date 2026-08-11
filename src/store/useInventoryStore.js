@@ -444,25 +444,25 @@ export const useInventoryStore = create(
           for (const key of GLOBAL_STORE_KEYS) {
             const branchKeyName = branchId ? `${key}_${branchId}` : null;
             const branchVal = branchKeyName ? remote[branchKeyName] : null;
-            const val = (Array.isArray(branchVal) && branchVal.length > 0) ? branchVal : remote[key];
+            const val = branchVal !== undefined && branchVal !== null ? branchVal : remote[key];
             if (val !== undefined && val !== null) {
-              const isNonEmpty = Array.isArray(val) ? val.length > 0 : Object.keys(val).length > 0;
-              if (isNonEmpty) {
-                if (Array.isArray(val)) {
-                  // Tomar los datos remotos como base
-                  const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
-                  const deletedRegs = new Set(get().deletedPosRegisterIds || []);
-                  // Preservar SOLO ítems locales creados por el usuario que NO están en remoto,
-                  // que NO son datos de demo del código fuente y que NO han sido borrados
-                  const localArr = get()[key] || [];
-                  const userCreatedOffline = localArr.filter(item =>
-                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id) && !deletedRegs.has(item.id)
-                  );
-                  updates[key] = [...val, ...userCreatedOffline];
-                } else {
-                  // Objetos (no aplica a GLOBAL_STORE_KEYS actuales, pero por seguridad)
-                  updates[key] = val;
+              if (Array.isArray(val)) {
+                // Tomar los datos remotos como base
+                const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
+                const deletedRegs = new Set(get().deletedPosRegisterIds || []);
+                // Preservar SOLO ítems locales creados por el usuario que NO están en remoto,
+                // que NO son datos de demo del código fuente y que NO han sido borrados
+                const localArr = get()[key] || [];
+                const userCreatedOffline = localArr.filter(item =>
+                  item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id) && !deletedRegs.has(item.id)
+                );
+                let finalArr = [...val, ...userCreatedOffline];
+                if (key === 'posRegisters') {
+                  finalArr = finalArr.filter(r => !deletedRegs.has(r.id));
                 }
+                updates[key] = finalArr;
+              } else {
+                updates[key] = val;
               }
             }
           }
@@ -473,32 +473,29 @@ export const useInventoryStore = create(
             const effectiveBranch = branchId;
             const deletedShifts = get().deletedShiftIds || [];
             const deletedInv = get().deletedInventoryIds || [];
+            const deletedRegs = new Set(get().deletedPosRegisterIds || []);
 
             for (const key of BRANCH_STORE_KEYS) {
               const branchKeyName = `${key}_${effectiveBranch}`;
               const rawBranchVal = remote[branchKeyName];
-              const val = (Array.isArray(rawBranchVal) && rawBranchVal.length === 0) 
-                ? (remote[key] ?? rawBranchVal) 
-                : (rawBranchVal ?? remote[key]);
+              const val = rawBranchVal !== undefined && rawBranchVal !== null ? rawBranchVal : remote[key];
               if (val !== undefined && val !== null) {
-                const isNonEmpty = Array.isArray(val) ? val.length > 0 : (typeof val === 'object' ? Object.keys(val).length > 0 : true);
-                if (isNonEmpty) {
-                  if (Array.isArray(val)) {
-                    // Remoto reemplaza local; preservar solo offline genuinos
-                    const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
-                    const localArr = get()[key] || [];
-                    const userCreatedOffline = localArr.filter(item =>
-                      item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id)
-                    );
-                    let finalVal = [...val, ...userCreatedOffline];
-                    // Aplicar tombstones
-                    if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
-                    if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
-                    updates[key] = finalVal;
-                  } else {
-                    // Objetos (posSettings, etc.): remoto GANA siempre
-                    updates[key] = val;
-                  }
+                if (Array.isArray(val)) {
+                  // Remoto reemplaza local; preservar solo offline genuinos
+                  const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
+                  const localArr = get()[key] || [];
+                  const userCreatedOffline = localArr.filter(item =>
+                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id) && !deletedRegs.has(item.id)
+                  );
+                  let finalVal = [...val, ...userCreatedOffline];
+                  // Aplicar tombstones
+                  if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
+                  if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
+                  if (key === 'posRegisters') finalVal = finalVal.filter(r => !deletedRegs.has(r.id));
+                  updates[key] = finalVal;
+                } else {
+                  // Objetos (posSettings, etc.): remoto GANA siempre
+                  updates[key] = val;
                 }
               }
             }
@@ -506,7 +503,8 @@ export const useInventoryStore = create(
           } else {
             // Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
-            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds'];
+            const deletedRegs = new Set(get().deletedPosRegisterIds || []);
+            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'posRegisters', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds', 'deletedPosRegisterIds'];
             for (const key of BRANCH_STORE_KEYS) {
               let merged = [];
               const addedIds = new Set();
@@ -543,8 +541,13 @@ export const useInventoryStore = create(
 
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') merged = merged.filter(s => !deleted.includes(s.id));
+                if (key === 'posRegisters') merged = merged.filter(r => !deletedRegs.has(r.id));
                 if (key === 'deletedInventoryIds') {
                   const localDeleted = get().deletedInventoryIds || [];
+                  merged = [...new Set([...merged, ...localDeleted])];
+                }
+                if (key === 'deletedPosRegisterIds') {
+                  const localDeleted = get().deletedPosRegisterIds || [];
                   merged = [...new Set([...merged, ...localDeleted])];
                 }
                 updates[key] = merged;

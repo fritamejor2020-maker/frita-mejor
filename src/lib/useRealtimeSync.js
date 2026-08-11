@@ -234,6 +234,22 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ warehouses: merged });
     };
     applicators[`vendorTransfers_${bid}`]   = (v) => useVendorTransferStore.getState().loadFromRemote(v);
+    applicators[`posRegisters_${bid}`]     = (v) => {
+      const state = useInventoryStore.getState();
+      const deletedRegs = new Set(state.deletedPosRegisterIds || []);
+      const filtered = (v || []).filter(r => !deletedRegs.has(r.id));
+      const current = state.posRegisters || [];
+      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid && !deletedRegs.has(r.id));
+      useInventoryStore.setState({ posRegisters: [...otherBranch, ...filtered] });
+    };
+    applicators[`deletedPosRegisterIds_${bid}`] = (v) => {
+      const local = useInventoryStore.getState().deletedPosRegisterIds || [];
+      const merged = [...new Set([...local, ...(v || [])])];
+      useInventoryStore.setState({ deletedPosRegisterIds: merged });
+      const currentRegs = useInventoryStore.getState().posRegisters || [];
+      const setDeleted = new Set(merged);
+      useInventoryStore.setState({ posRegisters: currentRegs.filter(r => !setDeleted.has(r.id)) });
+    };
 
     // Legacy: llaves sin sufijo (para migración inicial desde versión anterior)
     if (!applicators['posShifts'])        applicators['posShifts']        = (v) => {
@@ -249,7 +265,18 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useInventoryStore.setState({ posSales: merged });
     };
     if (!applicators['posExpenses'])      applicators['posExpenses']      = (v) => useInventoryStore.setState({ posExpenses: v });
-    if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => useInventoryStore.setState({ posRegisters: v });
+    if (!applicators['posRegisters'])     applicators['posRegisters']     = (v) => {
+      const deleted = new Set(useInventoryStore.getState().deletedPosRegisterIds || []);
+      useInventoryStore.setState({ posRegisters: (v || []).filter(r => !deleted.has(r.id)) });
+    };
+    if (!applicators['deletedPosRegisterIds']) applicators['deletedPosRegisterIds'] = (v) => {
+      const local = useInventoryStore.getState().deletedPosRegisterIds || [];
+      const merged = [...new Set([...local, ...(v || [])])];
+      useInventoryStore.setState({ deletedPosRegisterIds: merged });
+      const currentRegs = useInventoryStore.getState().posRegisters || [];
+      const setDeleted = new Set(merged);
+      useInventoryStore.setState({ posRegisters: currentRegs.filter(r => !setDeleted.has(r.id)) });
+    };
     if (!applicators['posSettings'])      applicators['posSettings']      = (v) => useInventoryStore.setState({ posSettings: v });
     if (!applicators['inventory'])        applicators['inventory']        = (v) => {
       const state = useInventoryStore.getState();
