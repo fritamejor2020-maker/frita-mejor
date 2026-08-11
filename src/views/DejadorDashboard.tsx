@@ -724,11 +724,12 @@ export const DejadorDashboard = () => {
           {/* ─── TABS COMPACTAS ─── */}
           {(() => {
             const unreadTotalChat = getUnreadCount('DEJADOR');
+            const pendingOrdersCount = truePendingRequests.length;
             return (
               <div className="bg-amber-100/50 rounded-xl p-0.5 mt-1.5 flex max-w-2xl">
                 {[
                   { id: 'carga', label: 'Surtir' },
-                  { id: 'surtir', label: 'Pedidos' },
+                  { id: 'surtir', label: 'Pedidos', badge: pendingOrdersCount },
                   { id: 'recibir', label: 'Recibir' },
                   { id: 'gps', label: '📍 GPS' },
                   { id: 'chat', label: '💬 Chat', badge: unreadTotalChat },
