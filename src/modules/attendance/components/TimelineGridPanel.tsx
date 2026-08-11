@@ -79,10 +79,10 @@ export function TimelineGridPanel({
           {/* Current Time Red Line */}
           {targetDay?.isToday && (
             <div
-              className="absolute top-12 bottom-0 z-20 pointer-events-none border-l-2 border-red-500 shadow-sm"
+              className="absolute top-0 bottom-0 z-35 pointer-events-none border-l-2 border-red-500 shadow-sm"
               style={{ left: `calc(240px + (100% - 240px) * ${currentLeftPercent / 100})` }}
             >
-              <span className="bg-red-500 text-white font-black text-[9px] px-1.5 py-0.5 rounded-full shadow-xs absolute -top-2.5 -translate-x-1/2 uppercase tracking-tighter flex items-center gap-0.5">
+              <span className="bg-red-500 text-white font-black text-[9px] px-2 py-0.5 rounded-full shadow-md absolute top-2.5 -translate-x-1/2 uppercase tracking-tighter flex items-center gap-1">
                 <Clock size={10} /> Ahora
               </span>
             </div>
