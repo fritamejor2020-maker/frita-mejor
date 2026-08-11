@@ -44,6 +44,25 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(9750);
   const [pinPassword, setPinPassword] = useState('123456');
   const [showShiftTemplatesSubModal, setShowShiftTemplatesSubModal] = useState(false);
+  const [subModalInitialTab, setSubModalInitialTab] = useState<'groups' | 'templates' | 'employees'>('groups');
+
+  // Re-sincronizar automáticamente los campos del formulario cuando el contrato del trabajador seleccionado
+  // se actualiza en la tienda global (por ejemplo, al hacer asignación masiva)
+  React.useEffect(() => {
+    if (selectedEmpId) {
+      const match = employeeContracts.find((c) => c.employeeId === selectedEmpId);
+      if (match) {
+        setShiftType(match.shiftType || 'VARIABLE');
+        setScheduleGroupId(match.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
+        setDefaultShiftId(match.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+        setWeeklyTargetHours(match.weeklyTargetHours || 44);
+        setBaseHourlyRate(match.baseHourlyRate || 6500);
+        setOvertimeHourlyRate(match.overtimeHourlyRate || 9750);
+        setBranchId(match.branchId || branches[0]?.id || 'BRANCH-001');
+        setPinPassword(match.pinPassword || '123456');
+      }
+    }
+  }, [employeeContracts, selectedEmpId]);
 
   // Preseleccionar si viene por prop
   React.useEffect(() => {
@@ -599,13 +618,22 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-black text-gray-700">Horario Maestro Asignado (Grupo de Turnos)</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowShiftTemplatesSubModal(true)}
-                      className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
-                    >
-                      ⚙️ Gestionar Horarios y Turnos
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { setSubModalInitialTab('employees'); setShowShiftTemplatesSubModal(true); }}
+                        className="text-[11px] font-black text-amber-900 hover:text-amber-950 bg-amber-200 hover:bg-amber-300 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        ⚡ Asignación Masiva
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSubModalInitialTab('groups'); setShowShiftTemplatesSubModal(true); }}
+                        className="text-[11px] font-black text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        ⚙️ Horarios
+                      </button>
+                    </div>
                   </div>
                   <select
                     value={scheduleGroupId}
@@ -627,13 +655,22 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
                 <div>
                   <div className="flex items-center justify-between mb-1">
                     <label className="block text-xs font-black text-gray-700">Turno Fijo Asignado (Todos los días)</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowShiftTemplatesSubModal(true)}
-                      className="text-[11px] font-black text-amber-700 hover:text-amber-800 bg-amber-100 hover:bg-amber-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
-                    >
-                      ⚙️ Gestionar Turnos
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => { setSubModalInitialTab('employees'); setShowShiftTemplatesSubModal(true); }}
+                        className="text-[11px] font-black text-amber-900 hover:text-amber-950 bg-amber-200 hover:bg-amber-300 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        ⚡ Asignación Masiva
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setSubModalInitialTab('templates'); setShowShiftTemplatesSubModal(true); }}
+                        className="text-[11px] font-black text-gray-700 hover:text-gray-900 bg-gray-100 hover:bg-gray-200 px-2.5 py-0.5 rounded-md cursor-pointer transition-colors flex items-center gap-1 shadow-2xs"
+                      >
+                        ⚙️ Turnos
+                      </button>
+                    </div>
                   </div>
                   <select
                     value={defaultShiftId}
@@ -755,7 +792,10 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
       </div>
 
       {showShiftTemplatesSubModal && (
-        <ShiftTemplatesModal onClose={() => setShowShiftTemplatesSubModal(false)} />
+        <ShiftTemplatesModal
+          initialTab={subModalInitialTab}
+          onClose={() => setShowShiftTemplatesSubModal(false)}
+        />
       )}
     </div>
   );

@@ -4,9 +4,10 @@ import { useAttendanceStore, ShiftTemplate, ShiftScheduleGroup, EmployeeContract
 
 interface ShiftTemplatesModalProps {
   onClose: () => void;
+  initialTab?: 'groups' | 'templates' | 'employees';
 }
 
-export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
+export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTemplatesModalProps) {
   const {
     shiftTemplates,
     scheduleGroups = [],
@@ -20,7 +21,7 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
     updateEmployeeContract,
   } = useAttendanceStore();
 
-  const [activeTab, setActiveTab] = useState<'groups' | 'templates' | 'employees'>('groups');
+  const [activeTab, setActiveTab] = useState<'groups' | 'templates' | 'employees'>(initialTab);
 
   // Form states for ShiftScheduleGroup
   const [editingGroup, setEditingGroup] = useState<ShiftScheduleGroup | null>(null);
