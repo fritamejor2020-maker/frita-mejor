@@ -63,8 +63,27 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['payrollEmployees']  = (v) => usePayrollStore.setState({ payrollEmployees: v });
   applicators['payrollRecords']    = (v) => usePayrollStore.setState({ payrollRecords: v });
   applicators['branches']          = (v) => useBranchStore.getState().loadFromRemote(v);
+  applicators['deletedBranchIds']  = (v) => {
+    const local = useBranchStore.getState().deletedBranchIds || [];
+    const merged = [...new Set([...local, ...(v || [])])];
+    useBranchStore.setState({ deletedBranchIds: merged });
+    const currentBranches = useBranchStore.getState().branches || [];
+    useBranchStore.getState().loadFromRemote(currentBranches);
+  };
   applicators['vendorLocations']   = (v) => useInventoryStore.setState({ vendorLocations: v });
-  applicators['posRegisters']      = (v) => useInventoryStore.setState({ posRegisters: v });
+  applicators['posRegisters']      = (v) => {
+    const deleted = new Set(useInventoryStore.getState().deletedPosRegisterIds || []);
+    const filtered = (v || []).filter(r => !deleted.has(r.id));
+    useInventoryStore.setState({ posRegisters: filtered });
+  };
+  applicators['deletedPosRegisterIds'] = (v) => {
+    const local = useInventoryStore.getState().deletedPosRegisterIds || [];
+    const merged = [...new Set([...local, ...(v || [])])];
+    useInventoryStore.setState({ deletedPosRegisterIds: merged });
+    const currentRegs = useInventoryStore.getState().posRegisters || [];
+    const setDeleted = new Set(merged);
+    useInventoryStore.setState({ posRegisters: currentRegs.filter(r => !setDeleted.has(r.id)) });
+  };
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });

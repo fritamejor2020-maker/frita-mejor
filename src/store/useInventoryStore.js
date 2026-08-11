@@ -364,7 +364,7 @@ export const useInventoryStore = create(
 
           // Llaves globales — se aplican directamente al store
           const GLOBAL_STORE_KEYS = [
-            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes', 'customers', 'customerTypes', 'salesGoals',
+            'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes', 'customers', 'customerTypes', 'salesGoals', 'posRegisters', 'deletedPosRegisterIds',
           ];
 
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
@@ -429,11 +429,12 @@ export const useInventoryStore = create(
                 if (Array.isArray(val)) {
                   // Tomar los datos remotos como base
                   const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
-                  // Preservar SOLO ítems locales creados por el usuario que NO están en remoto
-                  // y que NO son datos de demo del código fuente
+                  const deletedRegs = new Set(get().deletedPosRegisterIds || []);
+                  // Preservar SOLO ítems locales creados por el usuario que NO están en remoto,
+                  // que NO son datos de demo del código fuente y que NO han sido borrados
                   const localArr = get()[key] || [];
                   const userCreatedOffline = localArr.filter(item =>
-                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id)
+                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id) && !deletedRegs.has(item.id)
                   );
                   updates[key] = [...val, ...userCreatedOffline];
                 } else {
@@ -1048,7 +1049,15 @@ export const useInventoryStore = create(
       // Registros de Caja (Multi-Caja)
       addPosRegister: (reg) => { set((s) => ({ posRegisters: [...(s.posRegisters || INITIAL_POS_REGISTERS), { ...reg, id: `REG-${Date.now()}`, active: true }] })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
       updatePosRegister: (id, data) => { set((s) => ({ posRegisters: (s.posRegisters || []).map(r => r.id === id ? { ...r, ...data } : r) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
-      deletePosRegister: (id) => { set((s) => ({ posRegisters: (s.posRegisters || []).filter(r => r.id !== id) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
+      deletePosRegister: (id) => {
+        set((s) => {
+          const updatedRegisters = (s.posRegisters || []).filter(r => r.id !== id);
+          const newDeleted = [...new Set([...(s.deletedPosRegisterIds || []), id])];
+          return { posRegisters: updatedRegisters, deletedPosRegisterIds: newDeleted };
+        });
+        syncKey('posRegisters', useInventoryStore.getState().posRegisters);
+        syncKey('deletedPosRegisterIds', useInventoryStore.getState().deletedPosRegisterIds);
+      },
 
       // Fritado Recipes
       addFritadoRecipe: (recipe) => { set((s) => ({ fritadoRecipes: [...(s.fritadoRecipes || []), { ...recipe, id: `FR-${Date.now()}` }] })); syncKey('fritadoRecipes', useInventoryStore.getState().fritadoRecipes); },
@@ -1064,7 +1073,7 @@ export const useInventoryStore = create(
       addPosSale: (sale) => {
         set((s) => {
           const saleId = sale.id || `SALE-${Date.now()}`;
-          const updatedSales = [{ ...sale, id: saleId }, ...(s.posSales || [])];
+          const updatedSales = [{ ...sale, id: saleId }, ...(s.posSales || []).filter(item => item.id !== saleId)];
           let newInventory = s.inventory;
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           if (linkSales && sale.items && sale.status === 'PAID') {
@@ -1076,10 +1085,13 @@ export const useInventoryStore = create(
               return invItem;
             });
           }
-          return { posSales: updatedSales, inventory: newInventory };
+          // Limpiar de deletedPosSaleIds para asegurar que no quede bloqueada si era una venta en espera re-guardada
+          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => dId !== saleId && dId !== sale.originalOlaClickId && dId !== sale.publicId);
+          return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
+        syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
       },
       updatePosSale: (id, data) => {
         set((s) => {
@@ -1165,10 +1177,12 @@ export const useInventoryStore = create(
             }
             return sale;
           });
-          return { posSales: updatedSales, inventory: newInventory };
+          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => dId !== id && dId !== data.originalOlaClickId && dId !== data.publicId);
+          return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
+        syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
       },
       deletePosSale: (id) => {
         set((s) => {
@@ -1375,12 +1389,19 @@ export const useInventoryStore = create(
         salesGoals:         state.salesGoals || [],
         deletedShiftIds:      state.deletedShiftIds || [],
         deletedInventoryIds:  state.deletedInventoryIds || [],
+        deletedPosRegisterIds: state.deletedPosRegisterIds || [],
         vendorLocations:      state.vendorLocations  || {},
         contrataPayments:     state.contrataPayments || [],
       }),
       // Al rehidratar desde localStorage, filtrar items borrados y duplicados
       onRehydrateStorage: () => (state) => {
         if (!state) return;
+
+        // Filtrar cajas borradas
+        const deletedRegs = state.deletedPosRegisterIds || [];
+        if (deletedRegs.length > 0 && state.posRegisters?.length > 0) {
+          state.posRegisters = state.posRegisters.filter(r => !deletedRegs.includes(r.id));
+        }
 
         // ── Limpiar customerTypes y customers DEMO del localStorage ──
         // Si el localStorage tiene datos de plantilla (CTYPE-001, CTYPE-002, CUST-002),

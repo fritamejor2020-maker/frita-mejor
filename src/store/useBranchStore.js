@@ -140,26 +140,34 @@ export const useBranchStore = create(
           console.warn('[BranchStore] No se puede eliminar la Sede Principal.');
           return { ok: false, error: 'No puedes eliminar la Sede Principal.' };
         }
-        set(s => ({ branches: s.branches.filter(b => b.id !== id) }));
+        set(s => {
+          const updatedBranches = s.branches.filter(b => b.id !== id);
+          const newDeleted = [...new Set([...(s.deletedBranchIds || []), id])];
+          return { branches: updatedBranches, deletedBranchIds: newDeleted };
+        });
         syncBranches(useBranchStore.getState().branches);
+        push('deletedBranchIds', useBranchStore.getState().deletedBranchIds).catch(() => {});
         return { ok: true };
       },
 
       // ─── Carga remota ──────────────────────────────────────────────────────
       loadFromRemote: (remoteBranches) => {
-        if (Array.isArray(remoteBranches) && remoteBranches.length > 0) {
-          // Garantizar que BRANCH-001 siempre exista
-          const hasPrincipal = remoteBranches.some(b => b.id === 'BRANCH-001');
-          const merged = hasPrincipal
-            ? remoteBranches
-            : [DEFAULT_BRANCHES[0], ...remoteBranches];
-          set({ branches: merged });
+        if (Array.isArray(remoteBranches)) {
+          const deleted = new Set(get().deletedBranchIds || []);
+          const filtered = remoteBranches.filter(b => !deleted.has(b.id));
+          if (filtered.length > 0) {
+            const hasPrincipal = filtered.some(b => b.id === 'BRANCH-001');
+            const merged = hasPrincipal
+              ? filtered
+              : [DEFAULT_BRANCHES[0], ...filtered];
+            set({ branches: merged });
+          }
         }
       },
     }),
     {
       name: 'frita-mejor-branches',
-      version: 1,
+      version: 2,
     }
   )
 );
