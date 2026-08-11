@@ -96,11 +96,28 @@ function notifyListeners(status) {
 
 // ─── Cola de cambios pendientes ───────────────────────────────────────────────
 
-function getQueue() {
+export function getQueue() {
   try {
     return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
   } catch {
     return [];
+  }
+}
+
+export function getQueuedOfflineItemIds(key) {
+  try {
+    const queue = getQueue();
+    const setIds = new Set();
+    queue.forEach(item => {
+      if (item?.key && (item.key === key || (key && item.key.startsWith(`${key}_`)))) {
+        if (Array.isArray(item.value)) {
+          item.value.forEach(x => { if (x?.id) setIds.add(x.id); });
+        }
+      }
+    });
+    return setIds;
+  } catch {
+    return new Set();
   }
 }
 

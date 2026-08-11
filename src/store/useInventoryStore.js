@@ -54,6 +54,14 @@ export function mergeArrays(localArr, remoteArr, key) {
   if (!Array.isArray(remoteArr)) return localArr || [];
   
   const remoteById = new Map(remoteArr.filter(x => x?.id).map(x => [x.id, x]));
+  const queuedIds = getQueuedOfflineItemIds(key);
+
+  const deletedSales = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
+  const deletedShifts = new Set(useInventoryStore.getState()?.deletedShiftIds || []);
+  const deletedInvs = new Set(useInventoryStore.getState()?.deletedInventoryIds || []);
+  const deletedRegs = new Set(useInventoryStore.getState()?.deletedPosRegisterIds || []);
+  const deletedBranches = new Set(useBranchStore.getState()?.deletedBranchIds || []);
+
   const merged = [];
   const addedIds = new Set();
 
@@ -71,8 +79,7 @@ export function mergeArrays(localArr, remoteArr, key) {
             merged.push({ ...localItem, ...remoteVersion });
           }
         } else if (key === 'posSales') {
-          const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
-          if (deletedSet.has(localItem.id) || deletedSet.has(remoteVersion.id) || (localItem.originalOlaClickId && deletedSet.has(localItem.originalOlaClickId)) || (remoteVersion.originalOlaClickId && deletedSet.has(remoteVersion.originalOlaClickId))) {
+          if (deletedSales.has(localItem.id) || deletedSales.has(remoteVersion.id) || (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId))) {
             // Ignorar ventas eliminadas
           } else if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
             merged.push(remoteVersion);
@@ -85,28 +92,43 @@ export function mergeArrays(localArr, remoteArr, key) {
           // Por defecto, remoto gana para actualizaciones (inventarios, productos, etc.)
           merged.push(remoteVersion);
         }
+        addedIds.add(localItem.id);
       } else {
-        // Solo existe localmente (ej: venta offline)
-        const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
-        if (key !== 'posSales' || (!deletedSet.has(localItem.id) && (!localItem.originalOlaClickId || !deletedSet.has(localItem.originalOlaClickId)))) {
+        // Solo existe localmente en el localStorage de este dispositivo.
+        // PREVENCIÓN DE RESURRECCIÓN: Si no existe en Supabase y NO fue creado offline en este dispositivo,
+        // significa que fue ELIMINADO en otro equipo y NO debe ser resucitado ni re-subido a Supabase.
+        const isDeletedTombstone =
+          deletedSales.has(localItem.id) ||
+          deletedShifts.has(localItem.id) ||
+          deletedInvs.has(localItem.id) ||
+          deletedRegs.has(localItem.id) ||
+          deletedBranches.has(localItem.id);
+
+        const isQueuedOffline = queuedIds.has(localItem.id);
+
+        if (!isDeletedTombstone && (isQueuedOffline || key === 'posSales' || key === 'posShifts' || key === 'movements')) {
           merged.push(localItem);
+          addedIds.add(localItem.id);
         }
       }
-      addedIds.add(localItem.id);
     } else {
       merged.push(localItem);
     }
   });
 
-  const deletedSet = new Set(useInventoryStore.getState()?.deletedPosSaleIds || []);
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
-      if (key === 'posSales' && (deletedSet.has(remoteItem.id) || (remoteItem.originalOlaClickId && deletedSet.has(remoteItem.originalOlaClickId)))) {
-        // Ignorar de remoto si está en la tumba de eliminadas
-        return;
+      const isDeletedTombstone =
+        (key === 'posSales' && deletedSales.has(remoteItem.id)) ||
+        (key === 'posShifts' && deletedShifts.has(remoteItem.id)) ||
+        (key === 'inventory' && deletedInvs.has(remoteItem.id)) ||
+        (key === 'posRegisters' && deletedRegs.has(remoteItem.id)) ||
+        (key === 'branches' && deletedBranches.has(remoteItem.id));
+
+      if (!isDeletedTombstone) {
+        merged.push(remoteItem);
+        addedIds.add(remoteItem.id);
       }
-      merged.push(remoteItem);
-      addedIds.add(remoteItem.id);
     }
   });
 
