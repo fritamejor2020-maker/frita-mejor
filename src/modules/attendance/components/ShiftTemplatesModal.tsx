@@ -249,13 +249,13 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-2 overflow-x-auto">
+        <div className="flex border-b border-gray-200 bg-gray-100/90 px-6 py-3 gap-2 overflow-x-auto">
           <button
             onClick={() => { setActiveTab('groups'); setEditingGroup(null); setIsCreatingGroup(false); }}
-            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'groups'
-                ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
+                : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
             }`}
           >
             <Layers size={16} /> 1. Horarios Maestro ({scheduleGroups.length})
@@ -263,10 +263,10 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
 
           <button
             onClick={() => { setActiveTab('templates'); setEditingTemplate(null); setIsCreatingTemplate(false); }}
-            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'templates'
-                ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
+                : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
             }`}
           >
             <Clock size={16} /> 2. Catálogo de Turnos ({shiftTemplates.length})
@@ -274,10 +274,10 @@ export function ShiftTemplatesModal({ onClose }: ShiftTemplatesModalProps) {
 
           <button
             onClick={() => { setActiveTab('employees'); setEditingEmpContract(null); }}
-            className={`px-5 py-3 font-black text-xs sm:text-sm rounded-t-2xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'employees'
-                ? 'bg-white text-amber-700 border-t-2 border-amber-500 shadow-2xs'
-                : 'text-gray-500 hover:text-gray-900 hover:bg-gray-100'
+                ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
+                : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
             }`}
           >
             <UserCheck size={16} /> 3. Asignación por Persona ({employeeContracts.length})
