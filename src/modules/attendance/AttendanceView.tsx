@@ -107,8 +107,8 @@ export function AttendanceView() {
 
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">
-      {/* Header Superior con Botones Unificados */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+      {/* Header Superior */}
+      <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard')}
@@ -125,46 +125,9 @@ export function AttendanceView() {
             </p>
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            onClick={handleSyncTerminal}
-            disabled={isSyncing}
-            className="h-10 px-3.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer disabled:opacity-50"
-            title="Sincronizar marcaciones del biométrico"
-          >
-            <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
-            <span>Sincronizar Biométrico</span>
-          </button>
-
-          <button
-            onClick={() => setShowShiftTemplatesModal(true)}
-            className="h-10 px-3.5 bg-gray-900 hover:bg-black text-amber-400 font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer border border-gray-800"
-          >
-            <Calendar size={16} /> <span>Turnos & Horarios</span>
-          </button>
-
-          <button
-            onClick={() => {
-              setSelectedPayrollEmp(undefined);
-              setShowPayrollModal(true);
-            }}
-            className="h-10 px-3.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-extrabold text-xs sm:text-sm rounded-xl flex items-center gap-2 transition-all shadow-xs cursor-pointer border border-amber-300"
-          >
-            <DollarSign size={16} /> <span>Ver Liquidación Semanal ($)</span>
-          </button>
-
-          <button
-            onClick={signOut}
-            className="h-10 px-3.5 bg-white hover:bg-red-50 text-red-600 font-extrabold text-xs sm:text-sm rounded-xl border border-red-200 cursor-pointer flex items-center gap-1.5 transition-all shadow-2xs"
-            title="Cerrar Sesión"
-          >
-            <LogOut size={16} /> <span className="hidden sm:inline">Cerrar Sesión</span>
-          </button>
-        </div>
       </div>
 
-      {/* Toolbar de Navegación y Filtros */}
+      {/* Toolbar de Navegación y Filtros (Cápsula Unificada) */}
       <AttendanceToolbar
         viewMode={viewMode}
         setViewMode={setViewMode}
@@ -177,6 +140,11 @@ export function AttendanceView() {
         onSyncTerminal={handleSyncTerminal}
         onClearLogs={handleClearLogs}
         onOpenShiftTemplates={() => setShowShiftTemplatesModal(true)}
+        onOpenPayrollModal={() => {
+          setSelectedPayrollEmp(undefined);
+          setShowPayrollModal(true);
+        }}
+        onSignOut={signOut}
         isSyncing={isSyncing}
       />
 
