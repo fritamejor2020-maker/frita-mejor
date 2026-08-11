@@ -703,12 +703,12 @@ export const VendedorDashboard = () => {
                      addToCart(p, 1);
                   }
                 }}
-                className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-2 sm:p-5 min-h-[80px] sm:min-h-[120px] hover:-translate-y-0.5 hover:shadow-md group gap-0.5"
+                className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
               >
-                <span className="font-black text-gray-900 text-lg sm:text-2xl tracking-wide group-hover:text-[#FF4040] transition-colors leading-none">
-                  {getProductAbbreviation(p.name, p.abbreviation)}
+                <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
+                  {p.name}
                 </span>
-                <span className="text-[#FF4040] font-black text-[11px] sm:text-sm leading-tight">
+                <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
                   {formatMoney(p.price)}
                 </span>
               </button>
