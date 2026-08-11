@@ -877,7 +877,9 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
       {/* Main Card */}
       <div className="bg-white rounded-[2rem] p-6 md:p-8 shadow-sm border border-gray-100">
-        <h3 className="text-xl font-black text-gray-800 mb-6">📊 Historial de Cierres Z</h3>
+        <h3 className="text-xl font-black text-gray-800 mb-6">
+          {mode === 'POS' ? '📊 Historial de Cierres Z' : '💰 Historial de Cierres Finanzas'}
+        </h3>
 
         {filteredClosings.length === 0 ? (
           <div className="text-center py-12 text-gray-400">
@@ -890,9 +892,9 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
               <thead className="bg-gray-100/90 text-gray-500 font-black border-b border-gray-200 text-[10.5px] uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Fecha / Turno</th>
-                  <th className="py-3 px-4">Cajero / Caja</th>
+                  <th className="py-3 px-4">{mode === 'POS' ? 'Cajero / Caja' : 'Vendedor / Punto'}</th>
                   <th className="py-3 px-4 text-right">Teórico (App)</th>
-                  <th className="py-3 px-4 text-right">Real (Caja)</th>
+                  <th className="py-3 px-4 text-right">{mode === 'POS' ? 'Real (Caja)' : 'Real (Entregado)'}</th>
                   <th className="py-3 px-4 text-center">Efectivo</th>
                   <th className="py-3 px-4 text-center">Transferencia</th>
                   <th className="py-3 px-4 text-center">Salidas</th>
@@ -1030,10 +1032,10 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                             {closing._raw && (
                               <button
                                 className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-black text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 shadow-xs active:scale-95 transition-all"
-                                title="Imprimir o Descargar Ticket Cierre Z"
+                                title={mode === 'POS' ? 'Imprimir o Descargar Ticket Cierre Z' : 'Imprimir o Descargar Resumen Cierre'}
                                 onClick={() => handleDownloadZReport(closing)}
                               >
-                                <span>📊</span> Ticket Z
+                                <span>📊</span> {mode === 'POS' ? 'Ticket Z' : 'Resumen Cierre'}
                               </button>
                             )}
                             <button
