@@ -10,7 +10,22 @@ import { useVendorTransferStore } from '../../store/useVendorTransferStore';
 import { generateZReportHTML } from '../../modules/pos/ZReportReceipt';
 import * as XLSX from 'xlsx';
 
-// ─── Helpers ────────────────────────────────────────────────
+// ─── Helpers ─────────────────────────────────────────────────────────────────
+const formatShiftTime = (isoString?: string) => {
+  if (!isoString) return '';
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleTimeString('es-CO', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).toLowerCase();
+  } catch (e) {
+    return '';
+  }
+};
+
 import { formatMoney as fmt } from '../../utils/formatUtils';
 import { getProductAbbreviation } from '../../utils/formatUtils';
 
@@ -968,7 +983,14 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                         {/* Fecha / Turno */}
                         <td className="py-3.5 px-4">
                           <div className="font-black text-gray-900 text-xs">{closing.date}</div>
-                          <div className="text-[10px] text-gray-400 font-bold uppercase">{closing.shift}</div>
+                          <div className="text-[10px] text-gray-400 font-bold uppercase">
+                            {closing.shift}
+                            {(() => {
+                              const openT = formatShiftTime(closing._raw?.openedAt);
+                              const closeT = formatShiftTime(closing._raw?.closedAt);
+                              return openT && closeT ? ` (${openT} → ${closeT})` : '';
+                            })()}
+                          </div>
                         </td>
 
                         {/* Cajero / Caja */}
@@ -1320,9 +1342,9 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
             </table>
           </div>
         )}
-          </>
-        ) : (
-          <>
+        </>
+      ) : (
+        <>
             <h3 className="text-xl font-black text-gray-800 mb-6">Conciliación de Cierres</h3>
 
         {filteredClosings.length === 0 && (
@@ -1357,7 +1379,22 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                          )}
                          <span className="bg-gray-100 text-gray-500 text-[10px] font-bold px-2 py-0.5 rounded-md uppercase">{closing.shift}</span>
                        </div>
-                       <p className="text-xs text-gray-400 font-bold mt-0.5">{closing.date}</p>
+                        {(() => {
+                          const openT = formatShiftTime(closing._raw?.openedAt || closing._raw?.timestamp);
+                          const closeT = formatShiftTime(closing._raw?.closedAt);
+                          const timeStr = openT && closeT
+                            ? ` · ${openT} → ${closeT}`
+                            : openT
+                            ? ` · ${openT}`
+                            : closeT
+                            ? ` · ${closeT}`
+                            : '';
+                          return (
+                            <p className="text-xs text-gray-400 font-bold mt-0.5">
+                              {closing.date}{timeStr}
+                            </p>
+                          );
+                        })()}
                        {/* Anotador / Dejador badges */}
                        {(closing.anotadorName || closing.dejadorName) && (
                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
@@ -1736,7 +1773,8 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
           })}
         </div>
           </>
-        )}</div>
+        )}
+      </div>
 
       {/* ─── Edit Closing Modal ────────────────────────────────── */}
       {editingClosing && (
