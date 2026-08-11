@@ -1323,11 +1323,11 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
           </>
         ) : (
           <>
-            <h3 className="text-xl font-black text-gray-800 mb-6">Conciliaci+�n de Cierres</h3>
+            <h3 className="text-xl font-black text-gray-800 mb-6">Conciliación de Cierres</h3>
 
         {filteredClosings.length === 0 && (
           <div className="text-center py-12 text-gray-400">
-            <p className="text-5xl mb-3">����</p>
+            <p className="text-5xl mb-3">📭</p>
             <p className="font-bold">No hay cierres para los filtros seleccionados.</p>
           </div>
         )}
@@ -1342,7 +1342,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
             return (
               <div key={closing.id} className="py-6 first:pt-0 last:pb-0">
-                {/* ��������� Row Header ��������������������������������������������������������������������� */}
+                {/* ─── Row Header ─────────────────────── */}
                 <div className="flex items-start justify-between mb-4">
                   <div className="flex items-center gap-3">
                     {/* Initials circle */}
@@ -1363,12 +1363,12 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                          <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                            {closing.anotadorName && (
                              <span className="flex items-center gap-1 bg-amber-50 text-amber-700 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-100">
-                               ���� {closing.anotadorName}
+                               📋 {closing.anotadorName}
                              </span>
                            )}
                            {closing.dejadorName && (
                              <span className="flex items-center gap-1 bg-gray-900 text-white text-[10px] font-bold px-2 py-0.5 rounded-full">
-                               ���� {closing.dejadorName}
+                               🛵 {closing.dejadorName}
                              </span>
                            )}
                          </div>
@@ -1389,7 +1389,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                           setEditExpenses(String(closing.expenses || 0));
                           setEditExpensesDesc(closing._raw.expensesDesc || "");
                            // Si los detalles tienen enviado=0 (datos corruptos de edit antigua),
-                           // reconstruir desde log+�stica para que el form muestre datos reales.
+                           // reconstruir desde logística para que el form muestre datos reales.
                            const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
                            let _initDetails = closing.details.map((d: any) => ({ ...d }));
                            if (!_hasRealLogistics) {
@@ -1433,7 +1433,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                             const newLH = lh.filter((e: any) => !(e.vehicleId === closing._raw.pointId && dateOf(e.timestamp) === closing.date));
                             const newCR = cr.filter((r: any) => !(r.requester_point_id === closing._raw.pointId && dateOf(r.completed_at || r.created_at) === closing.date));
                             useLogisticsStore.setState({ loadHistory: newLH, completedRequests: newCR });
-                            // Persistir en localStorage para que otras tabs vean la eliminaci+�n
+                            // Persistir en localStorage para que otras tabs vean la eliminación
                             try {
                               const logKey = 'frita-mejor-logistics';
                               const raw = localStorage.getItem(logKey);
@@ -1455,15 +1455,15 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                   )}
                 </div>
 
-                {/* ��������� Comparison Block ������������������������������������������������������ */}
+                {/* ─── Comparison Block ────────────────── */}
                 <div className="bg-gray-50 rounded-2xl border border-gray-100 mb-4 overflow-hidden">
-                  {/* Fila principal: Te+�rico vs Real */}
+                  {/* Fila principal: Teórico vs Real */}
                   <div className="grid grid-cols-2 divide-x divide-gray-200">
                     <div className="py-5 px-6 text-center">
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Te+�rico (APP)</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">Teórico (APP)</p>
                       <p className="text-2xl font-black text-gray-800">{fmt(closing.theoretical)}</p>
                       <p className="text-[10px] font-bold text-gray-300 mt-1">
-                        {mode === 'POS' ? 'Calc. por ventas' : 'Calc. por log+�stica'}
+                        {mode === 'POS' ? 'Calc. por ventas' : 'Calc. por logística'}
                       </p>
                     </div>
                     <div className="py-5 px-6 text-center">
@@ -1475,7 +1475,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                   {/* Desglose de Real */}
                   <div className="grid grid-cols-3 divide-x divide-gray-200 border-t border-gray-200 bg-white">
                     <div className="py-3 px-4 text-center">
-                      <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">���� Efectivo</p>
+                      <p className="text-[9px] font-bold text-green-500 uppercase tracking-widest mb-0.5">💵 Efectivo</p>
                       <p className="text-base font-black text-green-700">{fmt(closing.cashAmount)}</p>
                     </div>
                     <button
@@ -1483,16 +1483,16 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                       onClick={() => setTransfersModal({ transfers: closing.shiftTransfers || [], pointName: closing.pointName })}
                       title="Ver transferencias"
                     >
-                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">���� Transferencia</p>
+                      <p className="text-[9px] font-bold text-blue-400 uppercase tracking-widest mb-0.5">📲 Transferencia</p>
                       <p className="text-base font-black text-blue-600 group-hover:text-blue-700 transition-colors">{fmt(closing.transferAmount)}</p>
                       <p className="text-[8px] font-bold text-gray-300 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity">Ver detalle</p>
                     </button>
                      <button
                        className="py-3 px-4 text-center group hover:bg-red-50/60 rounded-xl transition-colors cursor-pointer w-full"
                        onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
-                       title="Ver descripci+�n del gasto"
+                       title="Ver descripción del gasto"
                      >
-                       <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">���� Salidas</p>
+                       <p className="text-[9px] font-bold text-red-400 uppercase tracking-widest mb-0.5">📌 Salidas</p>
                        <p className="text-base font-black text-red-500 group-hover:text-red-600 transition-colors">{fmt(closing.expenses)}</p>
                        {closing._raw?.expensesDesc && closing._raw.expensesDesc.trim() !== ''
                          ? <p className="text-[8px] font-bold text-red-300 mt-0.5 truncate max-w-[80px] mx-auto">{closing._raw.expensesDesc}</p>
@@ -1502,7 +1502,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                    </div>
                  </div>
 
-                {/* ��������� Footer: Badge + Toggle ��������������������������������� */}
+                {/* ─── Footer: Badge + Toggle ─────────── */}
                 <div className="flex items-center justify-between">
                   {renderBadge(closing)}
                   <button
@@ -1525,14 +1525,14 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                   </button>
                 </div>
 
-                {/* ��������� Accordion Details ������������������������������������������������ */}
+                {/* ─── Accordion Details ──────────────── */}
                 {isExpanded && (
                   <div className="mt-5 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
 
                     {/* Banner: Valor Editado manualmente */}
                     {(closing as any)._raw?.editedAt && (
                       <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
-                        <span className="text-sm">ԣŴ��</span>
+                        <span className="text-sm">✏️</span>
                         <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
                         <span className="text-[10px] font-bold text-blue-400 ml-auto">
                           {new Date((closing as any)._raw.editedAt).toLocaleString('es-CO', { dateStyle: 'short', timeStyle: 'short' })}
@@ -1546,18 +1546,18 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                         <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Equipo Jornada:</span>
                         {(closing as any).anotadorName && (
                           <span className="inline-flex items-center gap-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
-                            ���� Anotador: {(closing as any).anotadorName}
+                            📋 Anotador: {(closing as any).anotadorName}
                           </span>
                         )}
                         {(closing as any).dejadorName && (
                           <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full">
-                            ���� Dejador: {(closing as any).dejadorName}
+                            🛵 Dejador: {(closing as any).dejadorName}
                           </span>
                         )}
                       </div>
                     )}
 
-                     {/* ������ Historial de Env+�os (colapsable) ������ */}
+                     {/* ── Historial de Envíos (colapsable) ── */}
                      {closing._raw?.pointId && (() => {
                        const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
                        // Inyectar entrada virtual si el cierre fue editado manualmente
@@ -1573,11 +1573,11 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                            items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
                          });
                          if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
-                           items.push({ name: '���� Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
+                           items.push({ name: '💵 Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
                          if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
-                           items.push({ name: '���� Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
+                           items.push({ name: '📲 Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
                          if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
-                           items.push({ name: '���� Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
+                           items.push({ name: '📌 Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
                          return items;
                        };
                        if (rawHistory && rawHistory.length > 0) {
@@ -1590,7 +1590,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                            });
                          });
                        } else if (closing._raw?.editedAt) {
-                         // Backward compat: snapshot antiguo de una sola edici+�n
+                         // Backward compat: snapshot antiguo de una sola edición
                          timeline.push({
                            id: 'edit-' + closing.id,
                            type: 'edicion',
@@ -1609,7 +1609,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                              onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
                              className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
                            >
-                             <span>���� Historial de Env+�os ({timeline.length})</span>
+                             <span>📋 Historial de Envíos ({timeline.length})</span>
                              <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
                                className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
                                <polyline points="6 9 12 15 18 9" />
@@ -1622,10 +1622,10 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                                <div className="flex flex-col gap-2.5">
                                  {timeline.map((entry: any, idx: number) => {
                                    if (entry.type === 'surtido') surtidoCount++;
-                                   const icon = entry.type === 'carga' ? '����'
-                                     : entry.type === 'surtido' ? '����'
-                                     : entry.type === 'edicion' ? 'ԣŴ��'
-                                     : '����';
+                                   const icon = entry.type === 'carga' ? '📦'
+                                     : entry.type === 'surtido' ? '🔄'
+                                     : entry.type === 'edicion' ? '✏️'
+                                     : '📬';
                                    const label = entry.type === 'carga' ? 'Carga Inicial'
                                      : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
                                      : entry.type === 'edicion' ? 'Valor Editado por Admin'
@@ -1682,7 +1682,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                         <tr className="border-b border-gray-100 bg-gray-50">
                           <th className="py-3 px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Producto</th>
                           <th className="py-3 px-5 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">Enviado</th>
-                          <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Qued+�</th>
+                          <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Quedó</th>
                           <th className="py-3 px-5 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Venta</th>
                         </tr>
                       </thead>
@@ -1711,7 +1711,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                               <td className="py-3.5 px-5 text-center">
                                 {d.returned > 0
                                   ? <span className="bg-indigo-100 text-indigo-600 font-black text-xs px-2 py-0.5 rounded-full">{d.returned}</span>
-                                  : <span className="text-gray-300 font-bold text-xs">���</span>
+                                  : <span className="text-gray-300 font-bold text-xs">—</span>
                                 }
                               </td>
                               <td className="py-3.5 px-5 text-right">
@@ -1726,7 +1726,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
                     {/* Total Calculado */}
                     <div className="border-t border-gray-100 py-4 px-5 flex justify-end items-center gap-3 bg-gray-50/50">
-                      <span className="text-sm font-bold text-gray-500">Total Te+�rico Calculado:</span>
+                      <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
                       <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
                     </div>
                   </div>
