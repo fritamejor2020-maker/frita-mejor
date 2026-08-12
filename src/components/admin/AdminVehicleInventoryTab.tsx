@@ -393,17 +393,16 @@ export function AdminVehicleInventoryTab() {
   // Fecha de hoy local
   const today = dateOf(new Date().toISOString());
 
-  // Fuente 2: Sesiones activas detectadas desde sellerSession LOCAL o vendorLocations GPS en tiempo real
   const liveShifts: any[] = useMemo(() => {
     const lives: any[] = [];
 
-    // a) Sesión local si estamos en la misma app
     if (sellerSession?.isSetupComplete && sellerSession?.pointId) {
       const pId = sellerSession.pointId;
-      const alreadyStored = storedShifts.some(
-        (s: any) => !s.closedAt && matchVehicleId(s.pointId, pId)
-      );
-      if (!alreadyStored) {
+      const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
+      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
+      
+      if (!hasOpenShift && !hasClosedShiftToday) {
         lives.push({
           id: `LIVE-${pId}`,
           pointId: pId,
@@ -417,16 +416,19 @@ export function AdminVehicleInventoryTab() {
       }
     }
 
-    // b) Ubicaciones GPS en tiempo real desde Supabase (para PCs Admin y Dejador)
     const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
     Object.values(vendorLocs).forEach((loc: any) => {
       const pId = loc?.pointId || loc?.name;
       if (!pId) return;
-      const alreadyStored = storedShifts.some(
-        (s: any) => !s.closedAt && matchVehicleId(s.pointId, pId)
-      );
+
+      const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
+      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
+
+      if (hasOpenShift || hasClosedShiftToday) return;
+
       const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
-      if (!alreadyStored && !alreadyInLives) {
+      if (!alreadyInLives) {
         lives.push({
           id: `LIVE-GPS-${pId}`,
           pointId: pId,
@@ -443,11 +445,9 @@ export function AdminVehicleInventoryTab() {
     return lives;
   }, [sellerSession, storedShifts, today]);
 
-  // Combinar: sesiones live primero, luego historial almacenado (ordenado desc)
   const allShifts: any[] = useMemo(() => {
     const combined = [...liveShifts, ...storedShifts];
     return combined.sort((a: any, b: any) => {
-      // Activos primero
       if (!a.closedAt && b.closedAt) return -1;
       if (a.closedAt && !b.closedAt) return 1;
       const tA = new Date(a.closedAt || a.openedAt || 0).getTime();
@@ -456,7 +456,6 @@ export function AdminVehicleInventoryTab() {
     });
   }, [liveShifts, storedShifts]);
 
-  // Aplicar filtros fecha/jornada
   const filteredShifts = useMemo(() => {
     return allShifts.filter((s: any) => {
       const sDate    = s.fecha || dateOf(s.closedAt || s.openedAt || '');
@@ -479,35 +478,42 @@ export function AdminVehicleInventoryTab() {
   return (
     <div className="flex-1 p-4 space-y-5">
 
-      {/* ── Filtros ── */}
-      <div className="flex flex-wrap gap-2 items-center justify-between">
-        <div className="inline-flex items-center gap-3 bg-white rounded-full px-5 py-2.5 shadow-sm border border-gray-100 flex-wrap">
-          <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">Filtrar:</span>
-          <input type="date" value={filterDate} onChange={e => setFilterDate(e.target.value)}
-            className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer" />
-          <div className="w-px h-5 bg-gray-200" />
-          <select value={filterShift} onChange={e => setFilterShift(e.target.value)}
-            className="bg-transparent text-sm font-bold text-gray-700 outline-none cursor-pointer">
-            <option value="">Todas las jornadas</option>
-            {availableJornadas.length > 0
-              ? availableJornadas.map(j => <option key={j} value={j}>{j}</option>)
-              : ['AM', 'MD', 'PM'].map(j => <option key={j} value={j}>{j}</option>)}
-          </select>
-          {(filterDate || filterShift) && (
-            <button onClick={() => { setFilterDate(''); setFilterShift(''); }}
-              className="text-xs font-bold text-red-400 hover:text-red-600 transition-colors">
-              ✕ Limpiar
-            </button>
-          )}
+      <div className="flex items-center gap-3 flex-wrap bg-gray-50 p-3 rounded-2xl border border-gray-100">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500">Fecha:</span>
+          <input
+            type="date"
+            value={filterDate}
+            onChange={(e) => setFilterDate(e.target.value)}
+            className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+          />
         </div>
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs font-bold text-gray-500">Jornada:</span>
+          <select
+            value={filterShift}
+            onChange={(e) => setFilterShift(e.target.value)}
+            className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+          >
+            <option value="">Todas</option>
+            {availableJornadas.map((j) => (
+              <option key={j} value={j}>{j}</option>
+            ))}
+          </select>
+        </div>
+        {(filterDate || filterShift) && (
+          <button
+            onClick={() => { setFilterDate(''); setFilterShift(''); }}
+            className="text-xs font-bold text-red-500 hover:text-red-700 px-2 py-1 bg-red-50 rounded-lg active:scale-95 transition-all"
+          >
+            Limpiar filtros
+          </button>
+        )}
       </div>
 
-
-
-      {/* ── KPIs ── */}
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-center">
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">En curso</p>
+          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">En Curso</p>
           <p className="text-2xl font-black text-amber-600 leading-none mt-1">{activeCount}</p>
         </div>
         <div className="bg-green-50 border border-green-100 rounded-2xl p-4 text-center">
@@ -520,7 +526,6 @@ export function AdminVehicleInventoryTab() {
         </div>
       </div>
 
-      {/* ── Indicador ── */}
       <div className="flex items-center gap-2">
         <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
         <p className="text-xs font-bold text-gray-400">
@@ -529,7 +534,6 @@ export function AdminVehicleInventoryTab() {
         </p>
       </div>
 
-      {/* ── Lista de turnos ── */}
       {filteredShifts.length === 0 ? (
         <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
           <span className="text-5xl block mb-4">📋</span>
@@ -561,7 +565,6 @@ export function AdminVehicleInventoryTab() {
                 const closedAt = new Date().toISOString();
                 const targetPointId = shift.pointId;
 
-                // 1. Si el turno ya está en posShifts, actualizarlo; si es sintético LIVE, agregarlo como cerrado
                 const existingShift = (posShifts || []).find(
                   (s: any) => s.type === 'VENDEDOR' && !s.closedAt && matchVehicleId(s.pointId, targetPointId)
                 );
@@ -577,32 +580,22 @@ export function AdminVehicleInventoryTab() {
                   });
                 }
 
-                // 2. Limpiar y desactivar las ubicaciones GPS / vendorLocations en tiempo real
                 try {
-                  const store = useInventoryStore.getState() as any;
-                  const currentLocs = { ...(store.vendorLocations || {}) };
-                  let locationChanged = false;
-                  Object.keys(currentLocs).forEach((key) => {
-                    const loc = currentLocs[key];
-                    if (matchVehicleId(loc?.pointId || loc?.name || key, targetPointId)) {
-                      delete currentLocs[key];
-                      locationChanged = true;
-                    }
-                  });
-                  if (locationChanged) {
-                    useInventoryStore.setState({ vendorLocations: currentLocs });
-                  }
+                  useInventoryStore.getState().clearVendorLocation(targetPointId);
 
-                  // Actualizar estado is_active = false en Supabase DB
+                  await supabase
+                    .from('vendor_locations')
+                    .delete()
+                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%,name.ilike.%${targetPointId}%`);
+
                   await supabase
                     .from('vendor_locations')
                     .update({ is_active: false })
-                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%`);
+                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%,name.ilike.%${targetPointId}%`);
                 } catch (e) {
                   console.warn('[ForzarCierre] Warning al desactivar vendor_locations:', e);
                 }
 
-                // 3. Limpiar la sesión local del vendedor si coincide
                 forceEndShift();
               } : undefined}
             />
@@ -613,10 +606,6 @@ export function AdminVehicleInventoryTab() {
   );
 }
 
-// ─── Componente exportado para usar en el tab GPS del Dejador ──────────────────
-// Muestra la tarjeta de inventario en ruta de UN triciclo específico.
-// currentShift: jornada activa del Dejador ('AM'|'MD'|'PM') para filtrar correctamente.
-// activeOnly: si true, solo muestra turnos activos (sin closedAt), sin fallback al más reciente.
 export function VehicleShiftCard({
   vehicleId,
   currentShift,
@@ -626,26 +615,24 @@ export function VehicleShiftCard({
   currentShift?: string;
   activeOnly?: boolean;
 }) {
-  const { loadHistory, completedRequests } = useLogisticsStore();
   const { posShifts, getPosItems } = useInventoryStore();
   const sellerSession = useSellerSessionStore() as any;
-  const [isExpanded, setIsExpanded] = useState(false);
+  const { loadHistory, completedRequests } = useLogisticsStore();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  const today = dateOf(new Date().toISOString());
 
   const products = getPosItems();
   const priceMap: Record<string, { price: number; name: string }> = {};
   (products || []).forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
 
-  // Fecha de hoy en formato YYYY-MM-DD
-  const today = dateOf(new Date().toISOString());
-
-  // Sesión live del vendedor (desde sellerSession local O desde vendorLocations en tiempo real)
   const liveShift = useMemo(() => {
-    // a) sellerSession local
     if (sellerSession?.isSetupComplete && matchVehicleId(sellerSession?.pointId, vehicleId)) {
-      const alreadyStored = (posShifts || []).some(
-        (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId) && s.openedAt === sellerSession.openedAt
-      );
-      if (!alreadyStored) {
+      const matchingStored = (posShifts || []).filter((s: any) => matchVehicleId(s.pointId, vehicleId));
+      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
+
+      if (!hasOpenShift && !hasClosedShiftToday) {
         return {
           id: `LIVE-${vehicleId}`,
           pointId: vehicleId,
@@ -659,16 +646,16 @@ export function VehicleShiftCard({
       }
     }
 
-    // b) Realtime vendorLocations (para PCs de Admin / Dejador)
     const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
     const matchedLoc: any = Object.values(vendorLocs).find((loc: any) =>
       matchVehicleId(loc?.pointId || loc?.name, vehicleId)
     );
     if (matchedLoc) {
-      const alreadyStored = (posShifts || []).some(
-        (s: any) => !s.closedAt && matchVehicleId(s.pointId, vehicleId)
-      );
-      if (!alreadyStored) {
+      const matchingStored = (posShifts || []).filter((s: any) => matchVehicleId(s.pointId, vehicleId));
+      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
+
+      if (!hasOpenShift && !hasClosedShiftToday) {
         return {
           id: `LIVE-GPS-${vehicleId}`,
           pointId: vehicleId,
