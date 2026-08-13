@@ -1280,12 +1280,13 @@ export const useInventoryStore = create(
         const jornadaLabel = shift.jornada || shift.shift || 'AM';
         const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
 
-        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir el pointId Y el responsable para distinguir vendedores distintos
+        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir pointId, responsable y timestamp para distinguir vendedores distintos de forma 100% única
         const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
         const cleanResp = shift.responsibleName ? String(shift.responsibleName).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        const shiftTime = shift.openedAt ? new Date(shift.openedAt).getTime() : Date.now();
         const deterministicId = shift.id || (
           shift.type === 'VENDEDOR' && cleanPoint
-            ? `SHIFT-VENDOR-${cleanPoint}${cleanResp ? '-' + cleanResp : ''}-${dateStr}-${jornadaSlug}`
+            ? `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${dateStr}-${jornadaSlug}-${shiftTime}`
             : `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`
         );
 
