@@ -20,6 +20,8 @@ export const AdminPricesTab = () => {
   const [editAbbrev, setEditAbbrev] = useState('');
   const [editPresets, setEditPresets] = useState<string[]>([]);
   const [editPresetInput, setEditPresetInput] = useState('');
+  const [editShowInPos, setEditShowInPos] = useState(true);
+  const [editShowInTricicloPos, setEditShowInTricicloPos] = useState(false);
 
   const [mode, setMode] = useState<Mode>('list');
   const [search, setSearch] = useState('');
@@ -62,6 +64,8 @@ export const AdminPricesTab = () => {
     setEditPrice(p.price || 0);
     setEditIsVariable(p.variablePrice === true || p.price === 0);
     setEditReferencePrice(p.referencePrice || 0);
+    setEditShowInPos(p.showInPos !== false);
+    setEditShowInTricicloPos(!!p.showInTricicloPos);
     setEditPresets((p.inventoryPresets || []).map(String));
     setEditPresetInput('');
     setMode('edit');
@@ -80,6 +84,8 @@ export const AdminPricesTab = () => {
       price: editIsVariable ? 0 : editPrice,
       variablePrice: editIsVariable,
       referencePrice: editIsVariable ? editReferencePrice : undefined,
+      showInPos: editShowInPos,
+      showInTricicloPos: editShowInTricicloPos,
       inventoryPresets: parsedPresets.length > 0 ? parsedPresets : undefined,
     });
     
@@ -597,6 +603,38 @@ export const AdminPricesTab = () => {
                 </div>
               )}
 
+              {/* ── Visibilidad y Flujo (POS vs Surtido) ── */}
+              <div>
+                <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-2">Visibilidad en Módulos</label>
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditShowInPos(!editShowInPos)}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-3 rounded-2xl border-2 transition-all font-black text-xs ${
+                      editShowInPos
+                        ? 'border-green-600 bg-green-50 text-green-700'
+                        : 'border-gray-200 bg-gray-50 text-gray-400'
+                    }`}
+                  >
+                    🛒 {editShowInPos ? 'Visible en POS' : 'Oculto en POS'}
+                    <span className="text-[10px] font-bold opacity-70">{editShowInPos ? 'Habilitado en Venta Rápida' : 'No aparece en Venta Rápida'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditShowInTricicloPos(!editShowInTricicloPos)}
+                    className={`flex flex-col items-center gap-1 py-2.5 px-3 rounded-2xl border-2 transition-all font-black text-xs ${
+                      editShowInTricicloPos
+                        ? 'border-blue-600 bg-blue-50 text-blue-700'
+                        : 'border-gray-200 bg-gray-50 text-gray-500'
+                    }`}
+                  >
+                    🛵 {editShowInTricicloPos ? 'Solo POS' : 'Con Surtido'}
+                    <span className="text-[10px] font-bold opacity-70">{editShowInTricicloPos ? 'Exclusivo POS (Dejador no surte)' : 'Flujo normal con Dejador'}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Valores de los botones */}
               <div>
                 <label className="block text-[11px] font-bold text-gray-400 uppercase tracking-widest mb-1">Botones de cantidad</label>
@@ -648,7 +686,7 @@ export const AdminPricesTab = () => {
               <button
                 onClick={handleSave}
                 disabled={!editName.trim()}
-                className="w-full py-3.5 rounded-2xl bg-gray-900 text-white font-black text-sm disabled:opacity-40 hover:bg-gray-700 transition-colors active:scale-95"
+                className="w-full py-3.5 rounded-2xl bg-gray-900 text-white font-black text-sm disabled:opacity-40 hover:bg-gray-700 transition-colors active:scale-95 mt-2"
               >
                 Guardar Cambios
               </button>
@@ -656,24 +694,24 @@ export const AdminPricesTab = () => {
           </div>
         </div>
       )}
+
+      {/* ── Lista de Productos (Filas) ── */}
     </div>
   );
 };
 
-// ── Sub-componente reutilizable para cada fila de producto ────────────────
 interface ProductRowProps {
   p: any;
   openEdit: (p: any) => void;
   confirmDeleteId: string | null;
   setConfirmDeleteId: (id: string | null) => void;
   handleDelete: (id: string) => void;
-  updateInventoryItem: (id: string, data: any) => void;
+  updateInventoryItem: (id: string, updates: any) => void;
 }
 
 const ProductRow = ({
   p, openEdit,
   confirmDeleteId, setConfirmDeleteId, handleDelete,
-  updateInventoryItem,
 }: ProductRowProps) => {
   const isVariable = p.variablePrice === true || (p.price === 0 && p.variablePrice !== false);
 
@@ -681,35 +719,21 @@ const ProductRow = ({
     <div className={`bg-white p-4 rounded-2xl shadow-sm border flex justify-between items-center gap-3 ${
       isVariable ? 'border-amber-200' : 'border-gray-100'
     }`}>
-      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+      <div className="flex items-center gap-2 flex-1 min-w-0 flex-wrap">
         <span className="font-bold text-gray-800 text-lg leading-tight truncate">{p.name}</span>
-        {/* showInPos badge */}
-        <button
-          onClick={() => updateInventoryItem(p.id, { showInPos: !(p.showInPos !== false) })}
-          title={p.showInPos !== false ? 'Visible en POS vendedor — clic para ocultar' : 'Oculto en POS vendedor — clic para mostrar'}
-          className={`ml-1 shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${
-            p.showInPos !== false
-              ? 'bg-green-100 text-green-700 hover:bg-red-100 hover:text-red-500'
-              : 'bg-gray-100 text-gray-400 hover:bg-green-100 hover:text-green-600'
-          }`}
-        >
-          <ShoppingCart size={10} />
-          {p.showInPos !== false ? 'POS' : 'No POS'}
-        </button>
-        {/* showInTricicloPos badge — visible en POS del Vendedor pero NO en flujo del Dejador */}
-        <button
-          onClick={() => updateInventoryItem(p.id, { showInTricicloPos: !p.showInTricicloPos })}
-          title={p.showInTricicloPos ? 'Solo POS Triciclo (Dejador no lo ve) — clic para desmarcar' : 'Aparece en flujo normal del Dejador — clic para marcar como Solo POS'}
-          className={`shrink-0 px-2 py-0.5 rounded-full text-[10px] font-black flex items-center gap-1 transition-all ${
-            p.showInTricicloPos
-              ? 'bg-blue-100 text-blue-700 hover:bg-gray-100 hover:text-gray-400'
-              : 'bg-gray-100 text-gray-300 hover:bg-blue-100 hover:text-blue-600'
-          }`}
-        >
-          🛵 {p.showInTricicloPos ? 'Solo POS' : 'Con surtido'}
-        </button>
+        
+        {/* Badges indicativos limpios */}
+        {p.showInPos === false && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-gray-100 text-gray-400">
+            No POS
+          </span>
+        )}
+        {p.showInTricicloPos && (
+          <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-blue-100 text-blue-700">
+            🛵 Solo POS
+          </span>
+        )}
       </div>
-
 
       <div className="flex items-center gap-2 flex-shrink-0">
         <>
