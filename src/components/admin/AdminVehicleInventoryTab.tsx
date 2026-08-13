@@ -40,24 +40,26 @@ export function getVendedorName(
   loadHistory: any[] = [],
   completedRequests: any[] = []
 ): string {
-  const isGenericOrAccount = (name: string | null | undefined) => {
-    if (!name || name.trim() === '' || name === '—') return true;
-    const n = name.toLowerCase().trim();
-    return n.includes('vendedor m') || n === 'vendedor' || /^s\d+/i.test(n) || n.startsWith('caja');
-  };
-
-  const shiftDate = shift?.fecha || dateOf(shift?.closedAt || shift?.openedAt || '');
-
-  // 1. Si el turno tiene un responsibleName real que NO sea código de sistema (ej: Kevin), usarlo
-  if (shift?.responsibleName && !isGenericOrAccount(shift.responsibleName)) {
+  // 1. Usar directamente el nombre del responsable guardado en el turno
+  if (shift?.responsibleName && shift.responsibleName.trim() !== '' && shift.responsibleName !== '—') {
     return shift.responsibleName;
   }
+  if (shift?.userName && shift.userName.trim() !== '' && shift.userName !== '—') {
+    return shift.userName;
+  }
+  if (shift?.employeeName && shift.employeeName.trim() !== '' && shift.employeeName !== '—') {
+    return shift.employeeName;
+  }
+
+  const shiftDate = shift?.fecha || dateOf(shift?.closedAt || shift?.openedAt || '');
+  const isGeneric = (name: string | null | undefined) =>
+    !name || name.trim() === '' || name === '—' || name.toLowerCase().includes('vendedor m') || name.toLowerCase() === 'vendedor';
 
   // 2. Buscar en los surtidos (completedRequests) de este vehículo
   for (const r of completedRequests) {
     if (matchVehicleId(r.requester_point_id, vehicleId) && (!shiftDate || dateOf(r.completed_at || r.created_at) === shiftDate)) {
       const name = r.requester_name || r.created_by_name || r.responsibleName;
-      if (name && !isGenericOrAccount(name)) return name;
+      if (name && !isGeneric(name)) return name;
     }
   }
 
@@ -65,7 +67,7 @@ export function getVendedorName(
   for (const e of loadHistory) {
     if (matchVehicleId(e.vehicleId, vehicleId) && (!shiftDate || dateOf(e.timestamp) === shiftDate)) {
       const name = e.responsibleName || e.created_by_name || e.userName || e.vendorName;
-      if (name && !isGenericOrAccount(name)) return name;
+      if (name && !isGeneric(name)) return name;
     }
   }
 
