@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -10,6 +10,11 @@ export const SellerSetupView = () => {
   const startShift = useSellerSessionStore((state) => state.startShift);
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
   const enabledPointTypes = useVehicleStore((s: any) => s.enabledPointTypes ?? { Triciclo: true, Carrito: true, Local: false });
+  const posShifts = useInventoryStore((state) => state.posShifts || []);
+
+  const activeOpenShifts = useMemo(() => {
+    return (posShifts || []).filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt);
+  }, [posShifts]);
   
   const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
@@ -119,6 +124,57 @@ export const SellerSetupView = () => {
         <h1 className="text-3xl sm:text-4xl font-black text-gray-900 tracking-tight">¡Hola! 👋</h1>
         <p className="text-amber-900/60 font-black mt-1 sm:mt-2 text-xs sm:text-sm tracking-widest uppercase">CONFIGURA TU TURNO</p>
       </div>
+
+      {/* ── Banner de Turno Activo Existente (Reanudar rápido) ── */}
+      {activeOpenShifts.length > 0 && (
+        <div className="bg-emerald-600 text-white rounded-[32px] p-6 shadow-xl w-full max-w-lg mb-6 border border-emerald-400 animate-fade-in-up">
+          <div className="flex items-center gap-3 mb-3">
+            <span className="text-2xl animate-bounce">⚡</span>
+            <div>
+              <h2 className="font-black text-lg leading-tight">Turno Activo en Curso</h2>
+              <p className="text-emerald-100 text-xs font-bold">Existe un turno abierto en el sistema. Puedes reanudarlo para continuar en este dispositivo:</p>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            {activeOpenShifts.map((activeS: any) => {
+              const timeStr = activeS.openedAt
+                ? new Date(activeS.openedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
+                : '';
+              return (
+                <div key={activeS.id} className="bg-white text-gray-900 rounded-2xl p-4 flex items-center justify-between gap-3 shadow-md">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-black text-base text-gray-900">🛵 Punto {activeS.pointId}</span>
+                      <span className="bg-emerald-100 text-emerald-800 text-[10px] font-black px-2 py-0.5 rounded-full uppercase">
+                        {activeS.shift}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 font-bold truncate">
+                      {activeS.responsibleName || 'Vendedor'} {timeStr ? `· Abierto: ${timeStr}` : ''}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      startShift({
+                        pointId: activeS.pointId,
+                        shift: activeS.shift || 'AM',
+                        pointType: activeS.pointType || 'variable',
+                        responsibleName: activeS.responsibleName || user?.name || 'Vendedor',
+                        openedAt: activeS.openedAt,
+                      });
+                      navigate('/vendedor');
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-4 py-2.5 rounded-xl shadow transition-all active:scale-95 shrink-0"
+                  >
+                    Continuar Turno →
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="bg-white rounded-[36px] sm:rounded-[40px] p-6 sm:p-10 shadow-sm border border-white w-full max-w-lg">
         
