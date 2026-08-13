@@ -615,7 +615,7 @@ export const useInventoryStore = create(
        */
       getDeliveryItems: () =>
         get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles !== false && i.showInTricicloPos !== true
+          (i) => i.type !== 'INSUMO' && i.inTricycles === true && i.showInTricicloPos !== true
         ),
 
       /**
