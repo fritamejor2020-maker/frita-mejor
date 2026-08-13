@@ -392,32 +392,10 @@ export function AdminVehicleInventoryTab() {
 
   // ── Construir lista combinada de turnos ──────────────────────────────────────
   // Fuente 1: posShifts — solo turnos de VENDEDOR (excluye POS caja y DEJADOR)
-  const storedShifts: any[] = useMemo(() => {
-    const raw = (posShifts || []).filter((s: any) => s.type === 'VENDEDOR');
-    
-    // Si un vehículo+jornada ya tiene un turno CERRADO hoy, ignorar borrador/duplicado abierto antiguo
-    return raw.filter((s: any) => {
-      if (!s.closedAt) {
-        const sDate = s.fecha || dateOf(s.openedAt || '');
-        const pId = s.pointId;
-        const sShift = s.shift || 'AM';
-        
-        const hasClosedSibling = raw.some((other: any) => 
-          other.id !== s.id &&
-          other.closedAt &&
-          matchVehicleId(other.pointId, pId) &&
-          (other.shift === sShift || !other.shift || !sShift) &&
-          (dateOf(other.closedAt) === sDate || dateOf(other.openedAt) === sDate) &&
-          new Date(s.openedAt || 0).getTime() <= new Date(other.closedAt).getTime()
-        );
-        
-        if (hasClosedSibling) {
-          return false;
-        }
-      }
-      return true;
-    });
-  }, [posShifts]);
+  const storedShifts: any[] = useMemo(() =>
+    (posShifts || []).filter((s: any) => s.type === 'VENDEDOR'),
+    [posShifts]
+  );
 
   // Fecha de hoy local
   const today = dateOf(new Date().toISOString());

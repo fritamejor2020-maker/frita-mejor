@@ -1249,11 +1249,12 @@ export const useInventoryStore = create(
         const jornadaLabel = shift.jornada || shift.shift || 'AM';
         const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
 
-        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir el pointId para evitar colisiones con la caja POS
+        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir el pointId Y el responsable para distinguir vendedores distintos
         const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
+        const cleanResp = shift.responsibleName ? String(shift.responsibleName).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
         const deterministicId = shift.id || (
           shift.type === 'VENDEDOR' && cleanPoint
-            ? `SHIFT-VENDOR-${cleanPoint}-${dateStr}-${jornadaSlug}`
+            ? `SHIFT-VENDOR-${cleanPoint}${cleanResp ? '-' + cleanResp : ''}-${dateStr}-${jornadaSlug}`
             : `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`
         );
 
@@ -1265,13 +1266,15 @@ export const useInventoryStore = create(
               s.id === shift.id ||
               s.id === deterministicId ||
               (!s.closedAt && (
-                (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint && (s.shift === jornadaLabel || !s.shift || s.shift === s.jornada)) ||
+                (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+                 (s.responsibleName === shift.responsibleName || !s.responsibleName || !shift.responsibleName) &&
+                 (s.shift === jornadaLabel || !s.shift || s.shift === s.jornada)) ||
                 (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
               ))
             );
-            if (isMatch) {
+            if (isMatch && updatedCount === 0) {
               updatedCount++;
-              const isAccountCode = (n) => !n || n.trim() === '' || n === '—' || n.toLowerCase().includes('vendedor m') || n.toLowerCase() === 'vendedor' || /^s\d+/i.test(n.trim());
+              const isAccountCode = (n) => !n || n.trim() === '' || n === '—' || n.toLowerCase().includes('vendedor m') || n.toLowerCase() === 'vendedor';
               const keptResponsibleName = (!isAccountCode(s.responsibleName))
                 ? s.responsibleName
                 : (!isAccountCode(shift.responsibleName) ? shift.responsibleName : (s.responsibleName || shift.responsibleName || shift.userName || 'Vendedor'));
