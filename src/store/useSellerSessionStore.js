@@ -11,6 +11,7 @@ export const useSellerSessionStore = create(
     (set) => ({
       // Estado base de la sesión activa
       isSetupComplete: false,
+      shiftId: null,        // ID único del turno en posShifts
       pointId: null,        // VARCHAR, ej: 'T1'
       shift: null,          // 'AM' | 'PM' | 'MD'
       pointType: null,      // 'fija' | 'variable' | 'local'
@@ -23,12 +24,11 @@ export const useSellerSessionStore = create(
       startShift: (sessionData) => {
         set({
           isSetupComplete: true,
+          shiftId: sessionData.id || sessionData.shiftId || null,
           pointId: sessionData.pointId,
           shift: sessionData.shift,
           pointType: sessionData.pointType,
           responsibleName: sessionData.responsibleName,
-          // Usar el openedAt que viene del setup (ya generado antes de crear el posShift)
-          // para garantizar que ambos usen exactamente el mismo timestamp.
           openedAt: sessionData.openedAt || new Date().toISOString(),
         });
       },
@@ -40,6 +40,7 @@ export const useSellerSessionStore = create(
       endShift: () => {
         set({
           isSetupComplete: false,
+          shiftId: null,
           pointId: null,
           shift: null,
           pointType: null,

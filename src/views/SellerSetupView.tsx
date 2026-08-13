@@ -78,6 +78,7 @@ export const SellerSetupView = () => {
     if (existingShift) {
       // Reanudar turno existente — no crear duplicado
       startShift({
+        id: existingShift.id,
         pointId,
         shift,
         pointType,
@@ -90,8 +91,12 @@ export const SellerSetupView = () => {
 
     // Crear nuevo turno (no existe uno para este punto+jornada hoy)
     const openedAt = new Date().toISOString();
-    startShift({ pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt });
-    addPosShift({ openedAt, pointId, shift, responsibleName: finalResponsibleName, type: 'VENDEDOR', closedAt: null });
+    const cleanResp = String(finalResponsibleName).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const jornadaSlug = String(shift).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
+
+    startShift({ id: uniqueShiftId, pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt });
+    addPosShift({ id: uniqueShiftId, openedAt, pointId, shift, responsibleName: finalResponsibleName, type: 'VENDEDOR', closedAt: null });
     navigate('/vendedor');
   };
 

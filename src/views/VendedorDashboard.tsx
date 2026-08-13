@@ -476,15 +476,18 @@ export const VendedorDashboard = () => {
       const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
       const shiftKey = shiftData.shift; // "AM" o "PM"
 
-      // 1. Buscar turno abierto (sin closedAt) para este triciclo hoy usando matchVehicleId
+      // 1. Buscar el turno activo usando shiftId o por coincidencia de vendedor+punto+fecha
       const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
       let activeShiftRecord = (posShifts || []).find(
-        (s: any) => s.type === 'VENDEDOR' && !s.closedAt &&
-          (String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint || (s.openedAt && s.openedAt.slice(0, 10) === today))
+        (s: any) => (currentShiftId && s.id === currentShiftId) ||
+          (s.type === 'VENDEDOR' && !s.closedAt &&
+           String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+           (s.responsibleName === responsibleName || !s.responsibleName))
       );
 
       if (activeShiftRecord) {
-        updatePosShift(activeShiftRecord.id, finalShift);
+        updatePosShift(activeShiftRecord.id, { ...finalShift, id: activeShiftRecord.id });
       } else {
         addPosShift(finalShift);
       }
