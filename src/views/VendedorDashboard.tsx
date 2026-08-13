@@ -51,7 +51,7 @@ export const VendedorDashboard = () => {
 
   // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
   const trackingName = responsibleName || (user as any)?.name || 'Vendedor';
-  const trackingId   = (user as any)?.id || pointId || 'unknown';
+  const trackingId   = pointId || (user as any)?.id || 'unknown';
   const { status: gpsStatus, retry: gpsRetry, stop: gpsStop } = useVendorTracking(
     trackingId,
     trackingName,

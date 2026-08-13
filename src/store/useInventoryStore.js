@@ -1389,17 +1389,18 @@ export const useInventoryStore = create(
        */
       updateVendorLocation: (vendorId, lat, lng, name, pointId, openedAt, shift) => {
         const now = new Date().toISOString();
+        const locationKey = pointId || vendorId;
         set((s) => ({
           vendorLocations: {
             ...(s.vendorLocations || {}),
-            [vendorId]: {
+            [locationKey]: {
               lat,
               lng,
               name,
-              pointId,
+              pointId: pointId || vendorId,
               updatedAt: now,
-              openedAt: openedAt || s.vendorLocations?.[vendorId]?.openedAt || now,
-              shift: shift || s.vendorLocations?.[vendorId]?.shift || 'AM',
+              openedAt: openedAt || s.vendorLocations?.[locationKey]?.openedAt || now,
+              shift: shift || s.vendorLocations?.[locationKey]?.shift || 'AM',
               isActive: true,
             },
           }
