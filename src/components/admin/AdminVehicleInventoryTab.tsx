@@ -40,29 +40,32 @@ export function getVendedorName(
   loadHistory: any[] = [],
   completedRequests: any[] = []
 ): string {
-  const isGeneric = (name: string | null | undefined) =>
-    !name || name.trim() === '' || name === '—' || name.toLowerCase().includes('vendedor m') || name.toLowerCase() === 'vendedor';
-
-  // 1. Nombre directo en el turno (si no es genérico)
-  if (!isGeneric(shift?.responsibleName)) return shift.responsibleName;
-  if (!isGeneric(shift?.userName)) return shift.userName;
-  if (!isGeneric(shift?.employeeName)) return shift.employeeName;
+  const isGenericOrAccount = (name: string | null | undefined) => {
+    if (!name || name.trim() === '' || name === '—') return true;
+    const n = name.toLowerCase().trim();
+    return n.includes('vendedor m') || n === 'vendedor' || /^s\d+/i.test(n) || n.startsWith('caja');
+  };
 
   const shiftDate = shift?.fecha || dateOf(shift?.closedAt || shift?.openedAt || '');
 
-  // 2. Buscar en la logística de este turno (loadHistory)
-  for (const e of loadHistory) {
-    if (matchVehicleId(e.vehicleId, vehicleId) && (!shiftDate || dateOf(e.timestamp) === shiftDate)) {
-      const name = e.responsibleName || e.created_by_name || e.userName || e.vendorName;
-      if (!isGeneric(name)) return name;
-    }
+  // 1. Si el turno tiene un responsibleName real que NO sea código de sistema (ej: Kevin), usarlo
+  if (shift?.responsibleName && !isGenericOrAccount(shift.responsibleName)) {
+    return shift.responsibleName;
   }
 
-  // 3. Buscar en los surtidos (completedRequests)
+  // 2. Buscar en los surtidos (completedRequests) de este vehículo
   for (const r of completedRequests) {
     if (matchVehicleId(r.requester_point_id, vehicleId) && (!shiftDate || dateOf(r.completed_at || r.created_at) === shiftDate)) {
       const name = r.requester_name || r.created_by_name || r.responsibleName;
-      if (!isGeneric(name)) return name;
+      if (name && !isGenericOrAccount(name)) return name;
+    }
+  }
+
+  // 3. Buscar en la logística de este turno (loadHistory)
+  for (const e of loadHistory) {
+    if (matchVehicleId(e.vehicleId, vehicleId) && (!shiftDate || dateOf(e.timestamp) === shiftDate)) {
+      const name = e.responsibleName || e.created_by_name || e.userName || e.vendorName;
+      if (name && !isGenericOrAccount(name)) return name;
     }
   }
 
@@ -72,7 +75,7 @@ export function getVendedorName(
     const matchedContract = contracts.find((c: any) =>
       matchVehicleId(c.assignedPointId || c.assignedVehicleId || c.pointId, vehicleId)
     );
-    if (matchedContract && !isGeneric(matchedContract.employeeName)) {
+    if (matchedContract && !isGenericOrAccount(matchedContract.employeeName)) {
       return matchedContract.employeeName;
     }
   } catch (e) {}
@@ -83,12 +86,16 @@ export function getVendedorName(
     const matchedPayroll = payroll.find((e: any) =>
       matchVehicleId(e.assignedVehicle || e.pointId, vehicleId)
     );
-    if (matchedPayroll && !isGeneric(matchedPayroll.name)) {
+    if (matchedPayroll && !isGenericOrAccount(matchedPayroll.name)) {
       return matchedPayroll.name;
     }
   } catch (e) {}
 
-  return shift?.responsibleName || shift?.userName || 'Vendedor Móvil';
+  // Fallback si no hay nombre de persona real disponible
+  if (shift?.responsibleName && shift.responsibleName !== '—') return shift.responsibleName;
+  if (shift?.userName && shift.userName !== '—') return shift.userName;
+
+  return '—';
 }
 
 const dateOf = (iso: string) => {

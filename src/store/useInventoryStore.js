@@ -1271,11 +1271,16 @@ export const useInventoryStore = create(
             );
             if (isMatch) {
               updatedCount++;
+              const isAccountCode = (n) => !n || n.trim() === '' || n === '—' || n.toLowerCase().includes('vendedor m') || n.toLowerCase() === 'vendedor' || /^s\d+/i.test(n.trim());
+              const keptResponsibleName = (!isAccountCode(s.responsibleName))
+                ? s.responsibleName
+                : (!isAccountCode(shift.responsibleName) ? shift.responsibleName : (s.responsibleName || shift.responsibleName || shift.userName || 'Vendedor'));
+
               return {
                 ...s,
                 ...shift,
                 closedAt: shift.closedAt,
-                responsibleName: shift.responsibleName || shift.userName || s.responsibleName,
+                responsibleName: keptResponsibleName,
               };
             }
             return s;
