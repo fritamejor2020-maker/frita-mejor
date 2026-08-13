@@ -1259,24 +1259,33 @@ export const useInventoryStore = create(
 
         // ── CASO 1: CIERRE DE TURNO (shift.closedAt presente) ──
         if (shift.closedAt) {
-          // Buscar turno existente (abierto o por id) para aplicar la información del cierre
-          const existingIdx = current.findIndex(s =>
-            s.id === shift.id ||
-            s.id === deterministicId ||
-            (!s.closedAt && (
-              (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint) ||
-              (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
-            ))
-          );
+          let updatedCount = 0;
+          const nextShifts = current.map(s => {
+            const isMatch = (
+              s.id === shift.id ||
+              s.id === deterministicId ||
+              (!s.closedAt && (
+                (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint && (s.shift === jornadaLabel || !s.shift || s.shift === s.jornada)) ||
+                (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
+              ))
+            );
+            if (isMatch) {
+              updatedCount++;
+              return {
+                ...s,
+                ...shift,
+                closedAt: shift.closedAt,
+                responsibleName: shift.responsibleName || shift.userName || s.responsibleName,
+              };
+            }
+            return s;
+          });
 
-          if (existingIdx >= 0) {
-            const updatedShift = { ...current[existingIdx], ...shift, closedAt: shift.closedAt };
-            const nextShifts = [...current];
-            nextShifts[existingIdx] = updatedShift;
+          if (updatedCount > 0) {
             set({ posShifts: nextShifts });
             syncKey('posShifts', nextShifts);
-            console.log(`[Shift] Cierre aplicado exitosamente sobre turno existente: ${updatedShift.id}`);
-            return updatedShift;
+            console.log(`[Shift] Cierre aplicado exitosamente sobre ${updatedCount} turno(s) existente(s)`);
+            return nextShifts.find(s => s.id === shift.id || s.id === deterministicId) || nextShifts[0];
           }
 
           // Si no existía turno previo, registrar el nuevo turno cerrado
