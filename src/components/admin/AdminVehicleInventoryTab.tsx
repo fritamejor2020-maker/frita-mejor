@@ -619,6 +619,7 @@ export function VehicleShiftCard({
   const sellerSession = useSellerSessionStore() as any;
   const { loadHistory, completedRequests } = useLogisticsStore();
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const today = dateOf(new Date().toISOString());
 
