@@ -1248,18 +1248,24 @@ export const useInventoryStore = create(
         const reg = shift.registerId || 'REG-001';
         const jornadaLabel = shift.jornada || shift.shift || 'AM';
         const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
-        const deterministicId = shift.id || `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`;
+
+        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir el pointId para evitar colisiones con la caja POS
+        const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
+        const deterministicId = shift.id || (
+          shift.type === 'VENDEDOR' && cleanPoint
+            ? `SHIFT-VENDOR-${cleanPoint}-${dateStr}-${jornadaSlug}`
+            : `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`
+        );
 
         // ── CASO 1: CIERRE DE TURNO (shift.closedAt presente) ──
         if (shift.closedAt) {
           // Buscar turno existente (abierto o por id) para aplicar la información del cierre
-          const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
           const existingIdx = current.findIndex(s =>
             s.id === shift.id ||
             s.id === deterministicId ||
             (!s.closedAt && (
               (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint) ||
-              (s.branchId === branch && s.registerId === reg)
+              (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
             ))
           );
 
@@ -1294,24 +1300,24 @@ export const useInventoryStore = create(
         }
 
         // ── CASO 2: APERTURA DE TURNO (sin closedAt) ──
-        if (shift.type && shift.pointId && shift.shift) {
-          const cleanPoint = String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (shift.type === 'VENDEDOR' && cleanPoint && shift.shift) {
           const duplicate = current.find(
-            s => s.type === shift.type &&
+            s => s.type === 'VENDEDOR' &&
                  String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
                  s.shift === shift.shift &&
                  !s.closedAt
           );
           if (duplicate) {
-            console.log(`[Shift] Ya existe turno abierto para ${shift.pointId} ${shift.shift} — reusando turno existente`);
+            console.log(`[Shift] Ya existe turno abierto para vendedor ${shift.pointId} ${shift.shift} — reusando turno existente`);
             return duplicate;
           }
         }
 
         const existingOpenShift = current.find(
-          s => !s.closedAt && (
+          s => !s.closedAt && (s.type === (shift.type || 'POS')) && (
             s.id === deterministicId ||
-            (s.branchId === branch && s.registerId === reg && (s.openedAt || '').startsWith(dateStr) && (s.jornada === jornadaLabel || s.shift === jornadaLabel))
+            (s.type === 'VENDEDOR' && cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint && (s.openedAt || '').startsWith(dateStr) && s.shift === jornadaLabel) ||
+            (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg && (s.openedAt || '').startsWith(dateStr) && (s.jornada === jornadaLabel || s.shift === jornadaLabel))
           )
         );
 

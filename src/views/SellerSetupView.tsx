@@ -47,20 +47,26 @@ export const SellerSetupView = () => {
     }
 
     const { posShifts, addPosShift } = useInventoryStore.getState();
-    const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
+    const today = new Date().toISOString().slice(0, 10);
+    const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
 
     // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) por día ──
     // Primero buscar turno ABIERTO (sin cerrar)
     let existingShift = (posShifts || []).find(
-      (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.shift === shift
-        && !s.closedAt && s.openedAt?.startsWith(today)
+      (s: any) => s.type === 'VENDEDOR' &&
+        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+        s.shift === shift &&
+        !s.closedAt &&
+        (s.openedAt || '').startsWith(today)
     );
 
     // Si no hay abierto, buscar turno del mismo día (incluido cerrado) para reabrir
     if (!existingShift) {
       existingShift = (posShifts || []).find(
-        (s: any) => s.type === 'VENDEDOR' && s.pointId === pointId && s.shift === shift
-          && s.openedAt?.startsWith(today)
+        (s: any) => s.type === 'VENDEDOR' &&
+          String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+          s.shift === shift &&
+          (s.openedAt || '').startsWith(today)
       );
     }
 
