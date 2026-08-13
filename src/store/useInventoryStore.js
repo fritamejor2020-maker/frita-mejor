@@ -542,6 +542,29 @@ export const useInventoryStore = create(
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') {
                   merged = merged.filter(s => !deleted.includes(s.id));
+
+                  // Auto-cerrar borradores abiertos si el vehículo ya fue cerrado en esa fecha
+                  const closedTimesByPointDate = new Map();
+                  merged.forEach(s => {
+                    if (s.closedAt && s.pointId) {
+                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cD = s.closedAt.slice(0, 10);
+                      closedTimesByPointDate.set(`${cP}_${cD}`, s.closedAt);
+                    }
+                  });
+
+                  merged = merged.map(s => {
+                    if (!s.closedAt && s.pointId) {
+                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
+                      const matchingClosedAt = closedTimesByPointDate.get(`${cP}_${cD}`);
+                      if (matchingClosedAt) {
+                        return { ...s, closedAt: matchingClosedAt };
+                      }
+                    }
+                    return s;
+                  });
+
                   const shiftMap = new Map();
                   merged.forEach(s => {
                     const shiftKey = s.id || `${s.pointId}_${s.responsibleName}_${s.openedAt}`;
