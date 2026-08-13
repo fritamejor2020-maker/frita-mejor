@@ -489,6 +489,18 @@ export const VendedorDashboard = () => {
         addPosShift(finalShift);
       }
 
+      // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
+      try {
+        const shiftToSave = activeShiftRecord ? { ...activeShiftRecord, ...finalShift } : finalShift;
+        await supabase.from('app_sync_data').upsert({
+          key: 'posShifts',
+          data: useInventoryStore.getState().posShifts,
+          updated_at: new Date().toISOString()
+        });
+      } catch (eDb) {
+        console.warn('[VendedorClose] Error guardando cierre directo en DB:', eDb);
+      }
+
       // Marcar GPS inactivo inmediatamente en el mapa local y Supabase DB
       try {
         useInventoryStore.getState().clearVendorLocation(pointId);
