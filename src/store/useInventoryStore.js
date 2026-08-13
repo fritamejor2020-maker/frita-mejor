@@ -542,6 +542,31 @@ export const useInventoryStore = create(
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') {
                   merged = merged.filter(s => !deleted.includes(s.id));
+                  
+                  // Auto-sanear huérfanos: si existe un turno CERRADO para el mismo vehículo+jornada+fecha, aplicar el closedAt al borrador abierto
+                  const closedByVehicleDate = new Map();
+                  merged.forEach(s => {
+                    if (s.closedAt && s.pointId) {
+                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cD = s.closedAt.slice(0, 10);
+                      const cJ = String(s.shift || s.jornada || 'AM').toLowerCase();
+                      closedByVehicleDate.set(`${cP}_${cD}_${cJ}`, s.closedAt);
+                    }
+                  });
+
+                  merged = merged.map(s => {
+                    if (!s.closedAt && s.pointId) {
+                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
+                      const cJ = String(s.shift || s.jornada || 'AM').toLowerCase();
+                      const matchingClosedAt = closedByVehicleDate.get(`${cP}_${cD}_${cJ}`);
+                      if (matchingClosedAt) {
+                        return { ...s, closedAt: matchingClosedAt };
+                      }
+                    }
+                    return s;
+                  });
+
                   const shiftMap = new Map();
                   merged.forEach(s => {
                     const pId = s.pointId ? String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
@@ -1299,12 +1324,11 @@ export const useInventoryStore = create(
               s.id === deterministicId ||
               (!s.closedAt && (
                 (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
-                 (s.responsibleName === shift.responsibleName || !s.responsibleName || !shift.responsibleName) &&
                  (s.shift === jornadaLabel || !s.shift || s.shift === s.jornada)) ||
                 (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
               ))
             );
-            if (isMatch && updatedCount === 0) {
+            if (isMatch) {
               updatedCount++;
               const isAccountCode = (n) => !n || n.trim() === '' || n === '—' || n.toLowerCase().includes('vendedor m') || n.toLowerCase() === 'vendedor';
               const keptResponsibleName = (!isAccountCode(s.responsibleName))
