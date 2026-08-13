@@ -207,21 +207,28 @@ function App() {
     installGlobalErrorHandlers();
 
     // 1. Cargar estado remoto DESPUÉS de que Zustand persist hidrate
-    // El persist de Zustand carga síncronamente desde localStorage,
-    // pero lo hace en el mismo tick. Usamos un microtask (Promise.resolve)
-    // para asegurarnos de que ya está cargado antes de llamar loadFromRemote.
-    Promise.resolve().then(async () => {
-      // CRÍTICO: Primero cargar datos remotos, LUEGO vaciar la cola.
-      // Si flushQueue() corre ANTES de loadFromRemote(), datos obsoletos
-      // de localStorage sobreescriben los datos reales en Supabase.
+    const syncRemoteState = async () => {
       try {
         await useInventoryStore.getState().loadFromRemote();
       } catch (err) {
         console.warn('[App] Error en loadFromRemote:', err.message);
       }
-      // Solo vaciar la cola DESPUÉS de tener datos frescos
       flushQueue();
-    });
+    };
+
+    Promise.resolve().then(syncRemoteState);
+
+    // Auto-actualizar desde Supabase/Vercel cada vez que la app se abre o regresa a primer plano
+    const handleFocusSync = () => {
+      if (document.visibilityState === 'visible') {
+        useInventoryStore.getState().loadFromRemote().catch(e => {
+          console.warn('[App] Error en focus sync:', e.message);
+        });
+      }
+    };
+
+    window.addEventListener('focus', handleFocusSync);
+    document.addEventListener('visibilitychange', handleFocusSync);
 
     // 2. Inicializar sincronización entre pestañas (BroadcastChannel)
     initCrossTabSync();
@@ -267,6 +274,8 @@ function App() {
       unsubLogistics();
       unsubInventory();
       document.removeEventListener('pointerdown', handleGlobalPointer, true);
+      window.removeEventListener('focus', handleFocusSync);
+      document.removeEventListener('visibilitychange', handleFocusSync);
     };
   }, []);
 
