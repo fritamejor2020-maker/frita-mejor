@@ -606,7 +606,7 @@ export const useInventoryStore = create(
        */
       getPosItems: () =>
         get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles !== false
+          (i) => i.type !== 'INSUMO' && i.inTricycles === true
         ),
 
       /**
