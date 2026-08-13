@@ -395,33 +395,18 @@ export function AdminVehicleInventoryTab() {
   const storedShifts: any[] = useMemo(() => {
     const raw = (posShifts || []).filter((s: any) => s.type === 'VENDEDOR');
 
-    return raw.filter((s: any) => {
-      // Si este registro no tiene closedAt
-      if (!s.closedAt) {
-        const sDate = s.fecha || dateOf(s.openedAt || '');
-        const pId = s.pointId;
-        const vResp = String(s.responsibleName || '').toLowerCase().trim();
-
-        // Buscar si existe un turno CERRADO equivalente para el mismo vehículo + vendedor/jornada en esa fecha
-        const hasClosedEquivalent = raw.some((other: any) =>
-          other.id !== s.id &&
-          other.closedAt &&
-          matchVehicleId(other.pointId, pId) &&
-          (dateOf(other.closedAt) === sDate || dateOf(other.openedAt) === sDate) &&
-          (
-            !vResp ||
-            String(other.responsibleName || '').toLowerCase().trim() === vResp ||
-            other.shift === s.shift
-          )
-        );
-
-        if (hasClosedEquivalent) {
-          // Ya fue cerrado en otro registro. Ignorar la copia abierta huérfana
-          return false;
-        }
+    const uniqueMap = new Map<string, any>();
+    raw.forEach((s: any) => {
+      const key = s.id || `${s.pointId}_${s.responsibleName}_${s.openedAt}`;
+      const existing = uniqueMap.get(key);
+      if (!existing) {
+        uniqueMap.set(key, s);
+      } else if (!existing.closedAt && s.closedAt) {
+        uniqueMap.set(key, s);
       }
-      return true;
     });
+
+    return Array.from(uniqueMap.values());
   }, [posShifts]);
 
   // Fecha de hoy local

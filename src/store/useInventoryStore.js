@@ -542,56 +542,17 @@ export const useInventoryStore = create(
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') {
                   merged = merged.filter(s => !deleted.includes(s.id));
-                  
-                  // Auto-sanear huérfanos: si existe un turno CERRADO para el mismo vehículo+jornada+fecha, aplicar el closedAt al borrador abierto
-                  const closedByVehicleDate = new Map();
-                  merged.forEach(s => {
-                    if (s.closedAt && s.pointId) {
-                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const cD = s.closedAt.slice(0, 10);
-                      const cJ = String(s.shift || s.jornada || 'AM').toLowerCase();
-                      closedByVehicleDate.set(`${cP}_${cD}_${cJ}`, s.closedAt);
-                    }
-                  });
-
-                  merged = merged.map(s => {
-                    if (!s.closedAt && s.pointId) {
-                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
-                      const cJ = String(s.shift || s.jornada || 'AM').toLowerCase();
-                      const matchingClosedAt = closedByVehicleDate.get(`${cP}_${cD}_${cJ}`);
-                      if (matchingClosedAt) {
-                        return { ...s, closedAt: matchingClosedAt };
-                      }
-                    }
-                    return s;
-                  });
-
                   const shiftMap = new Map();
                   merged.forEach(s => {
-                    const pId = s.pointId ? String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-                    const vResp = s.responsibleName ? String(s.responsibleName).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-                    const dateStr = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
-                    const jLabel = String(s.shift || s.jornada || 'AM').toLowerCase();
-                    
-                    const shiftKey = (s.id && !s.id.startsWith('LIVE-') && !s.id.startsWith('AUTO-'))
-                      ? s.id
-                      : `${pId}_${vResp}_${dateStr}_${jLabel}`;
-
+                    const shiftKey = s.id || `${s.pointId}_${s.responsibleName}_${s.openedAt}`;
                     const existing = shiftMap.get(shiftKey);
                     if (!existing) {
                       shiftMap.set(shiftKey, s);
-                    } else {
-                      if (!existing.closedAt && s.closedAt) {
+                    } else if (!existing.closedAt && s.closedAt) {
+                      shiftMap.set(shiftKey, s);
+                    } else if (existing.closedAt && s.closedAt) {
+                      if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
                         shiftMap.set(shiftKey, s);
-                      } else if (existing.closedAt && s.closedAt) {
-                        if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-                          shiftMap.set(shiftKey, s);
-                        }
-                      } else if (!existing.closedAt && !s.closedAt) {
-                        if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
-                          shiftMap.set(shiftKey, s);
-                        }
                       }
                     }
                   });
