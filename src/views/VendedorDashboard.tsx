@@ -476,23 +476,35 @@ export const VendedorDashboard = () => {
       const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
       const shiftKey = shiftData.shift; // "AM" o "PM"
 
-      // 1. Buscar y cerrar TODOS los turnos abiertos pertenecientes a este punto
-      const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      // Helper para comparar nombres/IDs de punto de forma flexible (ej. "T2" vs "Punto T2")
+      const matchesPointId = (idA: any, idB: any) => {
+        if (!idA || !idB) return false;
+        const cleanA = String(idA).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanB = String(idB).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (cleanA === cleanB) return true;
+        if (cleanA.length >= 2 && cleanB.length >= 2 && (cleanA.includes(cleanB) || cleanB.includes(cleanA))) return true;
+        return false;
+      };
+
+      // 1. Buscar y cerrar TODOS los turnos abiertos pertenecientes a este punto o vendedor
       const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
       const currentShifts = useInventoryStore.getState().posShifts || [];
       let shiftFound = false;
 
       const updatedShifts = currentShifts.map((s: any) => {
-        const sPoint = String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const isTargetShift = (currentShiftId && s.id === currentShiftId) ||
-          (s.type === 'VENDEDOR' && !s.closedAt && sPoint === cleanPoint);
+        if (s.type !== 'VENDEDOR' || s.closedAt) return s;
 
-        if (isTargetShift) {
+        const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
+        const isMatchByPoint = matchesPointId(s.pointId, pointId);
+        const isMatchByName = s.responsibleName && responsibleName &&
+          String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
+
+        if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
           shiftFound = true;
           return {
             ...s,
             ...finalShift,
-            id: s.id, // Preservar ID único del turno
+            id: s.id, // Preservar ID único original
             closedAt: finalShift.closedAt,
           };
         }
