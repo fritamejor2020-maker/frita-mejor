@@ -143,12 +143,8 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   };
 
   const handlePushToBiometric = async () => {
-    if (!employeeNo || !fullName) return;
-    const term = terminals[0];
-    if (!term) {
-      showStatus('❌ No hay biométricos registrados.', 'error');
-      return;
-    }
+    const DEFAULT_TERMINAL = { id: 'TERM-001', name: 'Biométrico Entrada Principal', ipAddress: '192.168.3.220', port: 80, username: 'admin', password: 'Control.1' };
+    const term = terminals[0] || DEFAULT_TERMINAL;
 
     setIsProcessing(true);
     showStatus(`⏳ Enviando a ${fullName} (#${employeeNo}) al biométrico ${term.name}...`, 'info', 0);
