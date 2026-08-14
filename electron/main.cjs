@@ -350,16 +350,27 @@ ipcMain.handle('sync-biometric-manual', async () => {
 
 ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
   try {
-    const endpoint = '/ISAPI/AccessControl/UserInfo/Modify?format=json';
     const payload = JSON.stringify({
       UserInfo: {
         employeeNo: String(employeeNo),
         name: String(name),
-        password: String(password)
+        userType: 'normal',
+        password: String(password),
+        doorRight: '1',
+        RightPlan: [{ doorNo: 1, planTemplateNo: '1' }],
+        Valid: {
+          enable: true,
+          beginTime: '2020-01-01T00:00:00',
+          endTime: '2037-12-31T23:59:59'
+        }
       }
     });
 
-    const res = await isapiDigestFetch(endpoint, { method: 'PUT', body: payload });
+    let res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payload });
+    if (!res.ok) {
+      res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
+    }
+
     if (res.ok && res.text) {
       const jsonRes = JSON.parse(res.text);
       if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1) {

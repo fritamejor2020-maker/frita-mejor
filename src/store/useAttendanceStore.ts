@@ -739,27 +739,50 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         };
 
         try {
-          // 1. Enviar/Actualizar datos de usuario en el biométrico (ID + Nombre + Clave)
+          // 1. Enviar/Actualizar datos de usuario en el biométrico (ID + Nombre + Clave + Permisos de Acceso)
           const payloadUser = JSON.stringify({
             UserInfo: {
               employeeNo: String(contract.employeeNo),
               name: contract.fullName,
-              password: String(contract.pinPassword || '1234')
+              userType: 'normal',
+              password: String(contract.pinPassword || '1234'),
+              doorRight: '1',
+              RightPlan: [{ doorNo: 1, planTemplateNo: '1' }],
+              Valid: {
+                enable: true,
+                beginTime: '2020-01-01T00:00:00',
+                endTime: '2037-12-31T23:59:59'
+              }
             }
           });
 
           let modifyOk = false;
           let responseMsg = '';
 
+          // Intentar PUT /SetUp primero (garantiza escritura en flash de la máquina)
           try {
-            const modRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
-            const parsed = JSON.parse(modRes.text || '{}');
-            modifyOk = modRes.ok && (parsed.statusCode === 1 || parsed.statusString === 'OK');
+            const setRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payloadUser });
+            const parsed = JSON.parse(setRes.text || '{}');
+            modifyOk = setRes.ok && (parsed.statusCode === 1 || parsed.statusString === 'OK');
             if (modifyOk) {
               responseMsg = `✅ ¡Éxito! Usuario #${contract.employeeNo} actualizado a '${contract.fullName}' con clave '${contract.pinPassword || ''}' en el biométrico.`;
             }
           } catch (e: any) {
-            console.warn('[ISAPI pushUser] Modify error:', e.message);
+            console.warn('[ISAPI pushUser] SetUp error:', e.message);
+          }
+
+          // Si SetUp no respondió OK, intentar PUT /Modify
+          if (!modifyOk) {
+            try {
+              const modRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
+              const parsed = JSON.parse(modRes.text || '{}');
+              modifyOk = modRes.ok && (parsed.statusCode === 1 || parsed.statusString === 'OK');
+              if (modifyOk) {
+                responseMsg = `✅ ¡Éxito! Usuario #${contract.employeeNo} actualizado a '${contract.fullName}' con clave '${contract.pinPassword || ''}' en el biométrico.`;
+              }
+            } catch (e: any) {
+              console.warn('[ISAPI pushUser] Modify error:', e.message);
+            }
           }
 
           // Si el usuario no existe aún en el chip del biométrico, crearlo mediante Record
