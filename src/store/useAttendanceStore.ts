@@ -741,11 +741,12 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             // Guardar contrato en Supabase y Zustand inmediatamente
             get().upsertEmployeeContract(contract);
 
-            if (res && res.ok) {
-              return { ok: true, message: res.message };
+            if (res) {
+              return res;
             }
           } catch (err: any) {
             console.warn('[PushUser IPC Error]:', err.message);
+            return { ok: false, message: `❌ Error en comunicación nativa de Electron: ${err.message}` };
           }
         }
 
