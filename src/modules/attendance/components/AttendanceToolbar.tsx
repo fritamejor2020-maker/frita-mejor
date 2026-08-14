@@ -204,18 +204,6 @@ export function AttendanceToolbar({
           </button>
         )}
 
-        {/* Botón Cerrar Sesión */}
-        {onSignOut && (
-          <button
-            onClick={onSignOut}
-            className="h-7.5 px-2 bg-white hover:bg-red-50 text-red-600 border border-red-200 font-extrabold text-xs rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-2xs flex-shrink-0"
-            title="Cerrar Sesión"
-          >
-            <LogOut size={13} />
-            <span>Cerrar Sesión</span>
-          </button>
-        )}
-
         {/* Botón Pantalla Completa */}
         <button
           onClick={toggleFullscreen}

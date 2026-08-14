@@ -115,7 +115,7 @@ export function AttendanceView() {
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">
       {/* Header Superior */}
-      <div className="flex flex-wrap items-center justify-between gap-4 mb-3">
+      <div className="flex items-center justify-between gap-4 mb-3">
         <div className="flex items-center gap-3">
           <button
             onClick={() => navigate('/dashboard')}
@@ -132,6 +132,16 @@ export function AttendanceView() {
             </p>
           </div>
         </div>
+
+        {/* Botón Cerrar Sesión Arriba */}
+        <button
+          onClick={signOut}
+          className="h-8 px-3 bg-white hover:bg-red-50 text-red-600 border border-red-200 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all cursor-pointer shadow-2xs flex-shrink-0"
+          title="Cerrar Sesión"
+        >
+          <LogOut size={14} />
+          <span>Cerrar Sesión</span>
+        </button>
       </div>
 
       {/* Toolbar de Navegación y Filtros (Cápsula Unificada) */}
