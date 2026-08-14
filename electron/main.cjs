@@ -394,62 +394,76 @@ async function pushContractToBiometricDevice(employeeNo, name, password) {
     }
   });
 
-  let success = false;
-  let bioResText = '';
-
-  // 1. Probar SetUp (PUT)
+  // 1. Ejecutar intento de actualización en el biométrico (SetUp -> Modify -> Record)
   try {
     const res1 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payload });
     bioResText = res1.text || '';
-    if (res1.ok && bioResText) {
-      const jsonRes = JSON.parse(bioResText);
-      if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
-        success = true;
+    if (!res1.ok) {
+      const res2 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
+      bioResText = res2.text || bioResText;
+      if (!res2.ok) {
+        const res3 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payload });
+        bioResText = res3.text || bioResText;
       }
     }
   } catch (e) {
-    console.warn('[Biometric Push SetUp warning]:', e.message);
+    console.warn('[Biometric Push write attempt warning]:', e.message);
   }
 
-  // 2. Si SetUp no dio OK, probar Modify (PUT)
-  if (!success) {
-    try {
-      const res2 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
-      bioResText = res2.text || bioResText;
-      if (res2.ok && bioResText) {
-        const jsonRes = JSON.parse(bioResText);
-        if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
-          success = true;
+  // 2. VERIFICACIÓN OBLIGATORIA DE SEGURIDAD: Consultar a la máquina real lo que tiene grabado para este ID
+  try {
+    console.log(`[Biometric Push] 🔍 Verificando lectura real devuelta por el biométrico para ID #${empNoStr}...`);
+    const searchCond = {
+      UserInfoSearchCond: {
+        searchID: "1",
+        searchResultPosition: 0,
+        maxResults: 10,
+        EmployeeNoList: [{ employeeNo: empNoStr }]
+      }
+    };
+
+    const verifyRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+      method: 'POST',
+      body: JSON.stringify(searchCond)
+    });
+
+    if (verifyRes.ok && verifyRes.text) {
+      const verifyData = JSON.parse(verifyRes.text);
+      const searchRes = verifyData.UserInfoSearch || {};
+      let usersFound = searchRes.UserInfo || [];
+      if (!Array.isArray(usersFound)) usersFound = [usersFound];
+
+      const actualBioUser = usersFound.find(u => String(u.employeeNo).trim() === empNoStr) || usersFound[0];
+
+      if (actualBioUser) {
+        const actualName = String(actualBioUser.name || '').trim();
+        const actualPin = String(actualBioUser.password || '').trim();
+
+        console.log(`[Biometric Push Verify #${empNoStr}] Biométrico devolvió: Name="${actualName}", Password="${actualPin}"`);
+
+        const nameMatches = (actualName.toLowerCase() === nameStr.toLowerCase());
+        const pinMatches = (!pinStr || actualPin === pinStr);
+
+        if (nameMatches && pinMatches) {
+          console.log(`[Biometric Push Verify] ✅ ¡VERIFICACIÓN EXITOSA! Los datos en el biométrico coinciden 100%.`);
+          return {
+            ok: true,
+            message: `✅ ¡Éxito Verificado! El biométrico devolvió Nombre: "${actualName}" y Clave: "${actualPin || 'Sin clave'}".`
+          };
+        } else {
+          console.warn(`[Biometric Push Verify] ❌ VERIFICACIÓN FALLIDA. Se envió Name="${nameStr}" Pin="${pinStr}", pero la máquina devolvió Name="${actualName}" Pin="${actualPin}"`);
+          return {
+            ok: false,
+            message: `❌ Error de Verificación: Se envió Name="${nameStr}" y Clave="${pinStr}", pero el biométrico devolvió Name="${actualName}" y Clave="${actualPin}".`
+          };
         }
       }
-    } catch (e) {
-      console.warn('[Biometric Push Modify warning]:', e.message);
     }
+  } catch (vErr) {
+    console.error('[Biometric Push Verify Error]:', vErr.message);
   }
 
-  // 3. Si aun no dio OK, probar Record (POST)
-  if (!success) {
-    try {
-      const res3 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payload });
-      bioResText = res3.text || bioResText;
-      if (res3.ok && bioResText) {
-        const jsonRes = JSON.parse(bioResText);
-        if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
-          success = true;
-        }
-      }
-    } catch (e) {
-      console.warn('[Biometric Push Record warning]:', e.message);
-    }
-  }
-
-  if (success) {
-    console.log(`[Biometric Push] ✅ Usuario #${empNoStr} actualizado con éxito en biométrico.`);
-    return { ok: true, message: `✅ ¡Éxito! Usuario #${empNoStr} actualizado a '${nameStr}' con clave '${pinStr}' en el biométrico.` };
-  } else {
-    console.warn(`[Biometric Push] ⚠️ Respuesta del biométrico: ${bioResText}`);
-    return { ok: false, message: `⚠️ Biométrico respondió: ${bioResText}` };
-  }
+  return { ok: false, message: `❌ Error de Verificación: El biométrico no devolvió datos legibles para el empleado #${empNoStr}. (HTTP: ${bioResText})` };
 }
 
 // ── Manejo de Eventos IPC ──────────────────────────────────────────────────────
