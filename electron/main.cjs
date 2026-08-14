@@ -124,8 +124,11 @@ async function runBiometricSync() {
       } while (posicion < totalEnMemoria);
 
       if (deviceUsers.length > 0) {
-        const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
-        let currentContracts = contractState?.value || [];
+        const { data: contractState1 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').single();
+        const { data: contractState2 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+        let currentContracts = (contractState1?.value && Array.isArray(contractState1.value) && contractState1.value.length > 0)
+          ? contractState1.value
+          : (contractState2?.value || []);
         if (!Array.isArray(currentContracts)) currentContracts = [];
 
         const existingEmpNos = new Set(currentContracts.map(c => String(c.employeeNo || '').trim()));
