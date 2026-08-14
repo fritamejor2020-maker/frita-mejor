@@ -136,29 +136,10 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     setImportPreview(null);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!fullName || !employeeNo) return;
-
-    const newContract: EmployeeContract = {
-      employeeId: selectedEmpId || `EMP-${employeeNo}`,
-      employeeNo,
-      fullName,
-      branchId,
-      shiftType,
-      scheduleGroupId,
-      defaultShiftId,
-      weeklyTargetHours: Number(weeklyTargetHours),
-      baseHourlyRate: Number(baseHourlyRate),
-      overtimeHourlyRate: Number(overtimeHourlyRate),
-      pinPassword,
-      avatarColor: selectedEmpId
-        ? employeeContracts.find((c) => c.employeeId === selectedEmpId)?.avatarColor
-        : ['#3B82F6', '#10B981', '#F59E0B', '#6366F1', '#EC4899'][Math.floor(Math.random() * 5)],
-    };
-
-    upsertEmployeeContract(newContract);
-    showStatus(`✅ Perfil de ${fullName} guardado en el sistema.`);
+    await handlePushToBiometric();
   };
 
   const handlePushToBiometric = async () => {

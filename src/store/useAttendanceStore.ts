@@ -828,8 +828,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             return { ok: true, message: responseMsg };
           } else {
             return {
-              ok: true,
-              message: `✅ Usuario #${contract.employeeNo} (${contract.fullName}) guardado en el programa. (Clave: "${contract.pinPassword || 'Sin clave'}")`
+              ok: false,
+              message: `❌ Error: No se pudo enviar al biométrico local (192.168.3.220). El biométrico no confirmó la modificación.`
             };
           }
         } catch (e: any) {
