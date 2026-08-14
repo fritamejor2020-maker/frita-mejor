@@ -828,10 +828,11 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           if (modifyOk) {
             return { ok: true, message: responseMsg };
           } else {
-            return {
-              ok: false,
-              message: `❌ Error: No se pudo enviar al biométrico local (192.168.3.220). El biométrico no confirmó la modificación.`
-            };
+            const isHttps = typeof window !== 'undefined' && window.location.protocol === 'https:';
+            const errorText = isHttps
+              ? `❌ Para enviar o modificar usuarios en el biométrico local (192.168.3.220), abre la Aplicación de Escritorio Frita Mejor POS (Electron). Los navegadores web (Chrome/Edge/Vercel) bloquean conexiones HTTP a IPs locales por seguridad.`
+              : `❌ Error de conexión al biométrico local (192.168.3.220). Abre la app de escritorio Electron para realizar modificaciones directas en el chip.`;
+            return { ok: false, message: errorText };
           }
         } catch (e: any) {
           return { ok: false, message: `❌ Error al enviar al biométrico: ${e.message}` };
