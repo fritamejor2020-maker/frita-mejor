@@ -394,16 +394,33 @@ async function pushContractToBiometricDevice(employeeNo, name, password) {
     }
   });
 
+  function isResponseOk(res) {
+    if (!res || !res.ok || !res.text) return false;
+    try {
+      const json = JSON.parse(res.text);
+      return (json.statusCode === 1 || json.statusString === 'OK' || json.subStatusCode === 'ok');
+    } catch {
+      return false;
+    }
+  }
+
   // 1. Ejecutar intento de actualización en el biométrico (SetUp -> Modify -> Record)
+  let writeOk = false;
+  let bioResText = '';
   try {
     const res1 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payload });
     bioResText = res1.text || '';
-    if (!res1.ok) {
+    writeOk = isResponseOk(res1);
+
+    if (!writeOk) {
       const res2 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
       bioResText = res2.text || bioResText;
-      if (!res2.ok) {
+      writeOk = isResponseOk(res2);
+
+      if (!writeOk) {
         const res3 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payload });
         bioResText = res3.text || bioResText;
+        writeOk = isResponseOk(res3);
       }
     }
   } catch (e) {
