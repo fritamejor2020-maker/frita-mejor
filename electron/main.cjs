@@ -348,6 +348,30 @@ ipcMain.handle('sync-biometric-manual', async () => {
   return await runBiometricSync();
 });
 
+ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
+  try {
+    const endpoint = '/ISAPI/AccessControl/UserInfo/Modify?format=json';
+    const payload = JSON.stringify({
+      UserInfo: {
+        employeeNo: String(employeeNo),
+        name: String(name),
+        password: String(password)
+      }
+    });
+
+    const res = await isapiDigestFetch(endpoint, { method: 'PUT', body: payload });
+    if (res.ok && res.text) {
+      const jsonRes = JSON.parse(res.text);
+      if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1) {
+        return { ok: true, message: `✅ ¡Éxito! Usuario #${employeeNo} actualizado a '${name}' con clave '${password}'.` };
+      }
+    }
+    return { ok: false, message: `❌ Error al actualizar en biométrico (HTTP ${res.status}): ${res.text}` };
+  } catch (err) {
+    return { ok: false, message: `❌ Error de red biométrico: ${err.message}` };
+  }
+});
+
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });

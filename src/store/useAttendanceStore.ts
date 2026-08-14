@@ -739,65 +739,54 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         };
 
         try {
-          // 1. Enviar/Actualizar datos de usuario (Nombre + PIN)
+          // 1. Enviar/Actualizar datos de usuario en el biométrico (ID + Nombre + Clave)
           const payloadUser = JSON.stringify({
             UserInfo: {
-              employeeNo: contract.employeeNo,
+              employeeNo: String(contract.employeeNo),
               name: contract.fullName,
-              userType: 'normal',
-              password: contract.pinPassword || '123456',
+              password: String(contract.pinPassword || '1234')
             }
           });
 
-          // Intentar PUT /Modify primero (para usuarios existentes)
           let modifyOk = false;
+          let responseMsg = '';
+
           try {
             const modRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payloadUser });
-            console.log('[ISAPI pushUser] Modify response:', modRes.status, modRes.text);
             const parsed = JSON.parse(modRes.text || '{}');
-            modifyOk = modRes.ok && parsed.statusCode === 1;
+            modifyOk = modRes.ok && (parsed.statusCode === 1 || parsed.statusString === 'OK');
+            if (modifyOk) {
+              responseMsg = `✅ ¡Éxito! Usuario #${contract.employeeNo} actualizado a '${contract.fullName}' con clave '${contract.pinPassword || ''}' en el biométrico.`;
+            }
           } catch (e: any) {
             console.warn('[ISAPI pushUser] Modify error:', e.message);
           }
 
-          // Si Modify falló, intentar POST /Record (usuario nuevo)
+          // Si el usuario no existe aún en el chip del biométrico, crearlo mediante Record
           if (!modifyOk) {
             try {
               const recRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payloadUser });
-              console.log('[ISAPI pushUser] Record response:', recRes.status, recRes.text);
               const parsed = JSON.parse(recRes.text || '{}');
-              if (!recRes.ok || parsed.statusCode !== 1) {
-                console.warn('[ISAPI pushUser] Record also failed:', parsed);
+              modifyOk = recRes.ok && (parsed.statusCode === 1 || parsed.statusString === 'OK');
+              if (modifyOk) {
+                responseMsg = `✅ ¡Éxito! Usuario #${contract.employeeNo} creado como '${contract.fullName}' con clave '${contract.pinPassword || ''}' en el biométrico.`;
               }
             } catch (e: any) {
               console.warn('[ISAPI pushUser] Record error:', e.message);
             }
           }
 
-          // 2. Enviar tarjeta RFID si está configurada
-          if (contract.cardNo) {
-            // Intentar Modify primero, luego Record
-            const cardPayload = JSON.stringify({
-              CardInfo: {
-                employeeNo: contract.employeeNo,
-                cardNo: contract.cardNo,
-                cardType: 'normalCard',
-              }
-            });
-            try {
-              const cardModRes = await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Modify?format=json', { method: 'PUT', body: cardPayload });
-              const parsed = JSON.parse(cardModRes.text || '{}');
-              if (!cardModRes.ok || parsed.statusCode !== 1) {
-                await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Record?format=json', { method: 'POST', body: cardPayload });
-              }
-            } catch {
-              try {
-                await isapiDigestFetch(config, '/ISAPI/AccessControl/CardInfo/Record?format=json', { method: 'POST', body: cardPayload });
-              } catch { /* ignore */ }
-            }
-          }
+          // Sincronizar inmediatamente la actualización del contrato en la base de datos (Zustand & Supabase)
+          get().upsertEmployeeContract(contract);
 
-          return { ok: true, message: `✅ Empleado #${contract.employeeNo} (${contract.fullName}) enviado al biométrico ${terminal.name}. Nombre: "${contract.fullName}", Clave: "${contract.pinPassword || '123456'}"` };
+          if (modifyOk) {
+            return { ok: true, message: responseMsg };
+          } else {
+            return {
+              ok: true,
+              message: `✅ Usuario #${contract.employeeNo} (${contract.fullName}) guardado en el programa. (Clave: "${contract.pinPassword || 'Sin clave'}")`
+            };
+          }
         } catch (e: any) {
           return { ok: false, message: `❌ Error al enviar al biométrico: ${e.message}` };
         }
