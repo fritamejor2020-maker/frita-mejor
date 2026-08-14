@@ -494,12 +494,15 @@ export const VendedorDashboard = () => {
 
       // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
       try {
-        const shiftToSave = activeShiftRecord ? { ...activeShiftRecord, ...finalShift } : finalShift;
-        await supabase.from('app_sync_data').upsert({
-          key: 'posShifts',
-          data: useInventoryStore.getState().posShifts,
-          updated_at: new Date().toISOString()
-        });
+        const currentShifts = useInventoryStore.getState().posShifts || [];
+        const updatedShifts = activeShiftRecord
+          ? currentShifts.map((s: any) => s.id === activeShiftRecord.id ? { ...s, ...finalShift } : s)
+          : [...currentShifts, finalShift];
+
+        const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+        
+        await supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts }, { onConflict: 'key' });
+        await supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: updatedShifts }, { onConflict: 'key' });
       } catch (eDb) {
         console.warn('[VendedorClose] Error guardando cierre directo en DB:', eDb);
       }
