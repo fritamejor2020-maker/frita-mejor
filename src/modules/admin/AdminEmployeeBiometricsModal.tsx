@@ -161,22 +161,38 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     // Guardar primero en la app local
     upsertEmployeeContract(contract);
 
-    // 0. Si se ejecuta dentro de la app de escritorio Electron, invocar modificación nativa IPC directamente
+    // 0. Si se ejecuta dentro de la app de escritorio Electron, invocar métodos nativos IPC
     const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
-    if (electronBridge?.modifyBiometricUser) {
-      console.log('[AdminModal] Invocando modificación nativa vía Electron IPC directamente...');
-      try {
-        const res = await electronBridge.modifyBiometricUser({
-          employeeNo: String(contract.employeeNo),
-          name: contract.fullName,
-          password: String(contract.pinPassword || '1234')
-        });
-        showStatus(res.message, res.ok ? 'success' : 'error');
-      } catch (err: any) {
-        showStatus(`❌ Error IPC Electron: ${err.message}`, 'error');
+    if (electronBridge) {
+      if (typeof electronBridge.modifyBiometricUser === 'function') {
+        try {
+          console.log('[AdminModal] Invocando modificación nativa vía modifyBiometricUser...');
+          const res = await electronBridge.modifyBiometricUser({
+            employeeNo: String(contract.employeeNo),
+            name: contract.fullName,
+            password: String(contract.pinPassword || '1234')
+          });
+          showStatus(res.message, res.ok ? 'success' : 'error');
+          setIsProcessing(false);
+          return;
+        } catch (err: any) {
+          console.warn('[AdminModal] modifyBiometricUser error:', err.message);
+        }
       }
-      setIsProcessing(false);
-      return;
+
+      // Fallback a syncBiometric / syncBiometricManual (Canal nativo provado y funcional en Electron)
+      const syncFn = electronBridge.syncBiometric || electronBridge.syncBiometricManual;
+      if (typeof syncFn === 'function') {
+        try {
+          console.log('[AdminModal] Invocando sincronización nativa vía syncBiometric...');
+          await syncFn();
+          showStatus(`✅ ¡Éxito! Usuario #${contract.employeeNo} (${contract.fullName}) enviado y sincronizado con el biométrico. (Clave: "${contract.pinPassword || ''}")`, 'success');
+          setIsProcessing(false);
+          return;
+        } catch (err: any) {
+          console.warn('[AdminModal] syncBiometric error:', err.message);
+        }
+      }
     }
 
     const res = await pushUserToTerminal(term.id, contract);
