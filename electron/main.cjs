@@ -161,9 +161,30 @@ async function runBiometricSync() {
           await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
           console.log(`[Electron Sync Daemon] 🟢 Registradas ${newContractsAdded} personas nuevas automáticamente en la Nube.`);
         }
+
+        // Auto-sincronizar cambios pendientes de Supabase hacia el biométrico físico
+        const deviceUserMap = new Map(deviceUsers.map(u => [String(u.employeeNo || '').trim(), u]));
+        for (const contract of currentContracts) {
+          const empNo = String(contract.employeeNo || '').trim();
+          if (!empNo || empNo === '0') continue;
+          
+          const expectedName = String(contract.fullName || '').trim();
+          const expectedPin = String(contract.pinPassword || '').trim();
+          const devUser = deviceUserMap.get(empNo);
+
+          if (devUser) {
+            const actualName = String(devUser.name || '').trim();
+            const actualPin = String(devUser.password || '').trim();
+
+            if ((expectedName && expectedName !== actualName) || (expectedPin && expectedPin !== actualPin)) {
+              console.log(`[Electron Sync Daemon] 🔄 Sincronizando cambio detectado en Supabase hacia biométrico para Empleado #${empNo}: Nombre ("${actualName}" -> "${expectedName}"), Clave ("${actualPin}" -> "${expectedPin}")`);
+              await pushContractToBiometricDevice(empNo, expectedName, expectedPin);
+            }
+          }
+        }
       }
     } catch (userErr) {
-      console.warn('[Electron Sync Daemon] Warning auto-fetching users:', userErr.message);
+      console.warn('[Electron Sync Daemon] Warning auto-syncing users:', userErr.message);
     }
 
     // 2. Consultar eventos de marcación (asistencias)
@@ -348,80 +369,103 @@ ipcMain.handle('sync-biometric-manual', async () => {
   return await runBiometricSync();
 });
 
-ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
-  try {
-    const empNoStr = String(employeeNo).trim();
-    const nameStr = String(name).trim();
-    const pinStr = String(password).trim();
+async function pushContractToBiometricDevice(employeeNo, name, password) {
+  const empNoStr = String(employeeNo).trim();
+  const nameStr = String(name).trim();
+  const pinStr = String(password).trim();
 
-    console.log(`[Electron Native IPC] 🚀 Modificando usuario #${empNoStr} -> Nombre: "${nameStr}", Clave: "${pinStr}"...`);
+  if (!empNoStr || empNoStr === '0') return { ok: false, message: 'ID de empleado no válido' };
 
-    const payload = JSON.stringify({
-      UserInfo: {
-        employeeNo: empNoStr,
-        name: nameStr,
-        userType: 'normal',
-        password: pinStr || '1234',
-        doorRight: '1',
-        RightPlan: [{ doorNo: 1, planTemplateNo: '1' }],
-        Valid: {
-          enable: true,
-          beginTime: '2020-01-01T00:00:00',
-          endTime: '2037-12-31T23:59:59'
-        }
+  console.log(`[Biometric Push] 🚀 Enviando a biométrico #${empNoStr} -> Nombre: "${nameStr}", Clave: "${pinStr}"...`);
+
+  const payload = JSON.stringify({
+    UserInfo: {
+      employeeNo: empNoStr,
+      name: nameStr,
+      userType: 'normal',
+      password: pinStr || '1234',
+      doorRight: '1',
+      RightPlan: [{ doorNo: 1, planTemplateNo: '1' }],
+      Valid: {
+        enable: true,
+        beginTime: '2020-01-01T00:00:00',
+        endTime: '2037-12-31T23:59:59'
       }
-    });
+    }
+  });
 
-    let success = false;
-    let bioResText = '';
+  let success = false;
+  let bioResText = '';
 
-    // 1. Probar SetUp (PUT)
+  // 1. Probar SetUp (PUT)
+  try {
+    const res1 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payload });
+    bioResText = res1.text || '';
+    if (res1.ok && bioResText) {
+      const jsonRes = JSON.parse(bioResText);
+      if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
+        success = true;
+      }
+    }
+  } catch (e) {
+    console.warn('[Biometric Push SetUp warning]:', e.message);
+  }
+
+  // 2. Si SetUp no dio OK, probar Modify (PUT)
+  if (!success) {
     try {
-      const res1 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/SetUp?format=json', { method: 'PUT', body: payload });
-      bioResText = res1.text || '';
-      if (res1.ok && bioResText) {
+      const res2 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
+      bioResText = res2.text || bioResText;
+      if (res2.ok && bioResText) {
         const jsonRes = JSON.parse(bioResText);
         if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
           success = true;
         }
       }
     } catch (e) {
-      console.warn('[Electron Native IPC SetUp warning]:', e.message);
+      console.warn('[Biometric Push Modify warning]:', e.message);
     }
+  }
 
-    // 2. Si SetUp no dio OK, probar Modify (PUT)
-    if (!success) {
-      try {
-        const res2 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Modify?format=json', { method: 'PUT', body: payload });
-        bioResText = res2.text || bioResText;
-        if (res2.ok && bioResText) {
-          const jsonRes = JSON.parse(bioResText);
-          if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
-            success = true;
-          }
+  // 3. Si aun no dio OK, probar Record (POST)
+  if (!success) {
+    try {
+      const res3 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payload });
+      bioResText = res3.text || bioResText;
+      if (res3.ok && bioResText) {
+        const jsonRes = JSON.parse(bioResText);
+        if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
+          success = true;
         }
-      } catch (e) {
-        console.warn('[Electron Native IPC Modify warning]:', e.message);
       }
+    } catch (e) {
+      console.warn('[Biometric Push Record warning]:', e.message);
     }
+  }
 
-    // 3. Si aun no dio OK, probar Record (POST) para usuarios totalmente nuevos
-    if (!success) {
-      try {
-        const res3 = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Record?format=json', { method: 'POST', body: payload });
-        bioResText = res3.text || bioResText;
-        if (res3.ok && bioResText) {
-          const jsonRes = JSON.parse(bioResText);
-          if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1 || jsonRes.subStatusCode === 'ok') {
-            success = true;
-          }
-        }
-      } catch (e) {
-        console.warn('[Electron Native IPC Record warning]:', e.message);
-      }
-    }
+  if (success) {
+    console.log(`[Biometric Push] ✅ Usuario #${empNoStr} actualizado con éxito en biométrico.`);
+    return { ok: true, message: `✅ ¡Éxito! Usuario #${empNoStr} actualizado a '${nameStr}' con clave '${pinStr}' en el biométrico.` };
+  } else {
+    console.warn(`[Biometric Push] ⚠️ Respuesta del biométrico: ${bioResText}`);
+    return { ok: false, message: `⚠️ Biométrico respondió: ${bioResText}` };
+  }
+}
 
-    // 4. Sincronizar actualización de contrato inmediatamente en Supabase
+// ── Manejo de Eventos IPC ──────────────────────────────────────────────────────
+ipcMain.handle('sync-biometric-manual', async () => {
+  return await runBiometricSync();
+});
+
+ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
+  try {
+    const empNoStr = String(employeeNo).trim();
+    const nameStr = String(name).trim();
+    const pinStr = String(password).trim();
+
+    const pushRes = await pushContractToBiometricDevice(empNoStr, nameStr, pinStr);
+
+    // Sincronizar actualización de contrato inmediatamente en Supabase
     try {
       const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').single();
       let currentContracts = contractState?.value || [];
@@ -458,12 +502,7 @@ ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, passwo
       console.warn('[Electron Native IPC Supabase update error]:', dbErr.message);
     }
 
-    if (success) {
-      console.log(`[Electron Native IPC] ✅ Usuario #${empNoStr} actualizado con éxito en biométrico y Supabase.`);
-      return { ok: true, message: `✅ ¡Éxito! Usuario #${empNoStr} actualizado a '${nameStr}' con clave '${pinStr}' en el biométrico.` };
-    } else {
-      return { ok: true, message: `✅ Perfil del usuario #${empNoStr} (${nameStr}) guardado en el sistema y Supabase. (Biométrico respondió: ${bioResText || 'OK'})` };
-    }
+    return pushRes;
   } catch (err) {
     console.error('[Electron Native IPC Error]:', err.message);
     return { ok: false, message: `❌ Error de red biométrico: ${err.message}` };
