@@ -18,12 +18,15 @@ export function AttendanceView() {
   const [viewMode, setViewMode] = useState<'week' | 'day'>('week');
   const [selectedBranchId, setSelectedBranchId] = useState<string | null>(null);
   const [activeDate, setActiveDate] = useState<Date>(new Date());
-  const [weekStartDate, setWeekStartDate] = useState<Date>(() => {
-    const d = new Date();
+  
+  const weekStartDate = useMemo(() => {
+    const d = new Date(activeDate);
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Lunes
-    return new Date(d.setDate(diff));
-  });
+    d.setDate(diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, [activeDate]);
 
   const [isSyncing, setIsSyncing] = useState(false);
 
