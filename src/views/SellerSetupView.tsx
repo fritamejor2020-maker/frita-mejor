@@ -13,8 +13,30 @@ export const SellerSetupView = () => {
   const posShifts = useInventoryStore((state) => state.posShifts || []);
 
   const activeOpenShifts = useMemo(() => {
-    return (posShifts || []).filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt);
-  }, [posShifts]);
+    const currentUserName = String(user?.name || '').trim().toLowerCase();
+    const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
+
+    return (posShifts || []).filter((s: any) => {
+      if (s.type !== 'VENDEDOR' || s.closedAt) return false;
+
+      // Si no hay usuario logueado en el sistema
+      if (!user) return false;
+
+      // Si es Admin, Super Admin o Manager, ver todos los turnos abiertos
+      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
+        return true;
+      }
+
+      // Para Vendedor regular: SOLO mostrar si el turno pertenece a este mismo usuario (misma clave/cuenta)
+      const shiftResp = String(s.responsibleName || '').trim().toLowerCase();
+      const shiftUid = String(s.userId || s.createdBy || '').trim().toLowerCase();
+
+      const isSameUserByName = currentUserName.length > 0 && shiftResp === currentUserName;
+      const isSameUserById = currentUserId.length > 0 && shiftUid === currentUserId;
+
+      return isSameUserByName || isSameUserById;
+    });
+  }, [posShifts, user]);
   
   const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
@@ -96,7 +118,7 @@ export const SellerSetupView = () => {
     const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
 
     startShift({ id: uniqueShiftId, pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt });
-    addPosShift({ id: uniqueShiftId, openedAt, pointId, shift, responsibleName: finalResponsibleName, type: 'VENDEDOR', closedAt: null });
+    addPosShift({ id: uniqueShiftId, openedAt, pointId, shift, responsibleName: finalResponsibleName, userId: user?.id || user?.username, createdBy: user?.id, type: 'VENDEDOR', closedAt: null });
     navigate('/vendedor');
   };
 
