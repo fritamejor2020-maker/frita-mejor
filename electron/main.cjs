@@ -484,10 +484,6 @@ async function pushContractToBiometricDevice(employeeNo, name, password) {
 }
 
 // ── Manejo de Eventos IPC ──────────────────────────────────────────────────────
-ipcMain.handle('sync-biometric-manual', async () => {
-  return await runBiometricSync();
-});
-
 ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
   try {
     const empNoStr = String(employeeNo).trim();
