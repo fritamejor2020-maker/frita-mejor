@@ -161,6 +161,24 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     // Guardar primero en la app local
     upsertEmployeeContract(contract);
 
+    // 0. Si se ejecuta dentro de la app de escritorio Electron, invocar modificación nativa IPC directamente
+    const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
+    if (electronBridge?.modifyBiometricUser) {
+      console.log('[AdminModal] Invocando modificación nativa vía Electron IPC directamente...');
+      try {
+        const res = await electronBridge.modifyBiometricUser({
+          employeeNo: String(contract.employeeNo),
+          name: contract.fullName,
+          password: String(contract.pinPassword || '1234')
+        });
+        showStatus(res.message, res.ok ? 'success' : 'error');
+      } catch (err: any) {
+        showStatus(`❌ Error IPC Electron: ${err.message}`, 'error');
+      }
+      setIsProcessing(false);
+      return;
+    }
+
     const res = await pushUserToTerminal(term.id, contract);
     showStatus(res.message, res.ok ? 'success' : 'error');
     setIsProcessing(false);
