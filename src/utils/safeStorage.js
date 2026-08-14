@@ -22,15 +22,29 @@ export const safeLocalStorage = {
     } catch (e) {
       console.warn(`[SafeStorage] QuotaExceededError capturado en "${name}". Iniciando autolimpieza...`, e);
       try {
-        // Identificar y purgar llaves secundarias/antiguas o temporales
+        // Identificar y purgar llaves pesadas o secundarias (logs de asistencia antiguos, mensajes de chat, caché)
         const keysToPrune = [];
         for (let i = 0; i < localStorage.length; i++) {
           const key = localStorage.key(i);
-          if (key && key !== name && (key.includes('chat') || key.includes('temp') || key.includes('cache') || key.includes('old'))) {
+          if (key && key !== name) {
             keysToPrune.push(key);
           }
         }
-        keysToPrune.forEach(k => localStorage.removeItem(k));
+        
+        // Purgar primero registros no esenciales
+        keysToPrune.forEach(k => {
+          if (
+            k.includes('chat') ||
+            k.includes('temp') ||
+            k.includes('cache') ||
+            k.includes('old') ||
+            k.includes('logs') ||
+            k.includes('backup')
+          ) {
+            try { localStorage.removeItem(k); } catch (_) {}
+          }
+        });
+
         // Reintentar guardar
         localStorage.setItem(name, value);
       } catch (err2) {

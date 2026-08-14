@@ -519,6 +519,23 @@ export const VendedorDashboard = () => {
       endShift();
       signOut();
     } catch (err: any) {
+      console.warn('[VendedorClose Error]:', err?.message);
+      // Si fue un error de cuota de almacenamiento del navegador (QuotaExceededError en iPad/Safari)
+      if (err?.name === 'QuotaExceededError' || String(err?.message || '').toLowerCase().includes('quota')) {
+        try {
+          // Limpiar automáticamente llaves temporales del iPad
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.includes('chat') || k.includes('log') || k.includes('temp') || k.includes('cache'))) {
+              localStorage.removeItem(k);
+            }
+          }
+        } catch (_) {}
+        // Continuar el cierre normalmente sin bloquear la pantalla
+        endShift();
+        signOut();
+        return;
+      }
       alert("Error en cierre: " + err.message);
     }
   };
