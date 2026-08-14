@@ -161,7 +161,10 @@ export function AttendanceView() {
           setSelectedPayrollEmp(undefined);
           setShowPayrollModal(true);
         }}
-        onSignOut={signOut}
+        onOpenBioModal={() => {
+          setSelectedBioEmpNo(undefined);
+          setShowBioModal(true);
+        }}
         isSyncing={isSyncing}
       />
 

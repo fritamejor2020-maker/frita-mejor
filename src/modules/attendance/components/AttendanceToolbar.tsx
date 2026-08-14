@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building, Database, Trash2, DollarSign, LogOut } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar, Maximize2, Minimize2, RefreshCw, Building, Trash2, DollarSign, Users } from 'lucide-react';
 import { useBranchStore } from '../../../store/useBranchStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 
@@ -16,6 +16,7 @@ interface AttendanceToolbarProps {
   onClearLogs?: () => void;
   onOpenShiftTemplates?: () => void;
   onOpenPayrollModal?: () => void;
+  onOpenBioModal?: () => void;
   onSignOut?: () => void;
   isSyncing: boolean;
 }
@@ -33,6 +34,7 @@ export function AttendanceToolbar({
   onClearLogs,
   onOpenShiftTemplates,
   onOpenPayrollModal,
+  onOpenBioModal,
   onSignOut,
   isSyncing,
 }: AttendanceToolbarProps) {
@@ -157,60 +159,72 @@ export function AttendanceToolbar({
           </select>
         </div>
 
-        {/* Botón Sincronizar Biométrico */}
+        {/* Botón 1: Sincronizar Biométrico (Icono Esmeralda) */}
         <button
           onClick={onSyncTerminal}
           disabled={isSyncing}
-          className="h-7.5 px-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1 transition-all shadow-2xs cursor-pointer disabled:opacity-50 flex-shrink-0"
-          title="Sincronizar marcaciones del biométrico"
+          className="p-2 sm:px-2.5 sm:py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs hover:scale-105 cursor-pointer disabled:opacity-50 flex-shrink-0"
+          title="Sincronizar Marcaciones del Biométrico"
         >
-          <RefreshCw size={13} className={isSyncing ? 'animate-spin' : ''} />
-          <span>Sincronizar Biométrico</span>
+          <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+          <span className="hidden 2xl:inline">Sincronizar</span>
         </button>
 
-        {/* Botón Turnos & Horarios */}
+        {/* Botón 2: Turnos & Horarios (Icono Negro/Dorado) */}
         {onOpenShiftTemplates && (
           <button
             onClick={onOpenShiftTemplates}
-            className="h-7.5 px-2 bg-gray-900 hover:bg-black text-amber-400 font-extrabold text-xs rounded-xl flex items-center gap-1 transition-all shadow-2xs border border-gray-800 cursor-pointer flex-shrink-0"
-            title="Gestionar plantillas de turno y asignación por trabajador"
+            className="p-2 sm:px-2.5 sm:py-1.5 bg-gray-900 hover:bg-black text-amber-400 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs border border-gray-800 hover:scale-105 cursor-pointer flex-shrink-0"
+            title="Plantillas de Turnos & Horarios"
           >
-            <Calendar size={13} />
-            <span>Turnos & Horarios</span>
+            <Calendar size={16} />
+            <span className="hidden 2xl:inline">Turnos & Horarios</span>
           </button>
         )}
 
-        {/* Botón Ver Liquidación Semanal ($) */}
+        {/* Botón 3: Vincular Huellas / Biométricos (Icono Índigo) */}
+        {onOpenBioModal && (
+          <button
+            onClick={onOpenBioModal}
+            className="p-2 sm:px-2.5 sm:py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs hover:scale-105 cursor-pointer flex-shrink-0"
+            title="Vincular Huellas & Usuarios Biométricos"
+          >
+            <Users size={16} />
+            <span className="hidden 2xl:inline">Biométricos</span>
+          </button>
+        )}
+
+        {/* Botón 4: Ver Liquidación Semanal ($) (Icono Amarillo) */}
         {onOpenPayrollModal && (
           <button
             onClick={onOpenPayrollModal}
-            className="h-7.5 px-2 bg-amber-400 hover:bg-amber-500 text-gray-950 font-extrabold text-xs rounded-xl flex items-center gap-1 transition-all shadow-2xs border border-amber-300 cursor-pointer flex-shrink-0"
-            title="Ver Liquidación Semanal y Nómina"
+            className="p-2 sm:px-2.5 sm:py-1.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow-xs border border-amber-300 hover:scale-105 cursor-pointer flex-shrink-0"
+            title="Ver Liquidación Semanal y Nómina ($)"
           >
-            <DollarSign size={13} />
-            <span>Ver Liquidación Semanal ($)</span>
+            <DollarSign size={16} />
+            <span className="hidden 2xl:inline">Liquidación ($)</span>
           </button>
         )}
 
-        {/* Botón Limpiar Registros */}
+        {/* Botón 5: Borrar Registros (Icono Rojo Suave) */}
         {onClearLogs && (
           <button
             onClick={onClearLogs}
-            className="h-7.5 px-2 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-extrabold text-xs rounded-xl flex items-center gap-1 transition-all cursor-pointer shadow-2xs flex-shrink-0"
-            title="Borrar todas las marcaciones mostradas"
+            className="p-2 sm:px-2.5 sm:py-1.5 bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-extrabold text-xs rounded-xl flex items-center gap-1.5 transition-all hover:scale-105 cursor-pointer shadow-xs flex-shrink-0"
+            title="Borrar Registros de Pantalla"
           >
-            <Trash2 size={13} />
-            <span>Borrar Registros</span>
+            <Trash2 size={16} />
+            <span className="hidden 2xl:inline">Borrar</span>
           </button>
         )}
 
-        {/* Botón Pantalla Completa */}
+        {/* Botón 6: Pantalla Completa */}
         <button
           onClick={toggleFullscreen}
-          className="h-7.5 p-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-1 transition-colors cursor-pointer border border-gray-200 text-xs flex-shrink-0"
+          className="p-2 bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold rounded-xl flex items-center gap-1 transition-all hover:scale-105 cursor-pointer border border-gray-200 text-xs flex-shrink-0"
           title={isFullscreen ? 'Salir de Pantalla Completa' : 'Pantalla Completa'}
         >
-          {isFullscreen ? <Minimize2 size={13} /> : <Maximize2 size={13} />}
+          {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
         </button>
       </div>
     </div>
