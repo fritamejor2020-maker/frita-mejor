@@ -93,50 +93,70 @@ async function isapiDigestFetch(pathStr, options = {}) {
 // ── Motor de Sincronización Biométrico en Segundo Plano ───────────────────────
 async function runBiometricSync() {
   try {
-    // 1. Intentar consultar usuarios del biométrico para auto-registrar personas nuevas
+    // 1. Lectura paginada de TODOS los usuarios del biométrico para auto-registrar personas nuevas
     try {
-      const userSearchCond = { UserInfoSearchCond: { searchID: "1", searchResultPosition: 0, maxResults: 150 } };
-      const userRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', { method: 'POST', body: JSON.stringify(userSearchCond) });
-      if (userRes.ok && userRes.text) {
-        const userData = JSON.parse(userRes.text);
-        let deviceUsers = userData.UserInfoSearch?.UserInfo || [];
-        if (!Array.isArray(deviceUsers)) deviceUsers = [deviceUsers];
+      let posicion = 0;
+      let deviceUsers = [];
+      let totalEnMemoria = 0;
 
-        if (deviceUsers.length > 0) {
-          const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
-          let currentContracts = contractState?.value || [];
-          if (!Array.isArray(currentContracts)) currentContracts = [];
-
-          const existingEmpNos = new Set(currentContracts.map(c => String(c.employeeNo || '').trim()));
-          let newContractsAdded = 0;
-
-          deviceUsers.forEach(u => {
-            const empNo = String(u.employeeNo || '').trim();
-            if (empNo && empNo !== '0' && !existingEmpNos.has(empNo)) {
-              newContractsAdded++;
-              existingEmpNos.add(empNo);
-              currentContracts.push({
-                employeeId: `EMP-${empNo}`,
-                employeeNo: empNo,
-                fullName: (u.name && u.name.trim() !== '') ? u.name.trim() : `Empleado #${empNo}`,
-                branchId: 'BRANCH-001',
-                shiftType: 'VARIABLE',
-                weeklyTargetHours: 44,
-                baseHourlyRate: 6500,
-                overtimeHourlyRate: 9750,
-                avatarColor: '#3B82F6',
-                pinPassword: u.password || '',
-                cardNo: u.cardNo || ''
-              });
-              console.log(`[Electron Sync Daemon] 🆕 Auto-creado nuevo empleado de biométrico: #${empNo} (${u.name || 'Sin nombre'})`);
-            }
-          });
-
-          if (newContractsAdded > 0) {
-            await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
-            await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
-            console.log(`[Electron Sync Daemon] 🟢 Registradas ${newContractsAdded} personas nuevas automáticamente en la Nube.`);
+      do {
+        const payload = JSON.stringify({
+          UserInfoSearchCond: {
+            searchID: "1",
+            searchResultPosition: posicion,
+            maxResults: 10
           }
+        });
+
+        const userRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', { method: 'POST', body: payload });
+        if (!userRes.ok || !userRes.text) break;
+
+        const userData = JSON.parse(userRes.text);
+        const searchRes = userData.UserInfoSearch || {};
+        totalEnMemoria = searchRes.totalMatches || 0;
+        let listaLote = searchRes.UserInfo || [];
+        if (!Array.isArray(listaLote)) listaLote = [listaLote];
+
+        if (listaLote.length === 0) break;
+
+        deviceUsers.push(...listaLote);
+        posicion += listaLote.length;
+      } while (posicion < totalEnMemoria);
+
+      if (deviceUsers.length > 0) {
+        const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+        let currentContracts = contractState?.value || [];
+        if (!Array.isArray(currentContracts)) currentContracts = [];
+
+        const existingEmpNos = new Set(currentContracts.map(c => String(c.employeeNo || '').trim()));
+        let newContractsAdded = 0;
+
+        deviceUsers.forEach(u => {
+          const empNo = String(u.employeeNo || '').trim();
+          if (empNo && empNo !== '0' && !existingEmpNos.has(empNo)) {
+            newContractsAdded++;
+            existingEmpNos.add(empNo);
+            currentContracts.push({
+              employeeId: `EMP-${empNo}`,
+              employeeNo: empNo,
+              fullName: (u.name && u.name.trim() !== '') ? u.name.trim() : `Empleado #${empNo}`,
+              branchId: 'BRANCH-001',
+              shiftType: 'VARIABLE',
+              weeklyTargetHours: 44,
+              baseHourlyRate: 6500,
+              overtimeHourlyRate: 9750,
+              avatarColor: '#3B82F6',
+              pinPassword: u.password || '',
+              cardNo: u.cardNo || ''
+            });
+            console.log(`[Electron Sync Daemon] 🆕 Auto-creado nuevo empleado de biométrico: #${empNo} (${u.name || 'Sin nombre'})`);
+          }
+        });
+
+        if (newContractsAdded > 0) {
+          await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
+          await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
+          console.log(`[Electron Sync Daemon] 🟢 Registradas ${newContractsAdded} personas nuevas automáticamente en la Nube.`);
         }
       }
     } catch (userErr) {
