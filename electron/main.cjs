@@ -350,6 +350,7 @@ ipcMain.handle('sync-biometric-manual', async () => {
 
 ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
   try {
+    console.log(`[Electron Native IPC] 🚀 Modificando usuario #${employeeNo} -> Nombre: "${name}", Clave: "${password}"...`);
     const payload = JSON.stringify({
       UserInfo: {
         employeeNo: String(employeeNo),
@@ -374,11 +375,13 @@ ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, passwo
     if (res.ok && res.text) {
       const jsonRes = JSON.parse(res.text);
       if (jsonRes.statusString === 'OK' || jsonRes.statusCode === 1) {
-        return { ok: true, message: `✅ ¡Éxito! Usuario #${employeeNo} actualizado a '${name}' con clave '${password}'.` };
+        console.log(`[Electron Native IPC] ✅ Usuario #${employeeNo} modificado con éxito en biométrico.`);
+        return { ok: true, message: `✅ ¡Éxito! Usuario #${employeeNo} actualizado a '${name}' con clave '${password}' en el biométrico.` };
       }
     }
     return { ok: false, message: `❌ Error al actualizar en biométrico (HTTP ${res.status}): ${res.text}` };
   } catch (err) {
+    console.error('[Electron Native IPC Error]:', err.message);
     return { ok: false, message: `❌ Error de red biométrico: ${err.message}` };
   }
 });

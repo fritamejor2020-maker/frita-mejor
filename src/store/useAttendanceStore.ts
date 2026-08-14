@@ -728,6 +728,28 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
 
       pushUserToTerminal: async (terminalId, contract) => {
+        // 1. Si estamos ejecutando dentro de la app de Electron, invocar el canal IPC nativo en segundo plano
+        if (typeof window !== 'undefined' && (window as any).electronAPI?.modifyBiometricUser) {
+          try {
+            console.log('[PushUser] Ejecutando modificación nativa vía Electron IPC...');
+            const res = await (window as any).electronAPI.modifyBiometricUser({
+              employeeNo: String(contract.employeeNo),
+              name: contract.fullName,
+              password: String(contract.pinPassword || '1234')
+            });
+
+            // Guardar contrato en Supabase y Zustand inmediatamente
+            get().upsertEmployeeContract(contract);
+
+            if (res && res.ok) {
+              return { ok: true, message: res.message };
+            }
+          } catch (err: any) {
+            console.warn('[PushUser IPC Error]:', err.message);
+          }
+        }
+
+        // 2. Fallback HTTP directo (Web / Proxy)
         const terminal = get().terminals.find((t) => t.id === terminalId);
         if (!terminal) return { ok: false, message: 'Terminal no encontrado' };
 
