@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
+import { supabase } from '../lib/supabase';
 
 export interface BiometricTerminal {
   id: string;
@@ -114,6 +115,7 @@ interface AttendanceStoreState {
   fetchTerminalUsers: (terminalId: string) => Promise<{ ok: boolean; users: any[]; message: string }>;
   pushUserToTerminal: (terminalId: string, contract: EmployeeContract) => Promise<{ ok: boolean; message: string }>;
   deleteUserFromTerminal: (terminalId: string, employeeNo: string) => Promise<{ ok: boolean; message: string }>;
+  loadFromRemote: () => Promise<void>;
 }
 
 const INITIAL_SHIFTS: ShiftTemplate[] = [
@@ -821,10 +823,27 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             }
           });
           await isapiDigestFetch(config, path, { method: 'PUT', body: payload });
-          return { ok: true, message: `Empleado #${employeeNo} eliminado del biométrico.` };
         } catch (e: any) {
           return { ok: true, message: `Empleado #${employeeNo} desvinculado.` };
         }
+      },
+
+      loadFromRemote: async () => {
+        try {
+          const { data } = await supabase.from('app_state').select('*').like('key', '%attendance%');
+          if (data && Array.isArray(data)) {
+            data.forEach((row: any) => {
+              const val = row.value;
+              if (Array.isArray(val) && val.length > 0) {
+                if (row.key.includes('attendance_shifts')) useAttendanceStore.setState({ shiftTemplates: val });
+                if (row.key.includes('attendance_groups')) useAttendanceStore.setState({ scheduleGroups: val });
+                if (row.key.includes('attendance_contracts')) useAttendanceStore.setState({ employeeContracts: mergeBiometricContracts(val) });
+                if (row.key.includes('attendance_logs')) useAttendanceStore.setState({ attendanceLogs: mergeBiometricLogs(val, []) });
+                if (row.key.includes('attendance_overrides')) useAttendanceStore.setState({ shiftOverrides: val });
+              }
+            });
+          }
+        } catch { /* ignore */ }
       },
     }),
     {

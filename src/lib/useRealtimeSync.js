@@ -296,6 +296,9 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
     if (!applicators['attendance_contracts']) applicators['attendance_contracts'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ employeeContracts: v }); };
     if (!applicators['attendance_overrides']) applicators['attendance_overrides'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ shiftOverrides: v }); };
+    if (!applicators['attendance_shifts'])    applicators['attendance_shifts']    = (v) => { if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ shiftTemplates: v }); };
+    if (!applicators['attendance_groups'])    applicators['attendance_groups']    = (v) => { if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ scheduleGroups: v }); };
+    if (!applicators['attendance_terminals']) applicators['attendance_terminals'] = (v) => { if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ terminals: v }); };
   }
 
   return applicators;

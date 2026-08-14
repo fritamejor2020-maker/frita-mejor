@@ -52,7 +52,11 @@ export function AttendanceView() {
   } | null>(null);
 
   const { weekDays, payrollList } = useAttendanceData(selectedBranchId, weekStartDate);
-  const { terminals, syncTerminalEvents, fetchTerminalUsers, clearAllAttendanceLogs } = useAttendanceStore();
+  const { terminals, syncTerminalEvents, fetchTerminalUsers, clearAllAttendanceLogs, loadFromRemote } = useAttendanceStore();
+
+  React.useEffect(() => {
+    loadFromRemote();
+  }, [loadFromRemote]);
 
   const handleClearLogs = () => {
     if (window.confirm('¿Estás seguro de borrar todos los registros de asistencia mostrados? Se limpiará la pantalla.')) {
