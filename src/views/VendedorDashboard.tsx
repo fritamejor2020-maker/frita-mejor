@@ -476,31 +476,38 @@ export const VendedorDashboard = () => {
       const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
       const shiftKey = shiftData.shift; // "AM" o "PM"
 
-      // 1. Buscar el turno activo usando shiftId o por coincidencia de vendedor+punto+fecha
+      // 1. Buscar y cerrar TODOS los turnos abiertos pertenecientes a este punto
       const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
-      let activeShiftRecord = (posShifts || []).find(
-        (s: any) => (currentShiftId && s.id === currentShiftId) ||
-          (s.type === 'VENDEDOR' && !s.closedAt &&
-           String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
-           (s.responsibleName === responsibleName || !s.responsibleName))
-      );
+      const currentShifts = useInventoryStore.getState().posShifts || [];
+      let shiftFound = false;
 
-      if (activeShiftRecord) {
-        updatePosShift(activeShiftRecord.id, { ...finalShift, id: activeShiftRecord.id });
-      } else {
-        addPosShift(finalShift);
+      const updatedShifts = currentShifts.map((s: any) => {
+        const sPoint = String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const isTargetShift = (currentShiftId && s.id === currentShiftId) ||
+          (s.type === 'VENDEDOR' && !s.closedAt && sPoint === cleanPoint);
+
+        if (isTargetShift) {
+          shiftFound = true;
+          return {
+            ...s,
+            ...finalShift,
+            id: s.id, // Preservar ID único del turno
+            closedAt: finalShift.closedAt,
+          };
+        }
+        return s;
+      });
+
+      if (!shiftFound) {
+        updatedShifts.push(finalShift);
       }
+
+      useInventoryStore.setState({ posShifts: updatedShifts });
 
       // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
       try {
-        const currentShifts = useInventoryStore.getState().posShifts || [];
-        const updatedShifts = activeShiftRecord
-          ? currentShifts.map((s: any) => s.id === activeShiftRecord.id ? { ...s, ...finalShift } : s)
-          : [...currentShifts, finalShift];
-
         const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-        
         await supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts }, { onConflict: 'key' });
         await supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: updatedShifts }, { onConflict: 'key' });
       } catch (eDb) {
