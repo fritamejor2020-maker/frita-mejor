@@ -4,6 +4,7 @@ import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
 import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { safeJSONStorage } from '../utils/safeStorage';
 import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
 
 // Helper: sincroniza una sección del store con Supabase.
@@ -1486,6 +1487,7 @@ export const useInventoryStore = create(
     }),
     {
       name: 'frita-mejor-inventory',
+      storage: safeJSONStorage,
       version: 13, // v13: fix cashDrawerCode format + proteger posSettings
       migrate: (persisted, fromVersion) => {
         // v9 → v10: agregar branchId a cajas POS que no lo tienen

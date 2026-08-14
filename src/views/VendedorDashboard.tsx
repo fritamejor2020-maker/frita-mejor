@@ -505,6 +505,20 @@ export const VendedorDashboard = () => {
 
       useInventoryStore.setState({ posShifts: updatedShifts });
 
+      // Forzar persistencia directa en el localStorage del iPad previniendo fallos de caché
+      try {
+        const rawStore = localStorage.getItem('frita-mejor-inventory');
+        if (rawStore) {
+          const parsed = JSON.parse(rawStore);
+          if (parsed && parsed.state) {
+            parsed.state.posShifts = updatedShifts;
+            localStorage.setItem('frita-mejor-inventory', JSON.stringify(parsed));
+          }
+        }
+      } catch (eLs) {
+        console.warn('[VendedorClose] Error guardando directamente en localStorage:', eLs);
+      }
+
       // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
       try {
         const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
