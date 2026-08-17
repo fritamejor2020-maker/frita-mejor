@@ -538,7 +538,8 @@ export const VendedorDashboard = () => {
     const details: any[] = [];
 
     try {
-      const shiftData = useSellerSessionStore.getState();
+      const shiftData = useSellerSessionStore.getState() as any;
+      const currentShiftId = shiftData?.shiftId || '';
       const finalShift = {
           id: currentShiftId || `SHIFT-VEND-${pointId || 'AUTO'}-${Date.now()}`,
           openedAt: shiftData.openedAt || new Date().toISOString(),
@@ -582,7 +583,6 @@ export const VendedorDashboard = () => {
       };
 
       // 1. Buscar y cerrar TODOS los turnos abiertos pertenecientes a este punto o vendedor
-      const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
       const currentShifts = useInventoryStore.getState().posShifts || [];
       let shiftFound = false;
 
