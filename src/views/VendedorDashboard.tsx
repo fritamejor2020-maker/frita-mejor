@@ -419,22 +419,6 @@ export const VendedorDashboard = () => {
   const [variablePriceProduct, setVariablePriceProduct] = useState<any>(null);
   const [variablePriceInput, setVariablePriceInput] = useState('');
 
-
-
-  // Hydration guard: Zustand persist loads async, so read localStorage directly
-  // to avoid a false redirect during the brief window before rehydration.
-  const hasActiveSession = isSetupComplete || (() => {
-    try {
-      const raw = localStorage.getItem('frita-seller-session');
-      if (!raw) return false;
-      return JSON.parse(raw)?.state?.isSetupComplete === true;
-    } catch { return false; }
-  })();
-
-  if (!hasActiveSession) {
-    return <Navigate to="/vendedor-setup" replace />;
-  }
-
   const handleCheckout = async () => {
     try {
       await checkout(pointId as string);
