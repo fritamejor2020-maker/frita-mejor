@@ -5,6 +5,9 @@ import { Toaster } from 'react-hot-toast';
 import { useRealtimeSync, isApplyingRealtimeState } from './lib/useRealtimeSync';
 import { useInventoryStore } from './store/useInventoryStore';
 import { useLogisticsStore } from './store/useLogisticsStore';
+import { useVehicleStore } from './store/useVehicleStore';
+import { useIncomeConfigStore } from './store/useIncomeConfigStore';
+import { useGoalStore } from './store/useGoalStore';
 import { flushQueue } from './lib/syncManager';
 import { initCrossTabSync, registerStore, broadcastState, isApplyingRemoteState } from './lib/crossTabSync';
 import { trackError, installGlobalErrorHandlers } from './lib/errorTracker';
@@ -244,10 +247,23 @@ function App() {
       (s) => useInventoryStore.setState(s),
       () => useInventoryStore.getState()
     );
+    registerStore(
+      'frita-mejor-vehicles',
+      (s) => useVehicleStore.setState(s),
+      () => useVehicleStore.getState()
+    );
+    registerStore(
+      'frita-mejor-income-config',
+      (s) => useIncomeConfigStore.setState(s),
+      () => useIncomeConfigStore.getState()
+    );
+    registerStore(
+      'frita-dashboard-goals',
+      (s) => useGoalStore.setState(s),
+      () => useGoalStore.getState()
+    );
 
-    // Suscribir: cuando logistics cambia en ESTA pestaña → emitir solo datos a otras
-    // No re-emitir si el cambio viene de crossTabSync (eco) ni de Supabase Realtime
-    // (cada pestaña recibe Supabase directamente — no necesita retransmisión)
+    // Suscribir: cuando un store cambia en ESTA pestaña → emitir a otras
     const unsubLogistics = useLogisticsStore.subscribe((state) => {
       if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
       const { restockCart, pendingRequests, completedRequests, rejectedRequests, loadHistory } = state;
@@ -257,6 +273,21 @@ function App() {
       if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
       const { products, posSettings, posRegisters, loadTemplates, posShifts, posSales } = state;
       broadcastState('frita-mejor-inventory', { products, posSettings, posRegisters, loadTemplates, posShifts, posSales });
+    });
+    const unsubVehicles = useVehicleStore.subscribe((state) => {
+      if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      const { vehicles, sellerViewEnabled, dejadorViewEnabled, enabledPointTypes } = state;
+      broadcastState('frita-mejor-vehicles', { vehicles, sellerViewEnabled, dejadorViewEnabled, enabledPointTypes });
+    });
+    const unsubIncome = useIncomeConfigStore.subscribe((state) => {
+      if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      const { hierarchy, descarguesEnabled } = state;
+      broadcastState('frita-mejor-income-config', { hierarchy, descarguesEnabled });
+    });
+    const unsubGoals = useGoalStore.subscribe((state) => {
+      if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      const { monthlyGoals } = state;
+      broadcastState('frita-dashboard-goals', { monthlyGoals });
     });
 
     // 3. Auto-restaurar foco de teclado en la app Electron al interactuar con campos de texto
@@ -273,6 +304,9 @@ function App() {
     return () => {
       unsubLogistics();
       unsubInventory();
+      unsubVehicles();
+      unsubIncome();
+      unsubGoals();
       document.removeEventListener('pointerdown', handleGlobalPointer, true);
       window.removeEventListener('focus', handleFocusSync);
       document.removeEventListener('visibilitychange', handleFocusSync);

@@ -240,11 +240,6 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
 
     // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
-    applicators[`vehicles_${bid}`]          = (v) => {
-      const state = useVehicleStore.getState();
-      const merged = mergeArrays(state.vehicles || [], v || [], 'vehicles');
-      useVehicleStore.setState({ vehicles: merged });
-    };
     applicators[`loadTemplates_${bid}`]     = (v) => {
       const state = useInventoryStore.getState();
       const merged = mergeArrays(state.loadTemplates || [], v || [], 'loadTemplates');
@@ -344,7 +339,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
 
 // ─── Aplicación de snapshot remoto ────────────────────────────────────────────
 
-function applyRemoteSnapshot(snapshot, branchId, allBranchIds) {
+export function applyRemoteSnapshot(snapshot, branchId, allBranchIds) {
   const applicators = getApplicators(branchId, allBranchIds);
   _isApplyingRealtimeState = true;
   try {

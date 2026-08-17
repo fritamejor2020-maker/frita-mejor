@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
 import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady } from '../lib/syncManager';
-import { markLocalWrite } from '../lib/useRealtimeSync';
+import { markLocalWrite, applyRemoteSnapshot } from '../lib/useRealtimeSync';
 import { safeJSONStorage } from '../utils/safeStorage';
 import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
 
@@ -384,6 +384,11 @@ export const useInventoryStore = create(
           } catch { /* useBranchStore puede no estar listo aún */ }
 
           const remote = await pullAll(branchId, allBranchIds);
+
+          // Rehidratar inmediatamente TODOS los stores de la aplicación con el snapshot fresco de la nube
+          if (remote && Object.keys(remote).length > 0) {
+            applyRemoteSnapshot(remote, branchId, allBranchIds);
+          }
 
           // Llaves globales — se aplican directamente al store
           const GLOBAL_STORE_KEYS = [
