@@ -14,6 +14,8 @@ import { useTransferStore } from '../store/useTransferStore';
 import { useVendorTransferStore } from '../store/useVendorTransferStore';
 import { useChatStore } from '../store/useChatStore';
 import { useAttendanceStore, isLogDeleted, isExplicitAttendancePunch } from '../store/useAttendanceStore';
+import { useIncomeConfigStore } from '../store/useIncomeConfigStore';
+import { useGoalStore } from '../store/useGoalStore';
 
 // ==============================================================================
 // useRealtimeSync — Hook que suscribe a los cambios remotos de Supabase Realtime
@@ -53,7 +55,31 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['customers']         = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
   applicators['customerTypes']     = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
   applicators['loadTemplates']     = (v) => useInventoryStore.setState({ loadTemplates: v });
-  applicators['vehicles']          = (v) => useVehicleStore.setState({ vehicles: v });
+  applicators['vehicles']          = (v) => {
+    if (Array.isArray(v)) {
+      useVehicleStore.setState({ vehicles: v });
+    } else if (v && typeof v === 'object') {
+      useVehicleStore.setState({
+        vehicles: v.vehicles || [],
+        sellerViewEnabled: v.sellerViewEnabled ?? true,
+        dejadorViewEnabled: v.dejadorViewEnabled ?? true,
+        enabledPointTypes: v.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
+      });
+    }
+  };
+  applicators['incomeConfig']      = (v) => {
+    if (v && typeof v === 'object') {
+      useIncomeConfigStore.setState({
+        hierarchy: v.hierarchy || {},
+        descarguesEnabled: v.descarguesEnabled || {},
+      });
+    }
+  };
+  applicators['monthlyGoals']      = (v) => {
+    if (v && typeof v === 'object') {
+      useGoalStore.setState({ monthlyGoals: v });
+    }
+  };
   applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
   applicators['pendingRequests']   = (v) => useLogisticsStore.setState({ pendingRequests: v });
   applicators['completedRequests'] = (v) => useLogisticsStore.setState({ completedRequests: v });
@@ -174,6 +200,18 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       // MERGE: no perder tombstones locales al recibir los de otra sede
       const local = useInventoryStore.getState().deletedInventoryIds || [];
       useInventoryStore.setState({ deletedInventoryIds: [...new Set([...local, ...(v || [])])] });
+    };
+    applicators[`vehicles_${bid}`] = (v) => {
+      if (Array.isArray(v)) {
+        useVehicleStore.setState({ vehicles: v });
+      } else if (v && typeof v === 'object') {
+        useVehicleStore.setState({
+          vehicles: v.vehicles || [],
+          sellerViewEnabled: v.sellerViewEnabled ?? true,
+          dejadorViewEnabled: v.dejadorViewEnabled ?? true,
+          enabledPointTypes: v.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
+        });
+      }
     };
 
     // ── Logística (Dejador / Vendedor) ──

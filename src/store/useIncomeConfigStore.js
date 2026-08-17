@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { push } from '../lib/syncManager';
+import { markLocalWrite } from '../lib/useRealtimeSync';
 
 const defaultIncomeHierarchy = {
   Local: {
@@ -19,6 +21,15 @@ const defaultIncomeHierarchy = {
     Extra: ['Extra']
   }
 };
+
+function syncIncomeConfig(state) {
+  const payload = {
+    hierarchy: state.hierarchy || defaultIncomeHierarchy,
+    descarguesEnabled: state.descarguesEnabled || {},
+  };
+  markLocalWrite('incomeConfig');
+  push('incomeConfig', payload).catch(err => console.warn('[Sync] incomeConfig:', err.message));
+}
 
 export const useIncomeConfigStore = create(
   persist(
@@ -41,6 +52,7 @@ export const useIncomeConfigStore = create(
             [key]: !state.descarguesEnabled[key],
           },
         }));
+        syncIncomeConfig(get());
       },
 
       /** Retorna true si la franja tiene descargues activos */
@@ -51,6 +63,7 @@ export const useIncomeConfigStore = create(
 
       updateHierarchy: (newHierarchy) => {
         set({ hierarchy: newHierarchy });
+        syncIncomeConfig(get());
       },
 
       addLocation: (locationName) => {
@@ -63,6 +76,7 @@ export const useIncomeConfigStore = create(
             }
           };
         });
+        syncIncomeConfig(get());
       },
 
       removeLocation: (locationName) => {
@@ -71,6 +85,7 @@ export const useIncomeConfigStore = create(
           delete newHierarchy[locationName];
           return { hierarchy: newHierarchy };
         });
+        syncIncomeConfig(get());
       },
 
       addShift: (locationName, shiftName) => {
@@ -81,6 +96,7 @@ export const useIncomeConfigStore = create(
           newHierarchy[locationName] = { ...newHierarchy[locationName], [shiftName]: [] };
           return { hierarchy: newHierarchy };
         });
+        syncIncomeConfig(get());
       },
 
       removeShift: (locationName, shiftName) => {
@@ -91,6 +107,7 @@ export const useIncomeConfigStore = create(
            delete newHierarchy[locationName][shiftName];
            return { hierarchy: newHierarchy };
         });
+        syncIncomeConfig(get());
       },
 
       addTimeSlot: (locationName, shiftName, timeSlot) => {
@@ -106,6 +123,7 @@ export const useIncomeConfigStore = create(
           };
           return { hierarchy: newHierarchy };
         });
+        syncIncomeConfig(get());
       },
 
       removeTimeSlot: (locationName, shiftName, timeSlot) => {
@@ -120,6 +138,7 @@ export const useIncomeConfigStore = create(
            };
            return { hierarchy: newHierarchy };
         });
+        syncIncomeConfig(get());
       }
     }),
     {

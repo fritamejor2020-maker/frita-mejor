@@ -4,11 +4,17 @@ import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useAuthStore } from './useAuthStore';
 
-function syncVehicles(vehicles) {
+function syncVehicles(statePayload) {
   const user = useAuthStore.getState().user;
   const branchId = user?.branchId ?? null;
+  const payload = {
+    vehicles: statePayload.vehicles || [],
+    sellerViewEnabled: statePayload.sellerViewEnabled ?? true,
+    dejadorViewEnabled: statePayload.dejadorViewEnabled ?? true,
+    enabledPointTypes: statePayload.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
+  };
   markLocalWrite('vehicles', branchId);
-  push('vehicles', vehicles, branchId).catch(err => console.warn('[Sync] vehicles:', err.message));
+  push('vehicles', payload, branchId).catch(err => console.warn('[Sync] vehicles:', err.message));
 }
 
 /**
@@ -42,12 +48,12 @@ export const useVehicleStore = create(
 
       toggleSellerView: () => {
         set((state) => ({ sellerViewEnabled: !state.sellerViewEnabled }));
-        syncVehicles(useVehicleStore.getState().vehicles);
+        syncVehicles(get());
       },
 
       toggleDejadorView: () => {
         set((state) => ({ dejadorViewEnabled: !state.dejadorViewEnabled }));
-        syncVehicles(useVehicleStore.getState().vehicles);
+        syncVehicles(get());
       },
 
       togglePointType: (type) => {
@@ -57,6 +63,7 @@ export const useVehicleStore = create(
             [type]: !state.enabledPointTypes?.[type],
           },
         }));
+        syncVehicles(get());
       },
 
       addVehicle: (vehicleData) => {
@@ -69,21 +76,21 @@ export const useVehicleStore = create(
           ...vehicleData
         };
         set((state) => ({ vehicles: [...state.vehicles, newVehicle] }));
-        syncVehicles(useVehicleStore.getState().vehicles);
+        syncVehicles(get());
       },
 
       updateVehicle: (id, updatedData) => {
         set((state) => ({
           vehicles: state.vehicles.map(v => v.id === id ? { ...v, ...updatedData } : v)
         }));
-        syncVehicles(useVehicleStore.getState().vehicles);
+        syncVehicles(get());
       },
 
       removeVehicle: (id) => {
         set((state) => ({
           vehicles: state.vehicles.filter(v => v.id !== id)
         }));
-        syncVehicles(useVehicleStore.getState().vehicles);
+        syncVehicles(get());
       },
 
       // Returns ALL active point abbreviations (Triciclos + Locales + Carritos)

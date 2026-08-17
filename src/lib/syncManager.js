@@ -22,8 +22,8 @@ const SYNC_LISTENERS = new Set();
 export const GLOBAL_KEYS = [
   // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes',
-  // Administración global del sistema
-  'users', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals',
+  // Administración global del sistema y configuraciones
+  'users', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig',
   // Traslados (son cross-sede por diseño)
   'transfers',
 ];
