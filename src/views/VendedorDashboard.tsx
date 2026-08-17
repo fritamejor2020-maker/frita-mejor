@@ -613,8 +613,24 @@ export const VendedorDashboard = () => {
       // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
       try {
         const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-        await supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts }, { onConflict: 'key' });
-        await supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: updatedShifts }, { onConflict: 'key' });
+        const { data: remoteData } = await supabase
+          .from('app_state')
+          .select('key,value')
+          .in('key', ['posShifts', `posShifts_${activeBranchId}`]);
+        
+        const shiftMap = new Map();
+        if (remoteData && remoteData.length > 0) {
+          remoteData.forEach(r => {
+            if (Array.isArray(r.value)) {
+              r.value.forEach(s => { if (s?.id) shiftMap.set(s.id, s); });
+            }
+          });
+        }
+        updatedShifts.forEach(s => { if (s?.id) shiftMap.set(s.id, s); });
+        const mergedShifts = Array.from(shiftMap.values());
+
+        await supabase.from('app_state').upsert({ key: 'posShifts', value: mergedShifts }, { onConflict: 'key' });
+        await supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: mergedShifts }, { onConflict: 'key' });
       } catch (eDb) {
         console.warn('[VendedorClose] Error guardando cierre directo en DB:', eDb);
       }
