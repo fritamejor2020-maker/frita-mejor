@@ -760,28 +760,35 @@ export function AdminVehicleInventoryTab() {
                 const closedAt = new Date().toISOString();
                 const targetPointId = shift.pointId;
 
-                // 1. Marcar como CERRADOS todos los turnos abiertos de este vehículo
-                const currentShifts = useInventoryStore.getState().posShifts || [];
+                // 1. Marcar como CERRADOS todos los turnos abiertos de este vehículo preservando la lista completa
+                const allKnownShifts = [...supabaseShifts, ...(useInventoryStore.getState().posShifts || [])];
+                const shiftMap = new Map<string, any>();
+                allKnownShifts.forEach((s: any) => {
+                  if (s && s.id) shiftMap.set(s.id, s);
+                });
+
                 let shiftModified = false;
-                const updatedShifts = currentShifts.map((s: any) => {
+                shiftMap.forEach((s: any, id: string) => {
                   const matchPoint = matchVehicleId(s.pointId, targetPointId);
                   const matchId = s.id === shift.id;
                   if ((matchPoint || matchId) && !s.closedAt) {
                     shiftModified = true;
-                    return { ...s, closedAt, forcedByAdmin: true };
+                    shiftMap.set(id, { ...s, closedAt, forcedByAdmin: true });
                   }
-                  return s;
                 });
 
                 if (!shiftModified) {
-                  updatedShifts.push({
+                  const fallbackId = shift.id && !shift.id.startsWith('LIVE-') ? shift.id : `SHIFT-FORCED-${Date.now()}`;
+                  shiftMap.set(fallbackId, {
                     ...shift,
-                    id: shift.id && !shift.id.startsWith('LIVE-') ? shift.id : `SHIFT-FORCED-${Date.now()}`,
+                    id: fallbackId,
                     closedAt,
                     forcedByAdmin: true,
                     type: 'VENDEDOR',
                   });
                 }
+
+                const updatedShifts = Array.from(shiftMap.values());
 
                 // Actualizar store y estado local inmediatamente
                 useInventoryStore.setState({ posShifts: updatedShifts });
