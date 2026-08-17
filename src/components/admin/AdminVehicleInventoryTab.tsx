@@ -395,16 +395,22 @@ export function AdminVehicleInventoryTab() {
   // ── Construir lista combinada de turnos ──────────────────────────────────────
   // Fuente 1: posShifts — solo turnos de VENDEDOR (excluye POS caja y DEJADOR)
   const storedShifts: any[] = useMemo(() => {
-    const raw = (posShifts || []).filter((s: any) => s.type === 'VENDEDOR');
+    const raw = (posShifts || []).filter((s: any) =>
+      s.type === 'VENDEDOR' || (s.pointId && (String(s.pointId).toLowerCase().startsWith('t') || s.vehicle))
+    );
 
     const uniqueMap = new Map<string, any>();
     raw.forEach((s: any) => {
-      const key = s.id || `${s.pointId}_${s.responsibleName}_${s.openedAt}`;
+      const key = s.id || `${s.pointId || s.vehicle}_${s.responsibleName || s.userName}_${s.openedAt}`;
       const existing = uniqueMap.get(key);
       if (!existing) {
         uniqueMap.set(key, s);
       } else if (!existing.closedAt && s.closedAt) {
         uniqueMap.set(key, s);
+      } else if (existing.closedAt && s.closedAt) {
+        if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+          uniqueMap.set(key, s);
+        }
       }
     });
 

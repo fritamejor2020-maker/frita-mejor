@@ -114,6 +114,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });
   applicators['chatMessages']      = (v) => useChatStore.setState({ messages: v });
+  applicators['posShifts']        = (v) => {
+    const state = useInventoryStore.getState();
+    const deleted = new Set(state.deletedShiftIds || []);
+    const localShifts = (state.posShifts || []).filter(s => !deleted.has(s.id));
+    const remote = (v || []).filter(s => !deleted.has(s.id));
+    const merged = mergeArrays(localShifts, remote, 'posShifts');
+    useInventoryStore.setState({ posShifts: merged });
+  };
 
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.
