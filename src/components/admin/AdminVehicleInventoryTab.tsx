@@ -414,6 +414,8 @@ export function AdminVehicleInventoryTab() {
   // Fecha de hoy local
   const today = dateOf(new Date().toISOString());
 
+  const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
+
   const liveShifts: any[] = useMemo(() => {
     const lives: any[] = [];
 
@@ -421,9 +423,8 @@ export function AdminVehicleInventoryTab() {
       const pId = sellerSession.pointId;
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
       
-      if (!hasOpenShift && !hasClosedShiftToday) {
+      if (!hasOpenShift) {
         lives.push({
           id: `LIVE-${pId}`,
           pointId: pId,
@@ -437,16 +438,14 @@ export function AdminVehicleInventoryTab() {
       }
     }
 
-    const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
-    Object.values(vendorLocs).forEach((loc: any) => {
+    Object.values(vendorLocations).forEach((loc: any) => {
       const pId = loc?.pointId || loc?.name;
-      if (!pId) return;
+      if (!pId || loc?.isActive === false) return;
 
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
 
-      if (hasOpenShift || hasClosedShiftToday) return;
+      if (hasOpenShift) return;
 
       const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
       if (!alreadyInLives) {
@@ -464,7 +463,7 @@ export function AdminVehicleInventoryTab() {
     });
 
     return lives;
-  }, [sellerSession, storedShifts, today]);
+  }, [sellerSession, storedShifts, vendorLocations, today]);
 
   const allShifts: any[] = useMemo(() => {
     const combined = [...liveShifts, ...storedShifts];
@@ -672,14 +671,13 @@ export function VehicleShiftCard({
 
     const vendorLocs = (useInventoryStore.getState() as any).vendorLocations || {};
     const matchedLoc: any = Object.values(vendorLocs).find((loc: any) =>
-      matchVehicleId(loc?.pointId || loc?.name, vehicleId)
+      matchVehicleId(loc?.pointId || loc?.name, vehicleId) && loc?.isActive !== false
     );
     if (matchedLoc) {
       const matchingStored = (posShifts || []).filter((s: any) => matchVehicleId(s.pointId, vehicleId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      const hasClosedShiftToday = matchingStored.some((s: any) => s.closedAt && (dateOf(s.closedAt) === today || dateOf(s.openedAt) === today));
 
-      if (!hasOpenShift && !hasClosedShiftToday) {
+      if (!hasOpenShift) {
         return {
           id: `LIVE-GPS-${vehicleId}`,
           pointId: vehicleId,

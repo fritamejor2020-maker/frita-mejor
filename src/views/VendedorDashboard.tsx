@@ -46,8 +46,37 @@ export const VendedorDashboard = () => {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
-  // NOTA: El posShift se crea en SellerSetupView.handleStartShift (no aquí)
-  // para evitar duplicados por race condition con la rehidratación de Zustand persist.
+  // ── Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
+  useEffect(() => {
+    if (!isSetupComplete || !pointId) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanResp = String(responsibleName || (user as any)?.name || 'Vendedor').trim();
+
+    const currentShifts = useInventoryStore.getState().posShifts || [];
+    const hasOpenShift = currentShifts.some(
+      (s: any) => s.type === 'VENDEDOR' &&
+        !s.closedAt &&
+        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint
+    );
+
+    if (!hasOpenShift) {
+      const jornadaSlug = String(shift || 'AM').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp.toLowerCase().replace(/[^a-z0-9]/g, '') || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
+      console.log('[VendedorDashboard] Asegurando turno activo en posShifts:', uniqueShiftId);
+      addPosShift({
+        id: uniqueShiftId,
+        openedAt: openedAt || new Date().toISOString(),
+        pointId,
+        shift: shift || 'AM',
+        responsibleName: cleanResp,
+        userId: (user as any)?.id || (user as any)?.username,
+        createdBy: (user as any)?.id,
+        type: 'VENDEDOR',
+        closedAt: null,
+      });
+    }
+  }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
 
   // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
   const trackingName = responsibleName || (user as any)?.name || 'Vendedor';
