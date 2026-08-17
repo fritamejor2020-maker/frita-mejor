@@ -130,7 +130,7 @@ function buildShiftLogistics(
     const d = new Date(ref);
     return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); // midnight local
   })();
-  const to = closedAt ? new Date(closedAt).getTime() : Date.now();
+  const to = closedAt ? new Date(closedAt).getTime() : (Date.now() + 86400000);
 
   const inWindow = (ts: string) => {
     if (!ts) return false;

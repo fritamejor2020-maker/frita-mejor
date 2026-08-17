@@ -353,6 +353,7 @@ export const useLogisticsStore = create(
     set({ loadHistory: updated });
     const loadSlice = updated.filter(e => (e.branchId || getVehicleBranchId(e.vehicleId) || 'BRANCH-001') === affectedBranchId);
     syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, null);
   },
 
   // Editar items de un surtido completado
@@ -364,6 +365,7 @@ export const useLogisticsStore = create(
     set({ completedRequests: updated });
     const completedSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === affectedBranchId);
     syncKeyWithBranch('completedRequests', completedSlice, affectedBranchId);
+    syncKeyWithBranch('completedRequests', completedSlice, null);
   },
 
   // ===============================
@@ -399,6 +401,7 @@ export const useLogisticsStore = create(
     set({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, null);
     return true;
   },
 
@@ -430,6 +433,7 @@ export const useLogisticsStore = create(
     set({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
+    syncKeyWithBranch('loadHistory', loadSlice, null);
     return true;
   },
 
