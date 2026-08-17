@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { useSellerSessionStore } from './useSellerSessionStore';
+import { useDejadorSessionStore } from './useDejadorSessionStore';
 
 // =============================================================================
 // BASE DE USUARIOS LOCAL (mientras no está conectado a Supabase)
@@ -179,6 +181,30 @@ export const useAuthStore = create(
           return { ok: false };
         }
 
+        // Si hay una sesión de vendedor previa en este dispositivo de otro usuario, limpiarla
+        try {
+          const sellerSession = useSellerSessionStore.getState();
+          if (sellerSession.isSetupComplete) {
+            const sessionUserId = sellerSession.userId;
+            const sessionResp = String(sellerSession.responsibleName || '').trim().toLowerCase();
+            const foundName = String(found.name || '').trim().toLowerCase();
+            const isSameUser = (sessionUserId && (sessionUserId === found.id || sessionUserId === found.username)) ||
+                               (sessionResp && sessionResp === foundName);
+            if (!isSameUser) {
+              console.log('[Auth] Usuario diferente autenticado. Limpiando sesión de vendedor anterior...');
+              sellerSession.endShift();
+            }
+          }
+        } catch (_) {}
+
+        // También limpiar sesión de dejador si el usuario es diferente
+        try {
+          const dejadorSession = useDejadorSessionStore.getState();
+          if (dejadorSession.isSetupComplete && found.role !== 'DEJADOR' && found.role !== 'ADMIN') {
+            dejadorSession.endShift();
+          }
+        } catch (_) {}
+
         const activeBranchId = found.branchId || selectedBranchId || 'BRANCH-001';
         set({ user: found, activeBranchId, loading: false, error: null });
         return { ok: true, user: found };
@@ -187,6 +213,12 @@ export const useAuthStore = create(
 
       // ─── Cerrar sesión ───────────────────────────────────────────
       signOut: () => {
+        try {
+          useSellerSessionStore.getState().endShift();
+        } catch (_) {}
+        try {
+          useDejadorSessionStore.getState().endShift();
+        } catch (_) {}
         set({ user: null, activeBranchId: null, error: null });
       },
 

@@ -11,6 +11,7 @@ export const useSellerSessionStore = create(
     (set) => ({
       // Estado base de la sesión activa
       isSetupComplete: false,
+      userId: null,         // ID del usuario autenticado dueño del turno
       shiftId: null,        // ID único del turno en posShifts
       pointId: null,        // VARCHAR, ej: 'T1'
       shift: null,          // 'AM' | 'PM' | 'MD'
@@ -24,6 +25,7 @@ export const useSellerSessionStore = create(
       startShift: (sessionData) => {
         set({
           isSetupComplete: true,
+          userId: sessionData.userId || null,
           shiftId: sessionData.id || sessionData.shiftId || null,
           pointId: sessionData.pointId,
           shift: sessionData.shift,
@@ -40,6 +42,7 @@ export const useSellerSessionStore = create(
       endShift: () => {
         set({
           isSetupComplete: false,
+          userId: null,
           shiftId: null,
           pointId: null,
           shift: null,
@@ -56,6 +59,8 @@ export const useSellerSessionStore = create(
       forceEndShift: () => {
         set({
           isSetupComplete: false,
+          userId: null,
+          shiftId: null,
           pointId: null,
           shift: null,
           pointType: null,
@@ -66,9 +71,11 @@ export const useSellerSessionStore = create(
     }),
     {
       name: 'frita-seller-session', // clave en localStorage
-      // Solo persistir el estado de sesión, NO las funciones
+      // Persistir el estado de sesión incluyendo userId y shiftId
       partialize: (state) => ({
         isSetupComplete: state.isSetupComplete,
+        userId: state.userId,
+        shiftId: state.shiftId,
         pointId: state.pointId,
         shift: state.shift,
         pointType: state.pointType,

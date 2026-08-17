@@ -60,13 +60,19 @@ export const ModuleSelectorView = () => {
   }
 
   const handleSelect = (route: string, key: string) => {
-    // Para vendedor (Vendedor Móvil): revisar si ya hay sesión activa
+    // Para vendedor (Vendedor Móvil): revisar si ya hay sesión activa que pertenezca a este usuario
     if (key === 'vendedor') {
       try {
         const raw = localStorage.getItem('frita-seller-session');
         if (raw) {
-          const parsed = JSON.parse(raw);
-          if (parsed?.state?.isSetupComplete) {
+          const parsed = JSON.parse(raw)?.state;
+          const sessionUserId = parsed?.userId;
+          const sessionResp = String(parsed?.responsibleName || '').trim().toLowerCase();
+          const currentName = String(user?.name || '').trim().toLowerCase();
+          const currentId = String(user?.id || user?.username || '').trim().toLowerCase();
+          const isSameUser = (sessionUserId && sessionUserId === currentId) || (sessionResp && sessionResp === currentName);
+
+          if (parsed?.isSetupComplete && isSameUser) {
             navigate('/vendedor', { replace: true });
             return;
           }

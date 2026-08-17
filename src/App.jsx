@@ -79,8 +79,18 @@ function RoleRedirect() {
     if (key === 'vendedor') {
       try {
         const raw = localStorage.getItem('frita-seller-session');
-        if (raw && JSON.parse(raw)?.state?.isSetupComplete)
-          return <Navigate to="/vendedor" replace />;
+        if (raw) {
+          const parsed = JSON.parse(raw)?.state;
+          const sessionUserId = parsed?.userId;
+          const sessionResp = String(parsed?.responsibleName || '').trim().toLowerCase();
+          const currentName = String(user?.name || '').trim().toLowerCase();
+          const currentId = String(user?.id || user?.username || '').trim().toLowerCase();
+          const isSameUser = (sessionUserId && sessionUserId === currentId) || (sessionResp && sessionResp === currentName);
+
+          if (parsed?.isSetupComplete && isSameUser) {
+            return <Navigate to="/vendedor" replace />;
+          }
+        }
       } catch (_) {}
       return <Navigate to="/vendedor-setup" replace />;
     }

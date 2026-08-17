@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -11,6 +11,10 @@ export const SellerSetupView = () => {
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
   const enabledPointTypes = useVehicleStore((s: any) => s.enabledPointTypes ?? { Triciclo: true, Carrito: true, Local: false });
   const posShifts = useInventoryStore((state) => state.posShifts || []);
+
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+  }, []);
 
   const activeOpenShifts = useMemo(() => {
     const currentUserName = String(user?.name || '').trim().toLowerCase();
@@ -96,6 +100,7 @@ export const SellerSetupView = () => {
         pointType,
         responsibleName: finalResponsibleName,
         openedAt: openShift.openedAt,
+        userId: user?.id || user?.username,
       });
       navigate('/vendedor');
       return;
@@ -122,7 +127,7 @@ export const SellerSetupView = () => {
     const jornadaSlug = String(shift).toLowerCase().replace(/[^a-z0-9]/g, '');
     const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
 
-    startShift({ id: uniqueShiftId, pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt });
+    startShift({ id: uniqueShiftId, pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt, userId: user?.id || user?.username });
     addPosShift({ id: uniqueShiftId, openedAt, pointId, shift, responsibleName: finalResponsibleName, userId: user?.id || user?.username, createdBy: user?.id, type: 'VENDEDOR', closedAt: null });
     navigate('/vendedor');
   };

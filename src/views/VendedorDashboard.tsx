@@ -46,12 +46,30 @@ export const VendedorDashboard = () => {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
-  // ── Guardia: Si la sesión no está iniciada, redirigir a configuración ──────
-  if (!isSetupComplete) {
-    return <Navigate to="/vendedor-setup" replace />;
-  }
+  // ── 0. Cargar estado remoto más reciente de Supabase al montar ─────────────
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+  }, []);
 
-  // ── Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
+  // ── 1. Validar identidad del usuario: si la sesión en localStorage pertenece a otro usuario, salir ──
+  useEffect(() => {
+    if (!isSetupComplete || !user) return;
+    const sessionUserId = (useSellerSessionStore.getState() as any).userId;
+    const sessionResp = String(responsibleName || '').trim().toLowerCase();
+    const currentName = String((user as any)?.name || '').trim().toLowerCase();
+    const currentId = String((user as any)?.id || (user as any)?.username || '').trim().toLowerCase();
+
+    const isSameUser = (sessionUserId && (sessionUserId === currentId)) ||
+                       (sessionResp && sessionResp === currentName);
+
+    if (!isSameUser && (user as any).role !== 'ADMIN' && (user as any).role !== 'SUPER_ADMIN') {
+      console.log('[VendedorDashboard] Sesión previa pertenece a otro usuario. Limpiando...');
+      gpsStop();
+      endShift();
+    }
+  }, [user, isSetupComplete, responsibleName]);
+
+  // ── 2. Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
   useEffect(() => {
     if (!isSetupComplete || !pointId) return;
     const today = new Date().toISOString().slice(0, 10);
@@ -96,7 +114,7 @@ export const VendedorDashboard = () => {
     }
   }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
 
-  // ── Monitoreo reactivo en tiempo real: si el turno es cerrado por Admin, cerrar sesión inmediatamente ──
+  // ── 3. Monitoreo reactivo en tiempo real: si el turno es cerrado por Admin, cerrar sesión inmediatamente ──
   const livePosShifts = useInventoryStore((state: any) => state.posShifts) || [];
   useEffect(() => {
     if (!isSetupComplete || !pointId) return;
@@ -679,6 +697,11 @@ export const VendedorDashboard = () => {
 
   const currentDate = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedDate = currentDate.charAt(0).toUpperCase() + currentDate.slice(1);
+
+  // ── Guardia: Si la sesión no está iniciada, redirigir a configuración ──────
+  if (!isSetupComplete) {
+    return <Navigate to="/vendedor-setup" replace />;
+  }
 
   return (
     <div
