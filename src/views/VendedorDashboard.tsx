@@ -46,6 +46,11 @@ export const VendedorDashboard = () => {
   const [newTemplateName, setNewTemplateName] = useState('');
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
 
+  // ── Guardia: Si la sesión no está iniciada, redirigir a configuración ──────
+  if (!isSetupComplete) {
+    return <Navigate to="/vendedor-setup" replace />;
+  }
+
   // ── Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
   useEffect(() => {
     if (!isSetupComplete || !pointId) return;
@@ -54,13 +59,26 @@ export const VendedorDashboard = () => {
     const cleanResp = String(responsibleName || (user as any)?.name || 'Vendedor').trim();
 
     const currentShifts = useInventoryStore.getState().posShifts || [];
-    const hasOpenShift = currentShifts.some(
+    const matchingToday = currentShifts.filter(
       (s: any) => s.type === 'VENDEDOR' &&
-        !s.closedAt &&
-        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint
+        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+        (s.openedAt || s.fecha || '').slice(0, 10) === today
     );
 
-    if (!hasOpenShift) {
+    const hasOpenShift = matchingToday.some((s: any) => !s.closedAt);
+    const hasClosedShift = matchingToday.some((s: any) => s.closedAt);
+
+    // Si ya existe un turno CERRADO para este punto hoy y NO hay ninguno abierto,
+    // significa que el turno fue cerrado (por admin o por cierre previo). Salir de la sesión!
+    if (!hasOpenShift && hasClosedShift) {
+      console.log('[VendedorDashboard] Turno cerrado detectado en posShifts. Finalizando sesión local...');
+      toast.error('⚠️ Tu turno ha sido cerrado.', { duration: 4000 });
+      gpsStop();
+      endShift();
+      return;
+    }
+
+    if (!hasOpenShift && !hasClosedShift) {
       const jornadaSlug = String(shift || 'AM').toLowerCase().replace(/[^a-z0-9]/g, '');
       const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp.toLowerCase().replace(/[^a-z0-9]/g, '') || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
       console.log('[VendedorDashboard] Asegurando turno activo en posShifts:', uniqueShiftId);
@@ -77,6 +95,35 @@ export const VendedorDashboard = () => {
       });
     }
   }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
+
+  // ── Monitoreo reactivo en tiempo real: si el turno es cerrado por Admin, cerrar sesión inmediatamente ──
+  const livePosShifts = useInventoryStore((state: any) => state.posShifts) || [];
+  useEffect(() => {
+    if (!isSetupComplete || !pointId) return;
+
+    const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
+    const today = new Date().toISOString().slice(0, 10);
+
+    const matchingShifts = livePosShifts.filter((s: any) => {
+      if (s.type !== 'VENDEDOR') return false;
+      const sPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const matchPoint = sPoint === cleanPoint || sPoint.includes(cleanPoint) || cleanPoint.includes(sPoint);
+      const matchId = currentShiftId && s.id === currentShiftId;
+      const matchToday = (s.openedAt || s.fecha || '').slice(0, 10) === today;
+      return (matchId || matchPoint) && matchToday;
+    });
+
+    const hasOpenShift = matchingShifts.some((s: any) => !s.closedAt);
+    const hasClosedShift = matchingShifts.some((s: any) => s.closedAt);
+
+    if (matchingShifts.length > 0 && !hasOpenShift && hasClosedShift) {
+      console.log('[VendedorDashboard] Turno cerrado remotamente por la administración.');
+      toast.error('⚠️ Tu turno ha sido cerrado por la administración.', { duration: 5000 });
+      gpsStop();
+      endShift();
+    }
+  }, [livePosShifts, isSetupComplete, pointId]);
 
   // ── GPS Tracking: compartir ubicación en tiempo real con admin/dejadores ──
   const trackingName = responsibleName || (user as any)?.name || 'Vendedor';

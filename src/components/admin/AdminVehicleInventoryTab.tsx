@@ -576,8 +576,10 @@ export function AdminVehicleInventoryTab() {
       const pId = sellerSession.pointId;
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShift = matchingStored.some((s: any) => s.closedAt);
       
-      if (!hasOpenShift) {
+      // Si NO hay ningún turno abierto NI cerrado registrado, agregar sesión local en vivo
+      if (!hasOpenShift && !hasClosedShift) {
         lives.push({
           id: `LIVE-${pId}`,
           pointId: pId,
@@ -595,10 +597,19 @@ export function AdminVehicleInventoryTab() {
       const pId = loc?.pointId || loc?.name;
       if (!pId || loc?.isActive === false) return;
 
+      // Descartar pings GPS viejos (más de 30 minutos sin actualizar)
+      const locTime = loc.updatedAt || loc.timestamp;
+      if (locTime) {
+        const ageMs = Date.now() - new Date(locTime).getTime();
+        if (ageMs > 30 * 60 * 1000) return;
+      }
+
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
+      const hasClosedShift = matchingStored.some((s: any) => s.closedAt);
 
-      if (hasOpenShift) return;
+      // Si ya hay un turno abierto O un turno cerrado hoy para este vehículo, NO generar fake live
+      if (hasOpenShift || hasClosedShift) return;
 
       const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
       if (!alreadyInLives) {
@@ -749,23 +760,42 @@ export function AdminVehicleInventoryTab() {
                 const closedAt = new Date().toISOString();
                 const targetPointId = shift.pointId;
 
-                const matchingShifts = (posShifts || []).filter(
-                  (s: any) => s.type === 'VENDEDOR' && !s.closedAt && matchVehicleId(s.pointId, targetPointId)
-                );
-                if (matchingShifts.length > 0) {
-                  matchingShifts.forEach((s: any) => {
-                    updatePosShift(s.id, { closedAt, forcedByAdmin: true });
-                  });
-                } else {
-                  addPosShift({
+                // 1. Marcar como CERRADOS todos los turnos abiertos de este vehículo
+                const currentShifts = useInventoryStore.getState().posShifts || [];
+                let shiftModified = false;
+                const updatedShifts = currentShifts.map((s: any) => {
+                  const matchPoint = matchVehicleId(s.pointId, targetPointId);
+                  const matchId = s.id === shift.id;
+                  if ((matchPoint || matchId) && !s.closedAt) {
+                    shiftModified = true;
+                    return { ...s, closedAt, forcedByAdmin: true };
+                  }
+                  return s;
+                });
+
+                if (!shiftModified) {
+                  updatedShifts.push({
                     ...shift,
-                    id: shift.id.startsWith('LIVE-') ? `SHIFT-FORCED-${Date.now()}` : shift.id,
+                    id: shift.id && !shift.id.startsWith('LIVE-') ? shift.id : `SHIFT-FORCED-${Date.now()}`,
                     closedAt,
                     forcedByAdmin: true,
                     type: 'VENDEDOR',
                   });
                 }
 
+                // Actualizar store y estado local inmediatamente
+                useInventoryStore.setState({ posShifts: updatedShifts });
+                setSupabaseShifts(updatedShifts);
+
+                // 2. Persistir directamente en Supabase (ambas llaves para sincronización inmediata)
+                try {
+                  await supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts }, { onConflict: 'key' });
+                  await supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts }, { onConflict: 'key' });
+                } catch (e) {
+                  console.warn('[ForzarCierre] Error sincronizando posShifts en Supabase:', e);
+                }
+
+                // 3. Desactivar GPS y ubicación del vendedor en Supabase y localmente
                 try {
                   useInventoryStore.getState().clearVendorLocation(targetPointId);
 
@@ -782,7 +812,10 @@ export function AdminVehicleInventoryTab() {
                   console.warn('[ForzarCierre] Warning al desactivar vendor_locations:', e);
                 }
 
-                forceEndShift();
+                // 4. Si la sesión activa del browser coincide con este punto, cerrarla
+                if (sellerSession?.pointId && matchVehicleId(sellerSession.pointId, targetPointId)) {
+                  forceEndShift();
+                }
               } : undefined}
             />
           ))}

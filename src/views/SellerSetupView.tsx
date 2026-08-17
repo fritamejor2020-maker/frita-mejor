@@ -78,36 +78,41 @@ export const SellerSetupView = () => {
     const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
 
     // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) por día ──
-    // Primero buscar turno ABIERTO (sin cerrar)
-    let existingShift = (posShifts || []).find(
+    // 1. Buscar si hay turno ABIERTO para reanudar
+    const openShift = (posShifts || []).find(
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
         s.shift === shift &&
         !s.closedAt &&
-        (s.openedAt || '').startsWith(today)
+        (s.openedAt || s.fecha || '').startsWith(today)
     );
 
-    // Si no hay abierto, buscar turno del mismo día (incluido cerrado) para reabrir
-    if (!existingShift) {
-      existingShift = (posShifts || []).find(
-        (s: any) => s.type === 'VENDEDOR' &&
-          String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
-          s.shift === shift &&
-          (s.openedAt || '').startsWith(today)
-      );
-    }
-
-    if (existingShift) {
-      // Reanudar turno existente — no crear duplicado
+    if (openShift) {
+      // Reanudar turno abierto existente
       startShift({
-        id: existingShift.id,
+        id: openShift.id,
         pointId,
         shift,
         pointType,
         responsibleName: finalResponsibleName,
-        openedAt: existingShift.openedAt,
+        openedAt: openShift.openedAt,
       });
       navigate('/vendedor');
+      return;
+    }
+
+    // 2. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
+    const closedShift = (posShifts || []).find(
+      (s: any) => s.type === 'VENDEDOR' &&
+        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+        s.shift === shift &&
+        s.closedAt &&
+        (s.openedAt || s.fecha || '').startsWith(today)
+    );
+
+    if (closedShift) {
+      const closedTime = closedShift.closedAt ? new Date(closedShift.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+      alert(`⚠️ El turno de la jornada "${shift}" para el vehículo "${pointId}" ya fue cerrado hoy${closedTime ? ` a las ${closedTime}` : ''}.\n\nPara iniciar un nuevo turno, selecciona la siguiente jornada (MD o PM) o consulta al administrador.`);
       return;
     }
 
