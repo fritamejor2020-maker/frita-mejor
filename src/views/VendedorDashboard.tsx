@@ -475,6 +475,7 @@ export const VendedorDashboard = () => {
     try {
       const shiftData = useSellerSessionStore.getState();
       const finalShift = {
+          id: currentShiftId || `SHIFT-VEND-${pointId || 'AUTO'}-${Date.now()}`,
           openedAt: shiftData.openedAt || new Date().toISOString(),
           closedAt: new Date().toISOString(),
           userId: (user as any)?.id,
