@@ -122,6 +122,12 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
   const dbRef = useRef<Map<string, VendorLocation>>(new Map());
 
+  // Cargar datos remotos al abrir el mapa
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+    useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
+  }, []);
+
   // Calcular si una ubicación está "vieja" (más de 2 minutos)
   const isStale = (updatedAt: string) =>
     Date.now() - new Date(updatedAt).getTime() > 2 * 60 * 1000;
