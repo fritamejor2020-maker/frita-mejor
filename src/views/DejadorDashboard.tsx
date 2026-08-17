@@ -199,17 +199,43 @@ export const DejadorDashboard = () => {
   }, [allVehicles, userBranchId]);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
-  // Mapa: tricicloId → nombre del vendedor con turno abierto
+  const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
+
+  // Mapa: tricicloId → nombre del vendedor con turno abierto o GPS activo
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
+
+    // 1. Turnos en posShifts
     (posShifts || []).forEach((s: any) => {
       if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
-        const firstName = (s.responsibleName || s.userName || '').split(' ')[0];
-        if (firstName) map[s.pointId] = firstName;
+        const raw = s.responsibleName || s.userName || '';
+        const firstName = raw.split(' ')[0];
+        if (firstName && firstName !== '—') {
+          const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          map[s.pointId] = firstName;
+          map[cleanP] = firstName;
+        }
       }
     });
+
+    // 2. Ubicaciones GPS en vivo desde vendorLocations
+    Object.values(vendorLocations).forEach((loc: any) => {
+      const pId = loc?.pointId;
+      if (pId && loc?.isActive !== false) {
+        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+        if (!map[pId] && !map[cleanP]) {
+          const raw = loc.name || '';
+          const firstName = raw.split(' ')[0];
+          if (firstName) {
+            map[pId] = firstName;
+            map[cleanP] = firstName;
+          }
+        }
+      }
+    });
+
     return map;
-  }, [posShifts]);
+  }, [posShifts, vendorLocations]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
@@ -770,7 +796,8 @@ export const DejadorDashboard = () => {
             
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
               {vehicles.map((v: string) => {
-                const vendorName = vehicleVendorMap[v];
+                const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV];
                 return (
                 <button
                   key={v}
