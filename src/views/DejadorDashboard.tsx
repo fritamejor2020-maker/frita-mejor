@@ -129,27 +129,24 @@ function useDeliveryAlert() {
     } catch (_) {}
   };
 
-  // ── Reproducir alarma (un solo sonido nítido: WAV con fallback a Sintetizador + Vibración) ──
+  // ── Reproducir alarma (WAV + Sintetizador + Vibración) ─────────────────────
   const playAlarm = () => {
     if (stoppedRef.current) return;
     resumeAudioContext();
     vibrate();
 
-    // Reproducir un solo sonido: archivo WAV principal
+    // 1. Reproducir sintetizador Web Audio (alta fidelidad garantizada)
+    playSynthesizedChime();
+
+    // 2. Reproducir elemento Audio HTML5 (sonido complementario)
     try {
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = 0;
         audio.volume = 1.0;
-        audio.play().catch(() => {
-          // Fallback a sintetizador Web Audio si el navegador bloquea Audio HTML5
-          playSynthesizedChime();
-        });
-        return;
+        audio.play().catch(() => {});
       }
     } catch (_) {}
-
-    playSynthesizedChime();
   };
 
   const playOnce = () => {
