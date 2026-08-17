@@ -205,7 +205,7 @@ function buildShiftLogistics(
 // ─── Card de un turno ─────────────────────────────────────────────────────────
 function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle, onForceClose }: any) {
   const vehicleId = shift.pointId || shift.vehicle || '?';
-  const shiftDate = shift.fecha || dateOf(shift.closedAt || shift.openedAt || '');
+  const shiftDate = shift.fecha || shift.date || dateOf(shift.closedAt || shift.openedAt || '');
   const openedAt  = shift.openedAt || shift.start_time || null;
   const closedAt  = shift.closedAt || null;
   const jornada   = shift.shift || '—';
@@ -377,8 +377,12 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
 
 // ─── Tab Principal ─────────────────────────────────────────────────────────────
 export function AdminVehicleInventoryTab() {
-  const { loadHistory, completedRequests } = useLogisticsStore();
-  const { posShifts, getPosItems, addPosShift, updatePosShift } = useInventoryStore();
+  const posShifts = useInventoryStore((state: any) => state.posShifts) || [];
+  const getPosItems = useInventoryStore((state: any) => state.getPosItems);
+  const addPosShift = useInventoryStore((state: any) => state.addPosShift);
+  const updatePosShift = useInventoryStore((state: any) => state.updatePosShift);
+  const loadHistory = useLogisticsStore((state: any) => state.loadHistory) || [];
+  const completedRequests = useLogisticsStore((state: any) => state.completedRequests) || [];
   const forceEndShift = useSellerSessionStore((s: any) => s.forceEndShift);
 
   // ── Leer sesión activa LOCAL del vendedor directamente ──────────────────────
@@ -414,9 +418,14 @@ export function AdminVehicleInventoryTab() {
   // ── Construir lista combinada de turnos ──────────────────────────────────────
   // Fuente 1: posShifts — solo turnos de VENDEDOR (excluye POS caja y DEJADOR)
   const storedShifts: any[] = useMemo(() => {
-    const raw = (posShifts || []).filter((s: any) =>
-      s.type === 'VENDEDOR' || (s.pointId && (String(s.pointId).toLowerCase().startsWith('t') || s.vehicle))
-    );
+    const raw = (posShifts || []).filter((s: any) => {
+      if (!s) return false;
+      if (s.type === 'VENDEDOR') return true;
+      if (s.type === 'POS' && s.pointId && String(s.pointId).toLowerCase().startsWith('t')) return true;
+      if (s.pointId && (String(s.pointId).toLowerCase().startsWith('t') || String(s.pointId).toLowerCase().includes('triciclo'))) return true;
+      if (s.vehicle) return true;
+      return false;
+    });
 
     const uniqueMap = new Map<string, any>();
     raw.forEach((s: any) => {
