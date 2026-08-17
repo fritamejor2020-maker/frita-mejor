@@ -171,6 +171,7 @@ export const useLogisticsStore = create(
     // Enviar el array completo causaba sobreescritura de pedidos de otras sedes.
     const branchSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === (senderBranchId || 'BRANCH-001'));
     syncKeyWithBranch('pendingRequests', branchSlice, senderBranchId);
+    syncKeyWithBranch('pendingRequests', branchSlice, null);
 
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
     try {

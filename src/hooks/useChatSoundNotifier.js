@@ -13,7 +13,7 @@ import { useChatStore } from '../store/useChatStore';
 
 let _audioCtx = null;
 
-function getAudioCtx() {
+export function getAudioCtx() {
   if (typeof window === 'undefined') return null;
   if (!_audioCtx) {
     const AC = window.AudioContext || window.webkitAudioContext;
