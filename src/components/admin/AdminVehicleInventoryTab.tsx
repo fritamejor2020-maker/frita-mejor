@@ -136,17 +136,15 @@ function buildShiftLogistics(
   completedRequests: any[],
   priceMap: Record<string, { price: number; name: string }>
 ) {
-  // Ventana de tiempo EXACTA del turno:
-  // - Límite inferior: openedAt del turno (no medianoche) para separar AM de MD del mismo triciclo.
-  //   Si el Dejador hizo la carga ANTES de que el vendedor abriera la sesión, se amplía
-  //   el margen 90 minutos hacia atrás para no perder esas cargas.
-  // - Límite superior: closedAt del turno (o ahora + 1h si está abierto).
-  const MARGIN_MS = 90 * 60 * 1000; // 90 minutos de margen previo a la apertura
+  const shiftJornada = deriveJornada(shift);
+
+  // Ventana de tiempo:
+  // Si shiftDate existe, considerar todo el día con margen de 6h para evitar descartar cargas matutinas
+  const MARGIN_MS = 6 * 60 * 60 * 1000; // 6 horas de margen previo a la apertura
 
   const fromMs: number = (() => {
     if (openedAt) return Math.max(0, new Date(openedAt).getTime() - MARGIN_MS);
     if (shiftDate) {
-      // Sin openedAt, usar medianoche del día como fallback
       const d = new Date(`${shiftDate}T00:00:00`);
       return d.getTime();
     }
@@ -172,9 +170,12 @@ function buildShiftLogistics(
       if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenCargas.has(e.id)) return false;
       seenCargas.add(e.id);
-      // Si la carga tiene shiftId explícito, usar esa asociación exacta
-      if (e.shiftId) return e.shiftId === shift.id;
-      // Fallback: ventana de tiempo para cargas legacy sin shiftId
+      // 1. Si coincide el shiftId exacto
+      if (e.shiftId && (e.shiftId === shift.id || (shift.id && shift.id.includes(e.shiftId)))) return true;
+      // 2. Si coincide la jornada (AM/MD/PM) y la fecha de hoy/turno
+      const eDate = dateOf(e.timestamp);
+      if (e.jornada && e.jornada === shiftJornada && (!shiftDate || eDate === shiftDate)) return true;
+      // 3. Fallback: dentro de la ventana de tiempo del turno
       return inWindow(e.timestamp);
     })
     .forEach((e: any) => {
@@ -192,7 +193,6 @@ function buildShiftLogistics(
       if (!matchVehicleId(r.requester_point_id, vehicleId)) return false;
       if (seenSurtidos.has(r.id)) return false;
       seenSurtidos.add(r.id);
-      // Surtidos: siempre por ventana de tiempo (no llevan shiftId propio)
       return inWindow(r.completed_at || r.created_at);
     })
     .forEach((r: any) => {
@@ -211,8 +211,12 @@ function buildShiftLogistics(
       if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenRecepciones.has(e.id)) return false;
       seenRecepciones.add(e.id);
-      // Si la recepción tiene shiftId explícito, usar esa asociación exacta
-      if (e.shiftId) return e.shiftId === shift.id;
+      // 1. Si coincide el shiftId exacto
+      if (e.shiftId && (e.shiftId === shift.id || (shift.id && shift.id.includes(e.shiftId)))) return true;
+      // 2. Si coincide la jornada (AM/MD/PM) y la fecha de hoy/turno
+      const eDate = dateOf(e.timestamp);
+      if (e.jornada && e.jornada === shiftJornada && (!shiftDate || eDate === shiftDate)) return true;
+      // 3. Fallback: dentro de la ventana de tiempo
       return inWindow(e.timestamp);
     })
     .forEach((e: any) => {
@@ -221,6 +225,16 @@ function buildShiftLogistics(
         sobranteMap[productId].qty += qty;
       });
     });
+
+  // Si el turno mismo tiene sobrantes registrados en su cierre (shift.sobrantes)
+  if (shift?.sobrantes && typeof shift.sobrantes === 'object') {
+    Object.entries(shift.sobrantes).forEach(([pid, qty]: [string, any]) => {
+      if (typeof qty === 'number' && qty > 0) {
+        if (!sobranteMap[pid]) sobranteMap[pid] = { name: priceMap[pid]?.name || pid, qty: 0 };
+        sobranteMap[pid].qty += qty;
+      }
+    });
+  }
 
   const allIds = new Set([...Object.keys(cargaMap), ...Object.keys(surtidoMap), ...Object.keys(sobranteMap)]);
   const lines: any[] = [];
@@ -853,13 +867,24 @@ export function VehicleShiftCard({
     supabase
       .from('app_state')
       .select('key,value')
-      .in('key', ['posShifts_BRANCH-001', 'posShifts', 'vendorLocations_BRANCH-001', 'vendorLocations'])
+      .in('key', [
+        'posShifts_BRANCH-001', 'posShifts',
+        'loadHistory_BRANCH-001', 'loadHistory',
+        'completedRequests_BRANCH-001', 'completedRequests',
+        'vendorLocations_BRANCH-001', 'vendorLocations'
+      ])
       .then(({ data }) => {
         if (data) {
           const map: Record<string, any> = {};
           data.forEach(r => { map[r.key] = r.value; });
           const all = [...(map['posShifts_BRANCH-001'] || map['posShifts'] || [])];
           setRemoteShifts(all);
+          if (map['loadHistory_BRANCH-001'] || map['loadHistory']) {
+            useLogisticsStore.setState({ loadHistory: map['loadHistory_BRANCH-001'] || map['loadHistory'] });
+          }
+          if (map['completedRequests_BRANCH-001'] || map['completedRequests']) {
+            useLogisticsStore.setState({ completedRequests: map['completedRequests_BRANCH-001'] || map['completedRequests'] });
+          }
           if (map['vendorLocations_BRANCH-001'] || map['vendorLocations']) {
             useInventoryStore.setState({ vendorLocations: map['vendorLocations_BRANCH-001'] || map['vendorLocations'] });
           }

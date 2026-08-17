@@ -406,8 +406,11 @@ export const useLogisticsStore = create(
     const activeShift = posShifts.find(s => {
       if (!s || s.closedAt) return false;
       const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!cleanPoint || !cleanVehicle) return false;
       return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
     });
+
+    const dejadorJornada = useDejadorSessionStore.getState()?.activeJornada || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
     const entry = {
       id: `LOAD-${now}`,
@@ -415,7 +418,7 @@ export const useLogisticsStore = create(
       vehicleId,
       branchId: affectedBranchId,
       shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la carga
-      jornada: activeShift?.shift || null, // ← jornada del turno (AM/MD/PM)
+      jornada: activeShift?.shift || dejadorJornada, // ← jornada del turno (AM/MD/PM)
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
@@ -451,8 +454,11 @@ export const useLogisticsStore = create(
     const activeShift = posShifts.find(s => {
       if (!s || s.closedAt) return false;
       const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!cleanPoint || !cleanVehicle) return false;
       return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
     });
+
+    const dejadorJornada = useDejadorSessionStore.getState()?.activeJornada || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
     const entry = {
       id: `RECV-${now}`,
@@ -460,7 +466,7 @@ export const useLogisticsStore = create(
       vehicleId,
       branchId: affectedBranchId,
       shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la recepción
-      jornada: activeShift?.shift || null,
+      jornada: activeShift?.shift || dejadorJornada,
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
