@@ -39,7 +39,7 @@ const useRelativeTime = () => {
 };
 
 
-// ─── Hook: Audio — alarma máximo volumen con WAV real + sintetizador Web Audio + vibración ─────────────
+// ─── Hook: Audio — alarma máximo volumen con WAV real + vibración ─────────────
 function useDeliveryAlert() {
   const audioRef      = useRef<HTMLAudioElement | null>(null);
   const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -48,14 +48,12 @@ function useDeliveryAlert() {
 
   // ── Precargar el archivo WAV al montar ──────────────────────────────────────
   useEffect(() => {
-    try {
-      const audio = new Audio('/sounds/alarm.wav');
-      audio.preload = 'auto';
-      audio.volume  = 1.0;
-      audioRef.current = audio;
-    } catch (_) {}
+    const audio = new Audio('/sounds/alarm.wav');
+    audio.preload = 'auto';
+    audio.volume  = 1.0;
+    audioRef.current = audio;
     return () => {
-      audioRef.current?.pause();
+      audio.pause();
       audioRef.current = null;
     };
   }, []);
@@ -64,89 +62,68 @@ function useDeliveryAlert() {
   const vibrate = () => {
     try {
       if ('vibrate' in navigator) {
-        // Patrón: vibra 250ms, pausa 100ms, vibra 250ms, pausa 100ms, vibra 500ms
-        navigator.vibrate([250, 100, 250, 100, 500]);
+        // Patrón: vibra 200ms, pausa 80ms, vibra 200ms, pausa 80ms, vibra 400ms
+        navigator.vibrate([200, 80, 200, 80, 400]);
       }
     } catch (_) {}
   };
 
-  // ── Sintetizador Web Audio API de alto volumen y máxima compatibilidad ───────
-  const playSynthesizedChime = () => {
+  // ── Fallback: Web Audio API con compressor para más volumen ─────────────────
+  const playFallbackBeep = () => {
     try {
-      const ctx = getAudioCtx();
-      if (!ctx) return;
-      if (ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-
+      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (ctx.state === 'suspended') ctx.resume();
       const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -6;
+      compressor.threshold.value = -3;
       compressor.knee.value      = 0;
-      compressor.ratio.value     = 18;
-      compressor.attack.value    = 0.002;
-      compressor.release.value   = 0.15;
+      compressor.ratio.value     = 20;
+      compressor.attack.value    = 0.001;
+      compressor.release.value   = 0.1;
       compressor.connect(ctx.destination);
 
-      const playNote = (startTime: number, freq: number, dur: number, gainMultiplier = 1.0) => {
-        const osc = ctx.createOscillator();
-        const gain = ctx.createGain();
-        osc.type = 'triangle';
-        osc.frequency.setValueAtTime(freq, startTime);
-        gain.gain.setValueAtTime(0, startTime);
-        gain.gain.linearRampToValueAtTime(0.85 * gainMultiplier, startTime + 0.015);
-        gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
-        osc.connect(gain);
-        gain.connect(compressor);
-        osc.start(startTime);
-        osc.stop(startTime + dur);
-
-        // Armónico brillante
-        const osc2 = ctx.createOscillator();
-        const gain2 = ctx.createGain();
-        osc2.type = 'sine';
-        osc2.frequency.setValueAtTime(freq * 2, startTime);
-        gain2.gain.setValueAtTime(0, startTime);
-        gain2.gain.linearRampToValueAtTime(0.35 * gainMultiplier, startTime + 0.015);
-        gain2.gain.exponentialRampToValueAtTime(0.001, startTime + dur * 0.7);
-        osc2.connect(gain2);
-        gain2.connect(compressor);
-        osc2.start(startTime);
-        osc2.stop(startTime + dur * 0.7);
+      const playTone = (startTime: number, freq: number, dur: number) => {
+        // Sine wave con armónico suave — mismo sonido que el WAV
+        [[freq, 1.0], [freq * 2, 0.15], [freq * 3, 0.05]].forEach(([f, amp]) => {
+          const osc  = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(f, startTime);
+          // Envolvente campana: ataque 5ms, decay exponencial
+          gain.gain.setValueAtTime(0, startTime);
+          gain.gain.linearRampToValueAtTime(amp as number, startTime + 0.005);
+          gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
+          osc.connect(gain);
+          gain.connect(compressor);
+          osc.start(startTime);
+          osc.stop(startTime + dur);
+        });
       };
 
-      const now = ctx.currentTime;
-      // Secuencia armónica alegre y muy notoria: C5 -> E5 -> G5 -> C6 (x2)
-      playNote(now + 0.00, 523.25, 0.28, 1.0);  // C5
-      playNote(now + 0.14, 659.25, 0.28, 1.0);  // E5
-      playNote(now + 0.28, 783.99, 0.32, 1.1);  // G5
-      playNote(now + 0.44, 1046.50, 0.55, 1.2); // C6
+      const t = ctx.currentTime;
+      playTone(t + 0.00, 1318.5, 0.30);  // E6
+      playTone(t + 0.18, 1046.5, 0.30);  // C6
+      playTone(t + 0.36, 1567.9, 0.45);  // G6
 
-      // Segunda pasada para máxima atención
-      playNote(now + 0.80, 523.25, 0.28, 1.0);
-      playNote(now + 0.94, 659.25, 0.28, 1.0);
-      playNote(now + 1.08, 783.99, 0.32, 1.1);
-      playNote(now + 1.24, 1046.50, 0.65, 1.3);
+      setTimeout(() => { try { ctx.close(); } catch (_) {} }, 1500);
     } catch (_) {}
   };
 
-  // ── Reproducir alarma (WAV + Sintetizador + Vibración) ─────────────────────
+  // ── Reproducir el archivo WAV (siempre desde el inicio) ─────────────────────
   const playAlarm = () => {
     if (stoppedRef.current) return;
-    resumeAudioContext();
-    vibrate();
-
-    // 1. Reproducir sintetizador Web Audio (alta fidelidad garantizada)
-    playSynthesizedChime();
-
-    // 2. Reproducir elemento Audio HTML5 (sonido complementario)
     try {
       const audio = audioRef.current;
       if (audio) {
         audio.currentTime = 0;
         audio.volume = 1.0;
-        audio.play().catch(() => {});
+        const p = audio.play();
+        // Fallback Web Audio API si el archivo no se puede reproducir
+        if (p) p.catch(() => playFallbackBeep());
+      } else {
+        playFallbackBeep();
       }
-    } catch (_) {}
+    } catch (_) { playFallbackBeep(); }
+    vibrate();
   };
 
   const playOnce = () => {
