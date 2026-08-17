@@ -46,13 +46,17 @@ function syncLogisticsPartition(
   const bid = affectedBranchId || 'BRANCH-001';
   const pendingSlice = (pendingReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
   syncKeyWithBranch('pendingRequests', pendingSlice, bid);
+  syncKeyWithBranch('pendingRequests', pendingSlice, null);
+
   if (syncCompleted) {
     const completedSlice = (completedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
     syncKeyWithBranch('completedRequests', completedSlice, bid);
+    syncKeyWithBranch('completedRequests', completedSlice, null);
   }
   if (syncRejected) {
     const rejectedSlice = (rejectedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
     syncKeyWithBranch('rejectedRequests', rejectedSlice, bid);
+    syncKeyWithBranch('rejectedRequests', rejectedSlice, null);
   }
 }
 
