@@ -127,6 +127,7 @@ const fmtTime = (iso: string) =>
 
 // ─── Construye el resumen logístico de un turno ───────────────────────────────
 function buildShiftLogistics(
+  shift: any,           // ← turno completo (necesitamos shift.id para filtrar por shiftId)
   vehicleId: string,
   shiftDate: string,
   openedAt: string | null,
@@ -166,8 +167,16 @@ function buildShiftLogistics(
   const cargaMap: Record<string, { name: string; qty: number }> = {};
   const seenCargas = new Set<string>();
   loadHistory
-    .filter((e: any) => e.type === 'carga' && matchVehicleId(e.vehicleId, vehicleId)
-      && inWindow(e.timestamp) && !seenCargas.has(e.id) && (seenCargas.add(e.id) || true))
+    .filter((e: any) => {
+      if (e.type !== 'carga') return false;
+      if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
+      if (seenCargas.has(e.id)) return false;
+      seenCargas.add(e.id);
+      // Si la carga tiene shiftId explícito, usar esa asociación exacta
+      if (e.shiftId) return e.shiftId === shift.id;
+      // Fallback: ventana de tiempo para cargas legacy sin shiftId
+      return inWindow(e.timestamp);
+    })
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
         if (!cargaMap[productId]) cargaMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -179,9 +188,13 @@ function buildShiftLogistics(
   const surtidoMap: Record<string, { name: string; qty: number }> = {};
   const seenSurtidos = new Set<string>();
   completedRequests
-    .filter((r: any) => matchVehicleId(r.requester_point_id, vehicleId)
-      && inWindow(r.completed_at || r.created_at)
-      && !seenSurtidos.has(r.id) && (seenSurtidos.add(r.id) || true))
+    .filter((r: any) => {
+      if (!matchVehicleId(r.requester_point_id, vehicleId)) return false;
+      if (seenSurtidos.has(r.id)) return false;
+      seenSurtidos.add(r.id);
+      // Surtidos: siempre por ventana de tiempo (no llevan shiftId propio)
+      return inWindow(r.completed_at || r.created_at);
+    })
     .forEach((r: any) => {
       (r.items_payload || []).forEach(({ productId, qty, name }: any) => {
         if (!surtidoMap[productId]) surtidoMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -193,8 +206,15 @@ function buildShiftLogistics(
   const sobranteMap: Record<string, { name: string; qty: number }> = {};
   const seenRecepciones = new Set<string>();
   loadHistory
-    .filter((e: any) => e.type === 'recepcion' && matchVehicleId(e.vehicleId, vehicleId)
-      && inWindow(e.timestamp) && !seenRecepciones.has(e.id) && (seenRecepciones.add(e.id) || true))
+    .filter((e: any) => {
+      if (e.type !== 'recepcion') return false;
+      if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
+      if (seenRecepciones.has(e.id)) return false;
+      seenRecepciones.add(e.id);
+      // Si la recepción tiene shiftId explícito, usar esa asociación exacta
+      if (e.shiftId) return e.shiftId === shift.id;
+      return inWindow(e.timestamp);
+    })
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
         if (!sobranteMap[productId]) sobranteMap[productId] = { name: name || priceMap[productId]?.name || productId, qty: 0 };
@@ -235,8 +255,8 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
   const isClosed  = !!closedAt;
 
   const { lines, totalCarga, totalSurtido, totalSobrante, totalVendido, totalVendidoPesos } =
-    useMemo(() => buildShiftLogistics(vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests, priceMap),
-      [vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests]);
+    useMemo(() => buildShiftLogistics(shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests, priceMap),
+      [shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests]);
 
   const hasData = lines.length > 0;
 

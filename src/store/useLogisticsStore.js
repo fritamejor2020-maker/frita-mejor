@@ -7,6 +7,15 @@ import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useAuthStore } from './useAuthStore';
 import { useVehicleStore } from './useVehicleStore';
 
+// Acceso lazy a useInventoryStore para evitar import circular
+// (logistics ←→ inventory). Se resuelve en runtime cuando ya están todos cargados.
+function getPosShifts() {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    return (globalThis.__inventoryStore__ || { getState: () => ({}) }).getState().posShifts || [];
+  } catch { return []; }
+}
+
 function syncKey(key, value) {
   const user = useAuthStore.getState().user;
   const branchId = user?.branchId ?? null;
@@ -388,11 +397,25 @@ export const useLogisticsStore = create(
 
     const affectedBranchId = getVehicleBranchId(vehicleId);
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+
+    // ── Asociar al turno activo del vehículo ──────────────────────────────────
+    // Buscar el turno en curso (sin closedAt) cuyo pointId coincida con el vehículo
+    const posShifts = getPosShifts();
+    const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const now = Date.now();
+    const activeShift = posShifts.find(s => {
+      if (!s || s.closedAt) return false;
+      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+    });
+
     const entry = {
-      id: `LOAD-${Date.now()}`,
+      id: `LOAD-${now}`,
       type: 'carga',
       vehicleId,
-      branchId: affectedBranchId,  // ← guardar sede para poder filtrar después
+      branchId: affectedBranchId,
+      shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la carga
+      jornada: activeShift?.shift || null, // ← jornada del turno (AM/MD/PM)
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
@@ -420,11 +443,24 @@ export const useLogisticsStore = create(
 
     const affectedBranchId = getVehicleBranchId(vehicleId);
     const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+
+    // ── Asociar al turno activo del vehículo ──────────────────────────────────
+    const posShifts = getPosShifts();
+    const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const now = Date.now();
+    const activeShift = posShifts.find(s => {
+      if (!s || s.closedAt) return false;
+      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+    });
+
     const entry = {
-      id: `RECV-${Date.now()}`,
+      id: `RECV-${now}`,
       type: 'recepcion',
       vehicleId,
-      branchId: affectedBranchId,  // ← guardar sede para poder filtrar después
+      branchId: affectedBranchId,
+      shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la recepción
+      jornada: activeShift?.shift || null,
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,

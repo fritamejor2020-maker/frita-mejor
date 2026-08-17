@@ -1621,3 +1621,9 @@ export const useInventoryStore = create(
     }
   )
 );
+
+// Registrar en globalThis para que useLogisticsStore pueda leer posShifts
+// sin crear una dependencia circular entre stores.
+if (typeof globalThis !== 'undefined') {
+  globalThis.__inventoryStore__ = useInventoryStore;
+}
