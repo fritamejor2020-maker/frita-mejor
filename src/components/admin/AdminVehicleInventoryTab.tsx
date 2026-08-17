@@ -108,6 +108,17 @@ const dateOf = (iso: string) => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
+// Deriva la jornada desde la hora de apertura si no viene explícita en el turno
+const deriveJornada = (shift: any): string => {
+  if (shift.shift && shift.shift !== '—') return shift.shift;
+  const ref = shift.openedAt || shift.start_time || null;
+  if (!ref) return 'AM';
+  const h = new Date(ref).getHours(); // hora local
+  if (h < 12) return 'AM';
+  if (h < 17) return 'MD';
+  return 'PM';
+};
+
 const fmt = (n: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(n || 0);
 
@@ -124,20 +135,31 @@ function buildShiftLogistics(
   completedRequests: any[],
   priceMap: Record<string, { price: number; name: string }>
 ) {
-  // Use START OF DAY as lower bound so loads made before the vendor opens their session
-  // (which is the normal Dejador workflow) are still counted. Mirrors calcSoldByVehicle.
-  const fromDay: number = (() => {
-    const ref = openedAt || (shiftDate ? `${shiftDate}T00:00:00` : null);
-    if (!ref) return 0;
-    const d = new Date(ref);
-    return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime(); // midnight local
+  // Ventana de tiempo EXACTA del turno:
+  // - Límite inferior: openedAt del turno (no medianoche) para separar AM de MD del mismo triciclo.
+  //   Si el Dejador hizo la carga ANTES de que el vendedor abriera la sesión, se amplía
+  //   el margen 90 minutos hacia atrás para no perder esas cargas.
+  // - Límite superior: closedAt del turno (o ahora + 1h si está abierto).
+  const MARGIN_MS = 90 * 60 * 1000; // 90 minutos de margen previo a la apertura
+
+  const fromMs: number = (() => {
+    if (openedAt) return Math.max(0, new Date(openedAt).getTime() - MARGIN_MS);
+    if (shiftDate) {
+      // Sin openedAt, usar medianoche del día como fallback
+      const d = new Date(`${shiftDate}T00:00:00`);
+      return d.getTime();
+    }
+    return 0;
   })();
-  const to = closedAt ? new Date(closedAt).getTime() : (Date.now() + 86400000);
+
+  const toMs: number = closedAt
+    ? new Date(closedAt).getTime() + 60 * 60 * 1000 // 1h de gracia después del cierre
+    : Date.now() + 24 * 60 * 60 * 1000;
 
   const inWindow = (ts: string) => {
     if (!ts) return false;
     const t = new Date(ts).getTime();
-    return t >= fromDay && t <= to;
+    return t >= fromMs && t <= toMs;
   };
 
   // Cargas
@@ -208,7 +230,7 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
   const shiftDate = shift.fecha || shift.date || dateOf(shift.closedAt || shift.openedAt || '');
   const openedAt  = shift.openedAt || shift.start_time || null;
   const closedAt  = shift.closedAt || null;
-  const jornada   = shift.shift || '—';
+  const jornada   = deriveJornada(shift); // ← usa hora real de apertura para AM/MD/PM
   const vendedor  = getVendedorName(shift, vehicleId, loadHistory, completedRequests);
   const isClosed  = !!closedAt;
 
@@ -479,23 +501,47 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    const uniqueMap = new Map<string, any>();
+    // ── Paso 1: deduplicar por ID exacto (evitar duplicados por doble fuente) ──
+    const byId = new Map<string, any>();
     raw.forEach((s: any) => {
-      const key = s.id || `${s.pointId || s.vehicle}_${s.responsibleName || s.userName}_${s.openedAt}`;
-      const existing = uniqueMap.get(key);
+      if (!s?.id) return;
+      const existing = byId.get(s.id);
       if (!existing) {
-        uniqueMap.set(key, s);
+        byId.set(s.id, s);
       } else if (!existing.closedAt && s.closedAt) {
-        uniqueMap.set(key, s);
+        // Preferir el que tiene cierre
+        byId.set(s.id, s);
+      }
+    });
+    const deduped = Array.from(byId.values());
+
+    // ── Paso 2: deduplicar por (pointId + fecha + jornada) ──────────────────────
+    // Cada triciclo puede tener máximo UN turno por jornada por día.
+    // Si hay varios registros para la misma combinación, se mantiene el más completo.
+    const bySlot = new Map<string, any>();
+    deduped.forEach((s: any) => {
+      const pointId = (s.pointId || s.vehicle || '?').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const fecha   = s.fecha || s.date || dateOf(s.closedAt || s.openedAt || '');
+      const jornada = deriveJornada(s);
+      const slotKey = `${pointId}_${fecha}_${jornada}`;
+
+      const existing = bySlot.get(slotKey);
+      if (!existing) {
+        bySlot.set(slotKey, s);
+      } else if (!existing.closedAt && s.closedAt) {
+        // Preferir el que está cerrado
+        bySlot.set(slotKey, s);
       } else if (existing.closedAt && s.closedAt) {
+        // Si ambos cerrados, el más reciente gana
         if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-          uniqueMap.set(key, s);
+          bySlot.set(slotKey, s);
         }
       }
     });
 
-    return Array.from(uniqueMap.values());
+    return Array.from(bySlot.values());
   }, [posShifts, supabaseShifts]);
+
 
 
   // Fecha de hoy local
