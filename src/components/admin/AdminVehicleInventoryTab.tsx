@@ -386,7 +386,6 @@ export function AdminVehicleInventoryTab() {
   const forceEndShift = useSellerSessionStore((s: any) => s.forceEndShift);
 
   // ── Leer sesión activa LOCAL del vendedor directamente ──────────────────────
-  // Esto captura el turno en curso aunque no haya sincronizado con posShifts todavía
   const sellerSession = useSellerSessionStore() as any;
 
   const [filterDate,  setFilterDate]  = useState('');
@@ -394,16 +393,63 @@ export function AdminVehicleInventoryTab() {
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  // ── Estado local de turnos cargados directamente desde Supabase ─────────────
+  // Esto GARANTIZA que siempre hay datos aunque el store Zustand esté vacío
+  // por la hidratación desde localStorage.
+  const [supabaseShifts, setSupabaseShifts] = useState<any[]>([]);
+  const [supabaseLoaded, setSupabaseLoaded] = useState(false);
+
+  const loadShiftsFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
+
+      if (error || !data) return;
+
+      const map: Record<string, any> = {};
+      data.forEach((row: any) => { map[row.key] = row.value; });
+
+      const allShifts = [
+        ...((map['posShifts_BRANCH-001'] || map['posShifts'] || []) as any[]),
+      ];
+      // Deduplicar por id
+      const seen = new Set<string>();
+      const dedupedShifts: any[] = [];
+      allShifts.forEach((s: any) => {
+        if (!s?.id) return;
+        if (!seen.has(s.id)) { seen.add(s.id); dedupedShifts.push(s); }
+      });
+
+      // Filtrar tombstones
+      const deletedIds = new Set<string>([
+        ...((map['deletedShiftIds'] || []) as string[]),
+        ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
+      ]);
+      const filtered = dedupedShifts.filter((s: any) => !deletedIds.has(s.id));
+
+      setSupabaseShifts(filtered);
+
+      // También actualizar el store de Zustand para que quede sincronizado
+      useInventoryStore.setState({ posShifts: filtered });
+    } catch (e) {
+      // No bloquear la UI si falla Supabase
+    } finally {
+      setSupabaseLoaded(true);
+    }
+  };
+
   // Asegurar carga de datos remotos al abrir la pestaña
   useEffect(() => {
-    useInventoryStore.getState().loadFromRemote().catch(() => {});
+    loadShiftsFromSupabase();
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
   }, []);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
     try {
-      await useInventoryStore.getState().loadFromRemote();
+      await loadShiftsFromSupabase();
       await useLogisticsStore.getState().fetchPendingRequests();
     } finally {
       setIsRefreshing(false);
@@ -416,16 +462,22 @@ export function AdminVehicleInventoryTab() {
   (products || []).forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
 
   // ── Construir lista combinada de turnos ──────────────────────────────────────
-  // Fuente 1: posShifts — solo turnos de VENDEDOR (excluye POS caja y DEJADOR)
+  // Fuente primaria: supabaseShifts (cargados directamente al montar la vista)
+  // Fuente reactiva: posShifts del store de Zustand (se actualiza en tiempo real)
   const storedShifts: any[] = useMemo(() => {
-    const raw = (posShifts || []).filter((s: any) => {
+    // Combinar ambas fuentes: supabase (confiable) + store (tiempo real)
+    const combined = [...supabaseShifts, ...(posShifts || [])];
+
+    const isVehicleShift = (s: any) => {
       if (!s) return false;
       if (s.type === 'VENDEDOR') return true;
       if (s.type === 'POS' && s.pointId && String(s.pointId).toLowerCase().startsWith('t')) return true;
       if (s.pointId && (String(s.pointId).toLowerCase().startsWith('t') || String(s.pointId).toLowerCase().includes('triciclo'))) return true;
       if (s.vehicle) return true;
       return false;
-    });
+    };
+
+    const raw = combined.filter(isVehicleShift);
 
     const uniqueMap = new Map<string, any>();
     raw.forEach((s: any) => {
@@ -443,7 +495,8 @@ export function AdminVehicleInventoryTab() {
     });
 
     return Array.from(uniqueMap.values());
-  }, [posShifts]);
+  }, [posShifts, supabaseShifts]);
+
 
   // Fecha de hoy local
   const today = dateOf(new Date().toISOString());
