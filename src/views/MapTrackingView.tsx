@@ -15,6 +15,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { useAuthStore } from '../store/useAuthStore';
 import { useInventoryStore } from '../store/useInventoryStore';
+import { useLogisticsStore } from '../store/useLogisticsStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useBranchStore } from '../store/useBranchStore';
 import { useNavigate } from 'react-router-dom';
