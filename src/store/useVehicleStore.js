@@ -5,16 +5,16 @@ import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useAuthStore } from './useAuthStore';
 
 function syncVehicles(statePayload) {
-  const user = useAuthStore.getState().user;
-  const branchId = user?.branchId ?? null;
   const payload = {
     vehicles: statePayload.vehicles || [],
     sellerViewEnabled: statePayload.sellerViewEnabled ?? true,
     dejadorViewEnabled: statePayload.dejadorViewEnabled ?? true,
     enabledPointTypes: statePayload.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
   };
-  markLocalWrite('vehicles', branchId);
-  push('vehicles', payload, branchId).catch(err => console.warn('[Sync] vehicles:', err.message));
+  markLocalWrite('vehicles');
+  markLocalWrite('vehicles_BRANCH-001');
+  push('vehicles', payload).catch(err => console.warn('[Sync] vehicles:', err.message));
+  push('vehicles_BRANCH-001', payload).catch(err => console.warn('[Sync] vehicles_BRANCH-001:', err.message));
 }
 
 /**

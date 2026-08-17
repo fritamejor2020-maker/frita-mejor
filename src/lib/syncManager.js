@@ -23,7 +23,7 @@ export const GLOBAL_KEYS = [
   // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes',
   // Administración global del sistema y configuraciones
-  'users', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig',
+  'users', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
   // Traslados (son cross-sede por diseño)
   'transfers',
 ];
@@ -40,8 +40,6 @@ export const BRANCH_KEYS = [
   'contrataPayments', 'deletedShiftIds',
   // Logística (Dejador / Vendedor) — por sede
   'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
-  // Vehículos / Triciclos — por sede
-  'vehicles',
   // Plantillas de carga — por sede
   'loadTemplates',
   // Nómina y Asistencias — por sede
@@ -98,74 +96,54 @@ function notifyListeners(status) {
 
 export function getQueue() {
   try {
-    return JSON.parse(localStorage.getItem(QUEUE_KEY) || '[]');
+    const raw = localStorage.getItem(QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
   }
 }
 
-export function getQueuedOfflineItemIds(key) {
+function saveQueue(queue) {
   try {
-    const queue = getQueue();
-    const setIds = new Set();
-    queue.forEach(item => {
-      if (item?.key && (item.key === key || (key && item.key.startsWith(`${key}_`)))) {
-        if (Array.isArray(item.value)) {
-          item.value.forEach(x => { if (x?.id) setIds.add(x.id); });
-        }
-      }
-    });
-    return setIds;
-  } catch {
-    return new Set();
+    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+  } catch (e) {
+    console.warn('[SyncManager] Error al guardar cola:', e.message);
   }
 }
 
-function saveQueue(queue) {
-  localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
-}
-
-function enqueue(supabaseKey, value) {
+export function enqueue(key, value) {
   const queue = getQueue();
-  const existingIndex = queue.findIndex(item => item.key === supabaseKey);
-  if (existingIndex !== -1) {
-    queue[existingIndex] = { key: supabaseKey, value, timestamp: Date.now(), retries: 0 };
+  const existingIdx = queue.findIndex(item => item.key === key);
+  if (existingIdx >= 0) {
+    queue[existingIdx] = { key, value, timestamp: Date.now(), retries: 0 };
   } else {
-    queue.push({ key: supabaseKey, value, timestamp: Date.now(), retries: 0 });
+    queue.push({ key, value, timestamp: Date.now(), retries: 0 });
   }
   saveQueue(queue);
   notifyListeners({ online: isOnline, pendingCount: queue.length, syncing: false });
 }
 
-// ─── Escritura a Supabase ─────────────────────────────────────────────────────
+// ─── Escritura en Supabase ────────────────────────────────────────────────────
 
-function isSupabaseConfigured() {
-  const url = import.meta.env.VITE_SUPABASE_URL || '';
-  return url.length > 0 && !url.includes('placeholder');
-}
-
-async function writeToSupabase(supabaseKey, value) {
-  if (!isSupabaseConfigured()) {
-    throw new Error('Supabase no configurado: faltan variables de entorno VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY');
-  }
+async function writeToSupabase(key, value) {
   const { error } = await supabase
     .from('app_state')
-    .upsert({ key: supabaseKey, value }, { onConflict: 'key' });
+    .upsert(
+      { key, value, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
   if (error) throw error;
 }
 
 // ─── Vaciado de cola ──────────────────────────────────────────────────────────
 
 export async function flushQueue() {
-  if (isSyncing) return;
+  if (isSyncing || !isOnline) return;
   const queue = getQueue();
-  if (queue.length === 0) {
-    notifyListeners({ online: true, pendingCount: 0, syncing: false });
-    return;
-  }
+  if (queue.length === 0) return;
 
   isSyncing = true;
-  notifyListeners({ online: true, pendingCount: queue.length, syncing: true });
+  notifyListeners({ online: isOnline, pendingCount: queue.length, syncing: true });
 
   const remaining = [];
   try {
@@ -175,7 +153,7 @@ export async function flushQueue() {
       } catch (err) {
         const retries = (item.retries || 0) + 1;
         if (retries >= MAX_RETRIES) {
-          console.warn(`[SyncManager] "${item.key}" descartado tras ${MAX_RETRIES} intentos fallidos:`, err.message);
+          console.error(`[SyncManager] Descartando "${item.key}" tras ${MAX_RETRIES} intentos fallidos:`, err.message);
         } else {
           console.warn(`[SyncManager] Error syncing "${item.key}" (intento ${retries}/${MAX_RETRIES}):`, err.message);
           remaining.push({ ...item, retries });
@@ -275,10 +253,6 @@ export async function pullAll(branchId = null, allBranchIds = ['BRANCH-001']) {
       for (const bk of BRANCH_KEYS) {
         keysToFetch.push(`${bk}_${bid}`);
       }
-    }
-    // También incluir las llaves legacy (sin sufijo) para la migración inicial
-    for (const bk of BRANCH_KEYS) {
-      if (!keysToFetch.includes(bk)) keysToFetch.push(bk);
     }
   } else {
     // Operativo: solo su sede
