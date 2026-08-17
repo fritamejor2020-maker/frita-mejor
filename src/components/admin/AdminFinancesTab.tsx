@@ -431,7 +431,9 @@ export const AdminFinancesTab = ({
   // Helper reutilizable — usa fecha LOCAL para evitar desfases con UTC-5
   const dateOf = (ts: string) => {
     if (!ts) return '';
+    if (typeof ts === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(ts.trim())) return ts.trim();
     const d = new Date(ts);
+    if (isNaN(d.getTime())) return '';
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, '0');
     const day = String(d.getDate()).padStart(2, '0');
@@ -482,7 +484,9 @@ export const AdminFinancesTab = ({
   // Ej: AM cierra a las 14h, MD cierra a las 20h → cada uno solo ve su logística
   const shiftsByVehicleDate: Record<string, any[]> = {};
   (posShifts || [])
-    .filter((s: any) => s.closedAt && (mode === 'POS' ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR')) : s.type === 'VENDEDOR'))
+    .filter((s: any) => s.closedAt && (mode === 'POS'
+      ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'))
+      : (s.type === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')) || s.vehicle)))
     .forEach((s: any) => {
       const key = `${s.pointId || s.registerId || ''}__${dateOf(s.closedAt)}`;
       if (!shiftsByVehicleDate[key]) shiftsByVehicleDate[key] = [];
@@ -495,7 +499,9 @@ export const AdminFinancesTab = ({
 
   // Solo VENDEDOR y POS tienen cierre de finanzas. Los DEJADORES no.
   const mappedShifts = (posShifts || [])
-    .filter((s: any) => s.closedAt && (mode === 'POS' ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR')) : s.type === 'VENDEDOR'))
+    .filter((s: any) => s.closedAt && (mode === 'POS'
+      ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'))
+      : (s.type === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')) || s.vehicle)))
     .map((s: any) => {
      let details: ClosingDetail[] = [];
      let theoretical = 0;

@@ -102,7 +102,9 @@ export function getVendedorName(
 
 const dateOf = (iso: string) => {
   if (!iso) return '';
+  if (typeof iso === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(iso.trim())) return iso.trim();
   const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 };
 
@@ -386,6 +388,23 @@ export function AdminVehicleInventoryTab() {
   const [filterDate,  setFilterDate]  = useState('');
   const [filterShift, setFilterShift] = useState('');
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  // Asegurar carga de datos remotos al abrir la pestaña
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+    useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
+  }, []);
+
+  const handleRefresh = async () => {
+    setIsRefreshing(true);
+    try {
+      await useInventoryStore.getState().loadFromRemote();
+      await useLogisticsStore.getState().fetchPendingRequests();
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // Mapa de precios
   const products = getPosItems();
@@ -484,7 +503,7 @@ export function AdminVehicleInventoryTab() {
 
   const filteredShifts = useMemo(() => {
     return allShifts.filter((s: any) => {
-      const sDate    = s.fecha || dateOf(s.closedAt || s.openedAt || '');
+      const sDate    = s.fecha || s.date || dateOf(s.closedAt || s.openedAt || '');
       const sJornada = s.shift || '';
       if (filterDate  && sDate    !== filterDate)  return false;
       if (filterShift && sJornada !== filterShift) return false;
@@ -494,7 +513,7 @@ export function AdminVehicleInventoryTab() {
 
   const activeCount = filteredShifts.filter((s: any) => !s.closedAt).length;
   const closedCount = filteredShifts.filter((s: any) => !!s.closedAt).length;
-  const uniqueDates = new Set(filteredShifts.map((s: any) => s.fecha || dateOf(s.closedAt || s.openedAt || ''))).size;
+  const uniqueDates = new Set(filteredShifts.map((s: any) => s.fecha || s.date || dateOf(s.closedAt || s.openedAt || ''))).size;
 
   const availableJornadas = useMemo(() => {
     const j = new Set(allShifts.map((s: any) => s.shift).filter(Boolean));
@@ -504,37 +523,48 @@ export function AdminVehicleInventoryTab() {
   return (
     <div className="flex-1 p-4 space-y-5">
 
-      <div className="flex items-center gap-3 flex-wrap bg-gray-50 p-3 rounded-2xl border border-gray-100">
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold text-gray-500">Fecha:</span>
-          <input
-            type="date"
-            value={filterDate}
-            onChange={(e) => setFilterDate(e.target.value)}
-            className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
-          />
+      <div className="flex items-center gap-3 flex-wrap bg-gray-50 p-3 rounded-2xl border border-gray-100 justify-between">
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-gray-500">Fecha:</span>
+            <input
+              type="date"
+              value={filterDate}
+              onChange={(e) => setFilterDate(e.target.value)}
+              className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+            />
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-xs font-bold text-gray-500">Jornada:</span>
+            <select
+              value={filterShift}
+              onChange={(e) => setFilterShift(e.target.value)}
+              className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+            >
+              <option value="">Todas</option>
+              {availableJornadas.map((j) => (
+                <option key={j} value={j}>{j}</option>
+              ))}
+            </select>
+          </div>
+          {(filterDate || filterShift) && (
+            <button
+              onClick={() => { setFilterDate(''); setFilterShift(''); }}
+              className="text-xs font-bold text-red-500 hover:text-red-700 px-2 py-1 bg-red-50 rounded-lg active:scale-95 transition-all"
+            >
+              Limpiar filtros
+            </button>
+          )}
         </div>
-        <div className="flex items-center gap-1.5">
-          <span className="text-xs font-bold text-gray-500">Jornada:</span>
-          <select
-            value={filterShift}
-            onChange={(e) => setFilterShift(e.target.value)}
-            className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
-          >
-            <option value="">Todas</option>
-            {availableJornadas.map((j) => (
-              <option key={j} value={j}>{j}</option>
-            ))}
-          </select>
-        </div>
-        {(filterDate || filterShift) && (
-          <button
-            onClick={() => { setFilterDate(''); setFilterShift(''); }}
-            className="text-xs font-bold text-red-500 hover:text-red-700 px-2 py-1 bg-red-50 rounded-lg active:scale-95 transition-all"
-          >
-            Limpiar filtros
-          </button>
-        )}
+
+        <button
+          onClick={handleRefresh}
+          disabled={isRefreshing}
+          className="flex items-center gap-1.5 text-xs font-bold bg-white border border-gray-200 hover:border-amber-400 text-gray-700 px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 text-amber-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+          {isRefreshing ? 'Actualizando...' : 'Actualizar'}
+        </button>
       </div>
 
       <div className="grid grid-cols-3 gap-3">
