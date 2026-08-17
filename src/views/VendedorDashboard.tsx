@@ -1595,7 +1595,7 @@ export const VendedorDashboard = () => {
 
         {/* SUBVISTA: CHAT / RADIO INTERCOM */}
         {activeTab === 'chat' && (
-          <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col w-full overflow-hidden pb-16 md:pb-2">
+          <div className="max-w-4xl mx-auto flex-1 min-h-0 flex flex-col w-full overflow-hidden pb-20 sm:pb-24">
             <IntercomChatModule
               currentUserId={pointId || trackingId}
               currentUserName={`${pointId ? pointId + ' (' : ''}${responsibleName || trackingName}${pointId ? ')' : ''}`}
