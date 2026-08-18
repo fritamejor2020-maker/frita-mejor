@@ -149,12 +149,39 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     // Luego sobrescribir con los de Presence (estos son más recientes)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
-    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso)
+    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso) HOY
     const allActiveShifts = (activeShifts && activeShifts.length > 0)
       ? activeShifts
       : (posShiftsFromStore || []);
 
-    const openShifts = allActiveShifts.filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt);
+    const getLocalDateStr = (d = new Date()) => {
+      try {
+        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d);
+      } catch (_) {
+        const offset = d.getTimezoneOffset() * 60000;
+        return new Date(d.getTime() - offset).toISOString().slice(0, 10);
+      }
+    };
+
+    const getShiftDate = (s: any) => {
+      if (s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) return s.date;
+      if (s.fecha && /^\d{4}-\d{2}-\d{2}$/.test(s.fecha)) return s.fecha;
+      if (s.openedAt) {
+        try {
+          return getLocalDateStr(new Date(s.openedAt));
+        } catch (_) {
+          return s.openedAt.slice(0, 10);
+        }
+      }
+      return '';
+    };
+
+    const today = getLocalDateStr(new Date());
+    const openShifts = allActiveShifts.filter((s: any) => {
+      if (s.closedAt) return false;
+      if (s.type && String(s.type).toUpperCase() !== 'VENDEDOR') return false;
+      return getShiftDate(s) === today;
+    });
     const activePointIds = new Set(
       openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
