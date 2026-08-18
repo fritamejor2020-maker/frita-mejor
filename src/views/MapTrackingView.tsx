@@ -149,8 +149,26 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     // Luego sobrescribir con los de Presence (estos son más recientes)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
+    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso)
+    const allActiveShifts = (activeShifts && activeShifts.length > 0)
+      ? activeShifts
+      : (posShiftsFromStore || []);
+
+    const openShifts = allActiveShifts.filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt);
+    const activePointIds = new Set(
+      openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+    );
+    const activeUserIds = new Set(
+      openShifts.map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
+    );
+
+    let result = Array.from(merged.values()).filter(v => {
+      const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+      const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase() : '';
+      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid));
+    });
+
     // Filtrar por sede si hay branchId
-    let result = Array.from(merged.values());
     if (branchVehicleIds) {
       result = result.filter(v => v.pointId && branchVehicleIds.has(v.pointId));
     }
