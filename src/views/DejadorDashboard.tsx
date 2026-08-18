@@ -244,15 +244,13 @@ export const DejadorDashboard = () => {
   }, [allVehicles, userBranchId]);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
-  // Mapa: tricicloId → nombre del vendedor SOLO si tiene turno ABIERTO HOY en la MISMA JORNADA (AM/MD/PM) y SEDE
+  // Mapa: tricicloId → nombre del vendedor con turno ABIERTO EN CURSO
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
     const activeShiftsList = remoteShifts.length > 0 ? remoteShifts : posShifts;
-    const now = Date.now();
 
-    // Fuente única y estricta: Turnos de Vendedor ABIERTOS HOY en la misma jornada y sede
+    // Turnos de Vendedor ABIERTOS EN CURSO en la sede
     (activeShiftsList || []).forEach((s: any) => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
@@ -263,16 +261,10 @@ export const DejadorDashboard = () => {
       const pId = s.pointId || s.point_id || s.vehicle;
       if (!pId) return;
 
-      const sDate = (s.openedAt || s.fecha || '').slice(0, 10);
-      const sShift = String(s.shift || 'AM').trim().toUpperCase();
       const sBranch = s.branchId || 'BRANCH-001';
-
-      // REGLA ESTRICTA: Mismo día (today / últimas 18h), Misma jornada (AM/MD/PM), Misma sede
-      const isSameDate = sDate === today || (s.openedAt && (now - new Date(s.openedAt).getTime() < 18 * 3600 * 1000));
-      const matchesShift = !s.shift || sShift === currentShift;
       const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
 
-      if (isSameDate && matchesShift && matchesBranch) {
+      if (matchesBranch) {
         const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
         if (raw && raw !== '—') {
           const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -285,7 +277,7 @@ export const DejadorDashboard = () => {
     });
 
     return map;
-  }, [remoteShifts, posShifts, shift, today, userBranchId]);
+  }, [remoteShifts, posShifts, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
