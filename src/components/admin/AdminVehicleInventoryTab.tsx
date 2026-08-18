@@ -467,23 +467,25 @@ export function AdminVehicleInventoryTab() {
       const map: Record<string, any> = {};
       data.forEach((row: any) => { map[row.key] = row.value; });
 
-      const allShifts = [
-        ...((map['posShifts_BRANCH-001'] || map['posShifts'] || []) as any[]),
-      ];
-      // Deduplicar por id
-      const seen = new Set<string>();
-      const dedupedShifts: any[] = [];
-      allShifts.forEach((s: any) => {
+      const shiftMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+      ].forEach((s: any) => {
         if (!s?.id) return;
-        if (!seen.has(s.id)) { seen.add(s.id); dedupedShifts.push(s); }
+        const existing = shiftMap.get(s.id);
+        if (!existing || (!existing.closedAt && s.closedAt)) {
+          shiftMap.set(s.id, s);
+        }
       });
+      const allShifts = Array.from(shiftMap.values());
 
       // Filtrar tombstones
       const deletedIds = new Set<string>([
         ...((map['deletedShiftIds'] || []) as string[]),
         ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
       ]);
-      const filtered = dedupedShifts.filter((s: any) => !deletedIds.has(s.id));
+      const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
 
       setSupabaseShifts(filtered);
 

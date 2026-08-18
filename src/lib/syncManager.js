@@ -123,9 +123,45 @@ export function enqueue(key, value) {
   notifyListeners({ online: isOnline, pendingCount: queue.length, syncing: false });
 }
 
-// ─── Escritura en Supabase ────────────────────────────────────────────────────
+// ─── Escritura en Supabase con Protección Anti-Truncamiento ───────────────────
 
 async function writeToSupabase(key, value) {
+  // Para arrays críticos de historial (posShifts, loadHistory, completedRequests): NUNCA truncar datos remotos
+  if ((key === 'posShifts' || key.startsWith('posShifts_')) && Array.isArray(value)) {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
+      if (data && Array.isArray(data.value) && data.value.length > 0) {
+        const shiftMap = new Map();
+        data.value.forEach(s => { if (s?.id) shiftMap.set(s.id, s); });
+        value.forEach(s => {
+          if (s?.id) {
+            const existing = shiftMap.get(s.id);
+            if (!existing || (!existing.closedAt && s.closedAt) || s.forcedByAdmin) {
+              shiftMap.set(s.id, s);
+            }
+          }
+        });
+        value = Array.from(shiftMap.values());
+      }
+    } catch (e) {
+      console.warn('[SyncManager] Error merging shifts before write:', e);
+    }
+  }
+
+  if ((key === 'loadHistory' || key.startsWith('loadHistory_') || key === 'completedRequests' || key.startsWith('completedRequests_')) && Array.isArray(value)) {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
+      if (data && Array.isArray(data.value) && data.value.length > 0) {
+        const itemMap = new Map();
+        data.value.forEach(item => { if (item?.id) itemMap.set(item.id, item); });
+        value.forEach(item => { if (item?.id) itemMap.set(item.id, item); });
+        value = Array.from(itemMap.values());
+      }
+    } catch (e) {
+      console.warn('[SyncManager] Error merging history before write:', e);
+    }
+  }
+
   const { error } = await supabase
     .from('app_state')
     .upsert(

@@ -484,7 +484,24 @@ export const useInventoryStore = create(
             for (const key of BRANCH_STORE_KEYS) {
               const branchKeyName = `${key}_${effectiveBranch}`;
               const rawBranchVal = remote[branchKeyName];
-              const val = rawBranchVal !== undefined && rawBranchVal !== null ? rawBranchVal : remote[key];
+              let val = rawBranchVal !== undefined && rawBranchVal !== null ? rawBranchVal : remote[key];
+              if (Array.isArray(rawBranchVal) || Array.isArray(remote[key])) {
+                const combinedMap = new Map();
+                if (Array.isArray(remote[key])) {
+                  remote[key].forEach(item => { if (item?.id) combinedMap.set(item.id, item); });
+                }
+                if (Array.isArray(rawBranchVal)) {
+                  rawBranchVal.forEach(item => {
+                    if (item?.id) {
+                      const existing = combinedMap.get(item.id);
+                      if (!existing || (!existing.closedAt && item.closedAt)) {
+                        combinedMap.set(item.id, item);
+                      }
+                    }
+                  });
+                }
+                val = Array.from(combinedMap.values());
+              }
               if (val !== undefined && val !== null) {
                 if (Array.isArray(val)) {
                   // Remoto reemplaza local; preservar solo offline genuinos
