@@ -253,9 +253,8 @@ export const DejadorDashboard = () => {
     const map: Record<string, string> = {};
     const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
-    const now = Date.now();
 
-    // 1. Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
+    // Fuente única y estricta: Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
     (posShifts || []).forEach((s: any) => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
@@ -270,11 +269,12 @@ export const DejadorDashboard = () => {
       const sShift = String(s.shift || 'AM').trim().toUpperCase();
       const sBranch = s.branchId || 'BRANCH-001';
 
-      const isRecent = !s.openedAt || sDate === today || (now - new Date(s.openedAt).getTime() < 24 * 3600 * 1000);
-      const matchesShift = !s.shift || sShift === currentShift;
+      // REGLA ESTRICTA: Mismo día (today), Misma jornada (AM/MD/PM), Misma sede
+      const isSameDate = sDate === today;
+      const matchesShift = sShift === currentShift;
       const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
 
-      if (isRecent && matchesShift && matchesBranch) {
+      if (isSameDate && matchesShift && matchesBranch) {
         const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
         if (raw && raw !== '—') {
           const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -286,29 +286,8 @@ export const DejadorDashboard = () => {
       }
     });
 
-    // 2. Ubicaciones GPS en vivo desde vendorLocations (si está activo en las últimas 6 horas en la misma jornada)
-    Object.values(vendorLocations || {}).forEach((loc: any) => {
-      const pId = loc?.pointId;
-      if (pId && loc?.isActive !== false) {
-        const locShift = String(loc.shift || 'AM').trim().toUpperCase();
-        const locUpdated = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
-        const isRecentGps = (now - locUpdated) < 6 * 3600 * 1000;
-
-        if (locShift === currentShift && isRecentGps) {
-          const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
-          const upperP = String(pId).toUpperCase();
-          const raw = String(loc.name || '').trim();
-          if (raw && raw !== '—') {
-            if (!map[pId]) map[pId] = raw;
-            if (!map[cleanP]) map[cleanP] = raw;
-            if (!map[upperP]) map[upperP] = raw;
-          }
-        }
-      }
-    });
-
     return map;
-  }, [posShifts, vendorLocations, shift, today, userBranchId]);
+  }, [posShifts, shift, today, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
