@@ -217,22 +217,31 @@ export const DejadorDashboard = () => {
 
     // Fuente única y estricta: Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
     (posShifts || []).forEach((s: any) => {
-      if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
-        const sDate = (s.openedAt || s.fecha || '').slice(0, 10);
-        const sShift = String(s.shift || 'AM').trim().toUpperCase();
-        const sBranch = s.branchId || 'BRANCH-001';
+      const isClosed = Boolean(s.closedAt);
+      if (isClosed) return;
 
-        const matchesDate = sDate === today;
-        const matchesShift = sShift === currentShift;
-        const matchesBranch = userBranchId === null || sBranch === effectiveBranch;
+      const isVendor = !s.type || String(s.type).toUpperCase() === 'VENDEDOR';
+      if (!isVendor) return;
 
-        if (matchesDate && matchesShift && matchesBranch) {
-          const raw = String(s.responsibleName || s.userName || '').trim();
-          const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-          if (raw && raw !== '—') {
-            map[s.pointId] = raw;
-            map[cleanP] = raw;
-          }
+      const pId = s.pointId || s.point_id || s.vehicle;
+      if (!pId) return;
+
+      const sDate = (s.openedAt || s.fecha || '').slice(0, 10);
+      const sShift = String(s.shift || 'AM').trim().toUpperCase();
+      const sBranch = s.branchId || 'BRANCH-001';
+
+      const isRecent = !s.openedAt || sDate === today || (Date.now() - new Date(s.openedAt).getTime() < 24 * 3600 * 1000);
+      const matchesShift = !s.shift || sShift === currentShift;
+      const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
+
+      if (isRecent && matchesShift && matchesBranch) {
+        const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
+        if (raw && raw !== '—') {
+          const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          const upperP = String(pId).toUpperCase();
+          map[pId] = raw;
+          map[cleanP] = raw;
+          map[upperP] = raw;
         }
       }
     });
@@ -831,7 +840,8 @@ export const DejadorDashboard = () => {
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
               {vehicles.map((v: string) => {
                 const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-                const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV];
+                const upperV = String(v).toUpperCase();
+                const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV] || vehicleVendorMap[upperV];
                 return (
                 <button
                   key={v}
@@ -842,13 +852,13 @@ export const DejadorDashboard = () => {
                       : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
                 >
                   <span className="font-black text-base sm:text-xl leading-none">{v}</span>
-                  {vendorName && (
-                    <span className={`text-[9px] sm:text-[10px] font-bold leading-none truncate max-w-[58px] ${
-                      selectedVehicle === v ? 'text-amber-100' : 'text-gray-400'
+                  {vendorName ? (
+                    <span className={`text-[9px] sm:text-[10px] font-black leading-none truncate max-w-[58px] ${
+                      selectedVehicle === v ? 'text-amber-100' : 'text-amber-700'
                     }`}>
-                      {vendorName}
+                      {vendorName.split(' ')[0]}
                     </span>
-                  )}
+                  ) : null}
                 </button>
                 );
               })}

@@ -500,6 +500,16 @@ export const useInventoryStore = create(
                     }
                   });
                 }
+                if (key === 'posShifts' && Array.isArray(remote['posShifts_master_history'])) {
+                  remote['posShifts_master_history'].forEach(item => {
+                    if (item?.id) {
+                      const existing = combinedMap.get(item.id);
+                      if (!existing || (!existing.closedAt && item.closedAt)) {
+                        combinedMap.set(item.id, item);
+                      }
+                    }
+                  });
+                }
                 val = Array.from(combinedMap.values());
               }
               if (val !== undefined && val !== null) {
