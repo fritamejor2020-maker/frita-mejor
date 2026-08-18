@@ -190,24 +190,28 @@ export const DejadorDashboard = () => {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Vehículos base configurados en la sede
+  // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
   const allVehicles = useVehicleStore((state: any) => state.vehicles);
-  const baseVehicles = React.useMemo(() => {
+  const vehicles = React.useMemo(() => {
     const active = allVehicles.filter((v: any) => v.active);
     const branchFiltered = userBranchId
       ? active.filter((v: any) => !v.branchId || v.branchId === userBranchId)
       : active;
     return branchFiltered.map((v: any) => v.abbreviation || v.name);
   }, [allVehicles, userBranchId]);
+  const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
-  // REGLA: En Dejador, mostrar solo los triciclos/carritos/locales que tengan turno ACTIVO en la MISMA jornada (shift) hoy y en la misma sede
-  const vehicles = React.useMemo(() => {
+  const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
+
+  // Mapa: tricicloId → nombre del vendedor SOLO si tiene turno ABIERTO HOY en la MISMA JORNADA (AM/MD/PM) y SEDE
+  const vehicleVendorMap = React.useMemo(() => {
+    const map: Record<string, string> = {};
     const currentShift = shift || 'AM';
     const effectiveBranch = userBranchId || 'BRANCH-001';
 
-    const activeVehicleIds = new Set<string>();
+    // 1. Turnos en posShifts abiertos hoy en la misma jornada y sede
     (posShifts || []).forEach((s: any) => {
-      if (s.type === 'VENDEDOR' && !s.closedAt) {
+      if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
         const sDate = (s.openedAt || s.fecha || '').slice(0, 10);
         const sShift = s.shift || 'AM';
         const sBranch = s.branchId || 'BRANCH-001';
@@ -216,65 +220,40 @@ export const DejadorDashboard = () => {
         const matchesShift = sShift === currentShift;
         const matchesBranch = userBranchId === null || sBranch === effectiveBranch;
 
-        if (matchesDate && matchesShift && matchesBranch && s.pointId) {
-          activeVehicleIds.add(String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, ''));
-        }
-      }
-    });
-
-    // Filtrar lista de vehículos que tienen turno abierto en la jornada actual
-    const filtered = baseVehicles.filter((vId: string) => {
-      const cleanV = String(vId).toLowerCase().replace(/[^a-z0-9]/g, '');
-      return activeVehicleIds.has(cleanV);
-    });
-
-    // Si aún no hay turnos activos y el usuario es Administrador, mostrar la lista base como fallback
-    if (filtered.length === 0 && (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN')) {
-      return baseVehicles;
-    }
-
-    return filtered;
-  }, [baseVehicles, posShifts, shift, today, userBranchId, user]);
-
-  const defaultVehicle = vehicles.length > 0 ? vehicles[0] : (baseVehicles.length > 0 ? baseVehicles[0] : 'T1');
-
-  const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
-
-  // Mapa: tricicloId → nombre del vendedor con turno abierto o GPS activo
-  const vehicleVendorMap = React.useMemo(() => {
-    const map: Record<string, string> = {};
-
-    // 1. Turnos en posShifts
-    (posShifts || []).forEach((s: any) => {
-      if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
-        const raw = s.responsibleName || s.userName || '';
-        const firstName = raw.split(' ')[0];
-        if (firstName && firstName !== '—') {
-          const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-          map[s.pointId] = firstName;
-          map[cleanP] = firstName;
-        }
-      }
-    });
-
-    // 2. Ubicaciones GPS en vivo desde vendorLocations
-    Object.values(vendorLocations).forEach((loc: any) => {
-      const pId = loc?.pointId;
-      if (pId && loc?.isActive !== false) {
-        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
-        if (!map[pId] && !map[cleanP]) {
-          const raw = loc.name || '';
+        if (matchesDate && matchesShift && matchesBranch) {
+          const raw = s.responsibleName || s.userName || '';
           const firstName = raw.split(' ')[0];
-          if (firstName) {
-            map[pId] = firstName;
+          if (firstName && firstName !== '—') {
+            const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+            map[s.pointId] = firstName;
             map[cleanP] = firstName;
           }
         }
       }
     });
 
+    // 2. Ubicaciones GPS en vivo (solo si coinciden en fecha y jornada actual)
+    Object.values(vendorLocations).forEach((loc: any) => {
+      const pId = loc?.pointId;
+      if (pId && loc?.isActive !== false) {
+        const locDate = (loc.openedAt || loc.updatedAt || '').slice(0, 10);
+        const locShift = loc.shift || 'AM';
+        if (locDate === today && locShift === currentShift) {
+          const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (!map[pId] && !map[cleanP]) {
+            const raw = loc.name || '';
+            const firstName = raw.split(' ')[0];
+            if (firstName && firstName !== '—') {
+              map[pId] = firstName;
+              map[cleanP] = firstName;
+            }
+          }
+        }
+      }
+    });
+
     return map;
-  }, [posShifts, vendorLocations]);
+  }, [posShifts, vendorLocations, shift, today, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
@@ -857,42 +836,31 @@ export const DejadorDashboard = () => {
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="mb-5 sm:mb-8 flex flex-col xl:flex-row xl:items-center justify-between gap-4 sm:gap-6">
             
-            {vehicles.length === 0 ? (
-              <div className="bg-amber-50 border border-amber-200 rounded-2xl p-3.5 text-center flex-1">
-                <p className="text-xs sm:text-sm font-bold text-amber-900">
-                  🛵 No hay triciclos/carritos con turno activo en la jornada <span className="font-black uppercase">{shift || 'AM'}</span> hoy.
-                </p>
-                <p className="text-[11px] sm:text-xs text-amber-700 font-semibold mt-0.5">
-                  Los vehículos aparecerán aquí automáticamente en cuanto los vendedores inicien turno en {shift || 'AM'}.
-                </p>
-              </div>
-            ) : (
-              <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
-                {vehicles.map((v: string) => {
-                  const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-                  const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV];
-                  return (
-                  <button
-                    key={v}
-                    onClick={() => setSelectedVehicle(v)}
-                    className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg px-2 py-1.5 min-w-[52px] sm:min-w-[72px] min-h-[52px] sm:min-h-[72px]
-                      ${selectedVehicle === v 
-                        ? 'bg-amber-500 text-white shadow-[0_0_0_4px_white]' 
-                        : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
-                  >
-                    <span className="font-black text-base sm:text-xl leading-none">{v}</span>
-                    {vendorName && (
-                      <span className={`text-[9px] sm:text-[10px] font-bold leading-none truncate max-w-[58px] ${
-                        selectedVehicle === v ? 'text-amber-100' : 'text-gray-400'
-                      }`}>
-                        {vendorName}
-                      </span>
-                    )}
-                  </button>
-                  );
-                })}
-              </div>
-            )}
+            <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
+              {vehicles.map((v: string) => {
+                const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV];
+                return (
+                <button
+                  key={v}
+                  onClick={() => setSelectedVehicle(v)}
+                  className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg px-2 py-1.5 min-w-[52px] sm:min-w-[72px] min-h-[52px] sm:min-h-[72px]
+                    ${selectedVehicle === v 
+                      ? 'bg-amber-500 text-white shadow-[0_0_0_4px_white]' 
+                      : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
+                >
+                  <span className="font-black text-base sm:text-xl leading-none">{v}</span>
+                  {vendorName && (
+                    <span className={`text-[9px] sm:text-[10px] font-bold leading-none truncate max-w-[58px] ${
+                      selectedVehicle === v ? 'text-amber-100' : 'text-gray-400'
+                    }`}>
+                      {vendorName}
+                    </span>
+                  )}
+                </button>
+                );
+              })}
+            </div>
 
             {/* PRESET PILLS + Botón Organizar */}
             <div className="flex gap-2 px-1 flex-shrink-0 flex-wrap justify-end items-center">
