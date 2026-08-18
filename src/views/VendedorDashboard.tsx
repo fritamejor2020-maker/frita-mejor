@@ -27,6 +27,12 @@ export const VendedorDashboard = () => {
 
   // Detectar cierre remoto del turno (cuando el Admin lo cierra desde el PC)
   useRemoteShiftClose();
+
+  // Flag para distinguir cierre PROPIO del vendedor vs cierre REMOTO del Admin.
+  // Se activa antes de que handleCloseShift actualice posShifts, para que el
+  // efecto de monitoreo (useEffect #3) no muestre "cerrado por administración"
+  // cuando en realidad el vendedor hizo su propio cierre.
+  const isClosingNormally = useRef(false);
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
@@ -92,9 +98,12 @@ export const VendedorDashboard = () => {
 
     // Si ya existe un turno CERRADO para este punto hoy y NO hay ninguno abierto,
     // significa que el turno fue cerrado (por admin o por cierre previo). Salir de la sesión!
+    // PERO: si el propio vendedor está haciendo su cierre, no mostrar toast.
     if (!hasOpenShift && hasClosedShift) {
       console.log('[VendedorDashboard] Turno cerrado detectado en posShifts. Finalizando sesión local...');
-      toast.error('⚠️ Tu turno ha sido cerrado.', { duration: 4000 });
+      if (!isClosingNormally.current) {
+        toast.error('⚠️ Tu turno ha sido cerrado.', { duration: 4000 });
+      }
       gpsStop();
       endShift();
       return;
@@ -121,6 +130,8 @@ export const VendedorDashboard = () => {
   // ── 3. Monitoreo reactivo en tiempo real: si el turno es cerrado por Admin, cerrar sesión inmediatamente ──
   const livePosShifts = useInventoryStore((state: any) => state.posShifts) || [];
   useEffect(() => {
+    // Si el vendedor está haciendo su propio cierre, ignorar este efecto
+    if (isClosingNormally.current) return;
     if (!isSetupComplete || !pointId) return;
 
     const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -526,6 +537,11 @@ export const VendedorDashboard = () => {
     const details: any[] = [];
 
     try {
+      // Marcar que el cierre lo está haciendo el vendedor voluntariamente.
+      // Esto previene que el monitor de cierre remoto (useEffect #3) muestre
+      // "cerrado por administración" cuando el propio vendedor cierra su turno.
+      isClosingNormally.current = true;
+
       const shiftData = useSellerSessionStore.getState() as any;
       const currentShiftId = shiftData?.shiftId || '';
       const finalShift = {
