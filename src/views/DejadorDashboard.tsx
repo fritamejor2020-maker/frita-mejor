@@ -345,9 +345,16 @@ export const DejadorDashboard = () => {
 
 
   const [activeTab, setActiveTab] = useState('carga'); // carga, surtir, recibir
+  const [selectedVehicle, setSelectedVehicle] = useState<string>('');
 
-  // Auto-marcar como leídos al entrar al tab de Pedidos
+  // Limpiar selección de vehículo y cantidades al cambiar de pestaña
   useEffect(() => {
+    setSelectedVehicle('');
+    setLoadQuantities({});
+    setStringSelections({});
+    setActivePreset(null);
+
+    // Auto-marcar como leídos al entrar al tab de Pedidos
     if (activeTab === 'surtir') {
       const unread = truePendingRequests.filter((r: any) => !r.readAt && !r.isPostponed);
       if (unread.length > 0) {
@@ -359,7 +366,7 @@ export const DejadorDashboard = () => {
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
-  const [selectedVehicle, setSelectedVehicle] = useState(defaultVehicle);
+
   const [loadQuantities, setLoadQuantities] = useState<Record<string, number>>({});
   // For products with string presets (e.g. MON/20k/50k), track selected string value separately
   const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
@@ -1382,8 +1389,8 @@ export const DejadorDashboard = () => {
                 currentUserId="DEJADOR"
                 currentUserName={dejadorName || 'Dejador Logística'}
                 currentUserRole="DEJADOR"
-                targetUserId={selectedVehicle === 'ALL' ? 'ALL' : selectedVehicle}
-                targetUserName={selectedVehicle === 'ALL' ? 'Canal General Logística' : `Triciclo ${selectedVehicle} (${vehicleVendorMap[selectedVehicle] || 'Vendedor'})`}
+                targetUserId={selectedVehicle === 'ALL' ? 'ALL' : (selectedVehicle || 'ALL')}
+                targetUserName={(!selectedVehicle || selectedVehicle === 'ALL') ? 'Canal General Logística' : `Triciclo ${selectedVehicle} (${vehicleVendorMap[selectedVehicle] || 'Vendedor'})`}
                 branchId={userBranchId || 'BRANCH-001'}
                 shiftId="shift-active"
               />
@@ -1400,6 +1407,11 @@ export const DejadorDashboard = () => {
              <button 
                 onClick={(e) => {
                   e.stopPropagation();
+                  if (!selectedVehicle) {
+                    showToast('⚠️ Selecciona un triciclo o carrito primero arriba');
+                    return;
+                  }
+
                   const totalItems = Object.values(loadQuantities).filter(v => v > 0).length;
                   if (totalItems === 0) {
                     showToast('⚠️ Selecciona al menos un producto');
@@ -1416,7 +1428,9 @@ export const DejadorDashboard = () => {
                   if (success) {
                     showToast(`✅ ${activeTab === 'carga' ? 'Surtido registrado' : 'Sobrantes recibidos'} para ${selectedVehicle}`);
                     setLoadQuantities({});
+                    setStringSelections({});
                     setActivePreset(null);
+                    setSelectedVehicle(''); // ← Deselecciona el triciclo
                   } else {
                     showToast('⚠️ No se pudo registrar. Verifica las cantidades.');
                   }
