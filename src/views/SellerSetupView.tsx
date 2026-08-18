@@ -14,48 +14,80 @@ export const SellerSetupView = () => {
   const { isSetupComplete: sellerSetupComplete, shiftId: activeShiftId, endShift: clearSession } = useSellerSessionStore();
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
   const enabledPointTypes = useVehicleStore((s: any) => s.enabledPointTypes ?? { Triciclo: true, Carrito: true, Local: false });
-  const posShifts = useInventoryStore((state) => state.posShifts || []);
+  // remoteShifts: null = cargando, [] = sin turnos, [...] = turnos verificados en Supabase
+  // Usamos fetch DIRECTO a Supabase en lugar del store para evitar que el localStorage
+  // desactualizado del iPad muestre turnos ya cerrados como "en curso".
+  const [remoteShifts, setRemoteShifts] = useState<any[] | null>(null);
 
   useEffect(() => {
-    // 1. Cargar datos frescos desde Supabase
-    useInventoryStore.getState().loadFromRemote().catch(() => {});
+    let cancelled = false;
 
-    // 2. Si hay una sesión activa, verificar directamente en Supabase si el turno ya fue cerrado
-    // Esto resuelve el caso donde el Admin cierra el turno remotamente y la tablet aún lo muestra como abierto
-    if (sellerSetupComplete && activeShiftId) {
-      supabase
-        .from('app_state')
-        .select('value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001'])
-        .then(({ data }) => {
-          if (!data) return;
-          const allShifts = data.flatMap((r: any) => r.value || []);
-          const myShift = allShifts.find((s: any) => s.id === activeShiftId);
-          if (myShift?.closedAt) {
-            console.log('[SellerSetup] Turno activo ya está cerrado en Supabase. Limpiando sesión local.');
-            clearSession();
+    const fetchAndVerify = async () => {
+      try {
+        // Fetch directo a Supabase — fuente de verdad real
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .in('key', ['posShifts', 'posShifts_BRANCH-001']);
+
+        if (cancelled) return;
+
+        if (data) {
+          // Merge con "versión cerrada siempre gana"
+          const shiftMap = new Map<string, any>();
+          data.forEach((r: any) => {
+            (r.value || []).forEach((s: any) => {
+              if (!s?.id) return;
+              const ex = shiftMap.get(s.id);
+              if (!ex || (!ex.closedAt && s.closedAt)) shiftMap.set(s.id, s);
+            });
+          });
+          const verified = Array.from(shiftMap.values());
+
+          // Actualizar el store con la verdad remota
+          useInventoryStore.setState({ posShifts: verified });
+          setRemoteShifts(verified);
+
+          // Si la sesión activa está cerrada en Supabase, limpiarla
+          if (sellerSetupComplete && activeShiftId) {
+            const myShift = verified.find((s: any) => s.id === activeShiftId);
+            if (myShift?.closedAt) {
+              console.log('[SellerSetup] Sesión activa ya cerrada en Supabase. Limpiando...');
+              clearSession();
+            }
           }
-        })
-        .catch(() => {});
-    }
+        }
+      } catch (e) {
+        // En caso de error de red, caer al store local pero marcarlo como cargado
+        if (!cancelled) setRemoteShifts(useInventoryStore.getState().posShifts || []);
+      }
+
+      // También lanzar loadFromRemote para sincronizar todo el resto del store
+      useInventoryStore.getState().loadFromRemote().catch(() => {});
+    };
+
+    fetchAndVerify();
+    return () => { cancelled = true; };
   }, []);
 
+  // activeOpenShifts: solo basado en datos VERIFICADOS con Supabase (remoteShifts)
+  // Mientras carga (remoteShifts === null), devuelve [] para no mostrar banners falsos.
   const activeOpenShifts = useMemo(() => {
+    if (remoteShifts === null) return []; // Aún cargando — no mostrar nada
+
     const currentUserName = String(user?.name || '').trim().toLowerCase();
     const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
 
-    return (posShifts || []).filter((s: any) => {
+    return remoteShifts.filter((s: any) => {
       if (s.type !== 'VENDEDOR' || s.closedAt) return false;
-
-      // Si no hay usuario logueado en el sistema
       if (!user) return false;
 
-      // Si es Admin, Super Admin o Manager, ver todos los turnos abiertos
+      // Admin/Manager ven todos los turnos abiertos
       if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
         return true;
       }
 
-      // Para Vendedor regular: SOLO mostrar si el turno pertenece a este mismo usuario (misma clave/cuenta)
+      // Vendedor regular: solo ve sus propios turnos
       const shiftResp = String(s.responsibleName || '').trim().toLowerCase();
       const shiftUid = String(s.userId || s.createdBy || '').trim().toLowerCase();
 
@@ -64,7 +96,7 @@ export const SellerSetupView = () => {
 
       return isSameUserByName || isSameUserById;
     });
-  }, [posShifts, user]);
+  }, [remoteShifts, user]);
   
   const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
@@ -102,6 +134,7 @@ export const SellerSetupView = () => {
     }
 
     const { posShifts, addPosShift } = useInventoryStore.getState();
+    const shiftsList = remoteShifts || posShifts || [];
     const today = new Date().toISOString().slice(0, 10);
     const effectiveBranchId = userBranchId || 'BRANCH-001';
     const cleanBranch = String(effectiveBranchId).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -112,7 +145,7 @@ export const SellerSetupView = () => {
 
     // ── Regla: 1 turno por vehículo por jornada (AM/MD/PM) por sede por día ──
     // 1. Buscar si hay turno ABIERTO para este vehículo + jornada + sede hoy
-    const openShift = (posShifts || []).find(
+    const openShift = shiftsList.find(
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
         s.shift === shift &&
@@ -150,7 +183,7 @@ export const SellerSetupView = () => {
     }
 
     // 2. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
-    const closedShift = (posShifts || []).find(
+    const closedShift = shiftsList.find(
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
         s.shift === shift &&
