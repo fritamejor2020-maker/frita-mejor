@@ -167,9 +167,15 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     const merged = new Map<string, VendorLocation>();
 
     // Primero agregar los de la BD (última ubicación guardada)
-    dbRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'db' }));
+    // FILTRO DE ANTIGÜEDAD: descartar ubicaciones de BD más viejas de 15 minutos
+    // (Las de Presence no se filtran porque son conexiones en vivo)
+    const STALE_DB_MS = 15 * 60 * 1000;
+    dbRef.current.forEach((v, id) => {
+      if (v.updatedAt && Date.now() - new Date(v.updatedAt).getTime() > STALE_DB_MS) return;
+      merged.set(id, { ...v, source: 'db' });
+    });
 
-    // Luego sobrescribir con los de Presence (estos son más recientes)
+    // Luego sobrescribir con los de Presence (estos son más recientes y siempre válidos)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
     // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso)
@@ -179,29 +185,48 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
     const openShifts = allActiveShifts.filter((s: any) => {
       if (s.closedAt) return false;
-      // Requerir type=VENDEDOR explícito — excluir ghost shifts de caja (sin type o con type diferente)
       if (String(s.type || '').toUpperCase() !== 'VENDEDOR') return false;
-      // Debe tener un pointId válido para aparecer en el mapa
       if (!s.pointId) return false;
       return true;
     });
 
+    // Construir sets de IDs activos
     const activePointIds = new Set(
       openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
     const activeUserIds = new Set(
-      openShifts.map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
-    );
-    const activeNames = new Set(
-      openShifts.map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim())
+      openShifts.map((s: any) => String(s.userId || s.createdBy || '').toLowerCase()).filter(Boolean)
     );
 
+    // IMPORTANTE: Filtrar SOLO por pointId o userId — NO por nombre.
+    // Filtrar por nombre causa falsos positivos cuando dos turnos tienen el mismo vendedor (ej: "Vendedor Móvil").
     let result = Array.from(merged.values()).filter(v => {
       const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
       const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase() : '';
-      const cleanName = v.name ? String(v.name).toLowerCase().trim() : '';
-      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid)) || (cleanName && activeNames.has(cleanName));
+      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid));
     });
+
+    // DEDUPLICAR por pointId — si hay 2 entradas para el mismo vehículo (Presence + BD),
+    // quedarse solo con la más reciente (Presence siempre gana sobre BD)
+    const byPointId = new Map<string, VendorLocation>();
+    result.forEach(v => {
+      const pKey = v.pointId ? String(v.pointId).toUpperCase() : v.vendorId;
+      if (!pKey) return;
+      const existing = byPointId.get(pKey);
+      if (!existing) {
+        byPointId.set(pKey, v);
+      } else {
+        // Presence gana sobre offline; si ambos son Presence/db, la más reciente gana
+        const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+        const vTime = v.updatedAt ? new Date(v.updatedAt).getTime() : 0;
+        if (v.source === 'presence' && existing.source !== 'presence') {
+          byPointId.set(pKey, v);
+        } else if (vTime > existingTime && !(existing.source === 'presence' && v.source !== 'presence')) {
+          byPointId.set(pKey, v);
+        }
+      }
+    });
+    result = Array.from(byPointId.values());
 
     // Filtrar por sede si hay branchId
     if (branchVehicleIds) {

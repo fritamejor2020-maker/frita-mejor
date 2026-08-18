@@ -801,14 +801,26 @@ export function AdminVehicleInventoryTab() {
                 try {
                   useInventoryStore.getState().clearVendorLocation(targetPointId);
 
-                  await supabase
-                    .from('vendor_locations')
-                    .delete()
-                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%,name.ilike.%${targetPointId}%`);
+                  // Limpiar en app_state (ambas llaves: global + sede)
+                  const clearFromAppState = async (key: string) => {
+                    const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
+                    if (!data?.value || typeof data.value !== 'object') return;
+                    const locs = { ...data.value } as Record<string, any>;
+                    const cleanTarget = String(targetPointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                    Object.keys(locs).forEach(k => {
+                      const loc = locs[k];
+                      const cleanK = String(k).toLowerCase().replace(/[^a-z0-9]/g, '');
+                      const cleanP = String(loc?.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                      if (cleanK === cleanTarget || cleanP === cleanTarget) delete locs[k];
+                    });
+                    await supabase.from('app_state').upsert({ key, value: locs, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+                  };
+                  await clearFromAppState('vendorLocations');
+                  await clearFromAppState('vendorLocations_BRANCH-001');
 
                   await supabase
                     .from('vendor_locations')
-                    .update({ is_active: false })
+                    .delete()
                     .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%,name.ilike.%${targetPointId}%`);
                 } catch (e) {
                   console.warn('[ForzarCierre] Warning al desactivar vendor_locations:', e);
