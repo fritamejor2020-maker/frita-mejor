@@ -123,10 +123,33 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
   const dbRef = useRef<Map<string, VendorLocation>>(new Map());
 
-  // Cargar datos remotos al abrir el mapa
+  // Cargar datos remotos y turnos al abrir el mapa y periódicamente
   useEffect(() => {
+    const loadState = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_state')
+          .select('key, value')
+          .in('key', ['posShifts', 'posShifts_BRANCH-001', 'vendorLocations', 'vendorLocations_BRANCH-001']);
+        if (data) {
+          const map: Record<string, any> = {};
+          data.forEach(r => { map[r.key] = r.value; });
+          const shifts = map['posShifts_BRANCH-001'] || map['posShifts'];
+          if (Array.isArray(shifts)) {
+            useInventoryStore.setState({ posShifts: shifts });
+          }
+          const locs = map['vendorLocations_BRANCH-001'] || map['vendorLocations'];
+          if (locs && typeof locs === 'object') {
+            useInventoryStore.setState({ vendorLocations: locs });
+          }
+        }
+      } catch (e) {}
+    };
+    loadState();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
+    const interval = setInterval(loadState, 6000);
+    return () => clearInterval(interval);
   }, []);
 
   // Calcular si una ubicación está "vieja" (más de 2 minutos)
@@ -149,50 +172,32 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     // Luego sobrescribir con los de Presence (estos son más recientes)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
-    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso) HOY
+    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso)
     const allActiveShifts = (activeShifts && activeShifts.length > 0)
       ? activeShifts
       : (posShiftsFromStore || []);
 
-    const getLocalDateStr = (d = new Date()) => {
-      try {
-        return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d);
-      } catch (_) {
-        const offset = d.getTimezoneOffset() * 60000;
-        return new Date(d.getTime() - offset).toISOString().slice(0, 10);
-      }
-    };
-
-    const getShiftDate = (s: any) => {
-      if (s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) return s.date;
-      if (s.fecha && /^\d{4}-\d{2}-\d{2}$/.test(s.fecha)) return s.fecha;
-      if (s.openedAt) {
-        try {
-          return getLocalDateStr(new Date(s.openedAt));
-        } catch (_) {
-          return s.openedAt.slice(0, 10);
-        }
-      }
-      return '';
-    };
-
-    const today = getLocalDateStr(new Date());
     const openShifts = allActiveShifts.filter((s: any) => {
       if (s.closedAt) return false;
       if (s.type && String(s.type).toUpperCase() !== 'VENDEDOR') return false;
-      return getShiftDate(s) === today;
+      return true;
     });
+
     const activePointIds = new Set(
       openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
     const activeUserIds = new Set(
       openShifts.map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
     );
+    const activeNames = new Set(
+      openShifts.map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim())
+    );
 
     let result = Array.from(merged.values()).filter(v => {
       const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
       const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase() : '';
-      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid));
+      const cleanName = v.name ? String(v.name).toLowerCase().trim() : '';
+      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid)) || (cleanName && activeNames.has(cleanName));
     });
 
     // Filtrar por sede si hay branchId
@@ -204,28 +209,39 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   };
 
   // ── Leer ubicaciones desde el store (sincronizado vía app_state) ──────────
-  // Esto reemplaza la consulta a vendor_locations para mayor fiabilidad.
   const vendorLocationsFromStore = useInventoryStore((s: any) => s.vendorLocations || {});
   const posShiftsFromStore       = useInventoryStore((s: any) => s.posShifts || []);
 
   useEffect(() => {
     const activeShiftPointIds = new Set(
       posShiftsFromStore
-        .filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt)
-        .map((s: any) => s.pointId)
+        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
     const activeShiftUserIds = new Set(
       posShiftsFromStore
-        .filter((s: any) => s.type === 'VENDEDOR' && !s.closedAt)
-        .map((s: any) => s.userId)
+        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
+    );
+    const activeShiftNames = new Set(
+      posShiftsFromStore
+        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim())
     );
 
     dbRef.current.clear();
     Object.entries(vendorLocationsFromStore).forEach(([vendorId, loc]: [string, any]) => {
       if (!loc.lat || !loc.lng) return;
+      const cleanP = loc.pointId ? String(loc.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+      const cleanUid = vendorId ? String(vendorId).toLowerCase() : '';
+      const cleanName = loc.name ? String(loc.name).toLowerCase().trim() : '';
+
       // Solo mostrar si hay turno activo para ese vendedor
       const hasActiveShift =
-        activeShiftUserIds.has(vendorId) || activeShiftPointIds.has(loc.pointId);
+        (cleanP && activeShiftPointIds.has(cleanP)) ||
+        (cleanUid && activeShiftUserIds.has(cleanUid)) ||
+        (cleanName && activeShiftNames.has(cleanName));
+
       if (!hasActiveShift) return;
       // No sobreescribir si Presence ya tiene dato en vivo
       if (presenceRef.current.has(vendorId)) return;

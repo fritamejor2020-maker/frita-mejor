@@ -242,38 +242,13 @@ export const DejadorDashboard = () => {
     const list = branchFiltered.map((v: any) => v.abbreviation || v.name);
     return list.length > 0 ? list : ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
   }, [allVehicles, userBranchId]);
-  // Helper para obtener fecha local (Colombia YYYY-MM-DD)
-  const getLocalDateStr = (d = new Date()) => {
-    try {
-      return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Bogota' }).format(d);
-    } catch (_) {
-      const offset = d.getTimezoneOffset() * 60000;
-      return new Date(d.getTime() - offset).toISOString().slice(0, 10);
-    }
-  };
-
-  const getShiftDate = (s: any) => {
-    if (s.date && /^\d{4}-\d{2}-\d{2}$/.test(s.date)) return s.date;
-    if (s.fecha && /^\d{4}-\d{2}-\d{2}$/.test(s.fecha)) return s.fecha;
-    if (s.openedAt) {
-      try {
-        return getLocalDateStr(new Date(s.openedAt));
-      } catch (_) {
-        return s.openedAt.slice(0, 10);
-      }
-    }
-    return '';
-  };
-
-  // Mapa: tricicloId → nombre del vendedor SOLO si tiene turno ABIERTO HOY en la MISMA JORNADA (AM/MD/PM) y SEDE
+  // Mapa: tricicloId → nombre del vendedor con turno ABIERTO (EN CURSO)
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
     const activeShiftsList = remoteShifts.length > 0 ? remoteShifts : posShifts;
-    const today = getLocalDateStr(new Date());
 
-    // Fuente única y estricta: Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
+    // Turnos de Vendedor ABIERTOS EN CURSO en la sede
     (activeShiftsList || []).forEach((s: any) => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
@@ -284,16 +259,10 @@ export const DejadorDashboard = () => {
       const pId = s.pointId || s.point_id || s.vehicle;
       if (!pId) return;
 
-      const sDate = getShiftDate(s);
-      const sShift = String(s.shift || s.jornada || 'AM').trim().toUpperCase();
       const sBranch = s.branchId || 'BRANCH-001';
-
-      // REGLA ESTRICTA: Mismo día (today), Misma jornada (AM/MD/PM), Misma sede
-      const isSameDate = sDate === today;
-      const matchesShift = sShift === currentShift;
       const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
 
-      if (isSameDate && matchesShift && matchesBranch) {
+      if (matchesBranch) {
         const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
         if (raw && raw !== '—') {
           const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -306,7 +275,7 @@ export const DejadorDashboard = () => {
     });
 
     return map;
-  }, [remoteShifts, posShifts, shift, userBranchId]);
+  }, [remoteShifts, posShifts, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
