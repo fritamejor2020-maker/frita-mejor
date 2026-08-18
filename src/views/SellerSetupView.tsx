@@ -296,11 +296,15 @@ export const SellerSetupView = () => {
                   <button
                     onClick={() => {
                       startShift({
+                        id: activeS.id,
+                        shiftId: activeS.id,
                         pointId: activeS.pointId,
                         shift: activeS.shift || 'AM',
                         pointType: activeS.pointType || 'variable',
                         responsibleName: activeS.responsibleName || user?.name || 'Vendedor',
                         openedAt: activeS.openedAt,
+                        userId: activeS.userId || (user as any)?.id || (user as any)?.username,
+                        branchId: activeS.branchId || userBranchId || 'BRANCH-001',
                       });
                       navigate('/vendedor');
                     }}

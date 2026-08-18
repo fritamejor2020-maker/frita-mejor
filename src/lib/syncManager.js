@@ -260,8 +260,10 @@ export async function push(key, value, branchId = null) {
     return;
   }
 
-  // Protección 2: Bloquear TODAS las escrituras hasta que la app descargue los datos remotos
-  if (!_appReady) {
+  // Protección 2: Bloquear escrituras de estado general hasta que la app descargue los datos remotos
+  // EXCEPCIÓN: posShifts y vendorLocations son acciones explícitas del usuario y writeToSupabase ya hace merge seguro con Supabase.
+  const isShiftOrLocation = key === 'posShifts' || key.startsWith('posShifts_') || key === 'vendorLocations' || key.startsWith('vendorLocations_');
+  if (!_appReady && !isShiftOrLocation) {
     console.warn(`[SyncManager] Push de "${key}" encolado/omitido: la app aún no terminó de cargar datos remotos.`);
     // Permitir si se ha forzado explicitamente
     if (typeof window === 'undefined' || !window.__FRITA_FORCE_SYNC__) {
