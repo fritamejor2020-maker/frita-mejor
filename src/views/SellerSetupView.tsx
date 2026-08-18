@@ -79,31 +79,50 @@ export const SellerSetupView = () => {
 
     const { posShifts, addPosShift } = useInventoryStore.getState();
     const today = new Date().toISOString().slice(0, 10);
+    const effectiveBranchId = userBranchId || 'BRANCH-001';
+    const cleanBranch = String(effectiveBranchId).toLowerCase().replace(/[^a-z0-9]/g, '');
     const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    // ── Regla: 1 turno por triciclo por jornada (AM/PM/MD) por día ──
-    // 1. Buscar si hay turno ABIERTO para reanudar
+    const currentUserName = String(user?.name || '').trim().toLowerCase();
+    const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
+
+    // ── Regla: 1 turno por vehículo por jornada (AM/MD/PM) por sede por día ──
+    // 1. Buscar si hay turno ABIERTO para este vehículo + jornada + sede hoy
     const openShift = (posShifts || []).find(
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
         s.shift === shift &&
+        (s.branchId === effectiveBranchId || !s.branchId || userBranchId === null) &&
         !s.closedAt &&
         (s.openedAt || s.fecha || '').startsWith(today)
     );
 
     if (openShift) {
-      // Reanudar turno abierto existente
-      startShift({
-        id: openShift.id,
-        pointId,
-        shift,
-        pointType,
-        responsibleName: finalResponsibleName,
-        openedAt: openShift.openedAt,
-        userId: user?.id || user?.username,
-      });
-      navigate('/vendedor');
-      return;
+      const shiftResp = String(openShift.responsibleName || '').trim().toLowerCase();
+      const shiftUid = String(openShift.userId || openShift.createdBy || '').trim().toLowerCase();
+
+      const isOwner = (currentUserId && shiftUid && shiftUid === currentUserId) ||
+                      (currentUserName && shiftResp && shiftResp === currentUserName) ||
+                      (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'MANAGER');
+
+      if (isOwner) {
+        // Reanudar turno abierto existente
+        startShift({
+          id: openShift.id,
+          pointId,
+          shift: openShift.shift || shift,
+          pointType: openShift.pointType || pointType,
+          responsibleName: openShift.responsibleName || finalResponsibleName,
+          openedAt: openShift.openedAt,
+          userId: user?.id || user?.username,
+          branchId: openShift.branchId || effectiveBranchId,
+        });
+        navigate('/vendedor');
+        return;
+      } else {
+        alert(`⚠️ El vehículo/punto "${pointId}" ya tiene un turno abierto en la jornada "${shift}" por el usuario "${openShift.responsibleName || 'otro vendedor'}".\n\nSolo el usuario que abrió este turno puede reanudarlo en cualquier dispositivo.`);
+        return;
+      }
     }
 
     // 2. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
@@ -111,6 +130,7 @@ export const SellerSetupView = () => {
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
         s.shift === shift &&
+        (s.branchId === effectiveBranchId || !s.branchId || userBranchId === null) &&
         s.closedAt &&
         (s.openedAt || s.fecha || '').startsWith(today)
     );
@@ -125,10 +145,31 @@ export const SellerSetupView = () => {
     const openedAt = new Date().toISOString();
     const cleanResp = String(finalResponsibleName).toLowerCase().replace(/[^a-z0-9]/g, '');
     const jornadaSlug = String(shift).toLowerCase().replace(/[^a-z0-9]/g, '');
-    const uniqueShiftId = `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
+    const uniqueShiftId = `SHIFT-VENDOR-${cleanBranch}-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
 
-    startShift({ id: uniqueShiftId, pointId, shift, pointType, responsibleName: finalResponsibleName, openedAt, userId: user?.id || user?.username });
-    addPosShift({ id: uniqueShiftId, openedAt, pointId, shift, responsibleName: finalResponsibleName, userId: user?.id || user?.username, createdBy: user?.id, type: 'VENDEDOR', closedAt: null });
+    startShift({
+      id: uniqueShiftId,
+      pointId,
+      shift,
+      pointType,
+      responsibleName: finalResponsibleName,
+      openedAt,
+      userId: user?.id || user?.username,
+      branchId: effectiveBranchId,
+    });
+    addPosShift({
+      id: uniqueShiftId,
+      openedAt,
+      pointId,
+      shift,
+      branchId: effectiveBranchId,
+      pointType,
+      responsibleName: finalResponsibleName,
+      userId: user?.id || user?.username,
+      createdBy: user?.id,
+      type: 'VENDEDOR',
+      closedAt: null,
+    });
     navigate('/vendedor');
   };
 

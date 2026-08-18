@@ -217,10 +217,20 @@ export const useLogisticsStore = create(
     if (!req) return;
 
     const affectedBranchId = req.branchId || 'BRANCH-001';
-    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+    const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
+    const posShifts = getPosShifts();
+    const cleanRequester = String(req.requester_point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const activeShift = posShifts.find(s => {
+      if (!s || s.closedAt) return false;
+      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
+    });
+
     const newPending = pendingRequests.filter(req => req.id !== requestId);
     const newCompleted = [{
       ...req,
+      shiftId: activeShift?.id || null,
+      jornada: activeShift?.shift || dejadorShift || 'AM',
       status: 'completed',
       completed_at: new Date().toISOString(),
       anotadorName: anotadorName || null,
@@ -241,7 +251,14 @@ export const useLogisticsStore = create(
     if (!req) return;
 
     const affectedBranchId = req.branchId || 'BRANCH-001';
-    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+    const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
+    const posShifts = getPosShifts();
+    const cleanRequester = String(req.requester_point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const activeShift = posShifts.find(s => {
+      if (!s || s.closedAt) return false;
+      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
+    });
 
     // Quitar el request original de pendientes
     const newPending = pendingRequests.filter(r => r.id !== requestId);
@@ -249,6 +266,8 @@ export const useLogisticsStore = create(
     // Marcar como completado solo los ítems disponibles
     const newCompleted = [{
       ...req,
+      shiftId: activeShift?.id || null,
+      jornada: activeShift?.shift || dejadorShift || 'AM',
       items_payload: availableItems,
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -396,21 +415,23 @@ export const useLogisticsStore = create(
     if (items.length === 0) return false;
 
     const affectedBranchId = getVehicleBranchId(vehicleId);
-    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
 
     // ── Asociar al turno activo del vehículo ──────────────────────────────────
-    // Buscar el turno en curso (sin closedAt) cuyo pointId coincida con el vehículo
+    // Buscar el turno en curso (sin closedAt) cuyo pointId coincida con el vehículo y jornada
     const posShifts = getPosShifts();
     const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
     const now = Date.now();
+    const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
+    const dejadorJornada = dejadorShift || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
+
     const activeShift = posShifts.find(s => {
       if (!s || s.closedAt) return false;
       const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
-      return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+      const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+      const shiftMatches = !s.shift || s.shift === dejadorJornada;
+      return pointMatches && shiftMatches;
     });
-
-    const dejadorJornada = useDejadorSessionStore.getState()?.activeJornada || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
     const entry = {
       id: `LOAD-${now}`,
@@ -445,20 +466,21 @@ export const useLogisticsStore = create(
     if (items.length === 0) return false;
 
     const affectedBranchId = getVehicleBranchId(vehicleId);
-    const { anotadorName, dejadorName } = useDejadorSessionStore.getState();
+    const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
+    const dejadorJornada = dejadorShift || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
-    // ── Asociar al turno activo del vehículo ──────────────────────────────────
+    // ── Asociar al turno del vehículo ──────────────────────────────────
     const posShifts = getPosShifts();
     const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
     const now = Date.now();
     const activeShift = posShifts.find(s => {
-      if (!s || s.closedAt) return false;
+      if (!s) return false;
       const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
-      return cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+      const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
+      const shiftMatches = !s.shift || s.shift === dejadorJornada;
+      return pointMatches && shiftMatches;
     });
-
-    const dejadorJornada = useDejadorSessionStore.getState()?.activeJornada || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
     const entry = {
       id: `RECV-${now}`,
