@@ -190,9 +190,48 @@ export const DejadorDashboard = () => {
 
   const today = new Date().toISOString().slice(0, 10);
 
-  // Cargar estado remoto más reciente al entrar al dashboard del Dejador
+  // Sincronización directa y periódica con Supabase para turnos y GPS de los triciclos
+  const loadRemoteShifts = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'vendorLocations', 'vendorLocations_BRANCH-001']);
+
+      if (error || !data) return;
+
+      const map: Record<string, any> = {};
+      data.forEach((row: any) => { map[row.key] = row.value; });
+
+      const shiftMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
+        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+      ].forEach((s: any) => {
+        if (!s?.id) return;
+        const existing = shiftMap.get(s.id);
+        if (!existing || (!existing.closedAt && s.closedAt)) {
+          shiftMap.set(s.id, s);
+        }
+      });
+      const allShifts = Array.from(shiftMap.values());
+      useInventoryStore.setState({ posShifts: allShifts });
+
+      const locs = map['vendorLocations_BRANCH-001'] || map['vendorLocations'];
+      if (locs && typeof locs === 'object') {
+        useInventoryStore.setState({ vendorLocations: locs });
+      }
+    } catch (e) {
+      console.warn('[DejadorDashboard] Error loading remote shifts:', e);
+    }
+  };
+
   useEffect(() => {
+    loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
+    const interval = setInterval(loadRemoteShifts, 8000);
+    return () => clearInterval(interval);
   }, []);
 
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
@@ -214,8 +253,9 @@ export const DejadorDashboard = () => {
     const map: Record<string, string> = {};
     const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
+    const now = Date.now();
 
-    // Fuente única y estricta: Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
+    // 1. Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
     (posShifts || []).forEach((s: any) => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
@@ -230,7 +270,7 @@ export const DejadorDashboard = () => {
       const sShift = String(s.shift || 'AM').trim().toUpperCase();
       const sBranch = s.branchId || 'BRANCH-001';
 
-      const isRecent = !s.openedAt || sDate === today || (Date.now() - new Date(s.openedAt).getTime() < 24 * 3600 * 1000);
+      const isRecent = !s.openedAt || sDate === today || (now - new Date(s.openedAt).getTime() < 24 * 3600 * 1000);
       const matchesShift = !s.shift || sShift === currentShift;
       const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
 
@@ -246,8 +286,29 @@ export const DejadorDashboard = () => {
       }
     });
 
+    // 2. Ubicaciones GPS en vivo desde vendorLocations (si está activo en las últimas 6 horas en la misma jornada)
+    Object.values(vendorLocations || {}).forEach((loc: any) => {
+      const pId = loc?.pointId;
+      if (pId && loc?.isActive !== false) {
+        const locShift = String(loc.shift || 'AM').trim().toUpperCase();
+        const locUpdated = loc.updatedAt ? new Date(loc.updatedAt).getTime() : 0;
+        const isRecentGps = (now - locUpdated) < 6 * 3600 * 1000;
+
+        if (locShift === currentShift && isRecentGps) {
+          const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          const upperP = String(pId).toUpperCase();
+          const raw = String(loc.name || '').trim();
+          if (raw && raw !== '—') {
+            if (!map[pId]) map[pId] = raw;
+            if (!map[cleanP]) map[cleanP] = raw;
+            if (!map[upperP]) map[upperP] = raw;
+          }
+        }
+      }
+    });
+
     return map;
-  }, [posShifts, shift, today, userBranchId]);
+  }, [posShifts, vendorLocations, shift, today, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
