@@ -163,7 +163,8 @@ export const DejadorDashboard = () => {
   const navigate = useNavigate();
   const timeAgo = useRelativeTime();
   const { pendingRequests, completedRequests, rejectedRequests, loadHistory, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest, markRequestRead } = useLogisticsStore();
-  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, posShifts, addPosShift } = useInventoryStore();
+  const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, addPosShift } = useInventoryStore();
+  const posShifts = useInventoryStore((state: any) => state.posShifts) || [];
   const allDeliveryProducts = getDeliveryItems();
   const { user, signOut, updateUserPresets } = useAuthStore();
   const userBranchId = (user as any)?.branchId ?? null;
@@ -189,14 +190,15 @@ export const DejadorDashboard = () => {
   const INACTIVITY_MS = 2 * 60 * 1000; // 2 minutos
 
   const today = new Date().toISOString().slice(0, 10);
+  const [remoteShifts, setRemoteShifts] = useState<any[]>([]);
 
-  // Sincronización directa y periódica con Supabase para turnos y GPS de los triciclos
+  // Sincronización directa y periódica con Supabase para turnos de los triciclos
   const loadRemoteShifts = async () => {
     try {
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'vendorLocations', 'vendorLocations_BRANCH-001']);
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
 
       if (error || !data) return;
 
@@ -216,12 +218,8 @@ export const DejadorDashboard = () => {
         }
       });
       const allShifts = Array.from(shiftMap.values());
+      setRemoteShifts(allShifts);
       useInventoryStore.setState({ posShifts: allShifts });
-
-      const locs = map['vendorLocations_BRANCH-001'] || map['vendorLocations'];
-      if (locs && typeof locs === 'object') {
-        useInventoryStore.setState({ vendorLocations: locs });
-      }
     } catch (e) {
       console.warn('[DejadorDashboard] Error loading remote shifts:', e);
     }
@@ -230,7 +228,7 @@ export const DejadorDashboard = () => {
   useEffect(() => {
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
-    const interval = setInterval(loadRemoteShifts, 8000);
+    const interval = setInterval(loadRemoteShifts, 6000);
     return () => clearInterval(interval);
   }, []);
 
@@ -246,16 +244,16 @@ export const DejadorDashboard = () => {
   }, [allVehicles, userBranchId]);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
-  const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
-
   // Mapa: tricicloId → nombre del vendedor SOLO si tiene turno ABIERTO HOY en la MISMA JORNADA (AM/MD/PM) y SEDE
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
     const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
+    const activeShiftsList = remoteShifts.length > 0 ? remoteShifts : posShifts;
+    const now = Date.now();
 
-    // Fuente única y estricta: Turnos de Vendedor en posShifts ABIERTOS HOY en la misma jornada y sede
-    (posShifts || []).forEach((s: any) => {
+    // Fuente única y estricta: Turnos de Vendedor ABIERTOS HOY en la misma jornada y sede
+    (activeShiftsList || []).forEach((s: any) => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
 
@@ -269,9 +267,9 @@ export const DejadorDashboard = () => {
       const sShift = String(s.shift || 'AM').trim().toUpperCase();
       const sBranch = s.branchId || 'BRANCH-001';
 
-      // REGLA ESTRICTA: Mismo día (today), Misma jornada (AM/MD/PM), Misma sede
-      const isSameDate = sDate === today;
-      const matchesShift = sShift === currentShift;
+      // REGLA ESTRICTA: Mismo día (today / últimas 18h), Misma jornada (AM/MD/PM), Misma sede
+      const isSameDate = sDate === today || (s.openedAt && (now - new Date(s.openedAt).getTime() < 18 * 3600 * 1000));
+      const matchesShift = !s.shift || sShift === currentShift;
       const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
 
       if (isSameDate && matchesShift && matchesBranch) {
@@ -287,7 +285,7 @@ export const DejadorDashboard = () => {
     });
 
     return map;
-  }, [posShifts, shift, today, userBranchId]);
+  }, [remoteShifts, posShifts, shift, today, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
   const processedIds = new Set([
