@@ -4,6 +4,7 @@ import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useVehicleStore } from '../store/useVehicleStore';
 import { useAuthStore } from '../store/useAuthStore';
+import { push } from '../lib/syncManager';
 
 export const SellerSetupView = () => {
   const { user } = useAuthStore();
@@ -157,7 +158,7 @@ export const SellerSetupView = () => {
       userId: user?.id || user?.username,
       branchId: effectiveBranchId,
     });
-    addPosShift({
+    const newShiftRecord = {
       id: uniqueShiftId,
       openedAt,
       pointId,
@@ -169,7 +170,11 @@ export const SellerSetupView = () => {
       createdBy: user?.id,
       type: 'VENDEDOR',
       closedAt: null,
-    });
+    };
+
+    addPosShift(newShiftRecord);
+    push('posShifts', [newShiftRecord], effectiveBranchId).catch(() => {});
+    push('posShifts', [newShiftRecord], null).catch(() => {});
     navigate('/vendedor');
   };
 

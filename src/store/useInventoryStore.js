@@ -27,7 +27,7 @@ function syncKey(key, value) {
   // Bloqueo 2: Si la app no ha terminado de cargar datos remotos, no sincronizar
   // Esto evita que los valores INITIAL_* del código sobreescriban Supabase al arrancar
   const store = useInventoryStore.getState();
-  if (!store._hasLoadedRemote) {
+  if (!store._hasLoadedRemote && key !== 'posShifts' && !key.startsWith('posShifts_')) {
     console.warn(`[SyncGuard] Push de "${key}" bloqueado: aún no se ha cargado el estado remoto.`);
     return;
   }
