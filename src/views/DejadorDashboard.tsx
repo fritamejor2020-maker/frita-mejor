@@ -190,14 +190,20 @@ export const DejadorDashboard = () => {
 
   const today = new Date().toISOString().slice(0, 10);
 
+  // Cargar estado remoto más reciente al entrar al dashboard del Dejador
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+  }, []);
+
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
   const allVehicles = useVehicleStore((state: any) => state.vehicles);
   const vehicles = React.useMemo(() => {
-    const active = allVehicles.filter((v: any) => v.active);
+    const active = allVehicles.filter((v: any) => v.active !== false);
     const branchFiltered = userBranchId
       ? active.filter((v: any) => !v.branchId || v.branchId === userBranchId)
       : active;
-    return branchFiltered.map((v: any) => v.abbreviation || v.name);
+    const list = branchFiltered.map((v: any) => v.abbreviation || v.name);
+    return list.length > 0 ? list : ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
   }, [allVehicles, userBranchId]);
   const defaultVehicle = vehicles.length > 0 ? vehicles[0] : 'T1';
 
@@ -206,46 +212,43 @@ export const DejadorDashboard = () => {
   // Mapa: tricicloId → nombre del vendedor SOLO si tiene turno ABIERTO HOY en la MISMA JORNADA (AM/MD/PM) y SEDE
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    const currentShift = shift || 'AM';
+    const currentShift = String(shift || 'AM').trim().toUpperCase();
     const effectiveBranch = userBranchId || 'BRANCH-001';
 
     // 1. Turnos en posShifts abiertos hoy en la misma jornada y sede
     (posShifts || []).forEach((s: any) => {
       if (s.type === 'VENDEDOR' && s.pointId && !s.closedAt) {
         const sDate = (s.openedAt || s.fecha || '').slice(0, 10);
-        const sShift = s.shift || 'AM';
+        const sShift = String(s.shift || 'AM').trim().toUpperCase();
         const sBranch = s.branchId || 'BRANCH-001';
 
-        const matchesDate = sDate === today;
+        const matchesDate = !s.openedAt || sDate === today || (Date.now() - new Date(s.openedAt).getTime() < 24 * 60 * 60 * 1000);
         const matchesShift = sShift === currentShift;
         const matchesBranch = userBranchId === null || sBranch === effectiveBranch;
 
         if (matchesDate && matchesShift && matchesBranch) {
-          const raw = s.responsibleName || s.userName || '';
-          const firstName = raw.split(' ')[0];
-          if (firstName && firstName !== '—') {
-            const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-            map[s.pointId] = firstName;
-            map[cleanP] = firstName;
+          const raw = String(s.responsibleName || s.userName || '').trim();
+          const cleanP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (raw && raw !== '—') {
+            map[s.pointId] = raw;
+            map[cleanP] = raw;
           }
         }
       }
     });
 
-    // 2. Ubicaciones GPS en vivo (solo si coinciden en fecha y jornada actual)
+    // 2. Ubicaciones GPS en vivo (solo si coinciden en jornada y sede)
     Object.values(vendorLocations).forEach((loc: any) => {
       const pId = loc?.pointId;
       if (pId && loc?.isActive !== false) {
-        const locDate = (loc.openedAt || loc.updatedAt || '').slice(0, 10);
-        const locShift = loc.shift || 'AM';
-        if (locDate === today && locShift === currentShift) {
+        const locShift = String(loc.shift || 'AM').trim().toUpperCase();
+        if (locShift === currentShift) {
           const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
           if (!map[pId] && !map[cleanP]) {
-            const raw = loc.name || '';
-            const firstName = raw.split(' ')[0];
-            if (firstName && firstName !== '—') {
-              map[pId] = firstName;
-              map[cleanP] = firstName;
+            const raw = String(loc.name || '').trim();
+            if (raw && raw !== '—') {
+              map[pId] = raw;
+              map[cleanP] = raw;
             }
           }
         }
