@@ -6,15 +6,38 @@ import { useVehicleStore } from '../store/useVehicleStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { push } from '../lib/syncManager';
 
+import { supabase } from '../lib/supabase';
+
 export const SellerSetupView = () => {
   const { user } = useAuthStore();
   const startShift = useSellerSessionStore((state) => state.startShift);
+  const { isSetupComplete: sellerSetupComplete, shiftId: activeShiftId, endShift: clearSession } = useSellerSessionStore();
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
   const enabledPointTypes = useVehicleStore((s: any) => s.enabledPointTypes ?? { Triciclo: true, Carrito: true, Local: false });
   const posShifts = useInventoryStore((state) => state.posShifts || []);
 
   useEffect(() => {
+    // 1. Cargar datos frescos desde Supabase
     useInventoryStore.getState().loadFromRemote().catch(() => {});
+
+    // 2. Si hay una sesión activa, verificar directamente en Supabase si el turno ya fue cerrado
+    // Esto resuelve el caso donde el Admin cierra el turno remotamente y la tablet aún lo muestra como abierto
+    if (sellerSetupComplete && activeShiftId) {
+      supabase
+        .from('app_state')
+        .select('value')
+        .in('key', ['posShifts', 'posShifts_BRANCH-001'])
+        .then(({ data }) => {
+          if (!data) return;
+          const allShifts = data.flatMap((r: any) => r.value || []);
+          const myShift = allShifts.find((s: any) => s.id === activeShiftId);
+          if (myShift?.closedAt) {
+            console.log('[SellerSetup] Turno activo ya está cerrado en Supabase. Limpiando sesión local.');
+            clearSession();
+          }
+        })
+        .catch(() => {});
+    }
   }, []);
 
   const activeOpenShifts = useMemo(() => {

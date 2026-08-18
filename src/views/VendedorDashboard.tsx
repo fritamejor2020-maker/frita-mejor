@@ -20,9 +20,13 @@ import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
+import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
 
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
+
+  // Detectar cierre remoto del turno (cuando el Admin lo cierra desde el PC)
+  useRemoteShiftClose();
   const { cart, total, addToCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();

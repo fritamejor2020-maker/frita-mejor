@@ -134,6 +134,7 @@ async function writeToSupabase(key, value) {
         .select('key,value')
         .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
       
+      // Regla de oro: versión cerrada SIEMPRE gana. Un turno cerrado NUNCA puede reabrirse.
       const shiftMap = new Map();
       if (remoteRows && remoteRows.length > 0) {
         remoteRows.forEach(r => {
@@ -144,6 +145,7 @@ async function writeToSupabase(key, value) {
                 if (!existing || (!existing.closedAt && s.closedAt)) {
                   shiftMap.set(s.id, s);
                 }
+                // Si existing ya está cerrado y s está abierto → NO sobrescribir (existing gana)
               }
             });
           }
@@ -153,9 +155,19 @@ async function writeToSupabase(key, value) {
       value.forEach(s => {
         if (s?.id) {
           const existing = shiftMap.get(s.id);
-          if (!existing || (!existing.closedAt && s.closedAt) || s.forcedByAdmin) {
+          if (!existing) {
+            shiftMap.set(s.id, s);
+          } else if (existing.closedAt && !s.closedAt) {
+            // Remoto cerrado + local abierto → remoto GANA. NUNCA reabrir un turno cerrado.
+            // No hacer nada — mantener existing
+          } else if (!existing.closedAt && s.closedAt) {
+            // Remoto abierto + local cerrado → local GANA
+            shiftMap.set(s.id, s);
+          } else if (s.forcedByAdmin) {
+            // forcedByAdmin siempre tiene prioridad máxima
             shiftMap.set(s.id, s);
           }
+          // Si ambos abiertos o ambos cerrados → existing gana (sin cambios)
         }
       });
 

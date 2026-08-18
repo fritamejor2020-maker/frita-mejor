@@ -179,7 +179,10 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
     const openShifts = allActiveShifts.filter((s: any) => {
       if (s.closedAt) return false;
-      if (s.type && String(s.type).toUpperCase() !== 'VENDEDOR') return false;
+      // Requerir type=VENDEDOR explícito — excluir ghost shifts de caja (sin type o con type diferente)
+      if (String(s.type || '').toUpperCase() !== 'VENDEDOR') return false;
+      // Debe tener un pointId válido para aparecer en el mapa
+      if (!s.pointId) return false;
       return true;
     });
 
@@ -215,17 +218,17 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   useEffect(() => {
     const activeShiftPointIds = new Set(
       posShiftsFromStore
-        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
         .map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
     const activeShiftUserIds = new Set(
       posShiftsFromStore
-        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
         .map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
     );
     const activeShiftNames = new Set(
       posShiftsFromStore
-        .filter((s: any) => (!s.type || s.type === 'VENDEDOR') && !s.closedAt)
+        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
         .map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim())
     );
 

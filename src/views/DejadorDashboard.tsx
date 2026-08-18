@@ -253,7 +253,7 @@ export const DejadorDashboard = () => {
       const isClosed = Boolean(s.closedAt);
       if (isClosed) return;
 
-      const isVendor = !s.type || String(s.type).toUpperCase() === 'VENDEDOR';
+      const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
       if (!isVendor) return;
 
       const pId = s.pointId || s.point_id || s.vehicle;

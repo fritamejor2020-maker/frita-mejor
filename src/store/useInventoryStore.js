@@ -516,10 +516,26 @@ export const useInventoryStore = create(
                 if (Array.isArray(val)) {
                   // Remoto reemplaza local; preservar solo offline genuinos
                   const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
+                  // Mapa de turnos remotos por ID para comparar estado de cierre
+                  const remoteById = new Map(val.filter(x => x?.id).map(x => [x.id, x]));
                   const localArr = get()[key] || [];
-                  const userCreatedOffline = localArr.filter(item =>
-                    item?.id && !remoteIds.has(item.id) && !DEMO_IDS.has(item.id) && !deletedRegs.has(item.id)
-                  );
+                  const userCreatedOffline = localArr.filter(item => {
+                    if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
+                    if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
+                    // Para posShifts: verificar si hay una versión remota cerrada con el mismo ID
+                    // (puede estar en posShifts_master_history aunque no en val)
+                    if (key === 'posShifts') {
+                      // Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
+                      const allRemoteSources = [
+                        ...(remote['posShifts'] || []),
+                        ...(remote['posShifts_BRANCH-001'] || []),
+                        ...(remote['posShifts_master_history'] || []),
+                      ];
+                      const remoteVersion = allRemoteSources.find(r => r?.id === item.id);
+                      if (remoteVersion?.closedAt && !item.closedAt) return false; // remoto cerrado gana
+                    }
+                    return true;
+                  });
                   let finalVal = [...val, ...userCreatedOffline];
                   // Aplicar tombstones
                   if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
