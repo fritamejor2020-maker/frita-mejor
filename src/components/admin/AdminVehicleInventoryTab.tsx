@@ -537,7 +537,7 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    // ── Paso 1: deduplicar por ID exacto (evitar duplicados por doble fuente) ──
+    // ── Deduplicar por ID exacto preservando el estado más completo / cerrado ──
     const byId = new Map<string, any>();
     raw.forEach((s: any) => {
       if (!s?.id) return;
@@ -547,35 +547,14 @@ export function AdminVehicleInventoryTab() {
       } else if (!existing.closedAt && s.closedAt) {
         // Preferir el que tiene cierre
         byId.set(s.id, s);
-      }
-    });
-    const deduped = Array.from(byId.values());
-
-    // ── Paso 2: deduplicar por (pointId + fecha + jornada) ──────────────────────
-    // Cada triciclo puede tener máximo UN turno por jornada por día.
-    // Si hay varios registros para la misma combinación, se mantiene el más completo.
-    const bySlot = new Map<string, any>();
-    deduped.forEach((s: any) => {
-      const pointId = (s.pointId || s.vehicle || '?').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const fecha   = s.fecha || s.date || dateOf(s.closedAt || s.openedAt || '');
-      const jornada = deriveJornada(s);
-      const slotKey = `${pointId}_${fecha}_${jornada}`;
-
-      const existing = bySlot.get(slotKey);
-      if (!existing) {
-        bySlot.set(slotKey, s);
-      } else if (!existing.closedAt && s.closedAt) {
-        // Preferir el que está cerrado
-        bySlot.set(slotKey, s);
-      } else if (existing.closedAt && s.closedAt) {
-        // Si ambos cerrados, el más reciente gana
+      } else if (s.closedAt && existing.closedAt) {
         if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-          bySlot.set(slotKey, s);
+          byId.set(s.id, s);
         }
       }
     });
 
-    return Array.from(bySlot.values());
+    return Array.from(byId.values());
   }, [posShifts, supabaseShifts]);
 
 

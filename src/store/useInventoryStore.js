@@ -562,6 +562,16 @@ export const useInventoryStore = create(
                 });
               }
 
+              // 3. Respaldo permanente posShifts_master_history para posShifts
+              if (key === 'posShifts' && Array.isArray(remote['posShifts_master_history'])) {
+                remote['posShifts_master_history'].forEach(item => {
+                  if (item?.id && !addedIds.has(item.id)) {
+                    merged.push(item);
+                    addedIds.add(item.id);
+                  }
+                });
+              }
+
               if (mergedArrayKeys.includes(key) && merged.length > 0) {
                 if (key === 'posShifts') {
                   merged = merged.filter(s => !deleted.includes(s.id));
