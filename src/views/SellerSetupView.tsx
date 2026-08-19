@@ -247,35 +247,38 @@ export const SellerSetupView = () => {
     };
 
     addPosShift(newShiftRecord);
-    const updatedShifts = useInventoryStore.getState().posShifts || [newShiftRecord];
+    const allShifts = useInventoryStore.getState().posShifts || [newShiftRecord];
 
-    // ⚡ Garantizar sincronización remota inmediata con Supabase antes de redirigir (Esencial para iPad iOS)
-    try {
-      const keysToUpdate = ['posShifts', `posShifts_${effectiveBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'];
-      const { data: remoteData } = await supabase.from('app_state').select('key, value').in('key', keysToUpdate);
-      const shiftMap = new Map<string, any>();
-      (remoteData || []).forEach((row: any) => {
-        (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
+    push('posShifts', allShifts, effectiveBranchId).catch(() => {});
+    push('posShifts', allShifts, null).catch(() => {});
+
+    // ⚡ Sincronización remota asíncrona en segundo plano (NO bloquea la navegación en iPad)
+    supabase
+      .from('app_state')
+      .select('key, value')
+      .in('key', ['posShifts', `posShifts_${effectiveBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'])
+      .then(({ data }) => {
+        const shiftMap = new Map<string, any>();
+        (data || []).forEach((row: any) => {
+          (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
+            if (s?.id) shiftMap.set(s.id, s);
+          });
+        });
+        allShifts.forEach((s: any) => {
           if (s?.id) shiftMap.set(s.id, s);
         });
-      });
-      updatedShifts.forEach((s: any) => {
-        if (s?.id) shiftMap.set(s.id, s);
-      });
-      const mergedList = Array.from(shiftMap.values());
+        const mergedList = Array.from(shiftMap.values());
+        const nowIso = new Date().toISOString();
+        Promise.allSettled([
+          supabase.from('app_state').upsert({ key: 'posShifts', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
+        ]).catch(() => {});
+      })
+      .catch(() => {});
 
-      await Promise.allSettled([
-        supabase.from('app_state').upsert({ key: 'posShifts', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
-        supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
-        supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
-        supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
-        push('posShifts', mergedList, effectiveBranchId),
-        push('posShifts', mergedList, null)
-      ]);
-    } catch (eSync) {
-      console.warn('[SellerSetup Direct Sync Error]:', eSync);
-    }
-
+    // Navegar de inmediato sin esperar la red (0ms de latencia)
     navigate('/vendedor');
   };
 
