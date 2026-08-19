@@ -497,10 +497,8 @@ export function AdminVehicleInventoryTab() {
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   // ── Estado local de turnos cargados directamente desde Supabase ─────────────
-  // Esto GARANTIZA que siempre hay datos aunque el store Zustand esté vacío
-  // por la hidratación desde localStorage.
   const [supabaseShifts, setSupabaseShifts] = useState<any[]>([]);
-  const [supabaseLoaded, setSupabaseLoaded] = useState(false);
+  const [supabaseLoaded, setSupabaseLoaded] = useState(() => (useInventoryStore.getState().posShifts || []).length > 0);
 
   const loadShiftsFromSupabase = async () => {
     try {
@@ -509,36 +507,36 @@ export function AdminVehicleInventoryTab() {
         .select('key, value')
         .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
 
-      if (error || !data) return;
+      if (!error && data) {
+        const map: Record<string, any> = {};
+        data.forEach((row: any) => { map[row.key] = row.value; });
 
-      const map: Record<string, any> = {};
-      data.forEach((row: any) => { map[row.key] = row.value; });
+        const shiftMap = new Map<string, any>();
+        [
+          ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
+          ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+          ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+        ].forEach((s: any) => {
+          if (!s?.id) return;
+          const existing = shiftMap.get(s.id);
+          if (!existing || (!existing.closedAt && s.closedAt)) {
+            shiftMap.set(s.id, s);
+          }
+        });
+        const allShifts = Array.from(shiftMap.values());
 
-      const shiftMap = new Map<string, any>();
-      [
-        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
-        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
-      ].forEach((s: any) => {
-        if (!s?.id) return;
-        const existing = shiftMap.get(s.id);
-        if (!existing || (!existing.closedAt && s.closedAt)) {
-          shiftMap.set(s.id, s);
-        }
-      });
-      const allShifts = Array.from(shiftMap.values());
+        // Filtrar tombstones
+        const deletedIds = new Set<string>([
+          ...((map['deletedShiftIds'] || []) as string[]),
+          ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
+        ]);
+        const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
 
-      // Filtrar tombstones
-      const deletedIds = new Set<string>([
-        ...((map['deletedShiftIds'] || []) as string[]),
-        ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
-      ]);
-      const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
+        setSupabaseShifts(filtered);
 
-      setSupabaseShifts(filtered);
-
-      // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
-      useInventoryStore.setState({ posShifts: filtered });
+        // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
+        useInventoryStore.setState({ posShifts: filtered });
+      }
     } catch (e) {
       // No bloquear la UI si falla Supabase
     } finally {
@@ -551,6 +549,9 @@ export function AdminVehicleInventoryTab() {
     loadShiftsFromSupabase();
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
     useInventoryStore.getState().loadFromRemote().catch(() => {});
+
+    // Forzar término de carga en máximo 1.5s para no bloquear la pantalla
+    const safetyTimeout = setTimeout(() => setSupabaseLoaded(true), 1500);
 
     // Intervalo de respaldo cada 5 segundos
     const interval = setInterval(loadShiftsFromSupabase, 5000);
@@ -569,6 +570,7 @@ export function AdminVehicleInventoryTab() {
       .subscribe();
 
     return () => {
+      clearTimeout(safetyTimeout);
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
@@ -728,33 +730,35 @@ export function AdminVehicleInventoryTab() {
     <div className="flex-1 p-4 space-y-5">
 
       <div className="flex items-center gap-3 flex-wrap bg-gray-50 p-3 rounded-2xl border border-gray-100 justify-between">
-        <div className="flex items-center gap-3 flex-wrap">
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-gray-500">Fecha:</span>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold">
+            <span className="text-gray-400">Fecha:</span>
             <input
               type="date"
               value={filterDate}
               onChange={(e) => setFilterDate(e.target.value)}
-              className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+              className="outline-none text-gray-700 bg-transparent font-bold cursor-pointer"
             />
           </div>
-          <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-gray-500">Jornada:</span>
+
+          <div className="flex items-center gap-1.5 bg-white px-3 py-2 rounded-xl border border-gray-200 text-xs font-bold">
+            <span className="text-gray-400">Jornada:</span>
             <select
               value={filterShift}
               onChange={(e) => setFilterShift(e.target.value)}
-              className="text-xs font-bold bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 outline-none focus:border-amber-400"
+              className="outline-none text-gray-700 bg-transparent font-bold cursor-pointer"
             >
               <option value="">Todas</option>
-              {availableJornadas.map((j) => (
+              {availableJornadas.map(j => (
                 <option key={j} value={j}>{j}</option>
               ))}
             </select>
           </div>
+
           {(filterDate || filterShift) && (
             <button
               onClick={() => { setFilterDate(''); setFilterShift(''); }}
-              className="text-xs font-bold text-red-500 hover:text-red-700 px-2 py-1 bg-red-50 rounded-lg active:scale-95 transition-all"
+              className="text-xs text-red-500 font-bold px-2 py-1 hover:underline"
             >
               Limpiar filtros
             </button>
@@ -764,9 +768,9 @@ export function AdminVehicleInventoryTab() {
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="flex items-center gap-1.5 text-xs font-bold bg-white border border-gray-200 hover:border-amber-400 text-gray-700 px-3 py-1.5 rounded-xl shadow-sm transition-all active:scale-95 disabled:opacity-50"
+          className="flex items-center gap-1.5 bg-white hover:bg-gray-100 text-gray-700 font-bold text-xs px-3 py-2 rounded-xl border border-gray-200 transition-all active:scale-95 disabled:opacity-50 cursor-pointer"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-amber-500 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <RefreshCw size={13} className={isRefreshing ? 'animate-spin' : ''} />
           {isRefreshing ? 'Actualizando...' : 'Actualizar'}
         </button>
       </div>
@@ -794,12 +798,7 @@ export function AdminVehicleInventoryTab() {
         </p>
       </div>
 
-      {!supabaseLoaded ? (
-        <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
-          <span className="text-4xl block mb-4 animate-spin">⏳</span>
-          <p className="font-black text-gray-400 text-lg">Cargando turnos desde el servidor...</p>
-        </div>
-      ) : filteredShifts.length === 0 ? (
+      {filteredShifts.length === 0 ? (
         <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
           <span className="text-5xl block mb-4">📋</span>
           <p className="font-black text-gray-600 text-lg">No hay turnos registrados</p>
