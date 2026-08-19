@@ -464,63 +464,68 @@ export const VendedorDashboard = () => {
   };
 
   const handleCloseShift = async () => {
-    const cashVal = parseInt(cash) || 0;
-    const transferVal = shiftTransferTotal;
-    const expensesVal = parseInt(expenses) || 0;
-    const realTotal = cashVal + transferVal + expensesVal;
-
-    const { soldItems, theoretical: theorySalesVal } = getLogisticsCalc();
-    const difference = theorySalesVal - realTotal;
-    const status = difference === 0 ? 'CUADRADO' : difference > 0 ? 'FALTANTE' : 'SOBRANTE';
-
-    // Calculate goals and bonuses
-    const totalSales = cashVal + transferVal;
-    const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-    const dayOfWeek = new Date().getDay();
-
-    const activeGoal = salesGoals.find((g: any) => 
-      g.branchId === activeBranchId && 
-      g.targetType === 'VEHICLE' && 
-      g.targetId === pointId && 
-      g.shift === shift &&
-      g.daysOfWeek.includes(dayOfWeek)
-    );
-
-    const goalMet = activeGoal && totalSales >= activeGoal.minAmount;
-    const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
-    const totalBonus = goalMet ? (excess * (activeGoal.bonusPercent / 100)) : 0;
-
-    const bonusRecipients = [];
-    if (goalMet) {
-      const currentEmp = payrollEmployees.find((e: any) => e.name === responsibleName);
-      bonusRecipients.push({
-        employeeId: currentEmp?.id || 'TEMP-' + Date.now(),
-        name: responsibleName || 'Vendedor',
-        documentId: currentEmp?.documentId || '',
-        bonusAmount: Math.round(totalBonus)
-      });
-    }
-
-    // Construir details[] vacío (sección de productos vendidos eliminada)
-    const details: any[] = [];
+    isClosingNormally.current = true;
+    setIsClosing(true);
 
     try {
-      // Marcar que el cierre lo está haciendo el vendedor voluntariamente.
-      // Esto previene que el monitor de cierre remoto (useEffect #3) muestre
-      // "cerrado por administración" cuando el propio vendedor cierra su turno.
-      isClosingNormally.current = true;
-      setIsClosing(true);
+      const cashVal = parseInt(cash) || 0;
+      const transferVal = shiftTransferTotal || 0;
+      const expensesVal = parseInt(expenses) || 0;
+      const realTotal = cashVal + transferVal + expensesVal;
+
+      let soldItems = {};
+      let theorySalesVal = 0;
+      try {
+        const calc = getLogisticsCalc();
+        soldItems = calc?.soldItems || {};
+        theorySalesVal = calc?.theoretical || 0;
+      } catch (eCalc) {
+        console.warn('[VendedorClose] Error in getLogisticsCalc:', eCalc);
+      }
+
+      const difference = theorySalesVal - realTotal;
+      const status = difference === 0 ? 'CUADRADO' : difference > 0 ? 'FALTANTE' : 'SOBRANTE';
+
+      // Calculate goals and bonuses
+      const totalSales = cashVal + transferVal;
+      const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+      const dayOfWeek = new Date().getDay();
+
+      const activeGoal = (salesGoals || []).find((g: any) => 
+        g.branchId === activeBranchId && 
+        g.targetType === 'VEHICLE' && 
+        g.targetId === pointId && 
+        g.shift === shift &&
+        (g.daysOfWeek || []).includes(dayOfWeek)
+      );
+
+      const goalMet = activeGoal && totalSales >= activeGoal.minAmount;
+      const excess = goalMet ? (totalSales - activeGoal.minAmount) : 0;
+      const totalBonus = goalMet ? (excess * (activeGoal.bonusPercent / 100)) : 0;
+
+      const bonusRecipients: any[] = [];
+      if (goalMet) {
+        const currentEmp = (payrollEmployees || []).find((e: any) => e.name === responsibleName);
+        bonusRecipients.push({
+          employeeId: currentEmp?.id || 'TEMP-' + Date.now(),
+          name: responsibleName || 'Vendedor',
+          documentId: currentEmp?.documentId || '',
+          bonusAmount: Math.round(totalBonus)
+        });
+      }
 
       const shiftData = useSellerSessionStore.getState() as any;
       const currentShiftId = shiftData?.shiftId || '';
+      const closeTime = new Date().toISOString();
+
       const finalShift = {
           id: currentShiftId || `SHIFT-VEND-${pointId || 'AUTO'}-${Date.now()}`,
-          openedAt: shiftData.openedAt || new Date().toISOString(),
-          closedAt: new Date().toISOString(),
+          openedAt: shiftData.openedAt || closeTime,
+          closedAt: closeTime,
           userId: (user as any)?.id,
           userName: responsibleName,
           pointId: pointId,
-          shift: shiftData.shift,
+          shift: shiftData.shift || shift || 'AM',
           pointType: shiftData.pointType,
           theorySales: theorySalesVal,
           realAmount: realTotal,
@@ -533,14 +538,13 @@ export const VendedorDashboard = () => {
           difference: difference,
           type: 'VENDEDOR',
           soldItems,
-          details,
+          details: [],
           earnedBonus: Math.round(totalBonus),
           bonusGoalAmount: activeGoal?.minAmount || 0,
           bonusPercent: activeGoal?.bonusPercent || 0,
           bonusRecipients
       };
 
-      // Helper para comparar nombres/IDs de punto de forma flexible (ej. "T2" vs "Punto T2")
       const matchesPointId = (idA: any, idB: any) => {
         if (!idA || !idB) return false;
         const cleanA = String(idA).toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -550,7 +554,7 @@ export const VendedorDashboard = () => {
         return false;
       };
 
-      // 1. Buscar y cerrar TODOS los turnos abiertos pertenecientes a este punto o vendedor
+      // 1. Actualizar localmente posShifts
       const currentShifts = useInventoryStore.getState().posShifts || [];
       let shiftFound = false;
 
@@ -567,8 +571,8 @@ export const VendedorDashboard = () => {
           return {
             ...s,
             ...finalShift,
-            id: s.id, // Preservar ID único original
-            closedAt: finalShift.closedAt,
+            id: s.id,
+            closedAt: closeTime,
           };
         }
         return s;
@@ -578,31 +582,56 @@ export const VendedorDashboard = () => {
         updatedShifts.push(finalShift);
       }
 
-      // 2. Inmediatamente actualizar store local y limpiar GPS
       useInventoryStore.setState({ posShifts: updatedShifts });
       useInventoryStore.getState().clearVendorLocation(pointId);
 
-      // 3. Forzar persistencia directa en el localStorage del iPad
+      // 2. Detener GPS
+      try { gpsStop().catch(() => {}); } catch (_) {}
+
+      // 3. Escribir directamente a Supabase para garantizar cierre remoto
       try {
-        const rawStore = localStorage.getItem('frita-mejor-inventory');
-        if (rawStore) {
-          const parsed = JSON.parse(rawStore);
-          if (parsed && parsed.state) {
-            parsed.state.posShifts = updatedShifts;
-            localStorage.setItem('frita-mejor-inventory', JSON.stringify(parsed));
+        const keysToUpdate = [
+          'posShifts',
+          `posShifts_${activeBranchId}`,
+          'posShifts_BRANCH-001',
+          'posShifts_master_history'
+        ];
+
+        const { data: remoteData } = await supabase
+          .from('app_state')
+          .select('key, value')
+          .in('key', keysToUpdate);
+
+        const upsertPromises = (remoteData || []).map(row => {
+          const list = Array.isArray(row.value) ? row.value : [];
+          let modified = false;
+          const closedList = list.map((s: any) => {
+            if (s.type !== 'VENDEDOR' || s.closedAt) return s;
+            const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
+            const isMatchByPoint = matchesPointId(s.pointId, pointId);
+            const isMatchByName = s.responsibleName && responsibleName &&
+              String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
+
+            if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
+              modified = true;
+              return { ...s, ...finalShift, id: s.id, closedAt: closeTime };
+            }
+            return s;
+          });
+
+          if (!modified) {
+            closedList.push(finalShift);
           }
-        }
-      } catch (eLs) {
-        console.warn('[VendedorClose] Error guardando directamente en localStorage:', eLs);
-      }
 
-      // 4. Detener transmisión GPS
-      gpsStop().catch(() => {});
+          return supabase.from('app_state').upsert({
+            key: row.key,
+            value: closedList,
+            updated_at: closeTime
+          }, { onConflict: 'key' });
+        });
 
-      // 5. Sincronizar con Supabase en paralelo asegurando el envío antes de salir
-      const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-      try {
         await Promise.allSettled([
+          ...upsertPromises,
           push('posShifts', updatedShifts, activeBranchId),
           push('posShifts', updatedShifts, null),
           supabase
@@ -611,10 +640,10 @@ export const VendedorDashboard = () => {
             .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
         ]);
       } catch (eSync) {
-        console.warn('[VendedorClose Sync]:', eSync);
+        console.warn('[VendedorClose Remote Sync]:', eSync);
       }
 
-      // 6. Salir al setup / login
+      toast.success('Jornada cerrada');
       endShift();
       signOut();
     } catch (err: any) {
