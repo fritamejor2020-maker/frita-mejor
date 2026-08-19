@@ -599,17 +599,22 @@ export const VendedorDashboard = () => {
       // 4. Detener transmisión GPS
       gpsStop().catch(() => {});
 
-      // 5. Disparar sincronización a Supabase en paralelo sin bloquear la UI
+      // 5. Sincronizar con Supabase en paralelo asegurando el envío antes de salir
       const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-      push('posShifts', updatedShifts, activeBranchId).catch(() => {});
-      push('posShifts', updatedShifts, null).catch(() => {});
-      supabase
-        .from('vendor_locations')
-        .update({ is_active: false })
-        .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
-        .catch(() => {});
+      try {
+        await Promise.allSettled([
+          push('posShifts', updatedShifts, activeBranchId),
+          push('posShifts', updatedShifts, null),
+          supabase
+            .from('vendor_locations')
+            .update({ is_active: false })
+            .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
+        ]);
+      } catch (eSync) {
+        console.warn('[VendedorClose Sync]:', eSync);
+      }
 
-      // 6. Salir de inmediato al setup / login
+      // 6. Salir al setup / login
       endShift();
       signOut();
     } catch (err: any) {
