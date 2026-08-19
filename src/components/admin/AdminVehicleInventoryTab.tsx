@@ -127,38 +127,56 @@ const fmtTime = (iso: string) =>
 
 // ─── Construye el resumen logístico de un turno ───────────────────────────────
 function buildShiftLogistics(
-  shift: any,           // ← turno completo (necesitamos shift.id para filtrar por shiftId)
+  shift: any,
   vehicleId: string,
   shiftDate: string,
   openedAt: string | null,
   closedAt: string | null,
   loadHistory: any[],
   completedRequests: any[],
-  priceMap: Record<string, { price: number; name: string }>
+  priceMap: Record<string, { price: number; name: string }>,
+  allShifts: any[] = []
 ) {
-  const shiftJornada = deriveJornada(shift);
+  const shiftJornada = (deriveJornada(shift) || '').toUpperCase();
 
-  // Ventana de tiempo:
-  // Si shiftDate existe, considerar todo el día con margen de 6h para evitar descartar cargas matutinas
-  const MARGIN_MS = 6 * 60 * 60 * 1000; // 6 horas de margen previo a la apertura
+  // Encontrar otros turnos del mismo vehículo en la misma fecha para delimitar ventanas estrictas
+  const sameDayVehicleShifts = (allShifts || [])
+    .filter((s: any) => matchVehicleId(s.pointId || s.vehicle, vehicleId) && (s.fecha || s.date || dateOf(s.closedAt || s.openedAt || '')) === shiftDate)
+    .sort((a: any, b: any) => new Date(a.openedAt || a.closedAt || 0).getTime() - new Date(b.openedAt || b.closedAt || 0).getTime());
 
-  const fromMs: number = (() => {
-    if (openedAt) return Math.max(0, new Date(openedAt).getTime() - MARGIN_MS);
-    if (shiftDate) {
-      const d = new Date(`${shiftDate}T00:00:00`);
-      return d.getTime();
+  const shiftIdx = sameDayVehicleShifts.findIndex((s: any) => s.id === shift.id);
+
+  // Inicio de ventana: no puede ser anterior al cierre del turno previo
+  let windowStart = 0;
+  if (shiftIdx > 0) {
+    const prevShift = sameDayVehicleShifts[shiftIdx - 1];
+    if (prevShift.closedAt) {
+      windowStart = new Date(prevShift.closedAt).getTime();
+    } else if (prevShift.openedAt) {
+      windowStart = new Date(prevShift.openedAt).getTime() + 60 * 1000;
     }
-    return 0;
-  })();
+  } else if (openedAt) {
+    // Permite cargas hasta 25 min antes de que el vendedor abra sesión en la tablet
+    windowStart = Math.max(0, new Date(openedAt).getTime() - 25 * 60 * 1000);
+  } else if (shiftDate) {
+    windowStart = new Date(`${shiftDate}T00:00:00`).getTime();
+  }
 
-  const toMs: number = closedAt
-    ? new Date(closedAt).getTime() + 60 * 60 * 1000 // 1h de gracia después del cierre
-    : Date.now() + 24 * 60 * 60 * 1000;
+  // Fin de ventana: no puede sobrepasar el cierre de este turno ni la apertura del siguiente
+  let windowEnd = Infinity;
+  if (closedAt) {
+    windowEnd = new Date(closedAt).getTime() + 15 * 60 * 1000; // 15 min tras el cierre
+  } else if (shiftIdx >= 0 && shiftIdx < sameDayVehicleShifts.length - 1) {
+    const nextShift = sameDayVehicleShifts[shiftIdx + 1];
+    if (nextShift.openedAt) {
+      windowEnd = new Date(nextShift.openedAt).getTime();
+    }
+  }
 
   const inWindow = (ts: string) => {
     if (!ts) return false;
     const t = new Date(ts).getTime();
-    return t >= fromMs && t <= toMs;
+    return t >= windowStart && t <= windowEnd;
   };
 
   // Cargas
@@ -169,14 +187,25 @@ function buildShiftLogistics(
       if (e.type !== 'carga') return false;
       if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenCargas.has(e.id)) return false;
-      seenCargas.add(e.id);
+
       // 1. Si coincide el shiftId exacto
-      if (e.shiftId && (e.shiftId === shift.id || (shift.id && shift.id.includes(e.shiftId)))) return true;
-      // 2. Si coincide la jornada (AM/MD/PM) y la fecha de hoy/turno
-      const eDate = dateOf(e.timestamp);
-      if (e.jornada && e.jornada === shiftJornada && (!shiftDate || eDate === shiftDate)) return true;
-      // 3. Fallback: dentro de la ventana de tiempo del turno
-      return inWindow(e.timestamp);
+      if (e.shiftId && e.shiftId === shift.id) {
+        seenCargas.add(e.id);
+        return true;
+      }
+      if (e.shiftId && e.shiftId !== shift.id && sameDayVehicleShifts.some(s => s.id === e.shiftId)) {
+        return false;
+      }
+
+      // 2. Si tiene jornada explícita, debe coincidir exactamente
+      const eJornada = (e.jornada || e.shift || '').toUpperCase();
+      if (eJornada && shiftJornada && eJornada !== shiftJornada) return false;
+
+      // 3. Debe caer dentro de la ventana de tiempo del turno
+      if (!inWindow(e.timestamp)) return false;
+
+      seenCargas.add(e.id);
+      return true;
     })
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
@@ -192,8 +221,12 @@ function buildShiftLogistics(
     .filter((r: any) => {
       if (!matchVehicleId(r.requester_point_id, vehicleId)) return false;
       if (seenSurtidos.has(r.id)) return false;
+
+      const rTime = r.completed_at || r.created_at;
+      if (!inWindow(rTime)) return false;
+
       seenSurtidos.add(r.id);
-      return inWindow(r.completed_at || r.created_at);
+      return true;
     })
     .forEach((r: any) => {
       (r.items_payload || []).forEach(({ productId, qty, name }: any) => {
@@ -210,14 +243,28 @@ function buildShiftLogistics(
       if (e.type !== 'recepcion') return false;
       if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenRecepciones.has(e.id)) return false;
-      seenRecepciones.add(e.id);
+
+      // Un turno que aún está abierto y en curso NO tiene sobrantes de turnos anteriores
+      if (!closedAt && !inWindow(e.timestamp)) return false;
+
       // 1. Si coincide el shiftId exacto
-      if (e.shiftId && (e.shiftId === shift.id || (shift.id && shift.id.includes(e.shiftId)))) return true;
-      // 2. Si coincide la jornada (AM/MD/PM) y la fecha de hoy/turno
-      const eDate = dateOf(e.timestamp);
-      if (e.jornada && e.jornada === shiftJornada && (!shiftDate || eDate === shiftDate)) return true;
-      // 3. Fallback: dentro de la ventana de tiempo
-      return inWindow(e.timestamp);
+      if (e.shiftId && e.shiftId === shift.id) {
+        seenRecepciones.add(e.id);
+        return true;
+      }
+      if (e.shiftId && e.shiftId !== shift.id && sameDayVehicleShifts.some(s => s.id === e.shiftId)) {
+        return false;
+      }
+
+      // 2. Si tiene jornada explícita, debe coincidir exactamente
+      const eJornada = (e.jornada || e.shift || '').toUpperCase();
+      if (eJornada && shiftJornada && eJornada !== shiftJornada) return false;
+
+      // 3. Debe caer dentro de la ventana de tiempo
+      if (!inWindow(e.timestamp)) return false;
+
+      seenRecepciones.add(e.id);
+      return true;
     })
     .forEach((e: any) => {
       (e.items || []).forEach(({ productId, qty, name }: any) => {
@@ -227,7 +274,7 @@ function buildShiftLogistics(
     });
 
   // Si el turno mismo tiene sobrantes registrados en su cierre (shift.sobrantes)
-  if (shift?.sobrantes && typeof shift.sobrantes === 'object') {
+  if (closedAt && shift?.sobrantes && typeof shift.sobrantes === 'object') {
     Object.entries(shift.sobrantes).forEach(([pid, qty]: [string, any]) => {
       if (typeof qty === 'number' && qty > 0) {
         if (!sobranteMap[pid]) sobranteMap[pid] = { name: priceMap[pid]?.name || pid, qty: 0 };
@@ -259,7 +306,7 @@ function buildShiftLogistics(
 }
 
 // ─── Card de un turno ─────────────────────────────────────────────────────────
-function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle, onForceClose }: any) {
+function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle, onForceClose, allShifts }: any) {
   const vehicleId = shift.pointId || shift.vehicle || '?';
   const shiftDate = shift.fecha || shift.date || dateOf(shift.closedAt || shift.openedAt || '');
   const openedAt  = shift.openedAt || shift.start_time || null;
@@ -269,8 +316,8 @@ function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded
   const isClosed  = !!closedAt;
 
   const { lines, totalCarga, totalSurtido, totalSobrante, totalVendido, totalVendidoPesos } =
-    useMemo(() => buildShiftLogistics(shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests, priceMap),
-      [shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests]);
+    useMemo(() => buildShiftLogistics(shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests, priceMap, allShifts),
+      [shift, vehicleId, shiftDate, openedAt, closedAt, loadHistory, completedRequests, allShifts]);
 
   const hasData = lines.length > 0;
 
@@ -771,6 +818,7 @@ export function AdminVehicleInventoryTab() {
               loadHistory={loadHistory || []}
               completedRequests={completedRequests || []}
               priceMap={priceMap}
+              allShifts={allShifts}
               isExpanded={expandedId === shift.id}
               onToggle={() => setExpandedId(expandedId === shift.id ? null : shift.id)}
               onForceClose={!shift.closedAt ? async () => {
@@ -1075,6 +1123,7 @@ export function VehicleShiftCard({
         loadHistory={loadHistory || []}
         completedRequests={completedRequests || []}
         priceMap={priceMap}
+        allShifts={combinedShifts}
         isExpanded={isExpanded}
         onToggle={() => setIsExpanded(e => !e)}
         onForceClose={undefined}
