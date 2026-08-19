@@ -61,23 +61,19 @@ export const VendedorDashboard = () => {
     useInventoryStore.getState().loadFromRemote().catch(() => {});
   }, []);
 
-  // ── 1. Validar identidad del usuario: si la sesión en localStorage pertenece a otro usuario, salir ──
+  // ── 1. Validar identidad del usuario: solo si la sesión en localStorage pertenece explícitamente a otra cuenta de login distinta ──
   useEffect(() => {
     if (!isSetupComplete || !user) return;
-    const sessionUserId = (useSellerSessionStore.getState() as any).userId;
-    const sessionResp = String(responsibleName || '').trim().toLowerCase();
-    const currentName = String((user as any)?.name || '').trim().toLowerCase();
+    const sessionUserId = String((useSellerSessionStore.getState() as any).userId || '').trim().toLowerCase();
     const currentId = String((user as any)?.id || (user as any)?.username || '').trim().toLowerCase();
 
-    const isSameUser = (sessionUserId && (sessionUserId === currentId)) ||
-                       (sessionResp && sessionResp === currentName);
-
-    if (!isSameUser && (user as any).role !== 'ADMIN' && (user as any).role !== 'SUPER_ADMIN') {
-      console.log('[VendedorDashboard] Sesión previa pertenece a otro usuario. Limpiando...');
+    // Solo cerrar si la sesión tiene un userId grabado y ese userId es explícitamente de otra cuenta
+    if (sessionUserId && currentId && sessionUserId !== currentId && (user as any).role !== 'ADMIN' && (user as any).role !== 'SUPER_ADMIN') {
+      console.log('[VendedorDashboard] Sesión previa pertenece a otra cuenta de usuario. Limpiando...');
       gpsStop();
       endShift();
     }
-  }, [user, isSetupComplete, responsibleName]);
+  }, [user, isSetupComplete]);
 
   // ── 2. Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
   useEffect(() => {
