@@ -72,31 +72,38 @@ export const SellerSetupView = () => {
 
   // activeOpenShifts: solo basado en datos VERIFICADOS con Supabase (remoteShifts)
   // Mientras carga (remoteShifts === null), devuelve [] para no mostrar banners falsos.
-  const activeOpenShifts = useMemo(() => {
-    if (remoteShifts === null) return []; // Aún cargando — no mostrar nada
+  const { myUserOpenShifts, otherOpenShifts } = useMemo(() => {
+    if (remoteShifts === null) return { myUserOpenShifts: [], otherOpenShifts: [] };
 
     const currentUserName = String(user?.name || '').trim().toLowerCase();
     const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
 
-    return remoteShifts.filter((s: any) => {
-      if (s.type !== 'VENDEDOR' || s.closedAt) return false;
-      if (!user) return false;
+    const myMine: any[] = [];
+    const others: any[] = [];
 
-      // Admin/Manager ven todos los turnos abiertos
-      if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
-        return true;
-      }
+    remoteShifts.forEach((s: any) => {
+      if (s.type !== 'VENDEDOR' || s.closedAt) return;
+      if (!user) return;
 
-      // Vendedor regular: solo ve sus propios turnos
       const shiftResp = String(s.responsibleName || '').trim().toLowerCase();
       const shiftUid = String(s.userId || s.createdBy || '').trim().toLowerCase();
 
-      const isSameUserByName = currentUserName.length > 0 && shiftResp === currentUserName;
-      const isSameUserById = currentUserId.length > 0 && shiftUid === currentUserId;
+      const isMineByName = currentUserName.length > 0 && shiftResp === currentUserName;
+      const isMineById = currentUserId.length > 0 && shiftUid === currentUserId;
 
-      return isSameUserByName || isSameUserById;
+      if (isMineByName || isMineById) {
+        myMine.push(s);
+      } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
+        others.push(s);
+      }
     });
+
+    return { myUserOpenShifts: myMine, otherOpenShifts: others };
   }, [remoteShifts, user]);
+  
+  const activeOpenShifts = useMemo(() => {
+    return [...myUserOpenShifts, ...otherOpenShifts];
+  }, [myUserOpenShifts, otherOpenShifts]);
   
   const [pointType, setPointType] = useState('variable');
   const [pointId, setPointId] = useState('');
@@ -158,6 +165,45 @@ export const SellerSetupView = () => {
 
     const currentUserName = String(user?.name || '').trim().toLowerCase();
     const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
+
+    // 0. Si el usuario ya tiene un turno ABIERTO activo hoy:
+    if (myUserOpenShifts.length > 0) {
+      const myShift = myUserOpenShifts[0];
+      const samePointAndShift = String(myShift.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint && myShift.shift === shift;
+      if (samePointAndShift) {
+        startShift({
+          id: myShift.id,
+          pointId: myShift.pointId,
+          shift: myShift.shift,
+          pointType: myShift.pointType || pointType,
+          responsibleName: myShift.responsibleName || finalResponsibleName,
+          openedAt: myShift.openedAt,
+          userId: user?.id || user?.username,
+          branchId: myShift.branchId || effectiveBranchId,
+        });
+        navigate('/vendedor');
+        return;
+      }
+
+      const resumeConfirm = window.confirm(
+        `⚠️ Tu usuario "${finalResponsibleName}" ya tiene un turno ABIERTO en el punto "${myShift.pointId}" (Jornada ${myShift.shift}).\n\n¿Deseas REANUDAR tu turno en el punto "${myShift.pointId}"?`
+      );
+
+      if (resumeConfirm) {
+        startShift({
+          id: myShift.id,
+          pointId: myShift.pointId,
+          shift: myShift.shift,
+          pointType: myShift.pointType || pointType,
+          responsibleName: myShift.responsibleName || finalResponsibleName,
+          openedAt: myShift.openedAt,
+          userId: user?.id || user?.username,
+          branchId: myShift.branchId || effectiveBranchId,
+        });
+        navigate('/vendedor');
+        return;
+      }
+    }
 
     // ── Regla: 1 turno por vehículo por jornada (AM/MD/PM) por sede por día ──
     // 1. Buscar si hay turno ABIERTO para este vehículo + jornada + sede hoy
