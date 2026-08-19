@@ -132,14 +132,23 @@ async function writeToSupabase(key, value) {
       const { data: remoteRows } = await supabase
         .from('app_state')
         .select('key,value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
       
+      const deletedSet = new Set();
+      if (remoteRows && remoteRows.length > 0) {
+        remoteRows.forEach(r => {
+          if ((r.key === 'deletedShiftIds' || r.key === 'deletedShiftIds_BRANCH-001') && Array.isArray(r.value)) {
+            r.value.forEach(id => { if (id) deletedSet.add(id); });
+          }
+        });
+      }
+
       const shiftMap = new Map();
       if (remoteRows && remoteRows.length > 0) {
         remoteRows.forEach(r => {
-          if (Array.isArray(r.value)) {
+          if ((r.key === 'posShifts' || r.key.startsWith('posShifts_')) && Array.isArray(r.value)) {
             r.value.forEach(s => {
-              if (s?.id) {
+              if (s?.id && !deletedSet.has(s.id)) {
                 const existing = shiftMap.get(s.id);
                 if (!existing || (!existing.closedAt && s.closedAt)) {
                   shiftMap.set(s.id, s);
@@ -160,7 +169,7 @@ async function writeToSupabase(key, value) {
       }
 
       value.forEach(s => {
-        if (s?.id) {
+        if (s?.id && !deletedSet.has(s.id)) {
           const existing = shiftMap.get(s.id);
           if (!existing) {
             shiftMap.set(s.id, s);
