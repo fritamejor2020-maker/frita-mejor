@@ -163,16 +163,29 @@ export const useChatStore = create(
 
             if (!isForMe) return m;
 
-            // Si se está viendo un canal/vehículo específico (ej: 't1')
+            // Si se está viendo un canal/vehículo específico (ej: 't1', 't2')
             if (target && target !== 'all') {
-              if (sender === target || point === target || receiver === target) {
+              const cleanTarget = target.replace(/[^a-z0-9]/g, '');
+              const cleanSender = sender.replace(/[^a-z0-9]/g, '');
+              const cleanPoint = point.replace(/[^a-z0-9]/g, '');
+              const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
+
+              const matchesTarget = cleanSender === cleanTarget || 
+                                    cleanPoint === cleanTarget || 
+                                    cleanReceiver === cleanTarget ||
+                                    (cleanTarget && cleanSender.includes(cleanTarget)) ||
+                                    (cleanTarget && cleanPoint.includes(cleanTarget));
+
+              if (matchesTarget) {
                 changed = true;
                 return { ...m, read: true };
               }
-            } else {
-              // Viendo Canal General ('ALL'): marcar como leídos los mensajes no leídos
-              changed = true;
-              return { ...m, read: true };
+            } else if (target === 'all') {
+              // Viendo Canal General ('ALL'): SOLO marcar como leídos los mensajes dirigidos a Canal General ('ALL')
+              if (receiver === 'all') {
+                changed = true;
+                return { ...m, read: true };
+              }
             }
 
             return m;
@@ -203,19 +216,37 @@ export const useChatStore = create(
             // Descartar mensajes propios
             if (sender === myId || point === myId) return false;
 
-            // Si se filtra por un vehículo específico (ej: 'T1')
-            if (fromUserId && fromUserId !== 'ALL') {
-              const target = String(fromUserId).toLowerCase();
-              if (sender !== target && point !== target && receiver !== target) return false;
-            }
-
             // Verificar si el destinatario es para mí o mi rol
             const isForMe =
               receiver === 'all' ||
               receiver === myId ||
               (isDejador && (receiver === 'dejador' || receiver === 'logistica'));
 
-            return isForMe;
+            if (!isForMe) return false;
+
+            // Si se filtra por Canal General ('ALL')
+            if (fromUserId === 'ALL') {
+              return receiver === 'all';
+            }
+
+            // Si se filtra por un vehículo específico (ej: 'T1', 'T2')
+            if (fromUserId) {
+              const target = String(fromUserId).toLowerCase();
+              const cleanTarget = target.replace(/[^a-z0-9]/g, '');
+              const cleanSender = sender.replace(/[^a-z0-9]/g, '');
+              const cleanPoint = point.replace(/[^a-z0-9]/g, '');
+              const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
+
+              const matchesVehicle = cleanSender === cleanTarget || 
+                                     cleanPoint === cleanTarget || 
+                                     cleanReceiver === cleanTarget ||
+                                     (cleanTarget && cleanSender.includes(cleanTarget)) ||
+                                     (cleanTarget && cleanPoint.includes(cleanTarget));
+
+              return matchesVehicle;
+            }
+
+            return true;
           }).length;
         },
 
