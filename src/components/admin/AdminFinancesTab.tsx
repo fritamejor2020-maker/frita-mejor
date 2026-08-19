@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
 import { refreshAllFromSupabase } from '../../lib/useRealtimeSync';
+import { supabase } from '../../lib/supabase';
 import { useAuthStore } from '../../store/useAuthStore';
 import { useVehicleStore } from '../../store/useVehicleStore';
 import { useBranchStore } from '../../store/useBranchStore';
@@ -399,9 +400,80 @@ export const AdminFinancesTab = ({
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
+  const loadShiftsFromSupabase = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
+
+      if (error || !data) return;
+
+      const map: Record<string, any> = {};
+      data.forEach((row: any) => { map[row.key] = row.value; });
+
+      const shiftMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
+        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+      ].forEach((s: any) => {
+        if (!s?.id) return;
+        const existing = shiftMap.get(s.id);
+        if (!existing || (!existing.closedAt && s.closedAt)) {
+          shiftMap.set(s.id, s);
+        }
+      });
+      const allShifts = Array.from(shiftMap.values());
+
+      // Filtrar tombstones
+      const deletedIds = new Set<string>([
+        ...((map['deletedShiftIds'] || []) as string[]),
+        ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
+      ]);
+      const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
+
+      // Sincronizar en el store global para que Inventario en Ruta y Cierres Finanzas compartan exactamente los mismos datos
+      useInventoryStore.setState({ posShifts: filtered });
+    } catch (e) {
+      // Ignorar fallos de red sin romper la UI
+    }
+  };
+
+  // Carga inicial y escucha reactiva en tiempo real para mantener Cierres Finanzas 100% sincronizado
+  useEffect(() => {
+    loadShiftsFromSupabase();
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+    useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
+
+    const interval = setInterval(loadShiftsFromSupabase, 5000);
+
+    const channel = supabase
+      .channel('admin-finances-shifts-sync')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'app_state',
+        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
+      }, () => {
+        loadShiftsFromSupabase();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    try { await refreshAllFromSupabase(); } finally { setIsRefreshing(false); }
+    try {
+      await loadShiftsFromSupabase();
+      await refreshAllFromSupabase();
+    } finally {
+      setIsRefreshing(false);
+    }
   };
 
   const updateEditDetail = (idx: number, field: string, value: string) => {

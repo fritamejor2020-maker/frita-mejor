@@ -460,7 +460,7 @@ export function AdminVehicleInventoryTab() {
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
+        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
 
       if (error || !data) return;
 
@@ -469,6 +469,7 @@ export function AdminVehicleInventoryTab() {
 
       const shiftMap = new Map<string, any>();
       [
+        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
         ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
       ].forEach((s: any) => {
@@ -489,7 +490,7 @@ export function AdminVehicleInventoryTab() {
 
       setSupabaseShifts(filtered);
 
-      // También actualizar el store de Zustand para que quede sincronizado
+      // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
       useInventoryStore.setState({ posShifts: filtered });
     } catch (e) {
       // No bloquear la UI si falla Supabase
@@ -498,10 +499,32 @@ export function AdminVehicleInventoryTab() {
     }
   };
 
-  // Asegurar carga de datos remotos al abrir la pestaña
+  // Asegurar carga de datos remotos al abrir la pestaña y suscripción en tiempo real
   useEffect(() => {
     loadShiftsFromSupabase();
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+
+    // Intervalo de respaldo cada 5 segundos
+    const interval = setInterval(loadShiftsFromSupabase, 5000);
+
+    // Canal Realtime para cambios instantáneos
+    const channel = supabase
+      .channel('admin-shifts-live-sync')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'app_state',
+        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
+      }, () => {
+        loadShiftsFromSupabase();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, []);
 
   const handleRefresh = async () => {
