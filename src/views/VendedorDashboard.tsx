@@ -1917,13 +1917,14 @@ export const VendedorDashboard = () => {
                         <button
                           type="button"
                           onClick={() => decreaseFromCart(itemId)}
-                          className="h-5 w-5 min-w-[20px] max-h-[20px] rounded-full bg-red-100 hover:bg-red-200 text-[#FF4040] flex items-center justify-center font-black transition-all active:scale-90 shrink-0 self-center leading-none"
+                          style={{ minHeight: '22px', height: '22px', width: '22px', maxHeight: '22px', maxWidth: '22px', padding: 0 }}
+                          className="btn-compact !min-h-[22px] !h-[22px] !w-[22px] !max-h-[22px] !max-w-[22px] rounded-full bg-red-100 hover:bg-red-200 text-[#FF4040] flex items-center justify-center font-black transition-all active:scale-90 shrink-0 self-center leading-none shadow-none"
                           title={c.qty > 1 ? "Restar 1" : "Eliminar"}
                         >
                           {c.qty > 1 ? (
-                            <Minus size={11} strokeWidth={3.5} />
+                            <Minus size={12} strokeWidth={3.5} />
                           ) : (
-                            <X size={11} strokeWidth={3.5} />
+                            <X size={12} strokeWidth={3.5} />
                           )}
                         </button>
                         <span className="inline-flex items-center justify-center bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full shrink-0 leading-tight self-center">

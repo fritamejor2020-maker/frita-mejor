@@ -40,7 +40,11 @@ button:active, [role="button"]:active {
 
 /* ─── Touch targets mínimos (44px recomendado por Apple/Google) ─ */
 @media (pointer: coarse) {
-  button, [role="button"], select, input[type="checkbox"], input[type="radio"] {
+  button:not(.btn-compact):not([data-compact]), 
+  [role="button"]:not(.btn-compact):not([data-compact]), 
+  select:not(.btn-compact), 
+  input[type="checkbox"], 
+  input[type="radio"] {
     min-height: 44px;
   }
 }
