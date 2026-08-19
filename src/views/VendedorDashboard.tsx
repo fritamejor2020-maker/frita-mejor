@@ -21,6 +21,7 @@ import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
+import { push } from '../lib/syncManager';
 
 export const VendedorDashboard = () => {
   const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();

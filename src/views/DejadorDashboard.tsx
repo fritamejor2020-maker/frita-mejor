@@ -275,7 +275,7 @@ export const DejadorDashboard = () => {
     (sourceList || []).forEach((s: any) => {
       if (s.closedAt) return;
 
-      const isVendor = !s.type || String(s.type).toUpperCase() === 'VENDEDOR';
+      const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
       if (!isVendor) return;
 
       const rawPoint = String(s.pointId || s.point_id || s.vehicle || s.registerName || '').trim();
