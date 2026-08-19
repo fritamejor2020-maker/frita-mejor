@@ -142,7 +142,7 @@ export const SellerSetupView = () => {
 
   const navigate = useNavigate();
 
-  const handleStartShift = () => {
+  const handleStartShift = async () => {
     const finalResponsibleName = responsibleName.trim() || user?.name || '';
     if (!pointId || !finalResponsibleName) {
       alert("Faltan datos");
@@ -248,8 +248,34 @@ export const SellerSetupView = () => {
 
     addPosShift(newShiftRecord);
     const updatedShifts = useInventoryStore.getState().posShifts || [newShiftRecord];
-    push('posShifts', updatedShifts, effectiveBranchId).catch(() => {});
-    push('posShifts', updatedShifts, null).catch(() => {});
+
+    // ⚡ Garantizar sincronización remota inmediata con Supabase antes de redirigir (Esencial para iPad iOS)
+    try {
+      const keysToUpdate = ['posShifts', `posShifts_${effectiveBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'];
+      const { data: remoteData } = await supabase.from('app_state').select('key, value').in('key', keysToUpdate);
+      const shiftMap = new Map<string, any>();
+      (remoteData || []).forEach((row: any) => {
+        (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
+          if (s?.id) shiftMap.set(s.id, s);
+        });
+      });
+      updatedShifts.forEach((s: any) => {
+        if (s?.id) shiftMap.set(s.id, s);
+      });
+      const mergedList = Array.from(shiftMap.values());
+
+      await Promise.allSettled([
+        supabase.from('app_state').upsert({ key: 'posShifts', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedList, updated_at: openedAt }, { onConflict: 'key' }),
+        push('posShifts', mergedList, effectiveBranchId),
+        push('posShifts', mergedList, null)
+      ]);
+    } catch (eSync) {
+      console.warn('[SellerSetup Direct Sync Error]:', eSync);
+    }
+
     navigate('/vendedor');
   };
 
