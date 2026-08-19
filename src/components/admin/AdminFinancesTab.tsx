@@ -854,7 +854,11 @@ export const AdminFinancesTab = ({
         }
       }
     }
-    return Array.from(seen.values());
+    return Array.from(seen.values()).sort((a: any, b: any) => {
+      const timeA = new Date(a._raw?.closedAt || a.date || 0).getTime();
+      const timeB = new Date(b._raw?.closedAt || b.date || 0).getTime();
+      return timeB - timeA;
+    });
   })();
 
   const filteredClosings = deduplicatedClosings.filter((c: any) => {
