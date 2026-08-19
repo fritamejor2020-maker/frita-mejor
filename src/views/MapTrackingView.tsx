@@ -187,29 +187,23 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       return true;
     });
 
-    // Construir sets de IDs activos
+    // Construir sets de pointIds de vehículos activos
     const activePointIds = new Set(
       openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
-    const activeUserIds = new Set(
-      openShifts.map((s: any) => String(s.userId || s.createdBy || '').toLowerCase()).filter(Boolean)
-    );
-    const activeNames = new Set(
-      openShifts.map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim()).filter(Boolean)
-    );
 
+    // Filtrar estrictamente por pointId del vehículo activo (NUNCA por nombre para evitar falsos positivos)
     let result = Array.from(merged.values()).filter(v => {
       const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-      const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase() : '';
-      const cleanName = v.name ? String(v.name).toLowerCase().trim() : '';
-      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activeUserIds.has(cleanUid)) || (cleanName && activeNames.has(cleanName));
+      const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activePointIds.has(cleanUid));
     });
 
     // DEDUPLICAR por pointId — si hay 2 entradas para el mismo vehículo (Presence + BD),
     // quedarse solo con la más reciente (Presence siempre gana sobre BD)
     const byPointId = new Map<string, VendorLocation>();
     result.forEach(v => {
-      const pKey = v.pointId ? String(v.pointId).toUpperCase() : v.vendorId;
+      const pKey = (v.pointId ? String(v.pointId).toUpperCase() : String(v.vendorId).toUpperCase());
       if (!pKey) return;
       const existing = byPointId.get(pKey);
       if (!existing) {
@@ -244,37 +238,21 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
         .map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
     );
-    const activeShiftUserIds = new Set(
-      posShiftsFromStore
-        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
-        .map((s: any) => String(s.userId || s.createdBy || '').toLowerCase())
-    );
-    const activeShiftNames = new Set(
-      posShiftsFromStore
-        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
-        .map((s: any) => String(s.responsibleName || s.userName || '').toLowerCase().trim())
-    );
 
     dbRef.current.clear();
     Object.entries(vendorLocationsFromStore).forEach(([vendorId, loc]: [string, any]) => {
       if (!loc.lat || !loc.lng) return;
       const cleanP = loc.pointId ? String(loc.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-      const cleanUid = vendorId ? String(vendorId).toLowerCase() : '';
-      const cleanName = loc.name ? String(loc.name).toLowerCase().trim() : '';
+      const cleanUid = vendorId ? String(vendorId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
-      // Solo mostrar si hay turno activo para ese vendedor
-      const hasActiveShift =
-        (cleanP && activeShiftPointIds.has(cleanP)) ||
-        (cleanUid && activeShiftUserIds.has(cleanUid)) ||
-        (cleanName && activeShiftNames.has(cleanName));
-
+      // Solo registrar en dbRef si el vehículo tiene turno ACTIVO
+      const hasActiveShift = (cleanP && activeShiftPointIds.has(cleanP)) || (cleanUid && activeShiftPointIds.has(cleanUid));
       if (!hasActiveShift) return;
-      // No sobreescribir si Presence ya tiene dato en vivo
-      if (presenceRef.current.has(vendorId)) return;
 
-      dbRef.current.set(vendorId, {
-        vendorId,
-        pointId: loc.pointId || undefined,
+      const pKey = loc.pointId || vendorId;
+      dbRef.current.set(pKey, {
+        vendorId: pKey,
+        pointId: loc.pointId || vendorId,
         name: loc.name || loc.pointId || 'Vendedor',
         lat: loc.lat,
         lng: loc.lng,
@@ -299,9 +277,11 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       Object.values(state).forEach((entries) => {
         entries.forEach((e) => {
           // Solo incluir entradas con coordenadas reales (no los viewers)
-          if (e.lat && e.lng && e.vendorId) {
-            presenceRef.current.set(e.vendorId, {
+          if (e.lat && e.lng && (e.vendorId || e.pointId)) {
+            const pKey = e.pointId || e.vendorId;
+            presenceRef.current.set(pKey, {
               ...(e as VendorLocation),
+              vendorId: pKey,
               pointId: e.pointId || undefined,
             });
           }
