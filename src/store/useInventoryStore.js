@@ -522,10 +522,14 @@ export const useInventoryStore = create(
                   const userCreatedOffline = localArr.filter(item => {
                     if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
                     if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
-                    // Para posShifts: verificar si hay una versión remota cerrada con el mismo ID
-                    // (puede estar en posShifts_master_history aunque no en val)
+                    // Para posShifts: verificar que no sea un residuo de días anteriores ni esté cerrado en remoto
                     if (key === 'posShifts') {
-                      // Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
+                      // 1. Si es un turno de fecha anterior a hoy sin cerrar, es un residuo de sesión vieja: descartar
+                      const today = new Date().toISOString().slice(0, 10);
+                      const shiftDate = (item.openedAt || item.date || '').slice(0, 10);
+                      if (!item.closedAt && shiftDate && shiftDate < today) return false;
+
+                      // 2. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
                       const allRemoteSources = [
                         ...(remote['posShifts'] || []),
                         ...(remote['posShifts_BRANCH-001'] || []),
@@ -533,6 +537,15 @@ export const useInventoryStore = create(
                       ];
                       const remoteVersion = allRemoteSources.find(r => r?.id === item.id);
                       if (remoteVersion?.closedAt && !item.closedAt) return false; // remoto cerrado gana
+
+                      // 3. Si en remoto ya hay un turno activo para ese mismo vehículo hoy, el remoto manda
+                      if (!item.closedAt && item.pointId) {
+                        const cleanP = String(item.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const remoteHasPoint = val.some(r =>
+                          !r.closedAt && String(r.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP
+                        );
+                        if (remoteHasPoint) return false;
+                      }
                     }
                     return true;
                   });

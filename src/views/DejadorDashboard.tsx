@@ -190,7 +190,7 @@ export const DejadorDashboard = () => {
   const INACTIVITY_MS = 2 * 60 * 1000; // 2 minutos
 
   const today = new Date().toISOString().slice(0, 10);
-  const [remoteShifts, setRemoteShifts] = useState<any[]>([]);
+  const [remoteShifts, setRemoteShifts] = useState<any[] | null>(null);
 
   // Sincronización directa y periódica con Supabase para turnos de los triciclos
   const loadRemoteShifts = async () => {
@@ -208,8 +208,8 @@ export const DejadorDashboard = () => {
       const shiftMap = new Map<string, any>();
       [
         ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
       ].forEach((s: any) => {
         if (!s?.id) return;
         const existing = shiftMap.get(s.id);
@@ -246,7 +246,8 @@ export const DejadorDashboard = () => {
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
     const effectiveBranch = userBranchId || 'BRANCH-001';
-    const activeShiftsList = remoteShifts.length > 0 ? remoteShifts : posShifts;
+    // Usar estrictamente los turnos verificados de Supabase para no mostrar residuos locales
+    const activeShiftsList = remoteShifts !== null ? remoteShifts : [];
 
     // Turnos de Vendedor ABIERTOS EN CURSO en la sede
     (activeShiftsList || []).forEach((s: any) => {
