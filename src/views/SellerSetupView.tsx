@@ -119,10 +119,26 @@ export const SellerSetupView = () => {
     .filter((v: any) =>
       v.active &&
       v.type === selectedTypeObj?.vehicleType &&
-      // Admin ve todos; vendedor ve solo los de su sede (o sin sede)
       (userBranchId === null || !v.branchId || v.branchId === userBranchId)
     )
     .map((v: any) => v.abbreviation || v.name);
+
+  // Auto-cambiar jornada a PM si AM ya está cerrado para el vehículo seleccionado
+  useEffect(() => {
+    if (!pointId || !remoteShifts) return;
+    const today = new Date().toISOString().slice(0, 10);
+    const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const isAmClosed = remoteShifts.some(
+      (s: any) => s.type === 'VENDEDOR' &&
+        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
+        s.shift === 'AM' &&
+        s.closedAt &&
+        (s.openedAt || s.fecha || '').startsWith(today)
+    );
+    if (isAmClosed && shift === 'AM') {
+      setShift('PM');
+    }
+  }, [pointId, remoteShifts]);
 
   const navigate = useNavigate();
 
