@@ -195,10 +195,15 @@ export const DejadorDashboard = () => {
   // Sincronización directa y periódica con Supabase para turnos de los triciclos
   const loadRemoteShifts = async () => {
     try {
+      const keysToFetch = ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history'];
+      if (userBranchId && userBranchId !== 'BRANCH-001') {
+        keysToFetch.push(`posShifts_${userBranchId}`);
+      }
+
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
+        .in('key', keysToFetch);
 
       if (error || !data) return;
 
@@ -210,6 +215,7 @@ export const DejadorDashboard = () => {
         ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
         ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+        ...(userBranchId && Array.isArray(map[`posShifts_${userBranchId}`]) ? map[`posShifts_${userBranchId}`] : []),
       ].forEach((s: any) => {
         if (!s?.id) return;
         const existing = shiftMap.get(s.id);
@@ -228,9 +234,26 @@ export const DejadorDashboard = () => {
   useEffect(() => {
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
-    const interval = setInterval(loadRemoteShifts, 6000);
-    return () => clearInterval(interval);
-  }, []);
+    const interval = setInterval(loadRemoteShifts, 4000);
+
+    const channel = supabase
+      .channel('dejador-shifts-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state' },
+        (payload: any) => {
+          if (payload?.new?.key && (payload.new.key === 'posShifts' || payload.new.key.startsWith('posShifts_'))) {
+            loadRemoteShifts();
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
+  }, [userBranchId]);
 
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
   const allVehicles = useVehicleStore((state: any) => state.vehicles);
@@ -245,14 +268,12 @@ export const DejadorDashboard = () => {
   // Mapa: tricicloId → nombre del vendedor con turno ABIERTO (EN CURSO)
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    const effectiveBranch = userBranchId || 'BRANCH-001';
-    // Usar estrictamente los turnos verificados de Supabase para no mostrar residuos locales
-    const activeShiftsList = remoteShifts !== null ? remoteShifts : [];
+    // Usar remoteShifts si está disponible, o el store local de turnos
+    const sourceList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
 
-    // Turnos de Vendedor ABIERTOS EN CURSO en la sede
-    (activeShiftsList || []).forEach((s: any) => {
-      const isClosed = Boolean(s.closedAt);
-      if (isClosed) return;
+    // Turnos de Vendedor ABIERTOS EN CURSO
+    (sourceList || []).forEach((s: any) => {
+      if (s.closedAt) return;
 
       const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
       if (!isVendor) return;
@@ -260,18 +281,13 @@ export const DejadorDashboard = () => {
       const pId = s.pointId || s.point_id || s.vehicle;
       if (!pId) return;
 
-      const sBranch = s.branchId || 'BRANCH-001';
-      const matchesBranch = userBranchId === null || !s.branchId || sBranch === effectiveBranch || effectiveBranch === 'BRANCH-001';
-
-      if (matchesBranch) {
-        const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
-        if (raw && raw !== '—') {
-          const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
-          const upperP = String(pId).toUpperCase();
-          map[pId] = raw;
-          map[cleanP] = raw;
-          map[upperP] = raw;
-        }
+      const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
+      if (raw && raw !== '—') {
+        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const upperP = String(pId).toUpperCase();
+        map[pId] = raw;
+        map[cleanP] = raw;
+        map[upperP] = raw;
       }
     });
 
