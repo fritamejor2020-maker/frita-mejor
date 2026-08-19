@@ -134,7 +134,6 @@ async function writeToSupabase(key, value) {
         .select('key,value')
         .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
       
-      // Regla de oro: versión cerrada SIEMPRE gana. Un turno cerrado NUNCA puede reabrirse.
       const shiftMap = new Map();
       if (remoteRows && remoteRows.length > 0) {
         remoteRows.forEach(r => {
@@ -145,7 +144,6 @@ async function writeToSupabase(key, value) {
                 if (!existing || (!existing.closedAt && s.closedAt)) {
                   shiftMap.set(s.id, s);
                 }
-                // Si existing ya está cerrado y s está abierto → NO sobrescribir (existing gana)
               }
             });
           }
@@ -158,30 +156,35 @@ async function writeToSupabase(key, value) {
           if (!existing) {
             shiftMap.set(s.id, s);
           } else if (existing.closedAt && !s.closedAt) {
-            // Remoto cerrado + local abierto → remoto GANA. NUNCA reabrir un turno cerrado.
-            // No hacer nada — mantener existing
+            // Remoto cerrado + local abierto -> mantener cerrado
+            shiftMap.set(s.id, { ...s, ...existing });
           } else if (!existing.closedAt && s.closedAt) {
-            // Remoto abierto + local cerrado → local GANA
-            shiftMap.set(s.id, s);
-          } else if (s.forcedByAdmin) {
-            // forcedByAdmin siempre tiene prioridad máxima
-            shiftMap.set(s.id, s);
+            // Remoto abierto + local cerrado -> local cerrado gana
+            shiftMap.set(s.id, { ...existing, ...s });
+          } else {
+            // Ambos abiertos o ambos cerrados -> s (local) actualiza los datos
+            shiftMap.set(s.id, { ...existing, ...s });
           }
-          // Si ambos abiertos o ambos cerrados → existing gana (sin cambios)
         }
       });
 
       const mergedShifts = Array.from(shiftMap.values());
       value = mergedShifts;
 
-      // Respaldo maestro append-only inmutable
-      supabase
+      const nowIso = new Date().toISOString();
+      const { error } = await supabase
         .from('app_state')
         .upsert(
-          { key: 'posShifts_master_history', value: mergedShifts, updated_at: new Date().toISOString() },
+          { key, value: mergedShifts, updated_at: nowIso },
           { onConflict: 'key' }
-        )
-        .catch(() => {});
+        );
+      if (error) throw error;
+
+      // Respaldo simultáneo en posShifts, posShifts_BRANCH-001 y posShifts_master_history
+      supabase.from('app_state').upsert({ key: 'posShifts', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
+      supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
+      supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
+      return;
     } catch (e) {
       console.warn('[SyncManager] Error merging shifts before write:', e);
     }
