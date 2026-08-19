@@ -28,7 +28,7 @@ export const SellerSetupView = () => {
         const { data } = await supabase
           .from('app_state')
           .select('value')
-          .in('key', ['posShifts', 'posShifts_BRANCH-001']);
+          .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
 
         if (cancelled) return;
 
@@ -194,8 +194,10 @@ export const SellerSetupView = () => {
 
     if (closedShift) {
       const closedTime = closedShift.closedAt ? new Date(closedShift.closedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
-      alert(`⚠️ El turno de la jornada "${shift}" para el vehículo "${pointId}" ya fue cerrado hoy${closedTime ? ` a las ${closedTime}` : ''}.\n\nPara iniciar un nuevo turno, selecciona la siguiente jornada (MD o PM) o consulta al administrador.`);
-      return;
+      const allowNew = window.confirm(
+        `⚠️ El turno de la jornada "${shift}" para el vehículo "${pointId}" ya fue cerrado hoy${closedTime ? ` a las ${closedTime}` : ''}.\n\n¿Deseas iniciar un NUEVO turno para este vehículo de todas formas?`
+      );
+      if (!allowNew) return;
     }
 
     // Crear nuevo turno (no existe uno para este punto+jornada hoy)
