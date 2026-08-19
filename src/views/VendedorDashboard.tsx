@@ -1911,27 +1911,27 @@ export const VendedorDashboard = () => {
                 {cart.map((c: any) => {
                   const itemId = c.cartItemId || c.productId;
                   return (
-                    <div key={itemId} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-2xl">
-                      <div className="flex items-center gap-2 min-w-0">
-                        {/* Botón para restar 1 o eliminar si solo queda 1 */}
+                    <div key={itemId} className="flex justify-between items-center bg-gray-50 px-3 py-1.5 rounded-2xl">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {/* Botón para restar 1 o eliminar si solo queda 1 con la misma altura de la cápsula */}
                         <button
                           type="button"
                           onClick={() => decreaseFromCart(itemId)}
-                          className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 text-[#FF4040] flex items-center justify-center font-black transition-all active:scale-90 shrink-0 shadow-sm"
+                          className="h-5 w-5 min-w-[20px] max-h-[20px] rounded-full bg-red-100 hover:bg-red-200 text-[#FF4040] flex items-center justify-center font-black transition-all active:scale-90 shrink-0 self-center leading-none"
                           title={c.qty > 1 ? "Restar 1" : "Eliminar"}
                         >
                           {c.qty > 1 ? (
-                            <Minus size={13} strokeWidth={3.5} />
+                            <Minus size={11} strokeWidth={3.5} />
                           ) : (
-                            <X size={13} strokeWidth={3.5} />
+                            <X size={11} strokeWidth={3.5} />
                           )}
                         </button>
-                        <span className="inline-block bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full shrink-0">
+                        <span className="inline-flex items-center justify-center bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full shrink-0 leading-tight self-center">
                           {c.qty}x
                         </span>
-                        <span className="text-gray-900 font-black text-sm truncate">{c.name}</span>
+                        <span className="text-gray-900 font-black text-sm truncate self-center">{c.name}</span>
                       </div>
-                      <span className="text-[#FF4040] font-black text-sm shrink-0">{formatMoney(c.price * c.qty)}</span>
+                      <span className="text-[#FF4040] font-black text-sm shrink-0 self-center">{formatMoney(c.price * c.qty)}</span>
                     </div>
                   );
                 })}
