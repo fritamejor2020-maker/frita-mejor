@@ -268,26 +268,38 @@ export const DejadorDashboard = () => {
   // Mapa: tricicloId → nombre del vendedor con turno ABIERTO (EN CURSO)
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    // Usar remoteShifts si está disponible, o el store local de turnos
     const sourceList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
 
     // Turnos de Vendedor ABIERTOS EN CURSO
     (sourceList || []).forEach((s: any) => {
       if (s.closedAt) return;
 
-      const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
+      const isVendor = !s.type || String(s.type).toUpperCase() === 'VENDEDOR';
       if (!isVendor) return;
 
-      const pId = s.pointId || s.point_id || s.vehicle;
-      if (!pId) return;
+      const rawPoint = String(s.pointId || s.point_id || s.vehicle || s.registerName || '').trim();
+      if (!rawPoint) return;
 
-      const raw = String(s.responsibleName || s.userName || s.sellerName || '').trim();
-      if (raw && raw !== '—') {
-        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
-        const upperP = String(pId).toUpperCase();
-        map[pId] = raw;
-        map[cleanP] = raw;
-        map[upperP] = raw;
+      const rawName = String(s.responsibleName || s.userName || s.sellerName || s.driver || s.vendedor || s.name || '').trim();
+      if (!rawName || rawName === '—') return;
+
+      const cleanPoint = rawPoint.toLowerCase().replace(/[^a-z0-9]/g, '');
+      const numMatch = cleanPoint.match(/\d+/);
+      const pointNum = numMatch ? numMatch[0] : null;
+
+      // Asociar variantes de texto del punto
+      map[rawPoint] = rawName;
+      map[cleanPoint] = rawName;
+      map[rawPoint.toUpperCase()] = rawName;
+
+      // Si tiene número (ej. "1" para "T1"), asociar todas las formas comunes
+      if (pointNum) {
+        map[`T${pointNum}`] = rawName;
+        map[`t${pointNum}`] = rawName;
+        map[`T-${pointNum}`] = rawName;
+        map[`triciclo${pointNum}`] = rawName;
+        map[`TRICICLO${pointNum}`] = rawName;
+        map[pointNum] = rawName;
       }
     });
 
@@ -885,25 +897,31 @@ export const DejadorDashboard = () => {
             <div className="flex gap-2 sm:gap-3 overflow-x-auto py-1 sm:py-2 no-scrollbar px-1 sm:px-2 items-center flex-1">
               {vehicles.map((v: string) => {
                 const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
-                const upperV = String(v).toUpperCase();
-                const vendorName = vehicleVendorMap[v] || vehicleVendorMap[cleanV] || vehicleVendorMap[upperV];
+                const numV = cleanV.match(/\d+/)?.[0] || '';
+                const vendorName = vehicleVendorMap[v] || 
+                                   vehicleVendorMap[cleanV] || 
+                                   vehicleVendorMap[String(v).toUpperCase()] ||
+                                   (numV ? vehicleVendorMap[`T${numV}`] : '') ||
+                                   (numV ? vehicleVendorMap[numV] : '');
                 return (
                 <button
                   key={v}
                   onClick={() => setSelectedVehicle(v)}
-                  className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg px-2 py-1.5 min-w-[52px] sm:min-w-[72px] min-h-[52px] sm:min-h-[72px]
+                  className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-xl sm:rounded-2xl transition-all duration-300 shadow-sm hover:-translate-y-1 hover:shadow-chunky-lg px-2 py-1.5 min-w-[54px] sm:min-w-[74px] min-h-[54px] sm:min-h-[74px]
                     ${selectedVehicle === v 
                       ? 'bg-amber-500 text-white shadow-[0_0_0_4px_white]' 
                       : 'bg-white text-gray-800 border-2 border-transparent hover:border-amber-200'}`}
                 >
                   <span className="font-black text-base sm:text-xl leading-none">{v}</span>
                   {vendorName ? (
-                    <span className={`text-[9px] sm:text-[10px] font-black leading-none truncate max-w-[58px] ${
-                      selectedVehicle === v ? 'text-amber-100' : 'text-amber-700'
+                    <span className={`text-[10px] sm:text-[11px] font-black leading-none truncate max-w-[62px] block mt-0.5 ${
+                      selectedVehicle === v ? 'text-amber-100' : 'text-amber-800'
                     }`}>
                       {vendorName.split(' ')[0]}
                     </span>
-                  ) : null}
+                  ) : (
+                    <span className="text-[9px] font-bold text-gray-300 leading-none block mt-0.5">Libre</span>
+                  )}
                 </button>
                 );
               })}
@@ -1345,24 +1363,32 @@ export const DejadorDashboard = () => {
             {/* Selector de triciclo */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
               {vehicles.map((v: string) => {
-                const vendorName = vehicleVendorMap[v];
+                const cleanV = String(v).toLowerCase().replace(/[^a-z0-9]/g, '');
+                const numV = cleanV.match(/\d+/)?.[0] || '';
+                const vendorName = vehicleVendorMap[v] || 
+                                   vehicleVendorMap[cleanV] || 
+                                   vehicleVendorMap[String(v).toUpperCase()] ||
+                                   (numV ? vehicleVendorMap[`T${numV}`] : '') ||
+                                   (numV ? vehicleVendorMap[numV] : '');
                 return (
                   <button
                     key={v}
                     onClick={() => setGpsSelectedVehicle(v)}
-                    className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 min-w-[52px] font-black text-sm transition-all duration-200 border-2 active:scale-95 ${
+                    className={`flex-none flex flex-col items-center justify-center gap-0.5 rounded-2xl px-3 py-2 min-w-[54px] font-black text-sm transition-all duration-200 border-2 active:scale-95 ${
                       gpsSelectedVehicle === v
                         ? 'bg-emerald-500 text-white border-emerald-500 shadow-md'
                         : 'bg-white text-gray-700 border-gray-200 hover:border-emerald-300'
                     }`}
                   >
                     <span className="leading-none">{v}</span>
-                    {vendorName && (
-                      <span className={`text-[9px] font-bold leading-none ${
-                        gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-gray-400'
+                    {vendorName ? (
+                      <span className={`text-[9px] font-black leading-none ${
+                        gpsSelectedVehicle === v ? 'text-emerald-100' : 'text-emerald-700'
                       }`}>
-                        {vendorName}
+                        {vendorName.split(' ')[0]}
                       </span>
+                    ) : (
+                      <span className="text-[8px] font-bold text-gray-300 leading-none">Libre</span>
                     )}
                   </button>
                 );
