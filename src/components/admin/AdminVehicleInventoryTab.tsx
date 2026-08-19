@@ -724,7 +724,12 @@ export function AdminVehicleInventoryTab() {
         </p>
       </div>
 
-      {filteredShifts.length === 0 ? (
+      {!supabaseLoaded ? (
+        <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
+          <span className="text-4xl block mb-4 animate-spin">⏳</span>
+          <p className="font-black text-gray-400 text-lg">Cargando turnos desde el servidor...</p>
+        </div>
+      ) : filteredShifts.length === 0 ? (
         <div className="bg-gray-50 border-2 border-dashed border-gray-200 rounded-3xl p-10 text-center">
           <span className="text-5xl block mb-4">📋</span>
           <p className="font-black text-gray-600 text-lg">No hay turnos registrados</p>
