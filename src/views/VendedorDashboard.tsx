@@ -86,26 +86,55 @@ export const VendedorDashboard = () => {
     const currentShifts = useInventoryStore.getState().posShifts || [];
     const exists = currentShifts.some((s: any) => s.id === currentShiftId);
 
+    const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+    const cleanResp = String(responsibleName || (user as any)?.name || 'Vendedor').trim();
+    const activeShiftRecord = {
+      id: currentShiftId,
+      openedAt: openedAt || new Date().toISOString(),
+      pointId,
+      shift: shift || 'AM',
+      responsibleName: cleanResp,
+      userId: (user as any)?.id || (user as any)?.username,
+      createdBy: (user as any)?.id,
+      branchId: activeBranchId,
+      type: 'VENDEDOR',
+      closedAt: null,
+    };
+
     if (!exists) {
-      const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-      const cleanResp = String(responsibleName || (user as any)?.name || 'Vendedor').trim();
-      const newShiftRecord = {
-        id: currentShiftId,
-        openedAt: openedAt || new Date().toISOString(),
-        pointId,
-        shift: shift || 'AM',
-        responsibleName: cleanResp,
-        userId: (user as any)?.id || (user as any)?.username,
-        createdBy: (user as any)?.id,
-        branchId: activeBranchId,
-        type: 'VENDEDOR',
-        closedAt: null,
-      };
       console.log('[VendedorDashboard] Asegurando turno activo en posShifts:', currentShiftId);
-      addPosShift(newShiftRecord);
-      push('posShifts', [newShiftRecord], activeBranchId).catch(() => {});
-      push('posShifts', [newShiftRecord], null).catch(() => {});
+      addPosShift(activeShiftRecord);
     }
+
+    const allShifts = useInventoryStore.getState().posShifts || [activeShiftRecord];
+    push('posShifts', allShifts, activeBranchId).catch(() => {});
+    push('posShifts', allShifts, null).catch(() => {});
+
+    // Forzar asegurado directo en Supabase a todas las llaves simultáneamente
+    supabase
+      .from('app_state')
+      .select('key, value')
+      .in('key', ['posShifts', `posShifts_${activeBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'])
+      .then(({ data }) => {
+        const shiftMap = new Map<string, any>();
+        (data || []).forEach((row: any) => {
+          (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
+            if (s?.id) shiftMap.set(s.id, s);
+          });
+        });
+        allShifts.forEach((s: any) => {
+          if (s?.id) shiftMap.set(s.id, s);
+        });
+        const merged = Array.from(shiftMap.values());
+        const nowIso = new Date().toISOString();
+        Promise.allSettled([
+          supabase.from('app_state').upsert({ key: 'posShifts', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: merged, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
+        ]).catch(() => {});
+      })
+      .catch(() => {});
   }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
 
   // ── 3. Monitoreo reactivo en tiempo real: si ESTE turno específico es cerrado por Admin, salir ──
