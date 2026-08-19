@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image, MessageSquare } from 'lucide-react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image, MessageSquare, Minus } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -33,7 +33,7 @@ export const VendedorDashboard = () => {
   // efecto de monitoreo (useEffect #3) no muestre "cerrado por administración"
   // cuando en realidad el vendedor hizo su propio cierre.
   const isClosingNormally = useRef(false);
-  const { cart, total, addToCart, checkout, clearCart } = usePosStore();
+  const { cart, total, addToCart, decreaseFromCart, checkout, clearCart } = usePosStore();
   const { restockCart, addToRestockCart, sendRestockRequest, clearRestockCart, calcSoldByVehicle,
           pendingRequests, completedRequests, rejectedRequests } = useLogisticsStore();
   const { getPosItems, getVendedorPosItems, getDeliveryItems, loadTemplates, addLoadTemplate, deleteLoadTemplate, addPosShift, updatePosShift, posShifts, salesGoals = [] } = useInventoryStore();
@@ -1882,7 +1882,7 @@ export const VendedorDashboard = () => {
       {/* MODAL PRECIO VARIABLE */}
       {variablePriceProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm animate-slide-up text-center">
+          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm animate-modal-in text-center">
              <h3 className="font-black text-2xl text-gray-900 mb-2">{variablePriceProduct.name}</h3>
              <p className="text-gray-500 font-bold mb-6">Ingresa el precio de venta (Precio Variable).</p>
              
@@ -1944,15 +1944,33 @@ export const VendedorDashboard = () => {
             <div className="px-4 pt-3 pb-3">
               {/* Lista de items (scrollable) */}
               <div className="flex flex-col gap-1.5 max-h-[110px] overflow-y-auto mb-3 pr-1">
-                {cart.map((c: any) => (
-                  <div key={c.productId} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-2xl">
-                    <span className="text-gray-900 font-black text-sm">
-                      <span className="inline-block bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full mr-2">{c.qty}x</span>
-                      {c.name}
-                    </span>
-                    <span className="text-[#FF4040] font-black text-sm">{formatMoney(c.price * c.qty)}</span>
-                  </div>
-                ))}
+                {cart.map((c: any) => {
+                  const itemId = c.cartItemId || c.productId;
+                  return (
+                    <div key={itemId} className="flex justify-between items-center bg-gray-50 px-3 py-2 rounded-2xl">
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* Botón para restar 1 o eliminar si solo queda 1 */}
+                        <button
+                          type="button"
+                          onClick={() => decreaseFromCart(itemId)}
+                          className="w-6 h-6 rounded-full bg-red-100 hover:bg-red-200 text-[#FF4040] flex items-center justify-center font-black transition-all active:scale-90 shrink-0 shadow-sm"
+                          title={c.qty > 1 ? "Restar 1" : "Eliminar"}
+                        >
+                          {c.qty > 1 ? (
+                            <Minus size={13} strokeWidth={3.5} />
+                          ) : (
+                            <X size={13} strokeWidth={3.5} />
+                          )}
+                        </button>
+                        <span className="inline-block bg-[#FF4040] text-white text-xs font-black px-2 py-0.5 rounded-full shrink-0">
+                          {c.qty}x
+                        </span>
+                        <span className="text-gray-900 font-black text-sm truncate">{c.name}</span>
+                      </div>
+                      <span className="text-[#FF4040] font-black text-sm shrink-0">{formatMoney(c.price * c.qty)}</span>
+                    </div>
+                  );
+                })}
               </div>
               {/* Acciones */}
               <div className="flex gap-3">

@@ -39,6 +39,26 @@ export const usePosStore = create((set, get) => ({
   },
 
   /**
+   * Disminuye en 1 la cantidad del producto o lo elimina si la cantidad es 1
+   */
+  decreaseFromCart: (id) => {
+    const currentCart = get().cart;
+    const existingIndex = currentCart.findIndex(p => (p.cartItemId || p.productId) === id);
+    if (existingIndex < 0) return;
+
+    let newCart = [...currentCart];
+    if (newCart[existingIndex].qty > 1) {
+      newCart[existingIndex] = {
+        ...newCart[existingIndex],
+        qty: newCart[existingIndex].qty - 1
+      };
+    } else {
+      newCart.splice(existingIndex, 1);
+    }
+    set({ cart: newCart, total: calculateCartTotal(newCart) });
+  },
+
+  /**
    * Remueve totalmente el producto por su cartItemId o productId
    */
   removeFromCart: (id) => {
