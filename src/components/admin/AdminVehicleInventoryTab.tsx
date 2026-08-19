@@ -660,6 +660,9 @@ export function AdminVehicleInventoryTab() {
       }
     }
 
+    // Solo generar liveShifts por GPS cuando los turnos remotos ya hayan cargado para evitar destellos
+    if (!supabaseLoaded && supabaseShifts.length === 0) return lives;
+
     Object.values(vendorLocations).forEach((loc: any) => {
       const pId = loc?.pointId || loc?.name;
       if (!pId || loc?.isActive === false) return;
