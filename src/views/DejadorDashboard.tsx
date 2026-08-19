@@ -13,6 +13,7 @@ import { MapTrackingView } from './MapTrackingView';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
+import { useChatSoundNotifier, getAudioCtx, resumeAudioContext } from '../hooks/useChatSoundNotifier';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 
