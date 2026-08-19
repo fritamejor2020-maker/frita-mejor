@@ -150,6 +150,15 @@ async function writeToSupabase(key, value) {
         });
       }
 
+      let maxRemoteLength = 0;
+      if (remoteRows && remoteRows.length > 0) {
+        remoteRows.forEach(r => {
+          if (Array.isArray(r.value) && r.value.length > maxRemoteLength) {
+            maxRemoteLength = r.value.length;
+          }
+        });
+      }
+
       value.forEach(s => {
         if (s?.id) {
           const existing = shiftMap.get(s.id);
@@ -169,6 +178,13 @@ async function writeToSupabase(key, value) {
       });
 
       const mergedShifts = Array.from(shiftMap.values());
+
+      // Proteccion anti-truncado: NUNCA permitir guardar menos turnos de los que ya existian en el servidor
+      if (maxRemoteLength > 0 && mergedShifts.length < maxRemoteLength) {
+        console.warn(`[SyncManager] Sobreescritura truncada rechazada: remote tenía ${maxRemoteLength} turnos, merged intentaba escribir ${mergedShifts.length}.`);
+        return;
+      }
+
       value = mergedShifts;
 
       const nowIso = new Date().toISOString();

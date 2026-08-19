@@ -231,8 +231,9 @@ export const SellerSetupView = () => {
     };
 
     addPosShift(newShiftRecord);
-    push('posShifts', [newShiftRecord], effectiveBranchId).catch(() => {});
-    push('posShifts', [newShiftRecord], null).catch(() => {});
+    const updatedShifts = useInventoryStore.getState().posShifts || [newShiftRecord];
+    push('posShifts', updatedShifts, effectiveBranchId).catch(() => {});
+    push('posShifts', updatedShifts, null).catch(() => {});
     navigate('/vendedor');
   };
 
