@@ -308,7 +308,7 @@ function buildShiftLogistics(
 // ─── Card de un turno ─────────────────────────────────────────────────────────
 function ShiftCard({ shift, loadHistory, completedRequests, priceMap, isExpanded, onToggle, onForceClose, allShifts }: any) {
   const vehicleId = shift.pointId || shift.vehicle || '?';
-  const shiftDate = shift.fecha || shift.date || dateOf(shift.closedAt || shift.openedAt || '');
+  const shiftDate = shift.fecha || shift.date || dateOf(shift.openedAt || shift.closedAt || '');
   const openedAt  = shift.openedAt || shift.start_time || null;
   const closedAt  = shift.closedAt || null;
   const jornada   = deriveJornada(shift); // ← usa hora real de apertura para AM/MD/PM
@@ -709,7 +709,7 @@ export function AdminVehicleInventoryTab() {
 
   const filteredShifts = useMemo(() => {
     return allShifts.filter((s: any) => {
-      const sDate    = s.fecha || s.date || dateOf(s.closedAt || s.openedAt || '');
+      const sDate    = s.fecha || s.date || dateOf(s.openedAt || s.closedAt || '');
       const sJornada = s.shift || '';
       if (filterDate  && sDate    !== filterDate)  return false;
       if (filterShift && sJornada !== filterShift) return false;
