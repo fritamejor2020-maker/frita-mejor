@@ -55,6 +55,7 @@ export const VendedorDashboard = () => {
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
   const [newTemplateName, setNewTemplateName] = useState('');
   const [deletingTemplate, setDeletingTemplate] = useState<{ id: string; name: string } | null>(null);
+  const [isClosing, setIsClosing] = useState(false);
 
   // ── 0. Cargar estado remoto más reciente de Supabase al montar ─────────────
   useEffect(() => {
@@ -507,6 +508,7 @@ export const VendedorDashboard = () => {
       // Esto previene que el monitor de cierre remoto (useEffect #3) muestre
       // "cerrado por administración" cuando el propio vendedor cierra su turno.
       isClosingNormally.current = true;
+      setIsClosing(true);
 
       const shiftData = useSellerSessionStore.getState() as any;
       const currentShiftId = shiftData?.shiftId || '';
@@ -536,11 +538,6 @@ export const VendedorDashboard = () => {
           bonusPercent: activeGoal?.bonusPercent || 0,
           bonusRecipients
       };
-      // Buscar el turno abierto de este vehículo/jornada hoy.
-      // Búsqueda amplia: mismo pointId + tipo VENDEDOR + sin cerrar + mismo día.
-      // Esto evita duplicados cuando el vendedor reabre la app y openedAt cambia.
-      const today = new Date().toISOString().slice(0, 10); // "2026-05-06"
-      const shiftKey = shiftData.shift; // "AM" o "PM"
 
       // Helper para comparar nombres/IDs de punto de forma flexible (ej. "T2" vs "Punto T2")
       const matchesPointId = (idA: any, idB: any) => {
@@ -580,9 +577,11 @@ export const VendedorDashboard = () => {
         updatedShifts.push(finalShift);
       }
 
+      // 2. Inmediatamente actualizar store local y limpiar GPS
       useInventoryStore.setState({ posShifts: updatedShifts });
+      useInventoryStore.getState().clearVendorLocation(pointId);
 
-      // Forzar persistencia directa en el localStorage del iPad previniendo fallos de caché
+      // 3. Forzar persistencia directa en el localStorage del iPad
       try {
         const rawStore = localStorage.getItem('frita-mejor-inventory');
         if (rawStore) {
@@ -596,64 +595,26 @@ export const VendedorDashboard = () => {
         console.warn('[VendedorClose] Error guardando directamente en localStorage:', eLs);
       }
 
-      // Asegurar persistencia directa en Supabase DB para sincronización inmediata entre dispositivos
-      try {
-        const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
-        const { data: remoteData } = await supabase
-          .from('app_state')
-          .select('key,value')
-          .in('key', ['posShifts', `posShifts_${activeBranchId}`]);
-        
-        const shiftMap = new Map();
-        if (remoteData && remoteData.length > 0) {
-          remoteData.forEach(r => {
-            if (Array.isArray(r.value)) {
-              r.value.forEach(s => { if (s?.id) shiftMap.set(s.id, s); });
-            }
-          });
-        }
-        updatedShifts.forEach(s => { if (s?.id) shiftMap.set(s.id, s); });
-        const mergedShifts = Array.from(shiftMap.values());
+      // 4. Detener transmisión GPS
+      gpsStop().catch(() => {});
 
-        await supabase.from('app_state').upsert({ key: 'posShifts', value: mergedShifts }, { onConflict: 'key' });
-        await supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: mergedShifts }, { onConflict: 'key' });
-      } catch (eDb) {
-        console.warn('[VendedorClose] Error guardando cierre directo en DB:', eDb);
-      }
+      // 5. Disparar sincronización a Supabase en paralelo sin bloquear la UI
+      const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+      push('posShifts', updatedShifts, activeBranchId).catch(() => {});
+      push('posShifts', updatedShifts, null).catch(() => {});
+      supabase
+        .from('vendor_locations')
+        .update({ is_active: false })
+        .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
+        .catch(() => {});
 
-      // Marcar GPS inactivo inmediatamente en el mapa local y Supabase DB
-      try {
-        useInventoryStore.getState().clearVendorLocation(pointId);
-        await supabase
-          .from('vendor_locations')
-          .update({ is_active: false })
-          .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`);
-      } catch (e) {
-        console.warn('[VendedorClose] Error limpiando GPS:', e);
-      }
-
-      await gpsStop();
+      // 6. Salir de inmediato al setup / login
       endShift();
       signOut();
     } catch (err: any) {
       console.warn('[VendedorClose Error]:', err?.message);
-      // Si fue un error de cuota de almacenamiento del navegador (QuotaExceededError en iPad/Safari)
-      if (err?.name === 'QuotaExceededError' || String(err?.message || '').toLowerCase().includes('quota')) {
-        try {
-          // Limpiar automáticamente llaves temporales del iPad
-          for (let i = localStorage.length - 1; i >= 0; i--) {
-            const k = localStorage.key(i);
-            if (k && (k.includes('chat') || k.includes('log') || k.includes('temp') || k.includes('cache'))) {
-              localStorage.removeItem(k);
-            }
-          }
-        } catch (_) {}
-        // Continuar el cierre normalmente sin bloquear la pantalla
-        endShift();
-        signOut();
-        return;
-      }
-      alert("Error en cierre: " + err.message);
+      endShift();
+      signOut();
     }
   };
 
@@ -1777,10 +1738,13 @@ export const VendedorDashboard = () => {
               <span className="text-3xl font-black text-gray-900">{formatMoney(cashVal + transferVal)}</span>
             </div>
 
-            <button onClick={handleCloseShift}
-              className="w-full flex items-center justify-center gap-3 bg-[#FF4040] text-white font-black text-lg sm:text-2xl py-5 rounded-[28px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95">
+            <button 
+              onClick={handleCloseShift}
+              disabled={isClosing}
+              className="w-full flex items-center justify-center gap-3 bg-[#FF4040] disabled:bg-gray-400 text-white font-black text-lg sm:text-2xl py-5 rounded-[28px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] hover:scale-[1.02] transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed"
+            >
               <Check size={26} strokeWidth={3} />
-              CERRAR JORNADA
+              {isClosing ? 'CERRANDO JORNADA...' : 'CERRAR JORNADA'}
             </button>
 
           </div>
