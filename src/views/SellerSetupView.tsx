@@ -42,11 +42,33 @@ export const SellerSetupView = () => {
               if (!ex || (!ex.closedAt && s.closedAt)) shiftMap.set(s.id, s);
             });
           });
-          const verified = Array.from(shiftMap.values());
+
+          const today = new Date().toISOString().slice(0, 10);
+          let autoClosedCount = 0;
+
+          const verified = Array.from(shiftMap.values()).map((s: any) => {
+            if (!s.closedAt) {
+              const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+              if (shiftDate && shiftDate < today) {
+                autoClosedCount++;
+                return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+              }
+            }
+            return s;
+          });
 
           // Actualizar el store con la verdad remota
           useInventoryStore.setState({ posShifts: verified });
           setRemoteShifts(verified);
+
+          // Si se auto-cerraron turnos huérfanos, actualizar Supabase
+          if (autoClosedCount > 0) {
+            const nowIso = new Date().toISOString();
+            supabase.from('app_state').upsert([
+              { key: 'posShifts', value: verified, updated_at: nowIso },
+              { key: 'posShifts_BRANCH-001', value: verified, updated_at: nowIso },
+            ]).catch(() => {});
+          }
 
           // Si la sesión activa está cerrada en Supabase, limpiarla
           if (sellerSetupComplete && activeShiftId) {
@@ -75,15 +97,20 @@ export const SellerSetupView = () => {
   const { myUserOpenShifts, otherOpenShifts } = useMemo(() => {
     if (remoteShifts === null) return { myUserOpenShifts: [], otherOpenShifts: [] };
 
+    const today = new Date().toISOString().slice(0, 10);
     const currentUserName = String(user?.name || '').trim().toLowerCase();
     const currentUserId = String(user?.id || user?.username || '').trim().toLowerCase();
 
-    const myMine: any[] = [];
-    const others: any[] = [];
+    const myMineMap = new Map<string, any>();
+    const othersMap = new Map<string, any>();
 
     remoteShifts.forEach((s: any) => {
       if (s.type !== 'VENDEDOR' || s.closedAt) return;
       if (!user) return;
+
+      // Descartar turnos huérfanos de fechas pasadas
+      const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+      if (shiftDate && shiftDate < today) return;
 
       const shiftResp = String(s.responsibleName || '').trim().toLowerCase();
       const shiftUid = String(s.userId || s.createdBy || '').trim().toLowerCase();
@@ -91,14 +118,26 @@ export const SellerSetupView = () => {
       const isMineByName = currentUserName.length > 0 && shiftResp === currentUserName;
       const isMineById = currentUserId.length > 0 && shiftUid === currentUserId;
 
+      const vehicleKey = String(s.pointId || s.vehicle || s.id).toLowerCase().replace(/[^a-z0-9]/g, '');
+
       if (isMineByName || isMineById) {
-        myMine.push(s);
+        const ex = myMineMap.get(vehicleKey);
+        // Preservar solo el turno más reciente para el mismo vehículo hoy
+        if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
+          myMineMap.set(vehicleKey, s);
+        }
       } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
-        others.push(s);
+        const ex = othersMap.get(vehicleKey);
+        if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
+          othersMap.set(vehicleKey, s);
+        }
       }
     });
 
-    return { myUserOpenShifts: myMine, otherOpenShifts: others };
+    return {
+      myUserOpenShifts: Array.from(myMineMap.values()),
+      otherOpenShifts: Array.from(othersMap.values())
+    };
   }, [remoteShifts, user]);
   
   const activeOpenShifts = useMemo(() => {
@@ -292,8 +331,22 @@ export const SellerSetupView = () => {
       closedAt: null,
     };
 
-    addPosShift(newShiftRecord);
-    const allShifts = useInventoryStore.getState().posShifts || [newShiftRecord];
+    // Auto-cerrar turnos anteriores del mismo vendedor o del mismo vehículo antes de guardar el nuevo
+    const nowIso = new Date().toISOString();
+    const currentShiftsList = useInventoryStore.getState().posShifts || [];
+    const cleanedShifts = currentShiftsList.map((s: any) => {
+      if (s.type === 'VENDEDOR' && !s.closedAt) {
+        const isSamePoint = String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint;
+        const isSameUser = currentUserName && String(s.responsibleName || '').trim().toLowerCase() === currentUserName;
+        if (isSamePoint || isSameUser) {
+          return { ...s, closedAt: nowIso, _autoClosedOnNewStart: true };
+        }
+      }
+      return s;
+    });
+
+    const allShifts = [...cleanedShifts.filter((s: any) => s.id !== uniqueShiftId), newShiftRecord];
+    useInventoryStore.setState({ posShifts: allShifts });
 
     push('posShifts', allShifts, effectiveBranchId).catch(() => {});
     push('posShifts', allShifts, null).catch(() => {});

@@ -134,10 +134,25 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         if (data) {
           const map: Record<string, any> = {};
           data.forEach(r => { map[r.key] = r.value; });
-          const shifts = map['posShifts_BRANCH-001'] || map['posShifts'];
-          if (Array.isArray(shifts)) {
-            useInventoryStore.setState({ posShifts: shifts });
+
+          const shiftMap = new Map<string, any>();
+          [
+            ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
+            ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+            ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+          ].forEach((s: any) => {
+            if (!s?.id) return;
+            const existing = shiftMap.get(s.id);
+            if (!existing || (!existing.closedAt && s.closedAt)) {
+              shiftMap.set(s.id, s);
+            }
+          });
+
+          const combinedShifts = Array.from(shiftMap.values());
+          if (combinedShifts.length > 0) {
+            useInventoryStore.setState({ posShifts: combinedShifts });
           }
+
           const locs = { ...(map['vendorLocations'] || {}), ...(map['vendorLocations_BRANCH-001'] || {}) };
           if (Object.keys(locs).length > 0) {
             useInventoryStore.setState({ vendorLocations: locs });
@@ -167,7 +182,6 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     const merged = new Map<string, VendorLocation>();
 
     // Primero agregar los de la BD (última ubicación guardada)
-    // Siempre visible mientras el turno esté activo (en curso)
     dbRef.current.forEach((v, id) => {
       merged.set(id, { ...v, source: 'db' });
     });
@@ -175,28 +189,87 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     // Luego sobrescribir con los de Presence (estos son más recientes y siempre válidos)
     presenceRef.current.forEach((v, id) => merged.set(id, { ...v, source: 'presence' }));
 
-    // Filtrar estrictamente solo por vehículos con turno ACTIVO (en curso)
-    const allActiveShifts = (activeShifts && activeShifts.length > 0)
-      ? activeShifts
-      : (posShiftsFromStore || []);
+    // Fusionar turnos prop y store para evitar destellos durante refrescos
+    const allActiveShifts = [
+      ...(activeShifts || []),
+      ...(posShiftsFromStore || []),
+    ];
 
     const openShifts = allActiveShifts.filter((s: any) => {
       if (s.closedAt) return false;
       if (String(s.type || '').toUpperCase() !== 'VENDEDOR') return false;
-      if (!s.pointId) return false;
+      if (!s.pointId && !s.vehicle) return false;
       return true;
     });
 
-    // Construir sets de pointIds de vehículos activos
-    const activePointIds = new Set(
-      openShifts.map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
-    );
+    // Construir sets de claves de vehículos activos (pointId, responsable, userId)
+    const activeKeys = new Set<string>();
+    openShifts.forEach((s: any) => {
+      const pId = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const vName = String(s.responsibleName || s.userName || s.sellerName || s.vendedor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uId = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (pId) activeKeys.add(pId);
+      if (vName) activeKeys.add(vName);
+      if (uId) activeKeys.add(uId);
 
-    // Filtrar estrictamente por pointId del vehículo activo (NUNCA por nombre para evitar falsos positivos)
+      const numMatch = pId.match(/\d+/);
+      if (numMatch) {
+        activeKeys.add(`t${numMatch[0]}`);
+        activeKeys.add(`${numMatch[0]}`);
+      }
+    });
+
+    // ── GARANTÍA REQUERIDA: Todo vehículo con turno ABIERTO debe permanecer en el mapa en su última ubicación ──
+    openShifts.forEach((s: any) => {
+      const rawP = s.pointId || s.vehicle;
+      if (!rawP) return;
+      const cleanP = String(rawP).toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      // Verificar si ya existe en merged
+      const alreadyPresent = Array.from(merged.values()).some(v => {
+        const vP = String(v.pointId || v.vendorId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return vP === cleanP;
+      });
+
+      if (!alreadyPresent) {
+        // Buscar la última ubicación guardada en la base de datos o el store
+        const savedLoc = vendorLocationsFromStore[rawP] ||
+                         vendorLocationsFromStore[cleanP] ||
+                         vendorLocationsFromStore[String(rawP).toUpperCase()] ||
+                         Object.values(vendorLocationsFromStore).find((l: any) =>
+                           String(l?.pointId || l?.vendorId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP
+                         );
+
+        if (savedLoc && savedLoc.lat && savedLoc.lng) {
+          const pKey = String(rawP).toUpperCase();
+          merged.set(pKey, {
+            vendorId: pKey,
+            pointId: rawP,
+            name: s.responsibleName || savedLoc.name || rawP,
+            lat: savedLoc.lat,
+            lng: savedLoc.lng,
+            updatedAt: savedLoc.updatedAt || new Date().toISOString(),
+            source: 'db',
+          });
+        }
+      }
+    });
+
+    // Filtrar ubicaciones que correspondan a turnos activos
     let result = Array.from(merged.values()).filter(v => {
+      if (activeKeys.size === 0) return true; // Si aún están cargando los turnos, mantener marcadores existentes
+
       const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
       const cleanUid = v.vendorId ? String(v.vendorId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-      return (cleanP && activePointIds.has(cleanP)) || (cleanUid && activePointIds.has(cleanUid));
+      const cleanName = v.name ? String(v.name).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+      const numMatch = (cleanP || cleanName).match(/\d+/);
+      const pNumKey = numMatch ? `t${numMatch[0]}` : '';
+
+      return (cleanP && activeKeys.has(cleanP)) ||
+             (cleanUid && activeKeys.has(cleanUid)) ||
+             (cleanName && activeKeys.has(cleanName)) ||
+             (pNumKey && activeKeys.has(pNumKey));
     });
 
     // DEDUPLICAR por pointId — si hay 2 entradas para el mismo vehículo (Presence + BD),
@@ -225,7 +298,36 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       result = result.filter(v => v.pointId && branchVehicleIds.has(v.pointId));
     }
 
-    setVendors(result);
+    // ── REMOCIÓN ÚNICA: Filtrar por turno cerrado explícitamente ──
+    const closedPointIds = new Set(
+      allActiveShifts
+        .filter((s: any) => s.closedAt && (s.pointId || s.vehicle))
+        .map((s: any) => String(s.pointId || s.vehicle).toLowerCase().replace(/[^a-z0-9]/g, ''))
+    );
+
+    // Actualización funcional atómica: preserva marcadores en pantalla y evita parpadeos
+    setVendors(prev => {
+      const mergedMap = new Map<string, VendorLocation>();
+
+      // 1. Conservar marcadores existentes en pantalla
+      prev.forEach(v => {
+        const key = (v.pointId ? String(v.pointId).toUpperCase() : String(v.vendorId || v.name).toUpperCase());
+        if (key) mergedMap.set(key, v);
+      });
+
+      // 2. Aplicar ubicaciones más recientes
+      result.forEach(v => {
+        const key = (v.pointId ? String(v.pointId).toUpperCase() : String(v.vendorId || v.name).toUpperCase());
+        if (key) mergedMap.set(key, v);
+      });
+
+      // 3. Quitar del mapa ÚNICAMENTE si el turno fue cerrado explícitamente hoy
+      return Array.from(mergedMap.values()).filter(v => {
+        const cleanP = v.pointId ? String(v.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        if (cleanP && closedPointIds.has(cleanP)) return false;
+        return true;
+      });
+    });
   };
 
   // ── Leer ubicaciones desde el store (sincronizado vía app_state) ──────────
@@ -233,24 +335,51 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   const posShiftsFromStore       = useInventoryStore((s: any) => s.posShifts || []);
 
   useEffect(() => {
-    const activeShiftPointIds = new Set(
-      posShiftsFromStore
-        .filter((s: any) => String(s.type || '').toUpperCase() === 'VENDEDOR' && !s.closedAt && s.pointId)
-        .map((s: any) => String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
-    );
+    const activeOpenShifts = (posShiftsFromStore || []).filter((s: any) => {
+      if (s.closedAt) return false;
+      const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t'));
+      return isVendor;
+    });
 
-    dbRef.current.clear();
-    Object.entries(vendorLocationsFromStore).forEach(([vendorId, loc]: [string, any]) => {
+    const activeKeys = new Set<string>();
+    activeOpenShifts.forEach((s: any) => {
+      const pId = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const vName = String(s.responsibleName || s.userName || s.sellerName || s.vendedor || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const uId = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (pId) activeKeys.add(pId);
+      if (vName) activeKeys.add(vName);
+      if (uId) activeKeys.add(uId);
+
+      const numMatch = pId.match(/\d+/);
+      if (numMatch) {
+        activeKeys.add(`t${numMatch[0]}`);
+        activeKeys.add(`${numMatch[0]}`);
+      }
+    });
+
+    const updatedDbMap = new Map<string, VendorLocation>();
+
+    Object.entries(vendorLocationsFromStore || {}).forEach(([vendorId, loc]: [string, any]) => {
+      if (!loc || typeof loc !== 'object') return;
       if (!loc.lat || !loc.lng) return;
+
       const cleanP = loc.pointId ? String(loc.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
       const cleanUid = vendorId ? String(vendorId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+      const cleanName = loc.name ? String(loc.name).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
 
-      // Solo registrar en dbRef si el vehículo tiene turno ACTIVO
-      const hasActiveShift = (cleanP && activeShiftPointIds.has(cleanP)) || (cleanUid && activeShiftPointIds.has(cleanUid));
+      const numMatch = (cleanP || cleanName).match(/\d+/);
+      const pNumKey = numMatch ? `t${numMatch[0]}` : '';
+
+      const hasActiveShift = activeKeys.size === 0 ||
+        (cleanP && activeKeys.has(cleanP)) ||
+        (cleanUid && activeKeys.has(cleanUid)) ||
+        (cleanName && activeKeys.has(cleanName)) ||
+        (pNumKey && activeKeys.has(pNumKey));
+
       if (!hasActiveShift) return;
 
-      const pKey = loc.pointId || vendorId;
-      dbRef.current.set(pKey, {
+      const pKey = loc.pointId || vendorId || loc.name;
+      updatedDbMap.set(pKey, {
         vendorId: pKey,
         pointId: loc.pointId || vendorId,
         name: loc.name || loc.pointId || 'Vendedor',

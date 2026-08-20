@@ -240,15 +240,37 @@ export function ClientePedirView() {
     }
   }, []);
 
-  // Cargar datos al cambiar de sede
+  // Cargar datos al cambiar de sede y mantener sincronización periódica
   useEffect(() => {
     fetchGeofences();
     fetchVendors();
     fetchCatalog();
-    
+
+    const interval = setInterval(() => {
+      fetchVendors();
+      fetchCatalog();
+    }, 4000);
+
+    const channel = supabase
+      .channel('client-vendors-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'app_state' },
+        () => {
+          fetchVendors();
+          fetchCatalog();
+        }
+      )
+      .subscribe();
+
     if (activeOrderId && activeOrderToken) {
       monitorOrder();
     }
+
+    return () => {
+      clearInterval(interval);
+      supabase.removeChannel(channel);
+    };
   }, [selectedBranchId]);
 
   // Recalcular cobertura de Geocercas
@@ -277,8 +299,127 @@ export function ClientePedirView() {
   };
 
   const fetchVendors = async () => {
-    const { data } = await supabase.from('vendor_locations').select('*').eq('is_active', true);
-    setVendors(data || []);
+    try {
+      const keysToFetch = [
+        'vendorLocations', 'vendorLocations_BRANCH-001',
+        'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history'
+      ];
+      if (selectedBranchId && selectedBranchId !== 'BRANCH-001') {
+        keysToFetch.push(`vendorLocations_${selectedBranchId}`);
+        keysToFetch.push(`posShifts_${selectedBranchId}`);
+      }
+
+      const { data } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', keysToFetch);
+
+      if (!data) return;
+
+      const map: Record<string, any> = {};
+      data.forEach((row: any) => { map[row.key] = row.value; });
+
+      // 1. Obtener turnos activos (posShifts)
+      const shiftMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
+        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+        ...(selectedBranchId && Array.isArray(map[`posShifts_${selectedBranchId}`]) ? map[`posShifts_${selectedBranchId}`] : []),
+        ...(useInventoryStore.getState().posShifts || []),
+      ].forEach((s: any) => {
+        if (!s?.id) return;
+        const existing = shiftMap.get(s.id);
+        if (!existing || (!existing.closedAt && s.closedAt)) {
+          shiftMap.set(s.id, s);
+        }
+      });
+
+      const today = new Date().toISOString().slice(0, 10);
+      const activeShifts = Array.from(shiftMap.values()).filter((s: any) => {
+        if (s.closedAt) return false;
+        const typeStr = String(s.type || '').toUpperCase();
+        const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
+        const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
+        if (!isVendor) return false;
+        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+        if (shiftDate && shiftDate < today) return false;
+        return true;
+      });
+
+      const activePointIds = new Set(
+        activeShifts.map((s: any) => String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+      );
+
+      // 2. Obtener ubicaciones (vendorLocations)
+      const allLocs = {
+        ...(map['vendorLocations'] || {}),
+        ...(map['vendorLocations_BRANCH-001'] || {}),
+        ...(useInventoryStore.getState().vendorLocations || {}),
+        ...(selectedBranchId ? (map[`vendorLocations_${selectedBranchId}`] || {}) : {})
+      };
+
+      const vendorList: any[] = [];
+      const addedKeys = new Set<string>();
+
+      Object.entries(allLocs).forEach(([key, loc]: [string, any]) => {
+        if (!loc || typeof loc !== 'object') return;
+        if (!loc.lat || !loc.lng) return;
+
+        const cleanP = loc.pointId ? String(loc.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        const cleanUid = key ? String(key).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+        const cleanName = loc.name ? String(loc.name).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
+
+        // Si el vehículo tiene turno activo O si no hay filtro de turnos
+        const isPointActive = activePointIds.size === 0 ||
+          (cleanP && activePointIds.has(cleanP)) ||
+          (cleanUid && activePointIds.has(cleanUid)) ||
+          (cleanName && activePointIds.has(cleanName));
+
+        if (!isPointActive) return;
+
+        const dedupeKey = (cleanP || cleanUid || cleanName);
+        if (!addedKeys.has(dedupeKey)) {
+          addedKeys.add(dedupeKey);
+          vendorList.push({
+            id: dedupeKey,
+            vendorId: dedupeKey,
+            pointId: loc.pointId || key,
+            name: loc.name || loc.pointId || 'Vendedor',
+            lat: Number(loc.lat),
+            lng: Number(loc.lng),
+            updatedAt: loc.updatedAt || new Date().toISOString(),
+          });
+        }
+      });
+
+      // Si hay turnos activos sin coordenadas exactas guardadas, agregar marcador por defecto en la sede
+      activeShifts.forEach((s: any) => {
+        const pId = s.pointId || s.vehicle || 'Triciclo';
+        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
+        const alreadyAdded = Array.from(addedKeys).some(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP);
+
+        if (!alreadyAdded) {
+          addedKeys.add(cleanP);
+          const activeBranch = branches.find(b => b.id === selectedBranchId) || branches[0];
+          const bLat = Number(activeBranch?.settings?.lat || 1.8485);
+          const bLng = Number(activeBranch?.settings?.lng || -76.0522);
+          vendorList.push({
+            id: pId,
+            vendorId: s.userId || pId,
+            pointId: pId,
+            name: s.responsibleName || pId,
+            lat: bLat,
+            lng: bLng,
+            updatedAt: s.openedAt || new Date().toISOString(),
+          });
+        }
+      });
+
+      setVendors(vendorList);
+    } catch (e) {
+      console.warn('[ClientePedirView] Error fetching vendors:', e);
+    }
   };
 
   const fetchCatalog = async () => {
@@ -394,7 +535,7 @@ export function ClientePedirView() {
   const activeVendorsAround = vendors.map(v => {
     const distance = getHaversineDistance(clientPos[0], clientPos[1], v.lat, v.lng);
     return { ...v, distance };
-  }).filter(v => v.distance <= 6.0).sort((a, b) => a.distance - b.distance);
+  }).filter(v => isNaN(v.distance) || v.distance <= 25.0).sort((a, b) => a.distance - b.distance);
 
   // Stock disponible consolidado de los carritos del municipio
   const availableProducts = products.map(prod => {

@@ -157,30 +157,7 @@ const INITIAL_FRY_KITCHENS = [
   { id: 'FK-002', name: 'Cocina Apoyo',     location: 'Zona Sur',   active: true },
 ];
 
-const INITIAL_INVENTORY = [
-  // Bodega Central — Insumos
-  { id: 'INS-001', warehouseId: 'BOD-001', name: 'Carne de Cerdo',    qty: 120, unit: 'kg',  type: 'INSUMO',   alert: 20,  barcode: '7701234000001' },
-  { id: 'INS-002', warehouseId: 'BOD-001', name: 'Grasa de Cerdo',   qty: 45,  unit: 'kg',  type: 'INSUMO',   alert: 10,  barcode: '7701234000002' },
-  { id: 'INS-003', warehouseId: 'BOD-001', name: 'Especias Chorizo', qty: 8,   unit: 'kg',  type: 'INSUMO',   alert: 2,   barcode: '7701234000003' },
-  { id: 'INS-004', warehouseId: 'BOD-001', name: 'Sal Nitral',       qty: 3,   unit: 'kg',  type: 'INSUMO',   alert: 1,   barcode: '7701234000004' },
-  { id: 'INS-005', warehouseId: 'BOD-001', name: 'Tripa Natural',    qty: 50,  unit: 'm',   type: 'INSUMO',   alert: 10,  barcode: '7701234000005' },
-  // Bodega Refrigerada — Insumos
-  { id: 'INS-006', warehouseId: 'BOD-002', name: 'Carne de Res',     qty: 80,  unit: 'kg',  type: 'INSUMO',   alert: 15,  barcode: '7701234000006' },
-  { id: 'INS-007', warehouseId: 'BOD-002', name: 'Paprika',          qty: 2,   unit: 'kg',  type: 'INSUMO',   alert: 0.5, barcode: '7701234000007' },
-  { id: 'INS-008', warehouseId: 'BOD-002', name: 'Hielo',            qty: 200, unit: 'kg',  type: 'INSUMO',   alert: 30,  barcode: '7701234000008' },
-  // Bodega de Secos — Productos terminados listos para despacho
-  { id: 'PRD-001', warehouseId: 'BOD-003', name: 'Chorizo Tradicional', qty: 30, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100001', price: 15000, posCategoryId: 'CAT-003', inTricycles: true },
-  { id: 'PRD-002', warehouseId: 'BOD-003', name: 'Salchicha Viena',     qty: 15, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100002', price: 12000, posCategoryId: 'CAT-003', inTricycles: true },
-  { id: 'PRD-003', warehouseId: 'BOD-003', name: 'Morcilla Negra',      qty: 8,  unit: 'kg', type: 'PRODUCTO', alert: 3, barcode: '7701234100003', price: 14000, posCategoryId: 'CAT-003', inTricycles: true },
-  { id: 'PRD-004', warehouseId: 'BOD-003', name: 'Jamón del Diablo',    qty: 20, unit: 'kg', type: 'PRODUCTO', alert: 5, barcode: '7701234100004', price: 25000, posCategoryId: 'CAT-003', inTricycles: true },
-  
-  // Productos listos para freír / Fritos
-  // Productos listos para freír / Fritos
-  { id: 'PRD-RAW-005', warehouseId: 'BOD-002', name: 'Empanadas Crudas', qty: 150, unit: 'ud', type: 'PRODUCTO', alert: 30, barcode: '7701234100005C' },
-  { id: 'PRD-RAW-006', warehouseId: 'BOD-002', name: 'Pasteles Crudos',  qty: 80,  unit: 'ud', type: 'PRODUCTO', alert: 15, barcode: '7701234100006C' },
-  { id: 'PRD-005', warehouseId: 'BOD-003', name: 'Empanadas Fritas',    qty: 100, unit: 'ud', type: 'FRITO',    alert: 20, barcode: '7701234100005', price: 2000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1626202868472-3580436d6a2f?q=80&w=300&auto=format&fit=crop', inTricycles: true },
-  { id: 'PRD-006', warehouseId: 'BOD-003', name: 'Pasteles Fritos',     qty: 50,  unit: 'ud', type: 'FRITO',    alert: 10, barcode: '7701234100006', price: 4000, posCategoryId: 'CAT-001', imageUrl: 'https://images.unsplash.com/photo-1604467715878-83e57e8ba129?q=80&w=300&auto=format&fit=crop', inTricycles: true },
-];
+const INITIAL_INVENTORY = [];
 
 const INITIAL_PRODUCTS = [
   {
@@ -625,13 +602,20 @@ export const useInventoryStore = create(
                     }
                   });
 
+                  const today = new Date().toISOString().slice(0, 10);
                   merged = merged.map(s => {
-                    if (!s.closedAt && s.pointId) {
-                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
-                      const matchingClosedAt = closedTimesByPointDate.get(`${cP}_${cD}`);
-                      if (matchingClosedAt) {
-                        return { ...s, closedAt: matchingClosedAt };
+                    if (!s.closedAt) {
+                      if (s.pointId) {
+                        const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
+                        const matchingClosedAt = closedTimesByPointDate.get(`${cP}_${cD}`);
+                        if (matchingClosedAt) {
+                          return { ...s, closedAt: matchingClosedAt };
+                        }
+                      }
+                      const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+                      if (shiftDate && shiftDate < today) {
+                        return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
                       }
                     }
                     return s;
@@ -670,18 +654,16 @@ export const useInventoryStore = create(
             console.log('[Store] Admin: cargado desde Supabase (todas las sedes):', Object.keys(updates));
           }
 
-          // Carga estricta de inventario desde Supabase: el inventario remoto en la nube SIEMPRE tiene la máxima prioridad.
-          if (updates.inventory && Array.isArray(updates.inventory) && updates.inventory.length > 0) {
+          // Carga estricta de inventario desde Supabase: filtrar siempre los productos demo de la plantilla inicial
+          const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+          if (updates.inventory && Array.isArray(updates.inventory)) {
             const deletedInvIds = get().deletedInventoryIds || [];
-            updates.inventory = updates.inventory.filter(i => !deletedInvIds.includes(i.id));
+            updates.inventory = updates.inventory.filter(i => i?.id && !deletedInvIds.includes(i.id) && !DEMO_PRD_SET.has(i.id));
           } else if (get().inventory && get().inventory.length > 0) {
-            // Si no vino inventario de Supabase pero hay local, preservar solo lo que NO es demo
-            const localInv = get().inventory.filter(i => i?.id && !DEMO_IDS.has(i.id));
-            if (localInv.length > 0) {
-              updates.inventory = localInv;
-            }
+            const localInv = get().inventory.filter(i => i?.id && !DEMO_PRD_SET.has(i.id));
+            updates.inventory = localInv;
           }
-          // cashDrawerCode: respetar el formato del usuario (hex o decimal)
+
           if (Object.keys(updates).length > 0) {
             set(updates);
           }
@@ -716,28 +698,36 @@ export const useInventoryStore = create(
        * para que los productIds coincidan en cargas, surtidos, pedidos y cierres.
        * Filtra inventory por tipo FRITO o PRODUCTO y que tenga precio definido.
        */
-      getPosItems: () =>
-        get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles === true
-        ),
+      getPosItems: () => {
+        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        return get().inventory.filter(
+          (i) => i.type !== 'INSUMO' && i.inTricycles === true && !DEMO_PRD_IDS.has(i.id)
+        );
+      },
 
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir).
        * Incluye todos los productos vendibles habilitados para triciclos.
        */
-      getDeliveryItems: () =>
-        get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles === true && i.showInTricicloPos !== true
-        ),
+      getDeliveryItems: () => {
+        const inv = get().inventory || [];
+        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        return inv.filter(
+          (i) => i.type !== 'INSUMO' && i.inTricycles === true && i.showInTricicloPos !== true && !DEMO_PRD_IDS.has(i.id)
+        );
+      },
 
       /**
        * Productos del POS del Vendedor de triciclo (Venta Rápida).
        * Incluye exactamente los productos marcados con inTricycles === true.
        */
-      getVendedorPosItems: () =>
-        get().inventory.filter(
-          (i) => i.inTricycles === true && i.showInPos !== false
-        ),
+      getVendedorPosItems: () => {
+        const inv = get().inventory || [];
+        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        return inv.filter(
+          (i) => i.inTricycles === true && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
+        );
+      },
 
 
       // Verifica si hay stock para producir [batches] lotes
@@ -1628,11 +1618,16 @@ export const useInventoryStore = create(
           state.posRegisters = state.posRegisters.filter(r => !deletedRegs.includes(r.id));
         }
 
-        // ── Limpiar customerTypes y customers DEMO del localStorage ──
-        // Si el localStorage tiene datos de plantilla (CTYPE-001, CTYPE-002, CUST-002),
-        // vaciarlos para que loadFromRemote traiga los datos reales de Supabase.
+        // ── Limpiar inventory, customerTypes y customers DEMO del localStorage ──
         const DEMO_CTYPE_IDS = new Set(['CTYPE-001', 'CTYPE-002']);
         const DEMO_CUST_IDS = new Set(['CUST-002']);
+        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        if (Array.isArray(state.inventory)) {
+          const hasReal = state.inventory.some(i => i?.id && !DEMO_PRD_IDS.has(i.id));
+          if (hasReal) {
+            state.inventory = state.inventory.filter(i => !i?.id || !DEMO_PRD_IDS.has(i.id));
+          }
+        }
         if (Array.isArray(state.customerTypes)) {
           const realTypes = state.customerTypes.filter(ct => ct?.id && !DEMO_CTYPE_IDS.has(ct.id));
           if (realTypes.length === 0) {

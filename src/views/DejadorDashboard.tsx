@@ -193,12 +193,16 @@ export const DejadorDashboard = () => {
   const today = new Date().toISOString().slice(0, 10);
   const [remoteShifts, setRemoteShifts] = useState<any[] | null>(null);
 
-  // Sincronización directa y periódica con Supabase para turnos de los triciclos
+  // Sincronización directa y periódica con Supabase para turnos de los triciclos e inventario
   const loadRemoteShifts = async () => {
     try {
-      const keysToFetch = ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history'];
+      const keysToFetch = [
+        'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
+        'inventory', 'inventory_BRANCH-001'
+      ];
       if (userBranchId && userBranchId !== 'BRANCH-001') {
         keysToFetch.push(`posShifts_${userBranchId}`);
+        keysToFetch.push(`inventory_${userBranchId}`);
       }
 
       const { data, error } = await supabase
@@ -210,6 +214,16 @@ export const DejadorDashboard = () => {
 
       const map: Record<string, any> = {};
       data.forEach((row: any) => { map[row.key] = row.value; });
+
+      // Actualizar inventario si viene de Supabase (filtrando siempre los 6 ítems demo de la plantilla inicial)
+      const rawInv = (userBranchId && Array.isArray(map[`inventory_${userBranchId}`]))
+        ? map[`inventory_${userBranchId}`]
+        : (Array.isArray(map['inventory_BRANCH-001']) ? map['inventory_BRANCH-001'] : map['inventory']);
+
+      const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+      const cleanedInv = (Array.isArray(rawInv) ? rawInv : []).filter((i: any) => i?.id && !DEMO_PRD_IDS.has(i.id));
+
+      useInventoryStore.setState({ inventory: cleanedInv });
 
       const shiftMap = new Map<string, any>();
       [
@@ -224,7 +238,18 @@ export const DejadorDashboard = () => {
           shiftMap.set(s.id, s);
         }
       });
-      const allShifts = Array.from(shiftMap.values());
+
+      const today = new Date().toISOString().slice(0, 10);
+      const allShifts = Array.from(shiftMap.values()).map(s => {
+        if (!s.closedAt) {
+          const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+          if (shiftDate && shiftDate < today) {
+            return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+          }
+        }
+        return s;
+      });
+
       setRemoteShifts(allShifts);
       useInventoryStore.setState({ posShifts: allShifts });
     } catch (e) {
@@ -270,14 +295,26 @@ export const DejadorDashboard = () => {
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
     const sourceList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
+    const today = new Date().toISOString().slice(0, 10);
 
-    // Turnos de Vendedor ABIERTOS EN CURSO
-    (sourceList || []).forEach((s: any) => {
-      if (s.closedAt) return;
-
+    // Filtrar solo turnos de Vendedor ABIERTOS EN CURSO de HOY
+    const openShifts = (sourceList || []).filter((s: any) => {
+      if (s.closedAt) return false;
       const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
-      if (!isVendor) return;
+      if (!isVendor) return false;
 
+      const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+      // Si tiene fecha y es anterior a hoy, es un turno fantasma no cerrado de días pasados
+      if (shiftDate && shiftDate < today) return false;
+      return true;
+    });
+
+    // Ordenar por fecha de apertura más reciente para que el turno más nuevo de hoy gane
+    openShifts.sort((a: any, b: any) =>
+      new Date(b.openedAt || b.createdAt || 0).getTime() - new Date(a.openedAt || a.createdAt || 0).getTime()
+    );
+
+    openShifts.forEach((s: any) => {
       const rawPoint = String(s.pointId || s.point_id || s.vehicle || s.registerName || '').trim();
       if (!rawPoint) return;
 
@@ -288,19 +325,19 @@ export const DejadorDashboard = () => {
       const numMatch = cleanPoint.match(/\d+/);
       const pointNum = numMatch ? numMatch[0] : null;
 
-      // Asociar variantes de texto del punto
-      map[rawPoint] = rawName;
-      map[cleanPoint] = rawName;
-      map[rawPoint.toUpperCase()] = rawName;
+      // Solo asignar si aún no tiene un mapa registrado (el más reciente gana)
+      if (!map[rawPoint]) map[rawPoint] = rawName;
+      if (!map[cleanPoint]) map[cleanPoint] = rawName;
+      if (!map[rawPoint.toUpperCase()]) map[rawPoint.toUpperCase()] = rawName;
 
       // Si tiene número (ej. "1" para "T1"), asociar todas las formas comunes
       if (pointNum) {
-        map[`T${pointNum}`] = rawName;
-        map[`t${pointNum}`] = rawName;
-        map[`T-${pointNum}`] = rawName;
-        map[`triciclo${pointNum}`] = rawName;
-        map[`TRICICLO${pointNum}`] = rawName;
-        map[pointNum] = rawName;
+        if (!map[`T${pointNum}`]) map[`T${pointNum}`] = rawName;
+        if (!map[`t${pointNum}`]) map[`t${pointNum}`] = rawName;
+        if (!map[`T-${pointNum}`]) map[`T-${pointNum}`] = rawName;
+        if (!map[`triciclo${pointNum}`]) map[`triciclo${pointNum}`] = rawName;
+        if (!map[`TRICICLO${pointNum}`]) map[`TRICICLO${pointNum}`] = rawName;
+        if (!map[pointNum]) map[pointNum] = rawName;
       }
     });
 
@@ -801,7 +838,7 @@ export const DejadorDashboard = () => {
   return (
     <div
       className={`font-sans w-full bg-[#FFD56B] flex flex-col ${
-        activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden pb-0' : 'min-h-screen pb-32'
+        activeTab === 'chat' ? 'h-[100dvh] max-h-[100dvh] overflow-hidden pb-0' : 'min-h-screen pb-56 sm:pb-64'
       }`}
       onPointerDown={isAlertPlaying ? handleStopAlert : undefined}
     >
@@ -1484,7 +1521,7 @@ export const DejadorDashboard = () => {
 
       {/* ─── FLOATING CONFIRM BUTTON (For Surtir & Recibir) ─── */}
       {(activeTab === 'carga' || activeTab === 'recibir') && (
-        <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 pointer-events-none z-50">
+        <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 pointer-events-none z-50 bg-gradient-to-t from-[#FFD56B] via-[#FFD56B]/90 to-transparent pt-8 pb-4 sm:pb-6">
            <div className="max-w-7xl mx-auto flex justify-center sm:justify-end">
              <button 
                 onClick={(e) => {
