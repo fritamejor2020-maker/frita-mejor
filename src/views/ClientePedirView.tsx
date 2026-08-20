@@ -968,7 +968,7 @@ export function ClientePedirView() {
       </div>
 
       {/* ── HEADER FLOTANTE TIPO UBER ── */}
-      <header className="absolute top-4 left-4 right-4 z-20 max-w-md mx-auto">
+      <header className="absolute top-4 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] max-w-md">
         <div className="bg-white/95 backdrop-blur-md rounded-2xl p-3 shadow-2xl border border-gray-100 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="w-9 h-9 rounded-xl bg-[#FF4040] text-white flex items-center justify-center font-black text-base shadow-sm shrink-0">
@@ -1012,7 +1012,7 @@ export function ClientePedirView() {
 
       {/* ── BARRA INFERIOR DE ACCIÓN GIGANTE ESTILO UBER (STEP MAP) ── */}
       {uiStep === 'MAP' && (
-        <div className="absolute bottom-6 left-4 right-4 z-20 max-w-md mx-auto animate-slide-up">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-20 w-[calc(100%-2rem)] max-w-md animate-slide-up">
           <button
             onClick={() => setUiStep('MENU')}
             className="w-full bg-[#FF4040] hover:bg-red-600 text-white font-black py-4 px-6 rounded-[28px] shadow-2xl flex items-center justify-between transition-all active:scale-95 border-2 border-white/20"
