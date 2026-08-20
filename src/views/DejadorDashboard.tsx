@@ -847,7 +847,7 @@ export const DejadorDashboard = () => {
       
       {/* ─── HEADER ULTRA COMPACTO ─── */}
       <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl">
-        <div className="max-w-7xl mx-auto px-3 sm:px-6 pt-2 pb-2">
+        <div className="max-w-5xl mx-auto px-3 sm:px-6 pt-2 pb-2">
 
           {/* Top row: title + session info + CERRAR JORNADA */}
           <div className="flex items-center justify-between gap-2 flex-wrap sm:flex-nowrap">
@@ -924,7 +924,7 @@ export const DejadorDashboard = () => {
       </div>
 
       {/* ─── CONTENT AREA ─── */}
-      <div className={`w-full max-w-7xl mx-auto px-2 sm:px-6 animate-fade-in ${
+      <div className={`w-full max-w-5xl mx-auto px-2 sm:px-6 animate-fade-in ${
         activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-1.5 sm:my-2' : 'mt-3 sm:mt-4'
       }`}>
         
@@ -1522,7 +1522,7 @@ export const DejadorDashboard = () => {
       {/* ─── FLOATING CONFIRM BUTTON (For Surtir & Recibir) ─── */}
       {(activeTab === 'carga' || activeTab === 'recibir') && (
         <div className="fixed bottom-0 left-0 right-0 p-4 sm:p-6 pointer-events-none z-50 bg-gradient-to-t from-[#FFD56B] via-[#FFD56B]/90 to-transparent pt-8 pb-4 sm:pb-6">
-           <div className="max-w-7xl mx-auto flex justify-center sm:justify-end">
+           <div className="max-w-5xl mx-auto flex justify-center sm:justify-end">
              <button 
                 onClick={(e) => {
                   e.stopPropagation();
