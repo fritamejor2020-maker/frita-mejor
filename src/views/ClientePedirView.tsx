@@ -531,11 +531,11 @@ export function ClientePedirView() {
     };
   };
 
-  // Carritos activos ordenados por cercanía GPS
+  // Carritos activos ordenados por cercanía GPS (incluye exactamente todos los vendedores detectados en rastreo en vivo)
   const activeVendorsAround = vendors.map(v => {
     const distance = getHaversineDistance(clientPos[0], clientPos[1], v.lat, v.lng);
-    return { ...v, distance };
-  }).filter(v => isNaN(v.distance) || v.distance <= 25.0).sort((a, b) => a.distance - b.distance);
+    return { ...v, distance: isNaN(distance) ? 0 : distance };
+  }).sort((a, b) => a.distance - b.distance);
 
   // Stock disponible consolidado de los carritos del municipio
   const availableProducts = products.map(prod => {
