@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { safeLocalStorage } from '../utils/safeStorage';
 
 // ==============================================================================
 // SYNC MANAGER — Motor de sincronización Offline-First (Multisede)
@@ -96,7 +97,7 @@ function notifyListeners(status) {
 
 export function getQueue() {
   try {
-    const raw = localStorage.getItem(QUEUE_KEY);
+    const raw = safeLocalStorage.getItem(QUEUE_KEY);
     return raw ? JSON.parse(raw) : [];
   } catch {
     return [];
@@ -105,7 +106,7 @@ export function getQueue() {
 
 function saveQueue(queue) {
   try {
-    localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    safeLocalStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
   } catch (e) {
     console.warn('[SyncManager] Error al guardar cola:', e.message);
   }

@@ -6,6 +6,7 @@ import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useAuthStore } from './useAuthStore';
 import { useVehicleStore } from './useVehicleStore';
+import { safeJSONStorage } from '../utils/safeStorage';
 
 // Acceso lazy a useInventoryStore para evitar import circular
 // (logistics ←→ inventory). Se resuelve en runtime cuando ya están todos cargados.
@@ -569,6 +570,7 @@ export const useLogisticsStore = create(
     }),
     {
       name: 'frita-mejor-logistics',
+      storage: safeJSONStorage,
       version: 3,
       migrate: (persistedState, version) => {
         if (version < 3) {
@@ -578,10 +580,10 @@ export const useLogisticsStore = create(
         return persistedState;
       },
       partialize: (state) => ({ 
-        pendingRequests: state.pendingRequests, 
-        completedRequests: state.completedRequests,
-        rejectedRequests: state.rejectedRequests || [],
-        loadHistory: state.loadHistory 
+        pendingRequests: state.pendingRequests || [], 
+        completedRequests: (state.completedRequests || []).slice(-50),
+        rejectedRequests: (state.rejectedRequests || []).slice(-30),
+        loadHistory: (state.loadHistory || []).slice(-50) 
       }),
     }
   )

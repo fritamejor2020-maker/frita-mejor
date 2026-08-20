@@ -488,7 +488,6 @@ export function AdminVehicleInventoryTab() {
   const completedRequests = useLogisticsStore((state: any) => state.completedRequests) || [];
   const forceEndShift = useSellerSessionStore((s: any) => s.forceEndShift);
 
-  // ── Leer sesión activa LOCAL del vendedor directamente ──────────────────────
   const sellerSession = useSellerSessionStore() as any;
 
   const [filterDate,  setFilterDate]  = useState('');
@@ -496,7 +495,6 @@ export function AdminVehicleInventoryTab() {
   const [expandedId,  setExpandedId]  = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
 
-  // ── Estado local de turnos cargados directamente desde Supabase ─────────────
   const [supabaseShifts, setSupabaseShifts] = useState<any[]>([]);
   const [supabaseLoaded, setSupabaseLoaded] = useState(() => (useInventoryStore.getState().posShifts || []).length > 0);
 
@@ -523,7 +521,20 @@ export function AdminVehicleInventoryTab() {
             shiftMap.set(s.id, s);
           }
         });
-        const allShifts = Array.from(shiftMap.values());
+
+        const today = dateOf(new Date().toISOString());
+        let autoClosedCount = 0;
+
+        const allShifts = Array.from(shiftMap.values()).map((s: any) => {
+          if (!s.closedAt) {
+            const shiftDate = dateOf(s.openedAt || s.fecha || s.date || s.start_time || '');
+            if (shiftDate && shiftDate < today) {
+              autoClosedCount++;
+              return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+            }
+          }
+          return s;
+        });
 
         // Filtrar tombstones
         const deletedIds = new Set<string>([
@@ -536,6 +547,14 @@ export function AdminVehicleInventoryTab() {
 
         // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
         useInventoryStore.setState({ posShifts: filtered });
+
+        // Guardar la versión depurada y cerrada automáticamente en Supabase app_state
+        if (autoClosedCount > 0) {
+          supabase.from('app_state').upsert([
+            { key: 'posShifts', value: filtered, updated_at: new Date().toISOString() },
+            { key: 'posShifts_BRANCH-001', value: filtered, updated_at: new Date().toISOString() }
+          ]).catch(() => {});
+        }
       }
     } catch (e) {
       // No bloquear la UI si falla Supabase
@@ -629,8 +648,6 @@ export function AdminVehicleInventoryTab() {
     return Array.from(byId.values());
   }, [posShifts, supabaseShifts]);
 
-
-
   // Fecha de hoy local
   const today = dateOf(new Date().toISOString());
 
@@ -720,7 +737,16 @@ export function AdminVehicleInventoryTab() {
     });
   }, [allShifts, filterDate, filterShift]);
 
-  const activeCount = filteredShifts.filter((s: any) => !s.closedAt).length;
+  // Contar sólo turnos abiertos en curso reales (si no hay filtro de fecha activo, contar los de hoy)
+  const activeCount = useMemo(() => {
+    return filteredShifts.filter((s: any) => {
+      if (s.closedAt) return false;
+      const sDate = s.fecha || s.date || dateOf(s.openedAt || '');
+      if (!filterDate && sDate && sDate < today) return false;
+      return true;
+    }).length;
+  }, [filteredShifts, filterDate, today]);
+
   const closedCount = filteredShifts.filter((s: any) => !!s.closedAt).length;
   const uniqueDates = new Set(filteredShifts.map((s: any) => s.fecha || s.date || dateOf(s.closedAt || s.openedAt || ''))).size;
 

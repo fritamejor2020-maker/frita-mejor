@@ -276,3 +276,56 @@ input[type="password"]::-ms-clear {
 .animate-slide-in-right {
   animation: slide-in-right 0.3s var(--ease-out-expo) forwards;
 }
+
+/* ══════════════════════════════════════════════════════════════ */
+/* ADAPTACIÓN DINÁMICA DE ORIENTACIÓN (OPERA / TABLETS / PWA)    */
+/* ══════════════════════════════════════════════════════════════ */
+
+/* Modo Horizontal (Landscape) */
+@media (orientation: landscape), screen and (min-aspect-ratio: 13/10) {
+  html, body, #root {
+    min-height: 100vh;
+    width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Expandir contenedores principales cuando la tablet se gira a horizontal */
+  .is-landscape .max-w-md,
+  .is-landscape .max-w-lg,
+  .is-landscape .max-w-xl,
+  [data-orientation="landscape"] .max-w-md,
+  [data-orientation="landscape"] .max-w-lg,
+  [data-orientation="landscape"] .max-w-xl {
+    max-width: 95% !important;
+  }
+
+  /* Ajustar cuadrículas y contenedores principales en horizontal */
+  .grid-responsive-orientation {
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  }
+
+  /* Ajustar modales y diálogos para no cortar contenido en landscape */
+  .modal-content, [role="dialog"] {
+    max-height: 92vh;
+    overflow-y: auto;
+  }
+}
+
+/* Modo Vertical (Portrait) */
+@media (orientation: portrait) {
+  html, body, #root {
+    min-height: 100vh;
+  }
+}
+
+/* Reglas utilitarias basadas en data-orientation */
+html[data-orientation="landscape"] .orientation-flex-swap,
+body[data-orientation="landscape"] .orientation-flex-swap {
+  flex-direction: row !important;
+}
+
+html[data-orientation="portrait"] .orientation-flex-swap,
+body[data-orientation="portrait"] .orientation-flex-swap {
+  flex-direction: column !important;
+}
+

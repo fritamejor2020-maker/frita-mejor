@@ -13,6 +13,7 @@ import { initCrossTabSync, registerStore, broadcastState, isApplyingRemoteState 
 import { trackError, installGlobalErrorHandlers } from './lib/errorTracker';
 import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
 import VersionBadge from './components/ui/VersionBadge';
+import { useOrientation } from './hooks/useOrientation';
 
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -212,6 +213,9 @@ function TrackingWrapper() {
 }
 
 function App() {
+  // Manejo de orientación dinámica (vertical/horizontal) para Opera y navegadores de Tablet
+  useOrientation();
+
   // Suscripción a cambios remotos en tiempo real (Supabase)
   useRealtimeSync();
 

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { supabase } from '../lib/supabase';
+import { safeJSONStorage } from '../utils/safeStorage';
 
 export interface BiometricTerminal {
   id: string;
@@ -884,6 +885,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
     }),
     {
       name: 'frita_attendance_store_v10',
+      storage: safeJSONStorage,
       merge: (persistedState: any, currentState: any) => ({
         ...currentState,
         ...persistedState,
