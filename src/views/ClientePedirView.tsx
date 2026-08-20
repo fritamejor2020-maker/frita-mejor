@@ -300,33 +300,23 @@ export function ClientePedirView() {
 
   const fetchVendors = async () => {
     try {
-      const keysToFetch = [
-        'vendorLocations', 'vendorLocations_BRANCH-001',
-        'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history'
-      ];
-      if (selectedBranchId && selectedBranchId !== 'BRANCH-001') {
-        keysToFetch.push(`vendorLocations_${selectedBranchId}`);
-        keysToFetch.push(`posShifts_${selectedBranchId}`);
-      }
-
       const { data } = await supabase
         .from('app_state')
-        .select('key, value')
-        .in('key', keysToFetch);
+        .select('key, value');
 
       if (!data) return;
 
       const map: Record<string, any> = {};
       data.forEach((row: any) => { map[row.key] = row.value; });
 
-      // 1. Obtener turnos activos (posShifts)
-      const allShifts = [
-        ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
-        ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
-        ...(selectedBranchId && Array.isArray(map[`posShifts_${selectedBranchId}`]) ? map[`posShifts_${selectedBranchId}`] : []),
-        ...(useInventoryStore.getState().posShifts || []),
-        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-      ];
+      // 1. Recopilar TODOS los turnos posShifts de la app sin importar la llave de la sede
+      const allShifts: any[] = [];
+      Object.keys(map).forEach(key => {
+        if (key.startsWith('posShifts') && Array.isArray(map[key])) {
+          allShifts.push(...map[key]);
+        }
+      });
+      allShifts.push(...(useInventoryStore.getState().posShifts || []));
 
       const openShiftsMap = new Map<string, any>();
       const today = new Date().toISOString().slice(0, 10);
@@ -349,6 +339,7 @@ export function ClientePedirView() {
         const numMatch = cleanPoint.match(/\d+/);
         const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
         const uniqueShiftKey = vehicleCode || cleanName || cleanPoint;
+
         if (uniqueShiftKey) {
           const existing = openShiftsMap.get(uniqueShiftKey);
           if (!existing || new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
@@ -359,13 +350,14 @@ export function ClientePedirView() {
 
       const activeShifts = Array.from(openShiftsMap.values());
 
-      // 2. Obtener ubicaciones (vendorLocations)
-      const allLocs = {
-        ...(map['vendorLocations'] || {}),
-        ...(map['vendorLocations_BRANCH-001'] || {}),
-        ...(useInventoryStore.getState().vendorLocations || {}),
-        ...(selectedBranchId ? (map[`vendorLocations_${selectedBranchId}`] || {}) : {})
-      };
+      // 2. Recopilar TODAS las ubicaciones vendorLocations de la app
+      let allLocs: Record<string, any> = {};
+      Object.keys(map).forEach(key => {
+        if (key.startsWith('vendorLocations') && typeof map[key] === 'object' && map[key] !== null) {
+          allLocs = { ...allLocs, ...map[key] };
+        }
+      });
+      allLocs = { ...allLocs, ...(useInventoryStore.getState().vendorLocations || {}) };
 
       const finalVendorsMap = new Map<string, any>();
       const activeBranch = branches.find(b => b.id === selectedBranchId) || branches[0];
