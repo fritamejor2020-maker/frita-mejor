@@ -358,7 +358,19 @@ export function ClientePedirView() {
         if (!s || s.closedAt) return;
         const typeStr = String(s.type || '').toUpperCase();
         const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
-        const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
+        const respStr = String(s.responsibleName || s.userName || '').toLowerCase();
+
+        // 🚫 EXCLUSIÓN EXPLÍCITA DE CAJEROS / POS / SEDE / DEJADORES
+        const isCashierOrPos = 
+          typeStr === 'POS' || typeStr === 'CAJERO' || typeStr === 'CAJA' || typeStr === 'DESPACHO' || typeStr === 'ADMIN' || typeStr === 'DEJADOR' ||
+          pIdStr.includes('caja') || pIdStr.includes('pos') || pIdStr.includes('cajero') || pIdStr.includes('despacho') || pIdStr.includes('branch') || pIdStr.includes('sucursal') ||
+          respStr.includes('cajero') || respStr.includes('caja') || respStr.includes('despacho');
+
+        if (isCashierOrPos) return;
+
+        // 🛵 INCLUSIÓN EXCLUSIVA DE VENDEDORES MÓVILES / TRICICLOS
+        const hasVehiclePattern = /^[tc]\d+/i.test(pIdStr) || pIdStr.startsWith('t') || pIdStr.startsWith('c') || pIdStr.includes('vendedor') || pIdStr.includes('triciclo') || pIdStr.includes('carrito');
+        const isVendor = typeStr === 'VENDEDOR' || hasVehiclePattern;
         if (!isVendor) return;
 
         const rawPoint = s.pointId || s.vehicle || 'Punto';
@@ -437,6 +449,16 @@ export function ClientePedirView() {
         if (!loc || typeof loc !== 'object' || !loc.lat || !loc.lng) return;
         const rawPoint = loc.pointId || key || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
+        const pIdStr = cleanPoint.toLowerCase();
+        const nameStr = String(loc.name || '').toLowerCase();
+
+        // 🚫 EXCLUSIÓN DE CAJEROS / POS EN FALLBACK DE VENDORLOCATIONS
+        const isCashierOrPos = 
+          pIdStr.includes('caja') || pIdStr.includes('pos') || pIdStr.includes('cajero') || pIdStr.includes('despacho') || pIdStr.includes('branch') || pIdStr.includes('sucursal') ||
+          nameStr.includes('cajero') || nameStr.includes('caja') || nameStr.includes('despacho') || nameStr.includes('sede');
+
+        if (isCashierOrPos) return;
+
         const numMatch = cleanPoint.match(/\d+/);
         const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanPoint;
         const uniqueKey = vehicleCode || cleanPoint;

@@ -224,7 +224,19 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       if (!s || s.closedAt) return;
       const typeStr = String(s.type || '').toUpperCase();
       const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
-      const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
+      const respStr = String(s.responsibleName || s.userName || '').toLowerCase();
+
+      // 🚫 EXCLUSIÓN EXPLÍCITA DE CAJEROS / POS / SEDE / DEJADORES
+      const isCashierOrPos = 
+        typeStr === 'POS' || typeStr === 'CAJERO' || typeStr === 'CAJA' || typeStr === 'DESPACHO' || typeStr === 'ADMIN' || typeStr === 'DEJADOR' ||
+        pIdStr.includes('caja') || pIdStr.includes('pos') || pIdStr.includes('cajero') || pIdStr.includes('despacho') || pIdStr.includes('branch') || pIdStr.includes('sucursal') ||
+        respStr.includes('cajero') || respStr.includes('caja') || respStr.includes('despacho');
+
+      if (isCashierOrPos) return;
+
+      // 🛵 INCLUSIÓN EXCLUSIVA DE VENDEDORES MÓVILES / TRICICLOS
+      const hasVehiclePattern = /^[tc]\d+/i.test(pIdStr) || pIdStr.startsWith('t') || pIdStr.startsWith('c') || pIdStr.includes('vendedor') || pIdStr.includes('triciclo') || pIdStr.includes('carrito');
+      const isVendor = typeStr === 'VENDEDOR' || hasVehiclePattern;
       if (!isVendor) return;
 
       const rawPoint = s.pointId || s.vehicle || 'Punto';
