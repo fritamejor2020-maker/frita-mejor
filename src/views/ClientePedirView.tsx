@@ -320,45 +320,42 @@ export function ClientePedirView() {
       data.forEach((row: any) => { map[row.key] = row.value; });
 
       // 1. Obtener turnos activos (posShifts)
-      const shiftMap = new Map<string, any>();
-      [
+      const allShifts = [
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
         ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
         ...(selectedBranchId && Array.isArray(map[`posShifts_${selectedBranchId}`]) ? map[`posShifts_${selectedBranchId}`] : []),
         ...(useInventoryStore.getState().posShifts || []),
         ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-      ].forEach((s: any) => {
-        if (!s?.id) return;
-        const existing = shiftMap.get(s.id);
-        if (!existing) {
-          shiftMap.set(s.id, s);
-        } else if (existing.closedAt && !s.closedAt) {
-          // ¡Un turno ABIERTO siempre reemplaza a un registro CERRADO!
-          shiftMap.set(s.id, s);
-        } else if (!existing.closedAt && !s.closedAt) {
-          const existingTime = new Date(existing.openedAt || 0).getTime();
-          const sTime = new Date(s.openedAt || 0).getTime();
-          if (sTime > existingTime) {
-            shiftMap.set(s.id, s);
+      ];
+
+      const openShiftsMap = new Map<string, any>();
+      const today = new Date().toISOString().slice(0, 10);
+
+      allShifts.forEach((s: any) => {
+        if (!s || s.closedAt) return;
+        const typeStr = String(s.type || '').toUpperCase();
+        const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
+        const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
+        if (!isVendor) return;
+
+        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+        if (shiftDate && shiftDate < today) return;
+
+        const rawPoint = s.pointId || s.vehicle || 'Punto';
+        const cleanPoint = String(rawPoint).trim().toUpperCase();
+        const rawName = s.responsibleName || s.userName || s.sellerName || s.vendedor || rawPoint;
+        const cleanName = String(rawName).trim().toUpperCase();
+
+        const uniqueShiftKey = cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : (cleanName || cleanPoint);
+        if (uniqueShiftKey) {
+          const existing = openShiftsMap.get(uniqueShiftKey);
+          if (!existing || new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
+            openShiftsMap.set(uniqueShiftKey, s);
           }
         }
       });
 
-      const today = new Date().toISOString().slice(0, 10);
-      const activeShifts = Array.from(shiftMap.values()).filter((s: any) => {
-        if (s.closedAt) return false;
-        const typeStr = String(s.type || '').toUpperCase();
-        const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
-        const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
-        if (!isVendor) return false;
-        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
-        if (shiftDate && shiftDate < today) return false;
-        return true;
-      });
-
-      const activePointIds = new Set(
-        activeShifts.map((s: any) => String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
-      );
+      const activeShifts = Array.from(openShiftsMap.values());
 
       // 2. Obtener ubicaciones (vendorLocations)
       const allLocs = {
@@ -368,64 +365,47 @@ export function ClientePedirView() {
         ...(selectedBranchId ? (map[`vendorLocations_${selectedBranchId}`] || {}) : {})
       };
 
-      const vendorList: any[] = [];
-      const addedKeys = new Set<string>();
+      const finalVendorsMap = new Map<string, any>();
+      const activeBranch = branches.find(b => b.id === selectedBranchId) || branches[0];
+      const defaultLat = Number(activeBranch?.settings?.lat || 1.8485);
+      const defaultLng = Number(activeBranch?.settings?.lng || -76.0522);
 
-      Object.entries(allLocs).forEach(([key, loc]: [string, any]) => {
-        if (!loc || typeof loc !== 'object') return;
-        if (!loc.lat || !loc.lng) return;
-
-        const cleanP = loc.pointId ? String(loc.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-        const cleanUid = key ? String(key).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-        const cleanName = loc.name ? String(loc.name).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
-
-        // Si el vehículo tiene turno activo O si no hay filtro de turnos
-        const isPointActive = activePointIds.size === 0 ||
-          (cleanP && activePointIds.has(cleanP)) ||
-          (cleanUid && activePointIds.has(cleanUid)) ||
-          (cleanName && activePointIds.has(cleanName));
-
-        if (!isPointActive) return;
-
-        const dedupeKey = (cleanP || cleanUid || cleanName);
-        if (!addedKeys.has(dedupeKey)) {
-          addedKeys.add(dedupeKey);
-          vendorList.push({
-            id: dedupeKey,
-            vendorId: dedupeKey,
-            pointId: loc.pointId || key,
-            name: loc.name || loc.pointId || 'Vendedor',
-            lat: Number(loc.lat),
-            lng: Number(loc.lng),
-            updatedAt: loc.updatedAt || new Date().toISOString(),
-          });
-        }
-      });
-
-      // Si hay turnos activos sin coordenadas exactas guardadas, agregar marcador por defecto en la sede
       activeShifts.forEach((s: any) => {
-        const pId = s.pointId || s.vehicle || 'Triciclo';
-        const cleanP = String(pId).toLowerCase().replace(/[^a-z0-9]/g, '');
-        const alreadyAdded = Array.from(addedKeys).some(k => k.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP);
+        const rawPoint = s.pointId || s.vehicle || 'Punto';
+        const cleanPoint = String(rawPoint).trim().toUpperCase();
+        const cleanLowerP = cleanPoint.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const rawName = s.responsibleName || s.userName || s.sellerName || s.vendedor || rawPoint;
+        const cleanName = String(rawName).trim().toUpperCase();
+        const cleanLowerN = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+        const userId = String(s.userId || s.createdBy || '').trim();
 
-        if (!alreadyAdded) {
-          addedKeys.add(cleanP);
-          const activeBranch = branches.find(b => b.id === selectedBranchId) || branches[0];
-          const bLat = Number(activeBranch?.settings?.lat || 1.8485);
-          const bLng = Number(activeBranch?.settings?.lng || -76.0522);
-          vendorList.push({
-            id: pId,
-            vendorId: s.userId || pId,
-            pointId: pId,
-            name: s.responsibleName || pId,
-            lat: bLat,
-            lng: bLng,
-            updatedAt: s.openedAt || new Date().toISOString(),
-          });
-        }
+        const uniqueKey = cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : (cleanName || cleanPoint);
+
+        const locEntry = Object.entries(allLocs).find(([key, loc]: [string, any]) => {
+          if (!loc || typeof loc !== 'object') return false;
+          const lP = String(loc.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const lK = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const lN = String(loc.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (cleanLowerP && (lP === cleanLowerP || lK === cleanLowerP)) ||
+                 (cleanLowerN && lN === cleanLowerN);
+        });
+
+        const loc = locEntry ? locEntry[1] : null;
+        const lat = (loc?.lat && !isNaN(Number(loc.lat))) ? Number(loc.lat) : defaultLat;
+        const lng = (loc?.lng && !isNaN(Number(loc.lng))) ? Number(loc.lng) : defaultLng;
+
+        finalVendorsMap.set(uniqueKey, {
+          id: uniqueKey,
+          vendorId: loc?.vendorId || userId || uniqueKey,
+          pointId: rawPoint,
+          name: rawName,
+          lat,
+          lng,
+          updatedAt: loc?.updatedAt || s.openedAt || new Date().toISOString(),
+        });
       });
 
-      setVendors(vendorList);
+      setVendors(Array.from(finalVendorsMap.values()));
     } catch (e) {
       console.warn('[ClientePedirView] Error fetching vendors:', e);
     }
