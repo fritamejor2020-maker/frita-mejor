@@ -346,7 +346,9 @@ export function ClientePedirView() {
         const rawName = s.responsibleName || s.userName || s.sellerName || s.vendedor || rawPoint;
         const cleanName = String(rawName).trim().toUpperCase();
 
-        const uniqueShiftKey = cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : (cleanName || cleanPoint);
+        const numMatch = cleanPoint.match(/\d+/);
+        const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
+        const uniqueShiftKey = vehicleCode || cleanName || cleanPoint;
         if (uniqueShiftKey) {
           const existing = openShiftsMap.get(uniqueShiftKey);
           if (!existing || new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
@@ -379,7 +381,9 @@ export function ClientePedirView() {
         const cleanLowerN = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
         const userId = String(s.userId || s.createdBy || '').trim();
 
-        const uniqueKey = cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : (cleanName || cleanPoint);
+        const numMatch = cleanPoint.match(/\d+/);
+        const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
+        const uniqueKey = vehicleCode || cleanName || cleanPoint;
 
         const locEntry = Object.entries(allLocs).find(([key, loc]: [string, any]) => {
           if (!loc || typeof loc !== 'object') return false;
