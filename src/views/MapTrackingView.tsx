@@ -137,14 +137,23 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
           const shiftMap = new Map<string, any>();
           [
-            ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-            ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
             ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
+            ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
+            ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
           ].forEach((s: any) => {
             if (!s?.id) return;
             const existing = shiftMap.get(s.id);
-            if (!existing || (!existing.closedAt && s.closedAt)) {
+            if (!existing) {
               shiftMap.set(s.id, s);
+            } else if (existing.closedAt && !s.closedAt) {
+              // ¡Un turno ABIERTO siempre reemplaza a un registro CERRADO!
+              shiftMap.set(s.id, s);
+            } else if (!existing.closedAt && !s.closedAt) {
+              const existingTime = new Date(existing.openedAt || 0).getTime();
+              const sTime = new Date(s.openedAt || 0).getTime();
+              if (sTime > existingTime) {
+                shiftMap.set(s.id, s);
+              }
             }
           });
 
@@ -299,11 +308,16 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       result = result.filter(v => v.pointId && branchVehicleIds.has(v.pointId));
     }
 
-    // ── REMOCIÓN ÚNICA: Filtrar por turno cerrado explícitamente ──
+    // ── REMOCIÓN ÚNICA: Filtrar únicamente si el vehículo NO posee ningún turno abierto activo ──
+    const openPointIds = new Set(
+      openShifts.map((s: any) => String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, ''))
+    );
+
     const closedPointIds = new Set(
       allActiveShifts
         .filter((s: any) => s.closedAt && (s.pointId || s.vehicle))
         .map((s: any) => String(s.pointId || s.vehicle).toLowerCase().replace(/[^a-z0-9]/g, ''))
+        .filter(cleanP => cleanP && !openPointIds.has(cleanP))
     );
 
     // Actualización funcional atómica: preserva marcadores en pantalla y evita parpadeos

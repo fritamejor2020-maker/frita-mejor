@@ -322,16 +322,25 @@ export function ClientePedirView() {
       // 1. Obtener turnos activos (posShifts)
       const shiftMap = new Map<string, any>();
       [
-        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
         ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
         ...(selectedBranchId && Array.isArray(map[`posShifts_${selectedBranchId}`]) ? map[`posShifts_${selectedBranchId}`] : []),
         ...(useInventoryStore.getState().posShifts || []),
+        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
       ].forEach((s: any) => {
         if (!s?.id) return;
         const existing = shiftMap.get(s.id);
-        if (!existing || (!existing.closedAt && s.closedAt)) {
+        if (!existing) {
           shiftMap.set(s.id, s);
+        } else if (existing.closedAt && !s.closedAt) {
+          // ¡Un turno ABIERTO siempre reemplaza a un registro CERRADO!
+          shiftMap.set(s.id, s);
+        } else if (!existing.closedAt && !s.closedAt) {
+          const existingTime = new Date(existing.openedAt || 0).getTime();
+          const sTime = new Date(s.openedAt || 0).getTime();
+          if (sTime > existingTime) {
+            shiftMap.set(s.id, s);
+          }
         }
       });
 
