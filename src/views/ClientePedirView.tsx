@@ -5,6 +5,7 @@ import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
 import { isPointInPolygon, getHaversineDistance, formatDistance } from '../utils/geoUtils';
 import { useBranchStore } from '../store/useBranchStore';
+import { useInventoryStore } from '../store/useInventoryStore';
 import { toast } from 'react-hot-toast';
 import { 
   ShoppingBag, MapPin, Phone, User, Check, X, ShieldAlert, Sparkles, Navigation, 
