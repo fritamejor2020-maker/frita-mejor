@@ -219,7 +219,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       }
     });
 
-    // ── GARANTÍA REQUERIDA: Todo vehículo con turno ABIERTO debe permanecer en el mapa en su última ubicación ──
+    // ── GARANTÍA REQUERIDA: Todo vehículo con turno ABIERTO debe permanecer en el mapa ──
     openShifts.forEach((s: any) => {
       const rawP = s.pointId || s.vehicle;
       if (!rawP) return;
@@ -240,18 +240,19 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
                            String(l?.pointId || l?.vendorId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP
                          );
 
-        if (savedLoc && savedLoc.lat && savedLoc.lng) {
-          const pKey = String(rawP).toUpperCase();
-          merged.set(pKey, {
-            vendorId: pKey,
-            pointId: rawP,
-            name: s.responsibleName || savedLoc.name || rawP,
-            lat: savedLoc.lat,
-            lng: savedLoc.lng,
-            updatedAt: savedLoc.updatedAt || new Date().toISOString(),
-            source: 'db',
-          });
-        }
+        const lat = savedLoc?.lat || mapCenter[0];
+        const lng = savedLoc?.lng || mapCenter[1];
+        const pKey = String(rawP).toUpperCase();
+
+        merged.set(pKey, {
+          vendorId: pKey,
+          pointId: rawP,
+          name: s.responsibleName || savedLoc?.name || rawP,
+          lat: Number(lat),
+          lng: Number(lng),
+          updatedAt: savedLoc?.updatedAt || s.openedAt || new Date().toISOString(),
+          source: savedLoc?.lat ? 'db' : 'offline',
+        });
       }
     });
 
