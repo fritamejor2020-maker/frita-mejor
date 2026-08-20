@@ -328,9 +328,6 @@ export function ClientePedirView() {
         const isVendor = typeStr === 'VENDEDOR' || pIdStr.startsWith('t') || pIdStr.includes('vendedor') || !s.type;
         if (!isVendor) return;
 
-        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
-        if (shiftDate && shiftDate < today) return;
-
         const rawPoint = s.pointId || s.vehicle || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
         const rawName = s.responsibleName || s.userName || s.sellerName || s.vendedor || rawPoint;
@@ -364,6 +361,7 @@ export function ClientePedirView() {
       const defaultLat = Number(activeBranch?.settings?.lat || 1.8485);
       const defaultLng = Number(activeBranch?.settings?.lng || -76.0522);
 
+      // A) Añadir por Turnos Abiertos
       activeShifts.forEach((s: any) => {
         const rawPoint = s.pointId || s.vehicle || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
@@ -399,6 +397,28 @@ export function ClientePedirView() {
           lng,
           updatedAt: loc?.updatedAt || s.openedAt || new Date().toISOString(),
         });
+      });
+
+      // B) Añadir ubicaciones activas de vendorLocations (respaldo por si el turno no fue capturado)
+      Object.entries(allLocs).forEach(([key, loc]: [string, any]) => {
+        if (!loc || typeof loc !== 'object' || !loc.lat || !loc.lng) return;
+        const rawPoint = loc.pointId || key || 'Punto';
+        const cleanPoint = String(rawPoint).trim().toUpperCase();
+        const numMatch = cleanPoint.match(/\d+/);
+        const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanPoint;
+        const uniqueKey = vehicleCode || cleanPoint;
+
+        if (!finalVendorsMap.has(uniqueKey) && (loc.isActive !== false)) {
+          finalVendorsMap.set(uniqueKey, {
+            id: uniqueKey,
+            vendorId: loc.vendorId || uniqueKey,
+            pointId: rawPoint,
+            name: loc.name || rawPoint,
+            lat: Number(loc.lat),
+            lng: Number(loc.lng),
+            updatedAt: loc.updatedAt || new Date().toISOString(),
+          });
+        }
       });
 
       setVendors(Array.from(finalVendorsMap.values()));
