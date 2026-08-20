@@ -242,11 +242,13 @@ export function ClientePedirView() {
 
   // Cargar datos al cambiar de sede y mantener sincronización periódica
   useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
     fetchGeofences();
     fetchVendors();
     fetchCatalog();
 
     const interval = setInterval(() => {
+      useInventoryStore.getState().loadFromRemote().catch(() => {});
       fetchVendors();
       fetchCatalog();
     }, 4000);
@@ -257,6 +259,7 @@ export function ClientePedirView() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'app_state' },
         () => {
+          useInventoryStore.getState().loadFromRemote().catch(() => {});
           fetchVendors();
           fetchCatalog();
         }
