@@ -136,8 +136,50 @@ export function useChatSoundNotifier(currentUserId) {
 
     if (prevMsgCountRef.current > 0 && messages.length > prevMsgCountRef.current) {
       const latestMsg = messages[0];
-      if (latestMsg && latestMsg.senderId !== currentUserId) {
-        playRadioChime();
+      if (latestMsg) {
+        const myId = String(currentUserId || '').toLowerCase();
+        const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
+
+        const senderId = String(latestMsg.senderId || '').toLowerCase();
+        const cleanSenderId = senderId.replace(/[^a-z0-9]/g, '');
+
+        const senderRole = String(latestMsg.senderRole || '').toLowerCase();
+        const receiverId = String(latestMsg.receiverId || '').toLowerCase();
+        const cleanReceiverId = receiverId.replace(/[^a-z0-9]/g, '');
+
+        const pointId = String(latestMsg.pointId || '').toLowerCase();
+        const cleanPointId = pointId.replace(/[^a-z0-9]/g, '');
+
+        const isDejadorUser = cleanMyId === 'dejador' || cleanMyId.includes('dejador') || cleanMyId.includes('logistica');
+        const isSenderDejador = senderRole === 'dejador' || senderRole === 'logistica' || cleanSenderId === 'dejador' || cleanSenderId.includes('dejador');
+
+        const isSenderMe = cleanSenderId === cleanMyId || (isDejadorUser && isSenderDejador);
+
+        // Si el mensaje fue enviado por el propio usuario actual, no reproducir sonido
+        if (!isSenderMe) {
+          if (isDejadorUser) {
+            // 📩 REGLA DEJADORES:
+            // Debe sonar siempre que un VENDEDOR le escriba a los dejadores
+            if (!isSenderDejador) {
+              playRadioChime();
+            }
+          } else {
+            // 📩 REGLA VENDEDORES:
+            // SOLO debe sonar si el DEJADOR le escribe a ESTE Vendedor específico (o a todos)
+            if (isSenderDejador) {
+              const isTargetedToMe =
+                receiverId === 'all' ||
+                (cleanMyId && cleanReceiverId && cleanReceiverId === cleanMyId) ||
+                (cleanMyId && cleanPointId && cleanPointId === cleanMyId) ||
+                (cleanMyId && cleanReceiverId && cleanMyId.includes(cleanReceiverId)) ||
+                (cleanReceiverId && cleanMyId && cleanReceiverId.includes(cleanMyId));
+
+              if (isTargetedToMe) {
+                playRadioChime();
+              }
+            }
+          }
+        }
       }
     }
     prevMsgCountRef.current = messages.length;
