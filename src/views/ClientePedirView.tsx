@@ -331,10 +331,29 @@ export function ClientePedirView() {
       });
       allShifts.push(...(useInventoryStore.getState().posShifts || []));
 
-      const openShiftsMap = new Map<string, any>();
-      const today = new Date().toISOString().slice(0, 10);
-
+      // 1. Recopilar y unificar TODOS los turnos por ID con prevalencia estricta de cierre
+      const shiftByIdMap = new Map<string, any>();
       allShifts.forEach((s: any) => {
+        if (!s?.id) return;
+        const existing = shiftByIdMap.get(s.id);
+        if (!existing) {
+          shiftByIdMap.set(s.id, s);
+        } else if (!existing.closedAt && s.closedAt) {
+          shiftByIdMap.set(s.id, s);
+        } else if (existing.closedAt && s.closedAt) {
+          if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+            shiftByIdMap.set(s.id, s);
+          }
+        } else if (!existing.closedAt && !s.closedAt) {
+          if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
+            shiftByIdMap.set(s.id, s);
+          }
+        }
+      });
+
+      const openShiftsMap = new Map<string, any>();
+
+      Array.from(shiftByIdMap.values()).forEach((s: any) => {
         if (!s || s.closedAt) return;
         const typeStr = String(s.type || '').toUpperCase();
         const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();

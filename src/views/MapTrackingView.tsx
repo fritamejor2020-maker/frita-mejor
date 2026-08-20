@@ -194,14 +194,33 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
   // ── Fusionar Presence (en vivo) + BD (persistida) ──────────────────────────
   const mergeVendors = () => {
-    // 1. Obtener todos los turnos activos en curso (sin cerrar)
+    // 1. Unificar todos los turnos por ID con prevalencia estricta de cierre
     const allActiveShifts = [
       ...(activeShifts || []),
       ...(posShiftsFromStore || []),
     ];
 
-    const openShiftsMap = new Map<string, any>();
+    const shiftByIdMap = new Map<string, any>();
     allActiveShifts.forEach((s: any) => {
+      if (!s?.id) return;
+      const existing = shiftByIdMap.get(s.id);
+      if (!existing) {
+        shiftByIdMap.set(s.id, s);
+      } else if (!existing.closedAt && s.closedAt) {
+        shiftByIdMap.set(s.id, s);
+      } else if (existing.closedAt && s.closedAt) {
+        if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+          shiftByIdMap.set(s.id, s);
+        }
+      } else if (!existing.closedAt && !s.closedAt) {
+        if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
+          shiftByIdMap.set(s.id, s);
+        }
+      }
+    });
+
+    const openShiftsMap = new Map<string, any>();
+    Array.from(shiftByIdMap.values()).forEach((s: any) => {
       if (!s || s.closedAt) return;
       const typeStr = String(s.type || '').toUpperCase();
       const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
