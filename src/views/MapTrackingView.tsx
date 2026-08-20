@@ -145,9 +145,15 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
             const existing = shiftMap.get(s.id);
             if (!existing) {
               shiftMap.set(s.id, s);
-            } else if (existing.closedAt && !s.closedAt) {
-              // ¡Un turno ABIERTO siempre reemplaza a un registro CERRADO!
+            } else if (!existing.closedAt && s.closedAt) {
+              // ¡Un registro CERRADO prevalece sobre un registro obsoleto abierto!
               shiftMap.set(s.id, s);
+            } else if (existing.closedAt && s.closedAt) {
+              const existingTime = new Date(existing.closedAt || 0).getTime();
+              const sTime = new Date(s.closedAt || 0).getTime();
+              if (sTime > existingTime) {
+                shiftMap.set(s.id, s);
+              }
             } else if (!existing.closedAt && !s.closedAt) {
               const existingTime = new Date(existing.openedAt || 0).getTime();
               const sTime = new Date(s.openedAt || 0).getTime();

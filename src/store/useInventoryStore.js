@@ -1394,6 +1394,20 @@ export const useInventoryStore = create(
           if (updatedCount > 0) {
             set({ posShifts: nextShifts });
             syncKey('posShifts', nextShifts);
+
+            if (cleanPoint) {
+              const currentLocs = { ...(get().vendorLocations || {}) };
+              Object.keys(currentLocs).forEach(k => {
+                const loc = currentLocs[k];
+                const lP = String(loc?.pointId || k || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (lP === cleanPoint) {
+                  currentLocs[k] = { ...loc, isActive: false, closedAt: shift.closedAt };
+                }
+              });
+              set({ vendorLocations: currentLocs });
+              syncKey('vendorLocations', currentLocs);
+            }
+
             console.log(`[Shift] Cierre aplicado exitosamente sobre ${updatedCount} turno(s) existente(s)`);
             return nextShifts.find(s => s.id === shift.id || s.id === deterministicId) || nextShifts[0];
           }
