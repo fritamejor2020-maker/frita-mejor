@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Polygon, Polyline, useMapEvents
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { supabase } from '../lib/supabase';
+import { push } from '../lib/syncManager';
 import { isPointInPolygon, getHaversineDistance, formatDistance } from '../utils/geoUtils';
 import { useBranchStore } from '../store/useBranchStore';
 import { useInventoryStore } from '../store/useInventoryStore';
@@ -546,59 +547,49 @@ export function ClientePedirView() {
   };
 
   const monitorOrder = async () => {
-    if (!activeOrderId || !activeOrderToken) return;
+    if (!activeOrderId) return;
 
-    const { data, error } = await supabase.rpc('get_active_delivery_request', {
-      p_order_id: activeOrderId,
-      p_client_token: activeOrderToken
-    });
+    const checkStateOrder = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
 
-    if (error || !data || data.length === 0) {
-      localStorage.removeItem('fm_active_order_id');
-      localStorage.removeItem('fm_active_order_token');
-      setActiveOrderId(null);
-      setActiveOrderToken(null);
-      setActiveOrder(null);
-      return;
-    }
+        const orders: any[] = data?.value || [];
+        const match = orders.find((o: any) => o.id === activeOrderId);
+        if (match) {
+          setActiveOrder(match);
+          if (match.status === 'completed' || match.status === 'rejected') {
+            return true;
+          }
+        }
+      } catch (e) {}
+      return false;
+    };
 
-    const orderData = data[0];
-    setActiveOrder(orderData);
-
-    if (orderData.status === 'completed' || orderData.status === 'rejected') {
-      return;
-    }
+    const isFinished = await checkStateOrder();
+    if (isFinished) return;
 
     const channel = supabase.channel(`order-track-${activeOrderId}`)
       .on('postgres_changes', {
-        event: 'UPDATE',
+        event: '*',
         schema: 'public',
-        table: 'delivery_requests',
-        filter: `id=eq.${activeOrderId}`
+        table: 'app_state',
+        filter: 'key=eq.customer_delivery_requests'
       }, async () => {
-        const { data: updated } = await supabase.rpc('get_active_delivery_request', {
-          p_order_id: activeOrderId,
-          p_client_token: activeOrderToken
-        });
-        if (updated && updated.length > 0) {
-          setActiveOrder(updated[0]);
-        }
+        await checkStateOrder();
       })
       .subscribe();
 
     const interval = setInterval(async () => {
-      const { data: polled } = await supabase.rpc('get_active_delivery_request', {
-        p_order_id: activeOrderId,
-        p_client_token: activeOrderToken
-      });
-      if (polled && polled.length > 0) {
-        setActiveOrder(polled[0]);
-        if (polled[0].status === 'completed' || polled[0].status === 'rejected') {
-          clearInterval(interval);
-          supabase.removeChannel(channel);
-        }
+      const done = await checkStateOrder();
+      if (done) {
+        clearInterval(interval);
+        supabase.removeChannel(channel);
       }
-    }, 6000);
+    }, 3000);
 
     return () => {
       clearInterval(interval);
@@ -708,7 +699,11 @@ export function ClientePedirView() {
       };
     });
 
+    const orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
+    const assignedVendorCode = targetVendor.pointId || targetVendor.vendor_id || targetVendor.id || 'T1';
+
     const newOrder = {
+      id: orderId,
       client_name: name.trim(),
       client_phone: phone.trim(),
       client_address: address.trim() || (deliveryMode === 'pickup' ? 'Para recoger en puesto' : 'Ubicación seleccionada en mapa'),
@@ -717,26 +712,54 @@ export function ClientePedirView() {
       items: itemsPayload,
       total_amount: getCartTotal(),
       status: 'pending',
-      assigned_vendor_id: targetVendor.vendor_id,
+      assigned_vendor_id: assignedVendorCode,
+      assigned_vendor_name: targetVendor.name || targetVendor.responsibleName || 'Vendedor Móvil',
       client_token: token,
+      created_at: new Date().toISOString(),
+      rejected_vendor_ids: [],
+      delivery_mode: deliveryMode,
     };
 
     try {
-      const { data, error } = await supabase.from('delivery_requests').insert(newOrder).select('id').single();
-      
-      if (error) throw new Error(error.message);
+      // 1. Guardar instantáneamente en app_state (soporta 50ms de respuesta sin timeouts de la BD)
+      const { data: stateData } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'customer_delivery_requests')
+        .maybeSingle();
+
+      const existingOrders: any[] = stateData?.value || [];
+      const updatedOrders = [newOrder, ...existingOrders.filter((o: any) => o?.id !== orderId)].slice(0, 50);
+
+      await push('customer_delivery_requests', updatedOrders);
+
+      // Intento secundario no bloqueante en la tabla SQL delivery_requests (si existe)
+      supabase.from('delivery_requests').insert({
+        id: orderId,
+        client_name: newOrder.client_name,
+        client_phone: newOrder.client_phone,
+        client_address: newOrder.client_address,
+        client_lat: newOrder.client_lat,
+        client_lng: newOrder.client_lng,
+        items: newOrder.items,
+        total_amount: newOrder.total_amount,
+        status: newOrder.status,
+        assigned_vendor_id: newOrder.assigned_vendor_id,
+        client_token: newOrder.client_token,
+      }).catch(() => {});
 
       toast.success(deliveryMode === 'delivery' ? '¡Buscando carrito cercano! 🛵💨' : '¡Reserva enviada al puesto! 📍');
-      localStorage.setItem('fm_active_order_id', data.id);
+      localStorage.setItem('fm_active_order_id', orderId);
       localStorage.setItem('fm_active_order_token', token);
-      setActiveOrderId(data.id);
+      setActiveOrderId(orderId);
       setActiveOrderToken(token);
+      setActiveOrder(newOrder);
       setUiStep('MAP');
       setCart({});
-      
+
       setTimeout(() => {
         monitorOrder();
-      }, 500);
+      }, 300);
 
     } catch (err: any) {
       console.error(err);

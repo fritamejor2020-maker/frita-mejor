@@ -18,6 +18,7 @@ import { usePayrollStore } from '../store/usePayrollStore';
 import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
+import { push } from '../lib/syncManager';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
@@ -167,86 +168,111 @@ export const VendedorDashboard = () => {
     };
 
     // 2. Cargar si hay algún pedido pendiente asignado a mí
-    const fetchPendingDelivery = async () => {
-      const { data } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('assigned_vendor_id', trackingId)
-        .eq('status', 'pending')
-        .limit(1);
-      
-      if (data && data.length > 0) {
-        setPendingDelivery(data[0]);
-        if (!audioRef.current) {
-          audioRef.current = new Audio('/sounds/mixkit_bell.wav');
-          audioRef.current.loop = true;
-        }
-        audioRef.current.play().catch(() => {});
-      }
-    };
+    // ── Sincronizar pedidos de cliente en tiempo real vía app_state ──
+    const syncCustomerOrders = async () => {
+      try {
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
 
-    fetchActiveDelivery();
-    fetchPendingDelivery();
+        const orders: any[] = data?.value || [];
+        const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanUser  = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanTrack = String(trackingId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    // 3. Suscribirse a cambios en tiempo real
-    const channel = supabase.channel(`vendor-delivery-${trackingId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'delivery_requests',
-        filter: `assigned_vendor_id=eq.${trackingId}`
-      }, (payload: any) => {
-        const order = payload.new;
-        if (!order) return;
+        const myPending = orders.find((o: any) => {
+          if (o.status !== 'pending') return false;
+          const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const matchVendor = (cleanPoint && assigned === cleanPoint) || (cleanUser && assigned === cleanUser) || (cleanTrack && assigned === cleanTrack);
+          const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
+          return matchVendor && !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack);
+        });
 
-        if (order.status === 'pending') {
-          setPendingDelivery(order);
+        const myActive = orders.find((o: any) => {
+          if (o.status !== 'accepted') return false;
+          const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return (cleanPoint && assigned === cleanPoint) || (cleanUser && assigned === cleanUser) || (cleanTrack && assigned === cleanTrack);
+        });
+
+        if (myPending) {
+          setPendingDelivery(myPending);
           if (!audioRef.current) {
             audioRef.current = new Audio('/sounds/mixkit_bell.wav');
             audioRef.current.loop = true;
           }
           audioRef.current.play().catch(() => {});
-        } else if (order.status === 'accepted') {
-          setActiveDelivery(order);
+        } else {
           setPendingDelivery(null);
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-          }
-        } else if (order.status === 'completed' || order.status === 'rejected') {
-          setActiveDelivery(null);
-          setPendingDelivery(null);
-          if (audioRef.current) {
-            audioRef.current.pause();
-            audioRef.current.currentTime = 0;
-          }
         }
+
+        if (myActive) {
+          setActiveDelivery(myActive);
+        } else {
+          setActiveDelivery(null);
+        }
+      } catch (e) {}
+    };
+
+    syncCustomerOrders();
+    const syncInterval = setInterval(syncCustomerOrders, 3000);
+
+    const channel = supabase.channel(`vendor-delivery-sync-${trackingId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'app_state',
+        filter: 'key=eq.customer_delivery_requests'
+      }, () => {
+        syncCustomerOrders();
       })
       .subscribe();
 
     return () => {
+      clearInterval(syncInterval);
       supabase.removeChannel(channel);
       if (audioRef.current) {
         audioRef.current.pause();
       }
     };
-  }, [trackingId, isSetupComplete]);
+  }, [trackingId, isSetupComplete, pointId]);
 
   const handleAcceptDelivery = async (orderId: string) => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
     }
-    const { error } = await supabase
-      .from('delivery_requests')
-      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-      .eq('id', orderId);
-    
-    if (error) {
-      toast.error('Error al aceptar el pedido: ' + error.message);
-    } else {
-      toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
+
+    try {
+      const { data } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'customer_delivery_requests')
+        .maybeSingle();
+
+      const orders: any[] = data?.value || [];
+      const idx = orders.findIndex((o: any) => o.id === orderId);
+      if (idx !== -1) {
+        orders[idx] = {
+          ...orders[idx],
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          accepted_vendor_name: responsibleName || pointId || 'Vendedor'
+        };
+        await push('customer_delivery_requests', orders);
+        setActiveDelivery(orders[idx]);
+        setPendingDelivery(null);
+        toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
+      }
+    } catch (e) {
+      toast.error('Error al aceptar el pedido.');
     }
+
+    supabase.from('delivery_requests')
+      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .catch(() => {});
   };
 
   const handleRejectDelivery = async (orderId: string) => {
@@ -256,67 +282,100 @@ export const VendedorDashboard = () => {
     }
 
     try {
-      // 1. Obtener la orden actual
-      const { data: order } = await supabase.from('delivery_requests').select('*').eq('id', orderId).single();
-      if (!order) return;
+      const { data } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'customer_delivery_requests')
+        .maybeSingle();
 
-      const rejectedList = [...(order.rejected_vendor_ids || []), trackingId];
+      const orders: any[] = data?.value || [];
+      const idx = orders.findIndex((o: any) => o.id === orderId);
+      if (idx === -1) return;
 
-      // 2. Buscar otros vendedores activos
-      const { data: allVendors } = await supabase.from('vendor_locations').select('*').eq('is_active', true);
-      
-      const candidates = (allVendors || [])
-        .filter(v => !rejectedList.includes(v.vendor_id))
-        .map(v => ({
-          ...v,
-          distance: getHaversineDistance(order.client_lat, order.client_lng, v.lat, v.lng)
-        }))
+      const order = orders[idx];
+      const rejectedList = Array.from(new Set([...(order.rejected_vendor_ids || []), trackingId, pointId].filter(Boolean)));
+
+      // Buscar otros vendedores con turno ABIERTO de HOY
+      const currentShifts = useInventoryStore.getState().posShifts || [];
+      const activeVendorShifts = currentShifts.filter((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR');
+
+      const locations = useInventoryStore.getState().vendorLocations || {};
+
+      const candidates = activeVendorShifts
+        .filter((s: any) => {
+          const vPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const vUser  = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return !rejectedList.some((r: string) => {
+            const cleanR = String(r).toLowerCase().replace(/[^a-z0-9]/g, '');
+            return cleanR === vPoint || cleanR === vUser;
+          });
+        })
+        .map((s: any) => {
+          const pId = s.pointId || s.vehicle;
+          const loc = locations[pId] || Object.values(locations).find((l: any) => l.pointId === pId);
+          const lat = loc?.lat || 1.8485;
+          const lng = loc?.lng || -76.0522;
+          const distance = getHaversineDistance(order.client_lat, order.client_lng, lat, lng);
+          return { shift: s, pId, name: s.responsibleName || pId, distance };
+        })
         .sort((a, b) => a.distance - b.distance);
 
       if (candidates.length > 0) {
         // Reasignar al siguiente carrito más cercano
         const nextVendor = candidates[0];
-        await supabase
-          .from('delivery_requests')
-          .update({
-            assigned_vendor_id: nextVendor.vendor_id,
-            rejected_vendor_ids: rejectedList,
-            status: 'pending'
-          })
-          .eq('id', orderId);
-        
-        toast.success('Pedido rechazado y reasignado al siguiente carrito.');
+        orders[idx] = {
+          ...order,
+          assigned_vendor_id: nextVendor.pId,
+          assigned_vendor_name: nextVendor.name,
+          rejected_vendor_ids: rejectedList,
+          status: 'pending'
+        };
+        toast.info(`Pedido reasignado al siguiente carrito más cercano (${nextVendor.pId}) 🛵`);
       } else {
-        // No hay más carritos candidatos
-        await supabase
-          .from('delivery_requests')
-          .update({
-            status: 'rejected',
-            rejected_vendor_ids: rejectedList
-          })
-          .eq('id', orderId);
-        
-        toast.success('Pedido rechazado.');
+        // No hay más carritos disponibles
+        orders[idx] = {
+          ...order,
+          rejected_vendor_ids: rejectedList,
+          status: 'rejected'
+        };
+        toast.info('No hay más carritos disponibles para este pedido.');
       }
-    } catch (err: any) {
-      toast.error('Error al rechazar: ' + err.message);
-    } finally {
+
+      await push('customer_delivery_requests', orders);
+
       setPendingDelivery(null);
+    } catch (err: any) {
+      console.error('Error rejecting delivery:', err);
     }
   };
 
   const handleCompleteDelivery = async (orderId: string) => {
-    const { error } = await supabase
-      .from('delivery_requests')
+    try {
+      const { data } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'customer_delivery_requests')
+        .maybeSingle();
+
+      const orders: any[] = data?.value || [];
+      const idx = orders.findIndex((o: any) => o.id === orderId);
+      if (idx !== -1) {
+        orders[idx] = {
+          ...orders[idx],
+          status: 'completed',
+          completed_at: new Date().toISOString()
+        };
+        await push('customer_delivery_requests', orders);
+      }
+    } catch (e) {}
+
+    supabase.from('delivery_requests')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', orderId);
-    
-    if (error) {
-      toast.error('Error al finalizar el pedido: ' + error.message);
-    } else {
-      setActiveDelivery(null);
-      toast.success('¡Pedido entregado con éxito! 🎉 Stock descontado.');
-    }
+      .eq('id', orderId)
+      .catch(() => {});
+
+    setActiveDelivery(null);
+    toast.success('¡Pedido entregado con éxito! 🎉 Stock descontado.');
   };
 
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
