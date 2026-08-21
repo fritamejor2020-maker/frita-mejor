@@ -236,7 +236,8 @@ export const useLogisticsStore = create(
     try {
       const { data } = await supabase
         .from('app_state')
-        .select('key, value');
+        .select('key, value')
+        .or('key.ilike.pendingRequests%,key.ilike.completedRequests%,key.ilike.rejectedRequests%,key.ilike.loadHistory%');
 
       if (!data) return;
 
