@@ -408,13 +408,13 @@ export const SellerSetupView = () => {
     navigate('/vendedor');
   };
 
-  // 🔄 Mientras verifica turnos remotos o redirecciona al turno activo del vendedor:
-  if (remoteShifts === null || (myUserOpenShifts && myUserOpenShifts.length > 0)) {
+  // 🔄 Mientras verifica turnos remotos:
+  if (remoteShifts === null) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#FFD56B] font-sans">
         <div className="bg-white rounded-[32px] p-8 shadow-sm text-center max-w-xs w-full flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-[#FF4040] border-t-transparent rounded-full animate-spin"></div>
-          <p className="font-black text-gray-800 text-sm">Entrando a tu turno activo...</p>
+          <p className="font-black text-gray-800 text-sm">Verificando turno activo...</p>
         </div>
       </div>
     );

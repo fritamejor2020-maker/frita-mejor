@@ -731,9 +731,26 @@ export const VendedorDashboard = () => {
   const currentDate = new Date().toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formattedDate = currentDate.charAt(0).toUpperCase() + currentDate.slice(1);
 
-  // ── Guardia: Si la sesión no está iniciada, redirigir a configuración ──────
+  // ── Guardia: Si la sesión no está iniciada, intentar auto-restaurar si hay turno abierto ──────
   if (!isSetupComplete) {
-    return <Navigate to="/vendedor-setup" replace />;
+    const shifts = useInventoryStore.getState().posShifts || [];
+    const today = new Date().toISOString().slice(0, 10);
+    const activeOpenShift = shifts.find((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR' && (s.openedAt || s.fecha || '').startsWith(today));
+    if (activeOpenShift) {
+      console.log('[VendedorDashboard] Auto-restaurando turno activo encontrado:', activeOpenShift);
+      useSellerSessionStore.getState().startShift({
+        id: activeOpenShift.id,
+        pointId: activeOpenShift.pointId || activeOpenShift.vehicle,
+        shift: activeOpenShift.shift || 'AM',
+        pointType: activeOpenShift.pointType || 'variable',
+        responsibleName: activeOpenShift.responsibleName || (user as any)?.name,
+        userId: activeOpenShift.userId || (user as any)?.id || (user as any)?.username,
+        openedAt: activeOpenShift.openedAt,
+        branchId: activeOpenShift.branchId || (user as any)?.branchId || 'BRANCH-001'
+      });
+    } else {
+      return <Navigate to="/vendedor-setup" replace />;
+    }
   }
 
   return (
