@@ -109,32 +109,6 @@ export const VendedorDashboard = () => {
     const allShifts = useInventoryStore.getState().posShifts || [activeShiftRecord];
     push('posShifts', allShifts, activeBranchId).catch(() => {});
     push('posShifts', allShifts, null).catch(() => {});
-
-    // Forzar asegurado directo en Supabase a todas las llaves simultáneamente
-    supabase
-      .from('app_state')
-      .select('key, value')
-      .in('key', ['posShifts', `posShifts_${activeBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'])
-      .then(({ data }) => {
-        const shiftMap = new Map<string, any>();
-        (data || []).forEach((row: any) => {
-          (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
-            if (s?.id) shiftMap.set(s.id, s);
-          });
-        });
-        allShifts.forEach((s: any) => {
-          if (s?.id) shiftMap.set(s.id, s);
-        });
-        const merged = Array.from(shiftMap.values());
-        const nowIso = new Date().toISOString();
-        Promise.allSettled([
-          supabase.from('app_state').upsert({ key: 'posShifts', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId}`, value: merged, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: merged, updated_at: nowIso }, { onConflict: 'key' }),
-        ]).catch(() => {});
-      })
-      .catch(() => {});
   }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
 
   // ── 3. Monitoreo reactivo en tiempo real: si ESTE turno específico es cerrado por Admin, salir ──
