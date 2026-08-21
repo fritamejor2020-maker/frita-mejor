@@ -96,6 +96,15 @@ function getVehicleBranchId(vehicleId) {
 /**
  * Store global para administrar flujos Logísticos y de Surtido
  */
+function isTodayItem(item) {
+  if (!item) return false;
+  const rawDate = item.completed_at || item.created_at || item.timestamp || item.fecha || item.date || '';
+  if (!rawDate) return true;
+  const itemDay = String(rawDate).slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
+  return itemDay >= today;
+}
+
 export const useLogisticsStore = create(
   persist(
     (set, get) => ({
@@ -250,10 +259,10 @@ export const useLogisticsStore = create(
         }
       });
 
-      const freshPending = Array.from(pendingMap.values());
-      const freshCompleted = Array.from(completedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
-      const freshRejected = Array.from(rejectedMap.values()).sort((a, b) => new Date(b.rejected_at || b.created_at || 0) - new Date(a.rejected_at || a.created_at || 0));
-      const freshHistory = Array.from(historyMap.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      const freshPending = Array.from(pendingMap.values()).filter(isTodayItem);
+      const freshCompleted = Array.from(completedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
+      const freshRejected = Array.from(rejectedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.rejected_at || b.created_at || 0) - new Date(a.rejected_at || a.created_at || 0));
+      const freshHistory = Array.from(historyMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
       set({
         pendingRequests: freshPending,
@@ -645,11 +654,19 @@ export const useLogisticsStore = create(
         }
         return persistedState;
       },
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.pendingRequests = (state.pendingRequests || []).filter(isTodayItem);
+          state.completedRequests = (state.completedRequests || []).filter(isTodayItem);
+          state.rejectedRequests = (state.rejectedRequests || []).filter(isTodayItem);
+          state.loadHistory = (state.loadHistory || []).filter(isTodayItem);
+        }
+      },
       partialize: (state) => ({ 
-        pendingRequests: state.pendingRequests || [], 
-        completedRequests: (state.completedRequests || []).slice(-50),
-        rejectedRequests: (state.rejectedRequests || []).slice(-30),
-        loadHistory: (state.loadHistory || []).slice(-50) 
+        pendingRequests: (state.pendingRequests || []).filter(isTodayItem), 
+        completedRequests: (state.completedRequests || []).filter(isTodayItem).slice(-50),
+        rejectedRequests: (state.rejectedRequests || []).filter(isTodayItem).slice(-30),
+        loadHistory: (state.loadHistory || []).filter(isTodayItem).slice(-50) 
       }),
     }
   )

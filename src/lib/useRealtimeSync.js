@@ -83,9 +83,15 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
   const mergeLogisticsList = (currentList, incomingList) => {
     if (!Array.isArray(incomingList)) return currentList || [];
+    const today = new Date().toISOString().slice(0, 10);
+    const isToday = (item) => {
+      if (!item) return false;
+      const d = (item.completed_at || item.created_at || item.timestamp || item.fecha || item.date || '').slice(0, 10);
+      return !d || d >= today;
+    };
     const map = new Map();
-    (currentList || []).forEach(item => { if (item?.id) map.set(item.id, item); });
-    incomingList.forEach(item => { if (item?.id) map.set(item.id, item); });
+    (currentList || []).filter(isToday).forEach(item => { if (item?.id) map.set(item.id, item); });
+    incomingList.filter(isToday).forEach(item => { if (item?.id) map.set(item.id, item); });
     return Array.from(map.values());
   };
 
