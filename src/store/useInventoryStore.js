@@ -499,14 +499,9 @@ export const useInventoryStore = create(
                   const userCreatedOffline = localArr.filter(item => {
                     if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
                     if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
-                    // Para posShifts: verificar que no sea un residuo de días anteriores ni esté cerrado en remoto
+                    // Para posShifts: verificar que no sea un residuo cerrado en remoto
                     if (key === 'posShifts') {
-                      // 1. Si es un turno de fecha anterior a hoy sin cerrar, es un residuo de sesión vieja: descartar
-                      const today = new Date().toISOString().slice(0, 10);
-                      const shiftDate = (item.openedAt || item.date || '').slice(0, 10);
-                      if (!item.closedAt && shiftDate && shiftDate < today) return false;
-
-                      // 2. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
+                      // 1. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
                       const allRemoteSources = [
                         ...(remote['posShifts'] || []),
                         ...(remote['posShifts_BRANCH-001'] || []),

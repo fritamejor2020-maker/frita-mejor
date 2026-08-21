@@ -407,7 +407,6 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
     ch.on('presence', { event: 'sync' }, () => {
       const state = ch.presenceState() as Record<string, any[]>;
-      presenceRef.current.clear();
 
       Object.values(state).forEach((entries) => {
         entries.forEach((e) => {

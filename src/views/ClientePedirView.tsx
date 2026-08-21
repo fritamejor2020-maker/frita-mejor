@@ -718,7 +718,6 @@ export function ClientePedirView() {
       assigned_vendor_id: targetVendor.vendor_id,
       client_token: token,
       delivery_mode: deliveryMode,
-      branch_id: selectedBranchId,
       rejected_vendor_ids: [],
     };
 
