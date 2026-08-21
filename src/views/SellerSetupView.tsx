@@ -104,6 +104,8 @@ export const SellerSetupView = () => {
     const myMineMap = new Map<string, any>();
     const othersMap = new Map<string, any>();
 
+    const isVendorUser = user?.role === 'VENDEDOR' || (user?.access || []).includes('vendedor');
+
     remoteShifts.forEach((s: any) => {
       if (s.type !== 'VENDEDOR' || s.closedAt) return;
       if (!user) return;
@@ -115,12 +117,13 @@ export const SellerSetupView = () => {
       const shiftResp = String(s.responsibleName || '').trim().toLowerCase();
       const shiftUid = String(s.userId || s.createdBy || '').trim().toLowerCase();
 
-      const isMineByName = currentUserName.length > 0 && shiftResp === currentUserName;
+      const isMineByName = currentUserName.length > 0 && (shiftResp === currentUserName || shiftResp.includes(currentUserName) || currentUserName.includes(shiftResp));
       const isMineById = currentUserId.length > 0 && shiftUid === currentUserId;
+      const isVendorMatch = isVendorUser && (!s.branchId || s.branchId === userBranchId || !userBranchId);
 
       const vehicleKey = String(s.pointId || s.vehicle || s.id).toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      if (isMineByName || isMineById) {
+      if (isMineByName || isMineById || isVendorMatch) {
         const ex = myMineMap.get(vehicleKey);
         // Preservar solo el turno más reciente para el mismo vehículo hoy
         if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
