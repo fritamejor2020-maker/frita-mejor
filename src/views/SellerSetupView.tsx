@@ -188,6 +188,30 @@ export const SellerSetupView = () => {
 
   const navigate = useNavigate();
 
+  // 🚀 SI EL VENDEDOR YA TIENE UN TURNO ABIERTO Y NO HA HECHO CIERRE DE SESIÓN:
+  // ENTRAR DE UNA VEZ EN EL TURNO ACTIVO SIN MOSTRAR LA PANTALLA "CONFIGURA TU TURNO"
+  useEffect(() => {
+    if (sellerSetupComplete && activeShiftId) {
+      navigate('/vendedor', { replace: true });
+      return;
+    }
+
+    if (remoteShifts !== null && myUserOpenShifts && myUserOpenShifts.length > 0) {
+      const activeShift = myUserOpenShifts[0];
+      startShift({
+        id: activeShift.id,
+        pointId: activeShift.pointId || activeShift.vehicle,
+        shift: activeShift.shift || 'AM',
+        pointType: activeShift.pointType || 'variable',
+        responsibleName: activeShift.responsibleName || user?.name,
+        userId: activeShift.userId || user?.id || (user as any)?.username,
+        openedAt: activeShift.openedAt,
+        branchId: activeShift.branchId || userBranchId || 'BRANCH-001'
+      });
+      navigate('/vendedor', { replace: true });
+    }
+  }, [sellerSetupComplete, activeShiftId, remoteShifts, myUserOpenShifts, navigate, user, startShift, userBranchId]);
+
   const handleStartShift = async () => {
     const finalResponsibleName = responsibleName.trim() || user?.name || '';
     if (!pointId || !finalResponsibleName) {
@@ -380,6 +404,18 @@ export const SellerSetupView = () => {
     // Navegar de inmediato sin esperar la red (0ms de latencia)
     navigate('/vendedor');
   };
+
+  // 🔄 Mientras verifica turnos remotos o redirecciona al turno activo del vendedor:
+  if (remoteShifts === null || (myUserOpenShifts && myUserOpenShifts.length > 0)) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-[#FFD56B] font-sans">
+        <div className="bg-white rounded-[32px] p-8 shadow-sm text-center max-w-xs w-full flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-[#FF4040] border-t-transparent rounded-full animate-spin"></div>
+          <p className="font-black text-gray-800 text-sm">Entrando a tu turno activo...</p>
+        </div>
+      </div>
+    );
+  }
 
   // Vista deshabilitada por el Admin
   if (!sellerViewEnabled) {
