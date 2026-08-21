@@ -694,7 +694,9 @@ export function ClientePedirView() {
     }
 
     setIsSubmitting(true);
-    const token = crypto.randomUUID ? crypto.randomUUID() : 'c-' + Math.random().toString(36).substring(2, 15);
+    const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
+      ? crypto.randomUUID()
+      : '00000000-0000-4000-8000-' + Math.random().toString(16).substring(2, 14).padEnd(12, '0');
 
     const itemsPayload = Object.entries(cart).map(([pId, qty]) => {
       const prod = products.find(p => String(p.id) === String(pId));
@@ -709,7 +711,7 @@ export function ClientePedirView() {
     const newOrder = {
       client_name: name.trim(),
       client_phone: phone.trim(),
-      client_address: address.trim() || (deliveryMode === 'pickup' ? 'Para recoger en puesto' : null),
+      client_address: address.trim() || (deliveryMode === 'pickup' ? 'Para recoger en puesto' : 'Ubicación seleccionada en mapa'),
       client_lat: clientPos[0],
       client_lng: clientPos[1],
       items: itemsPayload,
@@ -717,8 +719,6 @@ export function ClientePedirView() {
       status: 'pending',
       assigned_vendor_id: targetVendor.vendor_id,
       client_token: token,
-      delivery_mode: deliveryMode,
-      rejected_vendor_ids: [],
     };
 
     try {
