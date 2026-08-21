@@ -232,11 +232,9 @@ export const AdminUsersTab = () => {
   const [syncMsg, setSyncMsg]     = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<{ id: string; name: string } | null>(null);
 
-  // Al abrir la pestaña, empujar la lista actual de usuarios a Supabase
-  // Esto garantiza que usuarios creados antes del fix de sync lleguen a todos los dispositivos
+  // Al abrir la pestaña, descargar la lista más reciente de usuarios desde Supabase (Fuente de Verdad)
   useEffect(() => {
-    push('users', useAuthStore.getState().users).catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    useAuthStore.getState().loadFromRemote().catch(() => {});
   }, []);
 
   const handleForceSyncUsers = async () => {

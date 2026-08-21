@@ -55,6 +55,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['customers']         = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
   applicators['customerTypes']     = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
   applicators['loadTemplates']     = (v) => useInventoryStore.setState({ loadTemplates: v });
+  applicators['users']             = (v) => { if (Array.isArray(v) && v.length > 0) useAuthStore.setState({ users: v }); };
   applicators['vehicles']          = (v) => {
     if (Array.isArray(v)) {
       useVehicleStore.setState({ vehicles: v });

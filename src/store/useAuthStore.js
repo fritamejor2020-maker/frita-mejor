@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 import { useSellerSessionStore } from './useSellerSessionStore';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 
@@ -164,12 +165,51 @@ export const useAuthStore = create(
         set({ activeBranchId: branchId });
       },
 
+      // ─── Cargar usuarios de Supabase (Fuente de Verdad) ───────────
+      loadFromRemote: async () => {
+        try {
+          const { data } = await supabase
+            .from('app_state')
+            .select('value')
+            .eq('key', 'users')
+            .maybeSingle();
+
+          if (data && Array.isArray(data.value) && data.value.length > 0) {
+            const remoteUsers = data.value;
+            const currentLocalUsers = get().users || [];
+
+            const userMap = new Map();
+            DEFAULT_USERS.forEach(u => userMap.set(u.id, u));
+            currentLocalUsers.forEach(u => userMap.set(u.id, u));
+            remoteUsers.forEach(u => {
+              if (u?.id) userMap.set(u.id, u);
+            });
+
+            const mergedUsers = Array.from(userMap.values());
+            const currentUser = get().user;
+            const updatedSelf = currentUser ? (userMap.get(currentUser.id) || currentUser) : null;
+
+            set({ users: mergedUsers, user: updatedSelf });
+            console.log(`[AuthStore] ${mergedUsers.length} usuarios cargados correctamente desde Supabase.`);
+          }
+        } catch (err) {
+          console.warn('[AuthStore] Error cargando usuarios desde Supabase:', err?.message);
+        }
+      },
+
       // ─── Login solo por contraseña ────────────────────────────────
-      signIn: (password, selectedBranchId = null) => {
+      signIn: async (password, selectedBranchId = null) => {
         set({ loading: true, error: null });
 
-        const users = get().users;
-        const found = users.find((u) => u.password === password);
+        let users = get().users;
+        let found = users.find((u) => u.password === password);
+
+        // Si la contraseña no coincide localmente, consultar la nube por si el usuario es nuevo
+        if (!found) {
+          await get().loadFromRemote();
+          users = get().users;
+          found = users.find((u) => u.password === password);
+        }
 
         if (!found) {
           set({ loading: false, error: 'Contraseña incorrecta.' });

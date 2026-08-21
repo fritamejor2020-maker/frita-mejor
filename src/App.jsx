@@ -225,6 +225,7 @@ function App() {
       }
       try {
         await Promise.allSettled([
+          useAuthStore.getState().loadFromRemote(),
           useInventoryStore.getState().loadFromRemote(),
           useLogisticsStore.getState().loadFromRemote(),
         ]);
