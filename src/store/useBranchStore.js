@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 
 // =============================================================================
 // BRANCH STORE — Gestión de Sedes (Multisede)
@@ -151,10 +152,23 @@ export const useBranchStore = create(
       },
 
       // ─── Carga remota ──────────────────────────────────────────────────────
-      loadFromRemote: (remoteBranches) => {
-        if (Array.isArray(remoteBranches)) {
+      loadFromRemote: async (remoteBranches = null) => {
+        let list = remoteBranches;
+        if (!Array.isArray(list)) {
+          try {
+            const { data } = await supabase
+              .from('app_state')
+              .select('value')
+              .eq('key', 'branches')
+              .maybeSingle();
+            if (data && Array.isArray(data.value)) {
+              list = data.value;
+            }
+          } catch (e) {}
+        }
+        if (Array.isArray(list) && list.length > 0) {
           const deleted = new Set(get().deletedBranchIds || []);
-          const filtered = remoteBranches.filter(b => !deleted.has(b.id));
+          const filtered = list.filter(b => !deleted.has(b.id));
           if (filtered.length > 0) {
             const hasPrincipal = filtered.some(b => b.id === 'BRANCH-001');
             const merged = hasPrincipal

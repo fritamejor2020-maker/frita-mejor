@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 
 function syncSuppliers(suppliers) {
   markLocalWrite('suppliers');
@@ -165,6 +166,26 @@ export const useSupplierStore = create(
         );
         // If no exact match, return all active suppliers as fallback
         return matched.length > 0 ? matched : get().suppliers.filter(s => s.active);
+      },
+
+      // ─── Carga remota ──────────────────────────────────────────────────────
+      loadFromRemote: async (remoteSuppliers = null) => {
+        let suppliers = remoteSuppliers;
+        if (!Array.isArray(suppliers)) {
+          try {
+            const { data } = await supabase
+              .from('app_state')
+              .select('value')
+              .eq('key', 'suppliers')
+              .maybeSingle();
+            if (data && Array.isArray(data.value)) {
+              suppliers = data.value;
+            }
+          } catch (e) {}
+        }
+        if (Array.isArray(suppliers) && suppliers.length > 0) {
+          set({ suppliers });
+        }
       },
     }),
     {

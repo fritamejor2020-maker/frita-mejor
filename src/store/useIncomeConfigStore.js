@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 
 const defaultIncomeHierarchy = {
   Local: {
@@ -139,7 +140,28 @@ export const useIncomeConfigStore = create(
            return { hierarchy: newHierarchy };
         });
         syncIncomeConfig(get());
-      }
+      },
+
+      // ─── Carga remota ──────────────────────────────────────────────────────
+      loadFromRemote: async (remoteData = null) => {
+        let data = remoteData;
+        if (!data) {
+          try {
+            const { data: row } = await supabase
+              .from('app_state')
+              .select('value')
+              .eq('key', 'incomeConfig')
+              .maybeSingle();
+            if (row && row.value) data = row.value;
+          } catch (e) {}
+        }
+        if (data && typeof data === 'object') {
+          set({
+            hierarchy: data.hierarchy || get().hierarchy,
+            descarguesEnabled: data.descarguesEnabled || get().descarguesEnabled,
+          });
+        }
+      },
     }),
     {
       name: 'frita-mejor-income-config',

@@ -81,7 +81,9 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       useGoalStore.setState({ monthlyGoals: v });
     }
   };
-  applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
+  applicators['branches']          = (v) => { if (Array.isArray(v) && v.length > 0) useBranchStore.getState().loadFromRemote(v); };
+  applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
+  applicators['suppliers']         = (v) => useSupplierStore.getState().loadFromRemote(v);
   const mergeLogisticsList = (currentList, incomingList) => {
     if (!Array.isArray(incomingList)) return currentList || [];
     const today = new Date().toISOString().slice(0, 10);

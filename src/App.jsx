@@ -6,6 +6,9 @@ import { useRealtimeSync, isApplyingRealtimeState } from './lib/useRealtimeSync'
 import { useInventoryStore } from './store/useInventoryStore';
 import { useLogisticsStore } from './store/useLogisticsStore';
 import { useVehicleStore } from './store/useVehicleStore';
+import { useBranchStore } from './store/useBranchStore';
+import { useSupplierStore } from './store/useSupplierStore';
+import { useTaskStore } from './store/useTaskStore';
 import { useIncomeConfigStore } from './store/useIncomeConfigStore';
 import { useGoalStore } from './store/useGoalStore';
 import { flushQueue } from './lib/syncManager';
@@ -226,8 +229,14 @@ function App() {
       try {
         await Promise.allSettled([
           useAuthStore.getState().loadFromRemote(),
+          useBranchStore.getState().loadFromRemote(),
+          useVehicleStore.getState().loadFromRemote(),
           useInventoryStore.getState().loadFromRemote(),
           useLogisticsStore.getState().loadFromRemote(),
+          useSupplierStore.getState().loadFromRemote(),
+          useTaskStore.getState().loadFromRemote(),
+          useIncomeConfigStore.getState().loadFromRemote(),
+          useGoalStore.getState().loadFromRemote(),
         ]);
         flushQueue();
       } catch (err) {

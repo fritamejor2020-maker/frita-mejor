@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 import { useAuthStore } from './useAuthStore';
 
 function syncVehicles(statePayload) {
@@ -105,7 +106,35 @@ export const useVehicleStore = create(
         return get().vehicles
           .filter(v => v.type === 'Triciclo' && v.active)
           .map(v => v.abbreviation || v.name);
-      }
+      },
+
+      // ─── Carga remota ──────────────────────────────────────────────────────
+      loadFromRemote: async (remotePayload = null) => {
+        let payload = remotePayload;
+        if (!payload) {
+          try {
+            const { data } = await supabase
+              .from('app_state')
+              .select('value')
+              .eq('key', 'vehicles')
+              .maybeSingle();
+            if (data && data.value) {
+              payload = data.value;
+            }
+          } catch (e) {}
+        }
+
+        if (Array.isArray(payload)) {
+          set({ vehicles: payload });
+        } else if (payload && typeof payload === 'object') {
+          set({
+            vehicles: Array.isArray(payload.vehicles) ? payload.vehicles : (get().vehicles || []),
+            sellerViewEnabled: payload.sellerViewEnabled ?? true,
+            dejadorViewEnabled: payload.dejadorViewEnabled ?? true,
+            enabledPointTypes: payload.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
+          });
+        }
+      },
     }),
     {
       name: 'frita-mejor-vehicles',

@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
+import { supabase } from '../lib/supabase';
 
 // Proyectos iniciales por defecto (Estilo Todoist)
 const DEFAULT_PROJECTS = [
@@ -93,7 +94,18 @@ export const useTaskStore = create(
       setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
 
       // --- Carga remota ---
-      loadFromRemote: (data) => {
+      loadFromRemote: async (remoteData = null) => {
+        let data = remoteData;
+        if (!data) {
+          try {
+            const { data: row } = await supabase
+              .from('app_state')
+              .select('value')
+              .eq('key', 'tasks_data')
+              .maybeSingle();
+            if (row && row.value) data = row.value;
+          } catch (e) {}
+        }
         if (!data) return;
         set({
           tasks: data.tasks || get().tasks,
