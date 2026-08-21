@@ -136,7 +136,14 @@ export function ClientePedirView() {
   const [selectedCategory, setSelectedCategory] = useState('TODOS');
 
   // --- Catálogo y Stock Consolidado ---
-  const [vendors, setVendors] = useState<any[]>([]);
+  const [vendors, setVendors] = useState<any[]>(() => {
+    try {
+      const cached = localStorage.getItem('fm_cached_vendors');
+      return cached ? JSON.parse(cached) : [];
+    } catch (e) {
+      return [];
+    }
+  });
   const [products, setProducts] = useState<any[]>([]);
   const [inventorySnapshots, setInventorySnapshots] = useState<any[]>([]);
   const [posSettings, setPosSettings] = useState<any>(null);
@@ -473,7 +480,20 @@ export function ClientePedirView() {
         }
       });
 
-      setVendors(Array.from(finalVendorsMap.values()));
+      const freshVendors = Array.from(finalVendorsMap.values());
+      if (freshVendors.length > 0) {
+        setVendors(freshVendors);
+        try {
+          localStorage.setItem('fm_cached_vendors', JSON.stringify(freshVendors));
+        } catch (e) {}
+      } else {
+        // Protección anti-parpadeo: solo vaciar si la tienda local confirma que no hay turnos abiertos
+        const storeShifts = (useInventoryStore.getState().posShifts || [])
+          .filter((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR');
+        if (storeShifts.length === 0) {
+          setVendors([]);
+        }
+      }
     } catch (e) {
       console.warn('[ClientePedirView] Error fetching vendors:', e);
     }
