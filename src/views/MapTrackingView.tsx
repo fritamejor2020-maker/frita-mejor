@@ -78,18 +78,21 @@ interface VendorLocation {
   source?: 'presence' | 'db' | 'offline';
 }
 
-// ── Componente auxiliar: centra el mapa según la sede o los vendedores ────────
+// ── Componente auxiliar: centra el mapa una sola vez al cargar ────────
 function AutoCenter({ vendors, mapCenter }: { vendors: VendorLocation[]; mapCenter: [number, number] }) {
   const map = useMap();
+  const initialCenteredRef = useRef(false);
+
   useEffect(() => {
-    if (vendors.length === 1) {
-      map.setView([vendors[0].lat, vendors[0].lng], DEFAULT_ZOOM);
-    } else if (vendors.length > 1) {
-      const bounds = L.latLngBounds(vendors.map(v => [v.lat, v.lng]));
+    if (initialCenteredRef.current || vendors.length === 0) return;
+    const validVendors = vendors.filter(v => v.lat && v.lng && (v.lat !== mapCenter[0] || v.lng !== mapCenter[1]));
+    if (validVendors.length === 1) {
+      map.setView([validVendors[0].lat, validVendors[0].lng], DEFAULT_ZOOM);
+      initialCenteredRef.current = true;
+    } else if (validVendors.length > 1) {
+      const bounds = L.latLngBounds(validVendors.map(v => [v.lat, v.lng]));
       map.fitBounds(bounds, { padding: [50, 50] });
-    } else {
-      // Sin vendedores: centrar en la sede
-      map.setView(mapCenter, DEFAULT_ZOOM);
+      initialCenteredRef.current = true;
     }
   }, [vendors.length, mapCenter[0], mapCenter[1]]);
   return null;
@@ -333,7 +336,17 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       result = result.filter(v => v.pointId && branchVehicleIds.has(v.pointId));
     }
 
-    setVendors(result);
+    if (result.length > 0) {
+      setVendors(result);
+    } else {
+      // Prevenir reseteos temporales a 0 si en el store aún hay turnos activos
+      const hasActiveVendorShifts = (posShiftsFromStore || []).some((s: any) =>
+        !s.closedAt && (String(s.type || '').toUpperCase() === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')))
+      );
+      if (!hasActiveVendorShifts) {
+        setVendors([]);
+      }
+    }
   };
 
   // ── Leer ubicaciones desde el store (sincronizado vía app_state) ──────────
