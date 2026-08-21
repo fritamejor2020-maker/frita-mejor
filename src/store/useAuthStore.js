@@ -165,7 +165,7 @@ export const useAuthStore = create(
         set({ activeBranchId: branchId });
       },
 
-      // ─── Cargar usuarios de Supabase (Fuente de Verdad) ───────────
+      // ─── Cargar usuarios de Supabase (Fuente de Verdad + Auto-Curación) ───────────
       loadFromRemote: async () => {
         try {
           const { data } = await supabase
@@ -174,23 +174,24 @@ export const useAuthStore = create(
             .eq('key', 'users')
             .maybeSingle();
 
-          if (data && Array.isArray(data.value) && data.value.length > 0) {
-            const remoteUsers = data.value;
-            const currentLocalUsers = get().users || [];
+          const remoteUsers = (data && Array.isArray(data.value)) ? data.value : [];
+          const currentLocalUsers = get().users || [];
 
-            const userMap = new Map();
-            DEFAULT_USERS.forEach(u => userMap.set(u.id, u));
-            currentLocalUsers.forEach(u => userMap.set(u.id, u));
-            remoteUsers.forEach(u => {
-              if (u?.id) userMap.set(u.id, u);
-            });
+          const userMap = new Map();
+          DEFAULT_USERS.forEach(u => userMap.set(u.id, u));
+          currentLocalUsers.forEach(u => { if (u?.id) userMap.set(u.id, u); });
+          remoteUsers.forEach(u => { if (u?.id) userMap.set(u.id, u); });
 
-            const mergedUsers = Array.from(userMap.values());
-            const currentUser = get().user;
-            const updatedSelf = currentUser ? (userMap.get(currentUser.id) || currentUser) : null;
+          const mergedUsers = Array.from(userMap.values());
+          const currentUser = get().user;
+          const updatedSelf = currentUser ? (userMap.get(currentUser.id) || currentUser) : null;
 
-            set({ users: mergedUsers, user: updatedSelf });
-            console.log(`[AuthStore] ${mergedUsers.length} usuarios cargados correctamente desde Supabase.`);
+          set({ users: mergedUsers, user: updatedSelf });
+
+          // Si la memoria local tenía usuarios adicionales que no estaban en la nube, auto-curar Supabase
+          if (mergedUsers.length > remoteUsers.length) {
+            markLocalWrite('users');
+            push('users', mergedUsers).catch(() => {});
           }
         } catch (err) {
           console.warn('[AuthStore] Error cargando usuarios desde Supabase:', err?.message);
