@@ -217,29 +217,35 @@ function App() {
     // 0. Instalar handlers globales de errores (una sola vez)
     installGlobalErrorHandlers();
 
-    // 1. Cargar estado remoto DESPUÉS de que Zustand persist hidrate
-    const syncRemoteState = async () => {
+    // 1. Estrategia Nube-Primero: al abrir la app o reconectarse, priorizar siempre los datos de Supabase si hay internet
+    const syncAllRemoteStores = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        console.log('[CloudSync] Sin conexión a internet. Trabajando con caché local offline.');
+        return;
+      }
       try {
-        await useInventoryStore.getState().loadFromRemote();
+        await Promise.allSettled([
+          useInventoryStore.getState().loadFromRemote(),
+          useLogisticsStore.getState().loadFromRemote(),
+        ]);
+        flushQueue();
       } catch (err) {
-        console.warn('[App] Error en loadFromRemote:', err.message);
-      }
-      flushQueue();
-    };
-
-    Promise.resolve().then(syncRemoteState);
-
-    // Auto-actualizar desde Supabase/Vercel cada vez que la app se abre o regresa a primer plano
-    const handleFocusSync = () => {
-      if (document.visibilityState === 'visible') {
-        useInventoryStore.getState().loadFromRemote().catch(e => {
-          console.warn('[App] Error en focus sync:', e.message);
-        });
+        console.warn('[CloudSync] Error cargando datos de la nube:', err?.message);
       }
     };
 
-    window.addEventListener('focus', handleFocusSync);
-    document.addEventListener('visibilitychange', handleFocusSync);
+    Promise.resolve().then(syncAllRemoteStores);
+
+    // Auto-actualizar desde la nube cada vez que la app regresa a primer plano o recupera conexión a internet
+    const handleSyncTrigger = () => {
+      if (document.visibilityState === 'visible' && navigator.onLine) {
+        syncAllRemoteStores();
+      }
+    };
+
+    window.addEventListener('focus', handleSyncTrigger);
+    window.addEventListener('online', handleSyncTrigger);
+    document.addEventListener('visibilitychange', handleSyncTrigger);
 
     // 2. Inicializar sincronización entre pestañas (BroadcastChannel)
     initCrossTabSync();
