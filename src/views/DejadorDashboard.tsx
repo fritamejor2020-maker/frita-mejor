@@ -260,16 +260,23 @@ export const DejadorDashboard = () => {
   useEffect(() => {
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
-    const interval = setInterval(loadRemoteShifts, 4000);
+    useLogisticsStore.getState().loadFromRemote().catch(() => {});
+
+    const interval = setInterval(() => {
+      loadRemoteShifts();
+      useLogisticsStore.getState().loadFromRemote().catch(() => {});
+    }, 3000);
 
     const channel = supabase
-      .channel('dejador-shifts-sync')
+      .channel('dejador-logistics-realtime-sync')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'app_state' },
         (payload: any) => {
-          if (payload?.new?.key && (payload.new.key === 'posShifts' || payload.new.key.startsWith('posShifts_'))) {
+          const k = payload?.new?.key || '';
+          if (k.includes('posShifts') || k.includes('pendingRequests') || k.includes('completedRequests') || k.includes('loadHistory') || k.includes('inventory')) {
             loadRemoteShifts();
+            useLogisticsStore.getState().loadFromRemote().catch(() => {});
           }
         }
       )

@@ -55,19 +55,32 @@ function syncLogisticsPartition(
 ) {
   const bid = affectedBranchId || 'BRANCH-001';
   const pendingSlice = (pendingReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
-  syncKeyWithBranch('pendingRequests', pendingSlice, bid);
-  syncKeyWithBranch('pendingRequests', pendingSlice, null);
+  
+  markLocalWrite('pendingRequests', bid);
+  markLocalWrite('pendingRequests', null);
+
+  const pushes = [
+    push('pendingRequests', pendingSlice, bid),
+    push('pendingRequests', pendingSlice, null),
+  ];
 
   if (syncCompleted) {
     const completedSlice = (completedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
-    syncKeyWithBranch('completedRequests', completedSlice, bid);
-    syncKeyWithBranch('completedRequests', completedSlice, null);
+    markLocalWrite('completedRequests', bid);
+    markLocalWrite('completedRequests', null);
+    pushes.push(push('completedRequests', completedSlice, bid));
+    pushes.push(push('completedRequests', completedSlice, null));
   }
+
   if (syncRejected) {
     const rejectedSlice = (rejectedReqs || []).filter(r => (r.branchId || 'BRANCH-001') === bid);
-    syncKeyWithBranch('rejectedRequests', rejectedSlice, bid);
-    syncKeyWithBranch('rejectedRequests', rejectedSlice, null);
+    markLocalWrite('rejectedRequests', bid);
+    markLocalWrite('rejectedRequests', null);
+    pushes.push(push('rejectedRequests', rejectedSlice, bid));
+    pushes.push(push('rejectedRequests', rejectedSlice, null));
   }
+
+  Promise.allSettled(pushes).catch(() => {});
 }
 
 /**
@@ -206,10 +219,75 @@ export const useLogisticsStore = create(
   // ACCIONES LOGÍSTICA (DEJADOR)
   // ===============================
 
+  loadFromRemote: async () => {
+    try {
+      const user = useAuthStore.getState().user;
+      const userBranchId = user?.branchId ?? null;
+
+      const keysToFetch = [
+        'pendingRequests', 'pendingRequests_BRANCH-001',
+        'completedRequests', 'completedRequests_BRANCH-001',
+        'rejectedRequests', 'rejectedRequests_BRANCH-001',
+        'loadHistory', 'loadHistory_BRANCH-001'
+      ];
+
+      if (userBranchId && userBranchId !== 'BRANCH-001') {
+        keysToFetch.push(`pendingRequests_${userBranchId}`);
+        keysToFetch.push(`completedRequests_${userBranchId}`);
+        keysToFetch.push(`rejectedRequests_${userBranchId}`);
+        keysToFetch.push(`loadHistory_${userBranchId}`);
+      }
+
+      const { data } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', keysToFetch);
+
+      if (!data) return;
+
+      const map = {};
+      data.forEach(row => { map[row.key] = row.value; });
+
+      // Merge pendingRequests
+      const pendingMap = new Map();
+      Object.keys(map).forEach(k => {
+        if (k.startsWith('pendingRequests') && Array.isArray(map[k])) {
+          map[k].forEach(item => { if (item?.id) pendingMap.set(item.id, item); });
+        }
+      });
+
+      // Merge completedRequests
+      const completedMap = new Map();
+      Object.keys(map).forEach(k => {
+        if (k.startsWith('completedRequests') && Array.isArray(map[k])) {
+          map[k].forEach(item => { if (item?.id) completedMap.set(item.id, item); });
+        }
+      });
+
+      // Merge loadHistory
+      const historyMap = new Map();
+      Object.keys(map).forEach(k => {
+        if (k.startsWith('loadHistory') && Array.isArray(map[k])) {
+          map[k].forEach(item => { if (item?.id) historyMap.set(item.id, item); });
+        }
+      });
+
+      const freshPending = Array.from(pendingMap.values());
+      const freshCompleted = Array.from(completedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
+      const freshHistory = Array.from(historyMap.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      set({
+        pendingRequests: freshPending,
+        completedRequests: freshCompleted,
+        loadHistory: freshHistory
+      });
+    } catch (err) {
+      console.warn('[LogisticsStore] Error in loadFromRemote:', err);
+    }
+  },
+
   fetchPendingRequests: async () => {
-    // Local Mock: Do nothing, state already holds it
-    const { pendingRequests } = get();
-    console.log("Fetched pending requests locally:", pendingRequests.length);
+    await get().loadFromRemote();
   },
 
   commitRestock: async (requestId) => {
@@ -449,8 +527,12 @@ export const useLogisticsStore = create(
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
-    syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
-    syncKeyWithBranch('loadHistory', loadSlice, null);
+    markLocalWrite('loadHistory', affectedBranchId);
+    markLocalWrite('loadHistory', null);
+    Promise.allSettled([
+      push('loadHistory', loadSlice, affectedBranchId),
+      push('loadHistory', loadSlice, null)
+    ]).catch(() => {});
     return true;
   },
 
@@ -498,8 +580,12 @@ export const useLogisticsStore = create(
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
-    syncKeyWithBranch('loadHistory', loadSlice, affectedBranchId);
-    syncKeyWithBranch('loadHistory', loadSlice, null);
+    markLocalWrite('loadHistory', affectedBranchId);
+    markLocalWrite('loadHistory', null);
+    Promise.allSettled([
+      push('loadHistory', loadSlice, affectedBranchId),
+      push('loadHistory', loadSlice, null)
+    ]).catch(() => {});
     return true;
   },
 

@@ -31,7 +31,7 @@ let _ignoreRemoteKeys = new Set();
 export function markLocalWrite(key, branchId = null) {
   const supabaseKey = getBranchKey(key, branchId);
   _ignoreRemoteKeys.add(supabaseKey);
-  setTimeout(() => _ignoreRemoteKeys.delete(supabaseKey), 2000);
+  setTimeout(() => _ignoreRemoteKeys.delete(supabaseKey), 300);
 }
 
 // ─── Applicators dinámicos ────────────────────────────────────────────────────
