@@ -522,19 +522,7 @@ export function AdminVehicleInventoryTab() {
           }
         });
 
-        const today = dateOf(new Date().toISOString());
-        let autoClosedCount = 0;
-
-        const allShifts = Array.from(shiftMap.values()).map((s: any) => {
-          if (!s.closedAt) {
-            const shiftDate = dateOf(s.openedAt || s.fecha || s.date || s.start_time || '');
-            if (shiftDate && shiftDate < today) {
-              autoClosedCount++;
-              return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
-            }
-          }
-          return s;
-        });
+        const allShifts = Array.from(shiftMap.values());
 
         // Filtrar tombstones
         const deletedIds = new Set<string>([
@@ -547,14 +535,6 @@ export function AdminVehicleInventoryTab() {
 
         // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
         useInventoryStore.setState({ posShifts: filtered });
-
-        // Guardar la versión depurada y cerrada automáticamente en Supabase app_state
-        if (autoClosedCount > 0) {
-          supabase.from('app_state').upsert([
-            { key: 'posShifts', value: filtered, updated_at: new Date().toISOString() },
-            { key: 'posShifts_BRANCH-001', value: filtered, updated_at: new Date().toISOString() }
-          ]).catch(() => {});
-        }
       }
     } catch (e) {
       // No bloquear la UI si falla Supabase
