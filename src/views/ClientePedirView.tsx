@@ -84,6 +84,7 @@ function MapController({
   const map = useMapEvents({
     click(e) {
       onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
+      toast.success('📍 Ubicación ajustada en el mapa');
     },
   });
 
@@ -1044,8 +1045,22 @@ export function ClientePedirView() {
             />
           ))}
 
-          {/* Marcador del Cliente */}
-          <Marker position={clientPos} icon={clientIcon} />
+          {/* Marcador del Cliente (Arrastrable para fijar punto de entrega) */}
+          <Marker 
+            position={clientPos} 
+            icon={clientIcon} 
+            draggable={true}
+            eventHandlers={{
+              dragend(e) {
+                const marker = e.target;
+                if (marker != null) {
+                  const latLng = marker.getLatLng();
+                  handleLocationUpdate(latLng.lat, latLng.lng);
+                  toast.success('📍 Ubicación fijada en el mapa');
+                }
+              }
+            }}
+          />
 
           {/* Marcadores de Carritos y Triciclos en tiempo real alrededor */}
           {activeVendorsAround.map(v => (
@@ -1100,11 +1115,15 @@ export function ClientePedirView() {
         </div>
       </header>
 
-      {/* ── BADGE SUPERIOR DE CARRITOS DISPONIBLES ── */}
-      <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-20">
-        <div className="bg-gray-900/90 text-white backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 text-xs font-black flex items-center gap-2 animate-bounce">
+      {/* ── BADGE SUPERIOR DE CARRITOS DISPONIBLES Y GUÍA DE UBICACIÓN ── */}
+      <div className="absolute top-[88px] left-1/2 -translate-x-1/2 z-20 flex flex-col items-center gap-1.5 w-[calc(100%-2rem)] max-w-sm pointer-events-none">
+        <div className="bg-gray-900/90 text-white backdrop-blur-md px-4 py-2 rounded-full shadow-lg border border-white/20 text-xs font-black flex items-center gap-2 pointer-events-auto">
           <span className="w-2.5 h-2.5 rounded-full bg-green-400 animate-pulse"></span>
           <span>{activeVendorsAround.length} Carritos activos cerca de ti</span>
+        </div>
+        
+        <div className="bg-white/95 text-gray-800 backdrop-blur-md px-3 py-1 rounded-full shadow-md border border-amber-300 text-[10px] font-extrabold flex items-center gap-1.5 pointer-events-auto animate-fade-in">
+          <span>📍 Toca el mapa o arrastra el pin 😋 para cambiar tu ubicación</span>
         </div>
       </div>
 
@@ -1336,7 +1355,16 @@ export function ClientePedirView() {
 
               {deliveryMode === 'delivery' && (
                 <div className="flex flex-col gap-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Dirección / Indicaciones</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Dirección / Indicaciones</label>
+                    <button
+                      type="button"
+                      onClick={() => setUiStep('MAP')}
+                      className="text-[11px] font-black text-[#FF4040] hover:underline flex items-center gap-1"
+                    >
+                      📍 Cambiar punto en mapa
+                    </button>
+                  </div>
                   <input
                     type="text"
                     placeholder="Ej. Calle 5 # 4-20 (Frente al parque)"
@@ -1344,6 +1372,10 @@ export function ClientePedirView() {
                     onChange={e => setAddress(e.target.value)}
                     className="bg-gray-50 border border-gray-200 rounded-xl py-3 px-4 text-xs font-bold text-gray-800 outline-none focus:ring-2 ring-[#FF4040]"
                   />
+                  <p className="text-[10px] text-gray-400 font-bold mt-0.5 flex items-center gap-1">
+                    <span>📌 Punto fijado en mapa:</span>
+                    <span className="font-black text-gray-700">{clientPos[0].toFixed(4)}, {clientPos[1].toFixed(4)}</span>
+                  </p>
                 </div>
               )}
 
