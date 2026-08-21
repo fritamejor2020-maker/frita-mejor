@@ -269,10 +269,9 @@ export const VendedorDashboard = () => {
       toast.error('Error al aceptar el pedido.');
     }
 
-    supabase.from('delivery_requests')
+    Promise.resolve(supabase.from('delivery_requests')
       .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .catch(() => {});
+      .eq('id', orderId)).catch(() => {});
   };
 
   const handleRejectDelivery = async (orderId: string) => {
@@ -369,10 +368,9 @@ export const VendedorDashboard = () => {
       }
     } catch (e) {}
 
-    supabase.from('delivery_requests')
+    Promise.resolve(supabase.from('delivery_requests')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', orderId)
-      .catch(() => {});
+      .eq('id', orderId)).catch(() => {});
 
     setActiveDelivery(null);
     toast.success('¡Pedido entregado con éxito! 🎉 Stock descontado.');

@@ -736,7 +736,7 @@ export function ClientePedirView() {
       await push('customer_delivery_requests', updatedOrders);
 
       // Intento secundario no bloqueante en la tabla SQL delivery_requests (si existe)
-      supabase.from('delivery_requests').insert({
+      Promise.resolve(supabase.from('delivery_requests').insert({
         id: orderId,
         client_name: newOrder.client_name,
         client_phone: newOrder.client_phone,
@@ -748,7 +748,7 @@ export function ClientePedirView() {
         status: newOrder.status,
         assigned_vendor_id: newOrder.assigned_vendor_id,
         client_token: newOrder.client_token,
-      }).catch(() => {});
+      })).catch(() => {});
 
       toast.success(deliveryMode === 'delivery' ? '¡Buscando carrito cercano! 🛵💨' : '¡Reserva enviada al puesto! 📍');
       localStorage.setItem('fm_active_order_id', orderId);
