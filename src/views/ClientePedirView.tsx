@@ -306,7 +306,8 @@ export function ClientePedirView() {
     try {
       const keysToFetch = [
         'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
-        'vendorLocations', 'vendorLocations_BRANCH-001'
+        'vendorLocations', 'vendorLocations_BRANCH-001',
+        'deletedShiftIds', 'deletedShiftIds_BRANCH-001'
       ];
       if (selectedBranchId && selectedBranchId !== 'BRANCH-001') {
         keysToFetch.push(`posShifts_${selectedBranchId}`);
@@ -323,6 +324,11 @@ export function ClientePedirView() {
       const map: Record<string, any> = {};
       data.forEach((row: any) => { map[row.key] = row.value; });
 
+      const deletedIds = new Set<string>([
+        ...((map['deletedShiftIds'] || []) as string[]),
+        ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
+      ]);
+
       // 1. Recopilar TODOS los turnos posShifts de la app sin importar la llave de la sede
       const allShifts: any[] = [];
       Object.keys(map).forEach(key => {
@@ -332,10 +338,10 @@ export function ClientePedirView() {
       });
       allShifts.push(...(useInventoryStore.getState().posShifts || []));
 
-      // 1. Recopilar y unificar TODOS los turnos por ID con prevalencia estricta de cierre
+      // 1. Recopilar y unificar TODOS los turnos por ID descartando tombstones
       const shiftByIdMap = new Map<string, any>();
       allShifts.forEach((s: any) => {
-        if (!s?.id) return;
+        if (!s?.id || deletedIds.has(s.id)) return;
         const existing = shiftByIdMap.get(s.id);
         if (!existing) {
           shiftByIdMap.set(s.id, s);
@@ -447,6 +453,15 @@ export function ClientePedirView() {
       // B) Añadir ubicaciones activas de vendorLocations (respaldo por si el turno no fue capturado)
       Object.entries(allLocs).forEach(([key, loc]: [string, any]) => {
         if (!loc || typeof loc !== 'object' || !loc.lat || !loc.lng) return;
+        if (loc.isActive === false) return;
+
+        // Descartar pings GPS viejos (más de 30 minutos sin actualizar)
+        const locTime = loc.updatedAt || loc.timestamp;
+        if (locTime) {
+          const ageMs = Date.now() - new Date(locTime).getTime();
+          if (ageMs > 30 * 60 * 1000) return;
+        }
+
         const rawPoint = loc.pointId || key || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
         const pIdStr = cleanPoint.toLowerCase();
@@ -463,7 +478,7 @@ export function ClientePedirView() {
         const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanPoint;
         const uniqueKey = vehicleCode || cleanPoint;
 
-        if (!finalVendorsMap.has(uniqueKey) && (loc.isActive !== false)) {
+        if (!finalVendorsMap.has(uniqueKey)) {
           finalVendorsMap.set(uniqueKey, {
             id: uniqueKey,
             vendorId: loc.vendorId || uniqueKey,
