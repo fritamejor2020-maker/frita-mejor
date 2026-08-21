@@ -190,11 +190,15 @@ export const useLogisticsStore = create(
     const updated = [...pendingRequests, newRequest];
     set({ pendingRequests: updated });
     get().clearRestockCart();
-    // IMPORTANTE: sincronizar solo el slice de la sede del vendedor.
-    // Enviar el array completo causaba sobreescritura de pedidos de otras sedes.
+
     const branchSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === (senderBranchId || 'BRANCH-001'));
-    syncKeyWithBranch('pendingRequests', branchSlice, senderBranchId);
-    syncKeyWithBranch('pendingRequests', branchSlice, null);
+    markLocalWrite('pendingRequests', senderBranchId);
+    markLocalWrite('pendingRequests', null);
+
+    Promise.allSettled([
+      push('pendingRequests', updated, null),
+      push('pendingRequests', branchSlice, senderBranchId),
+    ]).catch(() => {});
 
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
     try {
@@ -221,64 +225,40 @@ export const useLogisticsStore = create(
 
   loadFromRemote: async () => {
     try {
-      const user = useAuthStore.getState().user;
-      const userBranchId = user?.branchId ?? null;
-
-      const keysToFetch = [
-        'pendingRequests', 'pendingRequests_BRANCH-001',
-        'completedRequests', 'completedRequests_BRANCH-001',
-        'rejectedRequests', 'rejectedRequests_BRANCH-001',
-        'loadHistory', 'loadHistory_BRANCH-001'
-      ];
-
-      if (userBranchId && userBranchId !== 'BRANCH-001') {
-        keysToFetch.push(`pendingRequests_${userBranchId}`);
-        keysToFetch.push(`completedRequests_${userBranchId}`);
-        keysToFetch.push(`rejectedRequests_${userBranchId}`);
-        keysToFetch.push(`loadHistory_${userBranchId}`);
-      }
-
       const { data } = await supabase
         .from('app_state')
-        .select('key, value')
-        .in('key', keysToFetch);
+        .select('key, value');
 
       if (!data) return;
 
-      const map = {};
-      data.forEach(row => { map[row.key] = row.value; });
-
-      // Merge pendingRequests
       const pendingMap = new Map();
-      Object.keys(map).forEach(k => {
-        if (k.startsWith('pendingRequests') && Array.isArray(map[k])) {
-          map[k].forEach(item => { if (item?.id) pendingMap.set(item.id, item); });
-        }
-      });
-
-      // Merge completedRequests
       const completedMap = new Map();
-      Object.keys(map).forEach(k => {
-        if (k.startsWith('completedRequests') && Array.isArray(map[k])) {
-          map[k].forEach(item => { if (item?.id) completedMap.set(item.id, item); });
-        }
-      });
-
-      // Merge loadHistory
+      const rejectedMap = new Map();
       const historyMap = new Map();
-      Object.keys(map).forEach(k => {
-        if (k.startsWith('loadHistory') && Array.isArray(map[k])) {
-          map[k].forEach(item => { if (item?.id) historyMap.set(item.id, item); });
+
+      data.forEach(row => {
+        const k = row.key || '';
+        const val = Array.isArray(row.value) ? row.value : [];
+        if (k.startsWith('pendingRequests')) {
+          val.forEach(item => { if (item?.id) pendingMap.set(item.id, item); });
+        } else if (k.startsWith('completedRequests')) {
+          val.forEach(item => { if (item?.id) completedMap.set(item.id, item); });
+        } else if (k.startsWith('rejectedRequests')) {
+          val.forEach(item => { if (item?.id) rejectedMap.set(item.id, item); });
+        } else if (k.startsWith('loadHistory')) {
+          val.forEach(item => { if (item?.id) historyMap.set(item.id, item); });
         }
       });
 
       const freshPending = Array.from(pendingMap.values());
       const freshCompleted = Array.from(completedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
+      const freshRejected = Array.from(rejectedMap.values()).sort((a, b) => new Date(b.rejected_at || b.created_at || 0) - new Date(a.rejected_at || a.created_at || 0));
       const freshHistory = Array.from(historyMap.values()).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
 
       set({
         pendingRequests: freshPending,
         completedRequests: freshCompleted,
+        rejectedRequests: freshRejected,
         loadHistory: freshHistory
       });
     } catch (err) {

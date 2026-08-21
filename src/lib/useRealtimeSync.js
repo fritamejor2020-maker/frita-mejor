@@ -81,10 +81,18 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     }
   };
   applicators['suppliers']         = (v) => useSupplierStore.setState({ suppliers: v });
-  applicators['pendingRequests']   = (v) => useLogisticsStore.setState({ pendingRequests: v });
-  applicators['completedRequests'] = (v) => useLogisticsStore.setState({ completedRequests: v });
-  applicators['rejectedRequests']  = (v) => useLogisticsStore.setState({ rejectedRequests: v });
-  applicators['loadHistory']       = (v) => useLogisticsStore.setState({ loadHistory: v });
+  const mergeLogisticsList = (currentList, incomingList) => {
+    if (!Array.isArray(incomingList)) return currentList || [];
+    const map = new Map();
+    (currentList || []).forEach(item => { if (item?.id) map.set(item.id, item); });
+    incomingList.forEach(item => { if (item?.id) map.set(item.id, item); });
+    return Array.from(map.values());
+  };
+
+  applicators['pendingRequests']   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
+  applicators['completedRequests'] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
+  applicators['rejectedRequests']  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
+  applicators['loadHistory']       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
   applicators['users']             = (v) => useAuthStore.setState({ users: v });
   applicators['payrollEmployees']  = (v) => usePayrollStore.setState({ payrollEmployees: v });
   applicators['payrollRecords']    = (v) => usePayrollStore.setState({ payrollRecords: v });
@@ -191,6 +199,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(state.contrataPayments || [], v || [], 'contrataPayments');
       useInventoryStore.setState({ contrataPayments: merged });
     };
+    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
+    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
+    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
+    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
     applicators[`customerTypes_${bid}`]   = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
     applicators[`customers_${bid}`]       = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
     applicators[`posSettings_${bid}`]     = (v) => {
