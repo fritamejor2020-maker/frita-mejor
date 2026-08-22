@@ -201,12 +201,11 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   };
 
   const handleImportFromBiometric = async () => {
-    const term = terminals[0];
-    if (!term) return;
+    const termId = terminals[0]?.id || 'TERM-001';
 
     setIsProcessing(true);
     showStatus('⏳ Consultando lista de personas en el biométrico...', 'info', 0);
-    const res = await fetchTerminalUsers(term.id);
+    const res = await fetchTerminalUsers(termId);
     showStatus(res.message, res.ok ? 'success' : 'error');
     setIsProcessing(false);
   };
