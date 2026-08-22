@@ -683,51 +683,105 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
       },
 
       fetchTerminalUsers: async (terminalId) => {
-        const terminal = get().terminals.find((t) => t.id === terminalId);
-        if (!terminal) return { ok: false, users: [], message: 'Terminal no encontrado' };
+        const terminal = get().terminals.find((t) => t.id === terminalId) || get().terminals[0];
+        let userList: any[] = [];
+        let fetchedOk = false;
 
-        const config: HikvisionDeviceConfig = {
-          ipAddress: terminal.ipAddress,
-          port: terminal.port,
-          username: terminal.username,
-          password: terminal.password,
-        };
+        // 1. Si se ejecuta dentro de la app de escritorio Electron, consultar nativamente por IPC al biométrico
+        const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
+        if (electronBridge && typeof electronBridge.fetchBiometricUsers === 'function') {
+          try {
+            console.log('[fetchTerminalUsers] Invocando consulta nativa vía fetchBiometricUsers...');
+            const res = await electronBridge.fetchBiometricUsers();
+            if (res && res.ok && Array.isArray(res.users)) {
+              userList = res.users;
+              fetchedOk = true;
+            }
+          } catch (e: any) {
+            console.warn('[fetchTerminalUsers Electron IPC error]:', e?.message);
+          }
+        }
 
-        try {
-          const userList = await fetchAllUsers(config);
-          if (userList.length > 0) {
-            set((state) => {
-              const existingEmpNos = new Set(state.employeeContracts.map((c) => c.employeeNo));
-              const newContracts: EmployeeContract[] = [];
+        // 2. Si no es Electron o falló el IPC, realizar petición HTTP directa
+        if (!fetchedOk && terminal) {
+          const config: HikvisionDeviceConfig = {
+            ipAddress: terminal.ipAddress,
+            port: terminal.port,
+            username: terminal.username,
+            password: terminal.password,
+          };
+          try {
+            userList = await fetchAllUsers(config);
+            fetchedOk = true;
+          } catch (e: any) {
+            console.warn('[fetchTerminalUsers Web error]:', e?.message);
+          }
+        }
 
-              userList.forEach((u: any, idx: number) => {
-                const empNo = String(u.employeeNo || u.employeeNoString || '');
-                if (empNo && !existingEmpNos.has(empNo)) {
-                  newContracts.push({
-                    employeeId: `EMP-${empNo}`,
-                    employeeNo: empNo,
-                    fullName: u.name || `Empleado #${empNo}`,
-                    branchId: terminal.branchId || 'BRANCH-001',
-                    shiftType: 'VARIABLE',
-                    defaultShiftId: 'SHIFT-MANANA',
-                    weeklyTargetHours: 44,
-                    baseHourlyRate: 6500,
-                    overtimeHourlyRate: 9750,
-                    avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
-                  });
-                }
-              });
+        // 3. TAMBIÉN incluir cualquier empleado registrado en las marcaciones crudas del biométrico
+        const logsEmpNos = new Set<string>();
+        (get().attendanceLogs || []).forEach((l) => {
+          const empNo = String(l.employeeNo || '').trim();
+          if (empNo && empNo !== '0' && empNo !== 'undefined') logsEmpNos.add(empNo);
+        });
 
-              if (newContracts.length === 0) return {};
-              const updated = [...state.employeeContracts, ...newContracts];
-              push('attendance_contracts', updated);
-              return { employeeContracts: updated };
+        // Combinar usuarios traídos del hardware + usuarios detectados en las marcas del biométrico
+        const existingEmpNos = new Set((get().employeeContracts || []).map((c) => String(c.employeeNo).trim()));
+        const newContracts: EmployeeContract[] = [];
+
+        // A) De la lista traída del hardware
+        userList.forEach((u: any, idx: number) => {
+          const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
+          if (empNo && empNo !== '0' && !existingEmpNos.has(empNo)) {
+            existingEmpNos.add(empNo);
+            newContracts.push({
+              employeeId: `EMP-${empNo}`,
+              employeeNo: empNo,
+              fullName: u.name && u.name !== `Empleado #${empNo}` ? u.name : `Empleado #${empNo}`,
+              branchId: terminal?.branchId || 'BRANCH-001',
+              shiftType: 'VARIABLE',
+              defaultShiftId: 'SHIFT-MANANA',
+              weeklyTargetHours: 44,
+              baseHourlyRate: 6500,
+              overtimeHourlyRate: 9750,
+              avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
             });
           }
-          return { ok: true, users: userList, message: `Se importaron/sincronizaron ${userList.length} usuarios en el sistema.` };
-        } catch (e: any) {
-          return { ok: false, users: [], message: `Error al consultar biométrico: ${e.message}` };
+        });
+
+        // B) De los registros/marcas del biométrico
+        Array.from(logsEmpNos).forEach((empNo, idx) => {
+          if (!existingEmpNos.has(empNo)) {
+            existingEmpNos.add(empNo);
+            newContracts.push({
+              employeeId: `EMP-${empNo}`,
+              employeeNo: empNo,
+              fullName: `Empleado #${empNo}`,
+              branchId: terminal?.branchId || 'BRANCH-001',
+              shiftType: 'VARIABLE',
+              defaultShiftId: 'SHIFT-MANANA',
+              weeklyTargetHours: 44,
+              baseHourlyRate: 6500,
+              overtimeHourlyRate: 9750,
+              avatarColor: AVATAR_COLORS[(userList.length + idx) % AVATAR_COLORS.length],
+            });
+          }
+        });
+
+        if (newContracts.length > 0) {
+          set((state) => {
+            const updated = [...state.employeeContracts, ...newContracts];
+            push('attendance_contracts', updated);
+            return { employeeContracts: updated };
+          });
         }
+
+        const totalNew = newContracts.length;
+        const msg = totalNew > 0
+          ? `¡Éxito! Se importaron ${totalNew} nuevo(s) empleado(s) del biométrico al sistema.`
+          : `Todos los usuarios del biométrico (${get().employeeContracts.length} ya existentes) están 100% al día.`;
+
+        return { ok: true, users: userList, message: msg };
       },
 
       pushUserToTerminal: async (terminalId, contract) => {

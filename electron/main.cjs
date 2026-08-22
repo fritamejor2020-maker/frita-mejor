@@ -556,6 +556,46 @@ ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, passwo
   }
 });
 
+async function fetchBiometricUsersFromDevice() {
+  try {
+    const searchBody = JSON.stringify({
+      UserInfoSearchCond: {
+        searchID: "1",
+        searchResultPosition: 0,
+        maxResults: 100
+      }
+    });
+
+    const resText = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+      method: 'POST',
+      body: searchBody
+    });
+
+    let parsed = null;
+    try {
+      parsed = JSON.parse(resText);
+    } catch { /* ignore */ }
+
+    let userList = [];
+    if (parsed && parsed.UserInfoSearch && Array.isArray(parsed.UserInfoSearch.UserInfo)) {
+      userList = parsed.UserInfoSearch.UserInfo.map(u => ({
+        employeeNo: String(u.employeeNo || u.employeeNoString || '').trim(),
+        name: u.name || `Empleado #${u.employeeNo}`,
+        userType: u.userType || 'normal'
+      })).filter(u => u.employeeNo && u.employeeNo !== '0');
+    }
+
+    return { ok: true, users: userList };
+  } catch (err) {
+    console.error('[fetchBiometricUsersFromDevice error]:', err.message);
+    return { ok: false, users: [], message: err.message };
+  }
+}
+
+ipcMain.handle('fetch-biometric-users', async () => {
+  return await fetchBiometricUsersFromDevice();
+});
+
 ipcMain.handle('get-app-version', () => {
   return app.getVersion();
 });

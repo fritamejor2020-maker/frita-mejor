@@ -4,6 +4,7 @@ const apiObj = {
   syncBiometricManual: () => ipcRenderer.invoke('sync-biometric-manual'),
   syncBiometric: () => ipcRenderer.invoke('sync-biometric-manual'),
   modifyBiometricUser: (data) => ipcRenderer.invoke('modify-biometric-user', data),
+  fetchBiometricUsers: () => ipcRenderer.invoke('fetch-biometric-users'),
   getAppVersion: () => ipcRenderer.invoke('get-app-version')
 };
 
