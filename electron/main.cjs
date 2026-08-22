@@ -1,4 +1,10 @@
 const { app, BrowserWindow, Tray, Menu, ipcMain, shell } = require('electron');
+
+// ── Solución a Bug de Windows/Electron: Prevenir pérdida de foco y congelamiento del cursor de texto (caret) ──
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+
 const path = require('path');
 const http = require('http');
 const crypto = require('crypto');
@@ -310,11 +316,25 @@ function createMainWindow() {
     minHeight: 600,
     title: 'Frita Mejor POS & Control de Asistencias',
     autoHideMenuBar: true,
+    focusable: true,
+    show: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
       webSecurity: false, // Permite peticiones directas HTTP local sin bloqueos CORS
       preload: path.join(__dirname, 'preload.cjs')
+    }
+  });
+
+  // Garantizar foco nativo al restaurar o mostrar
+  mainWindow.on('restore', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.focus();
+    }
+  });
+  mainWindow.on('show', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.focus();
     }
   });
 

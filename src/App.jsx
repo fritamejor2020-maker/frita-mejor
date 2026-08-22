@@ -220,6 +220,17 @@ function App() {
     // 0. Instalar handlers globales de errores (una sola vez)
     installGlobalErrorHandlers();
 
+    // 0.1 Garantizar foco y cursor de inserción de texto (caret) en Electron al hacer clic en inputs
+    const handleGlobalInputFocus = (e) => {
+      const target = e.target;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT')) {
+        if (typeof window !== 'undefined' && window.focus) {
+          window.focus();
+        }
+      }
+    };
+    document.addEventListener('click', handleGlobalInputFocus, true);
+
     // 1. Estrategia Nube-Primero: al abrir la app o reconectarse, priorizar siempre los datos de Supabase si hay internet
     const syncAllRemoteStores = async () => {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
