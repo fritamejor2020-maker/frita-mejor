@@ -200,9 +200,15 @@ function EditableEmployeePayrollCard({
   };
 
   return (
-    <div className="bg-gray-50/80 rounded-2xl p-4 border border-gray-200 space-y-3.5 transition-all hover:border-amber-300">
+    <div
+      className={`rounded-2xl border transition-all ${
+        includeInPayroll
+          ? 'bg-gray-50/80 p-4 border-gray-200 space-y-3.5 hover:border-amber-300'
+          : 'bg-gray-100/70 p-3 border-gray-200 opacity-80 shadow-2xs'
+      }`}
+    >
       {/* Empleado Header, Penalizaciones (Tardanza/Olvidos) Al Lado del Nombre & Pago Total */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
+      <div className={`flex flex-wrap items-center justify-between gap-3 ${includeInPayroll ? 'border-b border-gray-200/80 pb-3' : ''}`}>
         {/* Nombre e Info del Empleado */}
         <div className="flex items-center gap-3">
           <input
@@ -210,7 +216,7 @@ function EditableEmployeePayrollCard({
             checked={includeInPayroll}
             onChange={(e) => setIncludeInPayroll(e.target.checked)}
             title="Incluir a este trabajador en la liquidación semanal"
-            className="w-4 h-4 accent-amber-500 rounded cursor-pointer shrink-0"
+            className="w-4.5 h-4.5 accent-amber-500 rounded cursor-pointer shrink-0"
           />
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white shadow-sm shrink-0"
@@ -228,7 +234,7 @@ function EditableEmployeePayrollCard({
               )}
               {!includeInPayroll && (
                 <span className="bg-gray-200 text-gray-600 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md">
-                  Excluido
+                  Excluido de Liquidación
                 </span>
               )}
             </div>
@@ -238,44 +244,45 @@ function EditableEmployeePayrollCard({
           </div>
         </div>
 
-        {/* Controles de Penalización (Llegadas Tarde y Olvidos Marca) Al Lado del Nombre */}
-        <div className="flex flex-wrap items-center gap-2">
-          {/* Llegadas Tarde */}
-          <div className="bg-amber-50/90 border border-amber-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
-            <div>
-              <span className="text-[9px] font-black text-amber-900 uppercase block leading-none">Llegadas Tarde</span>
-              <span className="text-[8px] text-amber-700 font-bold leading-none">-30m (-{deductedTardinessHours}h)</span>
+        {includeInPayroll && (
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Llegadas Tarde */}
+            <div className="bg-amber-50/90 border border-amber-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
+              <div>
+                <span className="text-[9px] font-black text-amber-900 uppercase block leading-none">Llegadas Tarde</span>
+                <span className="text-[8px] text-amber-700 font-bold leading-none">-30m (-{deductedTardinessHours}h)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  value={tardinessCount}
+                  onChange={(e) => setTardinessCount(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-10 bg-white border border-amber-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-amber-950 outline-none focus:border-amber-500"
+                />
+                <span className="text-[10px] font-bold text-amber-800">x</span>
+              </div>
             </div>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                min="0"
-                value={tardinessCount}
-                onChange={(e) => setTardinessCount(Math.max(0, Number(e.target.value) || 0))}
-                className="w-10 bg-white border border-amber-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-amber-950 outline-none focus:border-amber-500"
-              />
-              <span className="text-[10px] font-bold text-amber-800">x</span>
-            </div>
-          </div>
 
-          {/* Olvidos Marca */}
-          <div className="bg-red-50/90 border border-red-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
-            <div>
-              <span className="text-[9px] font-black text-red-900 uppercase block leading-none">Olvidos Marca</span>
-              <span className="text-[8px] text-red-700 font-bold leading-none">-30m (-{deductedMissingMarksHours}h)</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <input
-                type="number"
-                min="0"
-                value={missingMarksCount}
-                onChange={(e) => setMissingMarksCount(Math.max(0, Number(e.target.value) || 0))}
-                className="w-10 bg-white border border-red-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-red-950 outline-none focus:border-red-500"
-              />
-              <span className="text-[10px] font-bold text-red-800">x</span>
+            {/* Olvidos Marca */}
+            <div className="bg-red-50/90 border border-red-200 rounded-xl px-2.5 py-1 flex items-center gap-2 shadow-2xs">
+              <div>
+                <span className="text-[9px] font-black text-red-900 uppercase block leading-none">Olvidos Marca</span>
+                <span className="text-[8px] text-red-700 font-bold leading-none">-30m (-{deductedMissingMarksHours}h)</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  min="0"
+                  value={missingMarksCount}
+                  onChange={(e) => setMissingMarksCount(Math.max(0, Number(e.target.value) || 0))}
+                  className="w-10 bg-white border border-red-300 rounded-lg py-0.5 px-1 text-center text-xs font-black text-red-950 outline-none focus:border-red-500"
+                />
+                <span className="text-[10px] font-bold text-red-800">x</span>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Pago Total Calculado */}
         <div className="text-right shrink-0">
@@ -286,181 +293,185 @@ function EditableEmployeePayrollCard({
         </div>
       </div>
 
-      {/* ── 1. Línea de Tiempo de la Semana (Horas por Día Editable) ────────── */}
-      <div>
-        <label className="block text-[10px] font-black text-gray-500 uppercase mb-1.5 flex items-center gap-1">
-          <Calendar size={12} className="text-amber-500" />
-          Línea de Tiempo Semanal — Ajustar Horas por Día:
-        </label>
+      {includeInPayroll && (
+        <>
+          {/* ── 1. Línea de Tiempo de la Semana (Horas por Día Editable) ────────── */}
+          <div>
+            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1.5 flex items-center gap-1">
+              <Calendar size={12} className="text-amber-500" />
+              Línea de Tiempo Semanal — Ajustar Horas por Día:
+            </label>
 
-        <div className="grid grid-cols-7 gap-1.5 bg-white p-2 rounded-2xl border border-gray-200">
-          {daysList.map((d) => {
-            const blocks = emp.dailyBlocks[d.dateStr] || [];
-            const b = blocks[0];
-            const firstIn = b?.firstIn ? b.firstIn.slice(0, 5) : null;
-            const lastOut = b?.lastOut ? b.lastOut.slice(0, 5) : null;
-            const hasPunches = firstIn || lastOut;
+            <div className="grid grid-cols-7 gap-1.5 bg-white p-2 rounded-2xl border border-gray-200">
+              {daysList.map((d) => {
+                const blocks = emp.dailyBlocks[d.dateStr] || [];
+                const b = blocks[0];
+                const firstIn = b?.firstIn ? b.firstIn.slice(0, 5) : null;
+                const lastOut = b?.lastOut ? b.lastOut.slice(0, 5) : null;
+                const hasPunches = firstIn || lastOut;
 
-            return (
-              <div
-                key={d.dateStr}
-                className={`flex flex-col items-center p-1.5 rounded-xl border text-center space-y-1 transition-all ${
-                  hasPunches
-                    ? 'bg-amber-50/40 border-amber-200/90'
-                    : 'bg-gray-50/60 border-gray-200/60'
+                return (
+                  <div
+                    key={d.dateStr}
+                    className={`flex flex-col items-center p-1.5 rounded-xl border text-center space-y-1 transition-all ${
+                      hasPunches
+                        ? 'bg-amber-50/40 border-amber-200/90'
+                        : 'bg-gray-50/60 border-gray-200/60'
+                    }`}
+                  >
+                    <div className="flex flex-col items-center leading-none">
+                      <span className="text-[10px] font-black text-gray-700">{d.dayName}</span>
+                      <span className="text-[9px] font-bold text-gray-400">{d.dateStr.slice(8, 10)}</span>
+                    </div>
+
+                    {/* Horas de Llegada (Entrada) y Salida (Soporta Múltiples Turnos) */}
+                    <div className="w-full bg-white rounded-lg p-1 border border-gray-200/90 text-[9px] font-extrabold flex flex-col gap-0.5 shadow-2xs max-h-16 overflow-y-auto">
+                      {blocks.length === 0 ? (
+                        <div className="flex items-center justify-between text-gray-300 font-normal py-1">
+                          <span className="text-[8px]">Ent:</span>
+                          <span>--:--</span>
+                        </div>
+                      ) : (
+                        blocks.map((blk, idx) => (
+                          <div key={idx} className="flex flex-col border-b border-gray-100 last:border-0 pb-0.5">
+                            <div className="flex items-center justify-between text-emerald-800">
+                              <span className="text-gray-400 font-bold text-[8px]">Ent{blocks.length > 1 ? `${idx+1}` : ''}:</span>
+                              <span className={blk.firstIn ? 'text-emerald-700 font-black' : 'text-gray-300 font-normal'}>
+                                {blk.firstIn ? blk.firstIn.slice(0, 5) : '--:--'}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-amber-800">
+                              <span className="text-gray-400 font-bold text-[8px]">Sal{blocks.length > 1 ? `${idx+1}` : ''}:</span>
+                              <span className={blk.lastOut ? 'text-amber-700 font-black' : 'text-gray-300 font-normal'}>
+                                {blk.lastOut ? blk.lastOut.slice(0, 5) : '--:--'}
+                              </span>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Input Horas Trabajadas */}
+                    <input
+                      type="number"
+                      step="0.5"
+                      min="0"
+                      max="24"
+                      value={dailyHours[d.dateStr] ?? 0}
+                      onChange={(e) => handleDayHourChange(d.dateStr, e.target.value)}
+                      className="w-full bg-amber-100/60 border border-amber-300 focus:border-amber-500 rounded-lg py-1 px-0.5 text-center text-xs font-black text-amber-950 outline-none"
+                      title="Horas trabajadas calculadas para la nómina"
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* ── 3. Parámetros de Contrato & Tarifas ──────────────────────────────── */}
+          <div className="bg-white p-2.5 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold">
+            <label className="flex items-center gap-2 cursor-pointer bg-amber-50/70 border border-amber-200/90 p-2 rounded-xl text-xs font-extrabold text-amber-950 col-span-1 sm:col-span-3 hover:bg-amber-100/60 transition-all">
+              <input
+                type="checkbox"
+                checked={payBaseSalary}
+                onChange={(e) => setPayBaseSalary(e.target.checked)}
+                className="w-4 h-4 accent-amber-500 rounded cursor-pointer shrink-0"
+              />
+              <span>Pagar Horas Ordinarias por valor hora (Si está desmarcado = Sueldo Fijo, solo liquida Horas Extras)</span>
+            </label>
+
+            <div>
+              <label className="text-[9px] text-gray-400 block uppercase">Meta Semanal (h)</label>
+              <input
+                type="number"
+                value={weeklyTargetHours}
+                onChange={(e) => setWeeklyTargetHours(Math.max(1, Number(e.target.value) || 0))}
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1 text-xs font-black text-gray-900 outline-none focus:border-amber-500"
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] text-gray-400 block uppercase">Valor Hora Base ($)</label>
+              <input
+                type="number"
+                step="100"
+                disabled={!payBaseSalary}
+                value={baseHourlyRate}
+                onChange={(e) => setBaseHourlyRate(Math.max(0, Number(e.target.value) || 0))}
+                className={`w-full border rounded-lg px-2 py-1 text-xs font-black outline-none focus:border-amber-500 ${
+                  payBaseSalary ? 'bg-gray-50 border-gray-300 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+                }`}
+              />
+            </div>
+
+            <div>
+              <label className="text-[9px] text-gray-400 block uppercase">Valor Hora Extra ($)</label>
+              <input
+                type="number"
+                step="100"
+                value={overtimeHourlyRate}
+                onChange={(e) => setOvertimeHourlyRate(Math.max(0, Number(e.target.value) || 0))}
+                className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1 text-xs font-black text-gray-900 outline-none focus:border-amber-500"
+              />
+            </div>
+          </div>
+
+          {/* Desglose de Horas Resultante */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold bg-gray-100/60 p-2 rounded-xl">
+            <div>
+              <span className="text-gray-400 block text-[9px]">BRUTO TRABAJADO</span>
+              <span className="text-gray-900 font-black">{grossHours} h</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block text-[9px]">DESCUENTO TOTAL</span>
+              <span className="text-amber-700 font-black">
+                -{(deductedTardinessHours + deductedMissingMarksHours).toFixed(1)} h
+              </span>
+            </div>
+            <div>
+              <span className="text-gray-400 block text-[9px]">NETO APROBADO</span>
+              <span className="text-emerald-700 font-black">{netHoursWorked} h</span>
+            </div>
+            <div>
+              <span className="text-gray-400 block text-[9px]">ORDINARIAS / EXTRAS</span>
+              <span className="text-gray-900 font-black">{regularHours}h / {overtimeHours}h</span>
+            </div>
+          </div>
+
+          {/* Cálculo Financiero & Guardar Contrato */}
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 w-full sm:w-auto">
+              <div className="bg-gray-200/60 rounded-xl p-2 flex justify-between items-center">
+                <span>Ordinarias ({regularHours}h x ${baseHourlyRate.toLocaleString('es-CO')}):</span>
+                <span className={`font-black ${payBaseSalary ? 'text-gray-900' : 'text-gray-400'}`}>
+                  {payBaseSalary ? `$${regularPay.toLocaleString('es-CO')}` : '$0 (Sueldo Fijo)'}
+                </span>
+              </div>
+              <div className="bg-emerald-100/70 rounded-xl p-2 flex justify-between items-center text-emerald-900">
+                <span>Extras ({overtimeHours}h x ${overtimeHourlyRate.toLocaleString('es-CO')}):</span>
+                <span className="font-black">${overtimePay.toLocaleString('es-CO')}</span>
+              </div>
+            </div>
+
+            {contract && (
+              <button
+                onClick={handleSaveContractChanges}
+                className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
+                  isSaved
+                    ? 'bg-emerald-600 text-white'
+                    : 'bg-amber-400 hover:bg-amber-500 text-gray-950 shadow-2xs'
                 }`}
               >
-                <div className="flex flex-col items-center leading-none">
-                  <span className="text-[10px] font-black text-gray-700">{d.dayName}</span>
-                  <span className="text-[9px] font-bold text-gray-400">{d.dateStr.slice(8, 10)}</span>
-                </div>
-
-                {/* Horas de Llegada (Entrada) y Salida (Soporta Múltiples Turnos) */}
-                <div className="w-full bg-white rounded-lg p-1 border border-gray-200/90 text-[9px] font-extrabold flex flex-col gap-0.5 shadow-2xs max-h-16 overflow-y-auto">
-                  {blocks.length === 0 ? (
-                    <div className="flex items-center justify-between text-gray-300 font-normal py-1">
-                      <span className="text-[8px]">Ent:</span>
-                      <span>--:--</span>
-                    </div>
-                  ) : (
-                    blocks.map((blk, idx) => (
-                      <div key={idx} className="flex flex-col border-b border-gray-100 last:border-0 pb-0.5">
-                        <div className="flex items-center justify-between text-emerald-800">
-                          <span className="text-gray-400 font-bold text-[8px]">Ent{blocks.length > 1 ? `${idx+1}` : ''}:</span>
-                          <span className={blk.firstIn ? 'text-emerald-700 font-black' : 'text-gray-300 font-normal'}>
-                            {blk.firstIn ? blk.firstIn.slice(0, 5) : '--:--'}
-                          </span>
-                        </div>
-                        <div className="flex items-center justify-between text-amber-800">
-                          <span className="text-gray-400 font-bold text-[8px]">Sal{blocks.length > 1 ? `${idx+1}` : ''}:</span>
-                          <span className={blk.lastOut ? 'text-amber-700 font-black' : 'text-gray-300 font-normal'}>
-                            {blk.lastOut ? blk.lastOut.slice(0, 5) : '--:--'}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
-
-                {/* Input Horas Trabajadas */}
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0"
-                  max="24"
-                  value={dailyHours[d.dateStr] ?? 0}
-                  onChange={(e) => handleDayHourChange(d.dateStr, e.target.value)}
-                  className="w-full bg-amber-100/60 border border-amber-300 focus:border-amber-500 rounded-lg py-1 px-0.5 text-center text-xs font-black text-amber-950 outline-none"
-                  title="Horas trabajadas calculadas para la nómina"
-                />
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* ── 3. Parámetros de Contrato & Tarifas ──────────────────────────────── */}
-      <div className="bg-white p-2.5 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold">
-        <label className="flex items-center gap-2 cursor-pointer bg-amber-50/70 border border-amber-200/90 p-2 rounded-xl text-xs font-extrabold text-amber-950 col-span-1 sm:col-span-3 hover:bg-amber-100/60 transition-all">
-          <input
-            type="checkbox"
-            checked={payBaseSalary}
-            onChange={(e) => setPayBaseSalary(e.target.checked)}
-            className="w-4 h-4 accent-amber-500 rounded cursor-pointer shrink-0"
-          />
-          <span>Pagar Horas Ordinarias por valor hora (Si está desmarcado = Sueldo Fijo, solo liquida Horas Extras)</span>
-        </label>
-
-        <div>
-          <label className="text-[9px] text-gray-400 block uppercase">Meta Semanal (h)</label>
-          <input
-            type="number"
-            value={weeklyTargetHours}
-            onChange={(e) => setWeeklyTargetHours(Math.max(1, Number(e.target.value) || 0))}
-            className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1 text-xs font-black text-gray-900 outline-none focus:border-amber-500"
-          />
-        </div>
-
-        <div>
-          <label className="text-[9px] text-gray-400 block uppercase">Valor Hora Base ($)</label>
-          <input
-            type="number"
-            step="100"
-            disabled={!payBaseSalary}
-            value={baseHourlyRate}
-            onChange={(e) => setBaseHourlyRate(Math.max(0, Number(e.target.value) || 0))}
-            className={`w-full border rounded-lg px-2 py-1 text-xs font-black outline-none focus:border-amber-500 ${
-              payBaseSalary ? 'bg-gray-50 border-gray-300 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
-            }`}
-          />
-        </div>
-
-        <div>
-          <label className="text-[9px] text-gray-400 block uppercase">Valor Hora Extra ($)</label>
-          <input
-            type="number"
-            step="100"
-            value={overtimeHourlyRate}
-            onChange={(e) => setOvertimeHourlyRate(Math.max(0, Number(e.target.value) || 0))}
-            className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1 text-xs font-black text-gray-900 outline-none focus:border-amber-500"
-          />
-        </div>
-      </div>
-
-      {/* Desglose de Horas Resultante */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-bold bg-gray-100/60 p-2 rounded-xl">
-        <div>
-          <span className="text-gray-400 block text-[9px]">BRUTO TRABAJADO</span>
-          <span className="text-gray-900 font-black">{grossHours} h</span>
-        </div>
-        <div>
-          <span className="text-gray-400 block text-[9px]">DESCUENTO TOTAL</span>
-          <span className="text-amber-700 font-black">
-            -{(deductedTardinessHours + deductedMissingMarksHours).toFixed(1)} h
-          </span>
-        </div>
-        <div>
-          <span className="text-gray-400 block text-[9px]">NETO APROBADO</span>
-          <span className="text-emerald-700 font-black">{netHoursWorked} h</span>
-        </div>
-        <div>
-          <span className="text-gray-400 block text-[9px]">ORDINARIAS / EXTRAS</span>
-          <span className="text-gray-900 font-black">{regularHours}h / {overtimeHours}h</span>
-        </div>
-      </div>
-
-      {/* Cálculo Financiero & Guardar Contrato */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-1">
-        <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 w-full sm:w-auto">
-          <div className="bg-gray-200/60 rounded-xl p-2 flex justify-between items-center">
-            <span>Ordinarias ({regularHours}h x ${baseHourlyRate.toLocaleString('es-CO')}):</span>
-            <span className={`font-black ${payBaseSalary ? 'text-gray-900' : 'text-gray-400'}`}>
-              {payBaseSalary ? `$${regularPay.toLocaleString('es-CO')}` : '$0 (Sueldo Fijo)'}
-            </span>
-          </div>
-          <div className="bg-emerald-100/70 rounded-xl p-2 flex justify-between items-center text-emerald-900">
-            <span>Extras ({overtimeHours}h x ${overtimeHourlyRate.toLocaleString('es-CO')}):</span>
-            <span className="font-black">${overtimePay.toLocaleString('es-CO')}</span>
-          </div>
-        </div>
-
-        {contract && (
-          <button
-            onClick={handleSaveContractChanges}
-            className={`px-3 py-2 rounded-xl text-xs font-black flex items-center gap-1 transition-all cursor-pointer shrink-0 ${
-              isSaved
-                ? 'bg-emerald-600 text-white'
-                : 'bg-amber-400 hover:bg-amber-500 text-gray-950 shadow-2xs'
-            }`}
-          >
-            {isSaved ? (
-              <><CheckCircle2 size={14} /> Guardado</>
-            ) : (
-              <><Save size={14} /> Guardar Tarifas</>
+                {isSaved ? (
+                  <><CheckCircle2 size={14} /> Guardado</>
+                ) : (
+                  <><Save size={14} /> Guardar Tarifas</>
+                )}
+              </button>
             )}
-          </button>
-        )}
-      </div>
+          </div>
+        </>
+      )}
     </div>
   );
 }
