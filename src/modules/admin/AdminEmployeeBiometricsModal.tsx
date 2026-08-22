@@ -205,6 +205,20 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
 
     setIsProcessing(true);
     showStatus('⏳ Consultando lista de personas en el biométrico...', 'info', 0);
+
+    // Invocar el canal nativo probado de Electron (la misma lógica que usan los demás botones)
+    const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
+    const syncFn = electronBridge?.syncBiometricManual || electronBridge?.syncBiometric;
+    if (typeof syncFn === 'function') {
+      try {
+        console.log('[AdminModal] Ejecutando sincronización nativa vía syncBiometricManual...');
+        await syncFn();
+      } catch (err: any) {
+        console.warn('[AdminModal] syncBiometricManual error:', err?.message);
+      }
+    }
+
+    await loadFromRemote();
     const res = await fetchTerminalUsers(termId);
     showStatus(res.message, res.ok ? 'success' : 'error');
     setIsProcessing(false);
