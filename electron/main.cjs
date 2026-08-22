@@ -558,40 +558,60 @@ ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, passwo
 
 async function fetchBiometricUsersFromDevice() {
   try {
-    const searchBody = JSON.stringify({
-      UserInfoSearchCond: {
-        searchID: "1",
-        searchResultPosition: 0,
-        maxResults: 100
+    let position = 0;
+    let totalMatches = Infinity;
+    const allUsersMap = new Map();
+
+    while (position < totalMatches) {
+      const searchBody = JSON.stringify({
+        UserInfoSearchCond: {
+          searchID: "1",
+          searchResultPosition: position,
+          maxResults: 10
+        }
+      });
+
+      const resText = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+        method: 'POST',
+        body: searchBody
+      });
+
+      let parsed = null;
+      try {
+        parsed = JSON.parse(resText);
+      } catch { /* ignore */ }
+
+      const searchResult = parsed?.UserInfoSearch || {};
+      if (typeof searchResult.totalMatches === 'number') {
+        totalMatches = searchResult.totalMatches;
       }
-    });
 
-    const resText = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
-      method: 'POST',
-      body: searchBody
-    });
+      let userList = searchResult.UserInfo || [];
+      if (!Array.isArray(userList)) userList = [userList];
+      if (userList.length === 0) break;
 
-    let parsed = null;
-    try {
-      parsed = JSON.parse(resText);
-    } catch { /* ignore */ }
-
-    let userList = [];
-    if (parsed && parsed.UserInfoSearch && Array.isArray(parsed.UserInfoSearch.UserInfo)) {
-      userList = parsed.UserInfoSearch.UserInfo.map(u => {
+      userList.forEach(u => {
         const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
         const rawName = String(
           u.name || u.userName || u.employeeName || u.nameString || u.displayName || u.User?.name || u.UserInfo?.name || ''
         ).trim();
-        return {
-          employeeNo: empNo,
-          name: rawName || `Empleado #${empNo}`,
-          userType: u.userType || 'normal'
-        };
-      }).filter(u => u.employeeNo && u.employeeNo !== '0');
+
+        if (empNo && empNo !== '0') {
+          allUsersMap.set(empNo, {
+            employeeNo: empNo,
+            name: rawName || `Empleado #${empNo}`,
+            userType: u.userType || 'normal'
+          });
+        }
+      });
+
+      position += userList.length;
+      if (position >= totalMatches) break;
     }
 
-    return { ok: true, users: userList };
+    const finalUsers = Array.from(allUsersMap.values());
+    console.log(`[fetchBiometricUsersFromDevice] 🟢 Extraídos ${finalUsers.length} de ${totalMatches} usuarios del biométrico.`);
+    return { ok: true, users: finalUsers };
   } catch (err) {
     console.error('[fetchBiometricUsersFromDevice error]:', err.message);
     return { ok: false, users: [], message: err.message };
