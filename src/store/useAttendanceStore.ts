@@ -230,19 +230,9 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
 }));
 
 function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
-  const initialMap = new Map<string, EmployeeContract>();
-  INITIAL_CONTRACTS.forEach((c) => initialMap.set(String(c.employeeNo).trim(), c));
-
   const map = new Map<string, EmployeeContract>();
   (existing || []).forEach((c) => {
     const empNo = String(c.employeeNo).trim();
-    if (initialMap.has(empNo)) {
-      const known = initialMap.get(empNo)!;
-      const isGeneric = !c.fullName || c.fullName.toLowerCase().startsWith('empleado #');
-      if (isGeneric && known.fullName && !known.fullName.toLowerCase().startsWith('empleado #')) {
-        c = { ...c, fullName: known.fullName };
-      }
-    }
     map.set(empNo, c);
   });
   INITIAL_CONTRACTS.forEach((c) => {
