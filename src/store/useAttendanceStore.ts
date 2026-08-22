@@ -947,12 +947,32 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         try {
           const { data } = await supabase.from('app_state').select('*').like('key', '%attendance%');
           if (data && Array.isArray(data)) {
-            data.forEach((row: any) => {
+            const sortedRows = [...data].sort((a, b) => (a.key.includes('BRANCH') ? 1 : -1));
+            sortedRows.forEach((row: any) => {
               const val = row.value;
               if (Array.isArray(val) && val.length > 0) {
                 if (row.key.includes('attendance_shifts')) useAttendanceStore.setState({ shiftTemplates: val });
                 if (row.key.includes('attendance_groups')) useAttendanceStore.setState({ scheduleGroups: val });
-                if (row.key.includes('attendance_contracts')) useAttendanceStore.setState({ employeeContracts: mergeBiometricContracts(val) });
+                if (row.key.includes('attendance_contracts')) {
+                  const merged = mergeBiometricContracts(val);
+                  useAttendanceStore.setState((state) => {
+                    const existingMap = new Map(state.employeeContracts.map(c => [String(c.employeeNo).trim(), c]));
+                    merged.forEach(c => {
+                      const empNo = String(c.employeeNo).trim();
+                      const isReal = c.fullName && !c.fullName.toLowerCase().startsWith('empleado #');
+                      if (existingMap.has(empNo)) {
+                        const cur = existingMap.get(empNo)!;
+                        const curIsGeneric = !cur.fullName || cur.fullName.toLowerCase().startsWith('empleado #');
+                        if (isReal || curIsGeneric) {
+                          existingMap.set(empNo, { ...cur, ...c, fullName: isReal ? c.fullName : cur.fullName });
+                        }
+                      } else {
+                        existingMap.set(empNo, c);
+                      }
+                    });
+                    return { employeeContracts: Array.from(existingMap.values()) };
+                  });
+                }
                 if (row.key.includes('attendance_logs')) useAttendanceStore.setState({ attendanceLogs: mergeBiometricLogs(val, []) });
                 if (row.key.includes('attendance_overrides')) useAttendanceStore.setState({ shiftOverrides: val });
               }
