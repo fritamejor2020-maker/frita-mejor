@@ -726,6 +726,58 @@ async function fetchBiometricUsersFromDevice() {
 
     const finalUsers = Array.from(allUsersMap.values());
     console.log(`[fetchBiometricUsersFromDevice] 🟢 Extraídos ${finalUsers.length} de ${totalMatches} usuarios del biométrico.`);
+
+    // Sincronizar automáticamente contratos en Supabase de forma 100% autónoma por Electron
+    try {
+      const { data: st1 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').single();
+      const { data: st2 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+      let currentContracts = (st1?.value && Array.isArray(st1.value) && st1.value.length > 0) ? st1.value : (st2?.value || []);
+      if (!Array.isArray(currentContracts)) currentContracts = [];
+
+      const contractMap = new Map();
+      currentContracts.forEach((c, idx) => contractMap.set(String(c.employeeNo || '').trim(), idx));
+      let changed = false;
+
+      finalUsers.forEach(u => {
+        const empNo = String(u.employeeNo || '').trim();
+        const devName = String(u.name || '').trim();
+        const hasRealName = devName && !devName.toLowerCase().startsWith('empleado #');
+        if (!empNo || empNo === '0') return;
+
+        if (contractMap.has(empNo)) {
+          const idx = contractMap.get(empNo);
+          const cur = currentContracts[idx];
+          const isGeneric = !cur.fullName || cur.fullName.toLowerCase().startsWith('empleado #');
+          if (hasRealName && (isGeneric || cur.fullName !== devName)) {
+            currentContracts[idx] = { ...cur, fullName: devName };
+            changed = true;
+          }
+        } else {
+          contractMap.set(empNo, currentContracts.length);
+          currentContracts.push({
+            employeeId: `EMP-${empNo}`,
+            employeeNo: empNo,
+            fullName: hasRealName ? devName : `Empleado #${empNo}`,
+            branchId: 'BRANCH-001',
+            shiftType: 'VARIABLE',
+            weeklyTargetHours: 44,
+            baseHourlyRate: 6500,
+            overtimeHourlyRate: 9750,
+            avatarColor: '#3B82F6'
+          });
+          changed = true;
+        }
+      });
+
+      if (changed) {
+        await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
+        await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
+        console.log('[fetchBiometricUsersFromDevice] 🟢 Contratos actualizados en Supabase autónomamente por Electron.');
+      }
+    } catch (e) {
+      console.warn('[fetchBiometricUsersFromDevice Supabase sync error]:', e.message);
+    }
+
     return { ok: true, users: finalUsers };
   } catch (err) {
     console.error('[fetchBiometricUsersFromDevice error]:', err.message);
