@@ -153,6 +153,31 @@ function EditableEmployeePayrollCard({
     totalPay,
   ]);
 
+  // ── Auto-Guardado Inmediato y Persistente en Supabase ──────────────────────
+  React.useEffect(() => {
+    if (!contract) return;
+    const hasChanged = contract.payBaseSalary !== payBaseSalary ||
+                       contract.includeInPayroll !== includeInPayroll ||
+                       contract.weeklyTargetHours !== weeklyTargetHours ||
+                       contract.baseHourlyRate !== baseHourlyRate ||
+                       contract.overtimeHourlyRate !== overtimeHourlyRate;
+
+    if (hasChanged) {
+      const updatedContract: EmployeeContract = {
+        ...contract,
+        weeklyTargetHours: Number(weeklyTargetHours),
+        baseHourlyRate: Number(baseHourlyRate),
+        overtimeHourlyRate: Number(overtimeHourlyRate),
+        payBaseSalary,
+        includeInPayroll,
+      };
+      upsertEmployeeContract(updatedContract);
+      setIsSaved(true);
+      const timer = setTimeout(() => setIsSaved(false), 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [payBaseSalary, includeInPayroll, weeklyTargetHours, baseHourlyRate, overtimeHourlyRate]);
+
   const handleDayHourChange = (dateStr: string, valueStr: string) => {
     const val = Math.max(0, Number(valueStr) || 0);
     setDailyHours((prev) => ({ ...prev, [dateStr]: val }));
