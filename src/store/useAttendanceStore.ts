@@ -686,37 +686,36 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         let userList: any[] = [];
         let fetchedOk = false;
 
-        // 1. Si se ejecuta dentro de la app de escritorio Electron, consultar nativamente por IPC al biométrico
+        // 1. Intentar primero consulta HTTP directa al biométrico (100% en vivo)
+        const config: HikvisionDeviceConfig = {
+          ipAddress: terminal?.ipAddress || '192.168.3.220',
+          port: terminal?.port || 80,
+          username: terminal?.username || 'admin',
+          password: terminal?.password || 'Control.1',
+        };
+
+        try {
+          const directUsers = await fetchAllUsers(config);
+          if (directUsers && directUsers.length > 0) {
+            userList = directUsers;
+            fetchedOk = true;
+          }
+        } catch (e: any) {
+          console.warn('[fetchTerminalUsers Direct HTTP error]:', e?.message);
+        }
+
+        // 2. Si falló la consulta directa (ej. restricción de navegador), consultar puente IPC de Electron
         const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
-        if (electronBridge && typeof electronBridge.fetchBiometricUsers === 'function') {
+        if ((!fetchedOk || userList.length === 0) && electronBridge && typeof electronBridge.fetchBiometricUsers === 'function') {
           try {
             console.log('[fetchTerminalUsers] Invocando consulta nativa vía fetchBiometricUsers...');
             const res = await electronBridge.fetchBiometricUsers();
-            if (res && res.ok && Array.isArray(res.users)) {
+            if (res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
               userList = res.users;
               fetchedOk = true;
             }
           } catch (e: any) {
             console.warn('[fetchTerminalUsers Electron IPC error]:', e?.message);
-          }
-        }
-
-        // 2. Si no es Electron, falló el IPC o trajo datos incompletos, realizar petición HTTP directa
-        if (!fetchedOk) {
-          const config: HikvisionDeviceConfig = {
-            ipAddress: terminal?.ipAddress || '192.168.3.220',
-            port: terminal?.port || 80,
-            username: terminal?.username || 'admin',
-            password: terminal?.password || 'Control.1',
-          };
-          try {
-            const directUsers = await fetchAllUsers(config);
-            if (directUsers && directUsers.length > 0) {
-              userList = directUsers;
-              fetchedOk = true;
-            }
-          } catch (e: any) {
-            console.warn('[fetchTerminalUsers Direct error]:', e?.message);
           }
         }
 
