@@ -122,7 +122,7 @@ async function runBiometricSync() {
           UserInfoSearchCond: {
             searchID: "1",
             searchResultPosition: posicion,
-            maxResults: 30
+            maxResults: 10
           }
         });
 
@@ -655,7 +655,7 @@ async function fetchBiometricUsersFromDevice() {
         UserInfoSearchCond: {
           searchID: "1",
           searchResultPosition: position,
-          maxResults: 30
+          maxResults: 10
         }
       });
 
