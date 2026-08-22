@@ -110,15 +110,23 @@ async function runBiometricSync() {
           UserInfoSearchCond: {
             searchID: "1",
             searchResultPosition: posicion,
-            maxResults: 10
+            maxResults: 30
           }
         });
 
-        const userRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', { method: 'POST', body: payload });
-        if (!userRes.ok || !userRes.text) break;
+        let userRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', { method: 'POST', body: payload });
+        if (!userRes || !userRes.ok || !userRes.text) {
+          // Re-intentar una vez tras 200ms si falló el primer intento
+          await new Promise(r => setTimeout(r, 200));
+          userRes = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', { method: 'POST', body: payload });
+        }
 
-        const userData = JSON.parse(userRes.text);
-        const searchRes = userData.UserInfoSearch || {};
+        if (!userRes || !userRes.ok || !userRes.text) break;
+
+        let userData = null;
+        try { userData = JSON.parse(userRes.text); } catch { break; }
+
+        const searchRes = userData?.UserInfoSearch || {};
         totalEnMemoria = searchRes.totalMatches || 0;
         let listaLote = searchRes.UserInfo || [];
         if (!Array.isArray(listaLote)) listaLote = [listaLote];
@@ -127,6 +135,7 @@ async function runBiometricSync() {
 
         deviceUsers.push(...listaLote);
         posicion += listaLote.length;
+        await new Promise(r => setTimeout(r, 150));
       } while (posicion < totalEnMemoria);
 
       if (deviceUsers.length > 0) {
@@ -634,14 +643,22 @@ async function fetchBiometricUsersFromDevice() {
         UserInfoSearchCond: {
           searchID: "1",
           searchResultPosition: position,
-          maxResults: 10
+          maxResults: 30
         }
       });
 
-      const res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+      let res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
         method: 'POST',
         body: searchBody
       });
+
+      if (!res || !res.ok || !res.text) {
+        await new Promise(r => setTimeout(r, 200));
+        res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+          method: 'POST',
+          body: searchBody
+        });
+      }
 
       if (!res || !res.ok || !res.text) break;
 
@@ -678,7 +695,7 @@ async function fetchBiometricUsersFromDevice() {
       });
 
       position += userList.length;
-      if (position >= totalMatches) break;
+      await new Promise(r => setTimeout(r, 150));
     }
 
     const finalUsers = Array.from(allUsersMap.values());
