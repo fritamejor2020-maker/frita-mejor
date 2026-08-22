@@ -76,6 +76,7 @@ async function isapiDigestFetch(pathStr, options = {}) {
         };
 
         const req2 = http.request(retryOpts, (res2) => {
+          res2.setEncoding('utf8');
           let body = '';
           res2.on('data', c => body += c);
           res2.on('end', () => resolve({ ok: res2.statusCode === 200, status: res2.statusCode, text: body }));
@@ -84,6 +85,7 @@ async function isapiDigestFetch(pathStr, options = {}) {
         if (bodyData) req2.write(bodyData);
         req2.end();
       } else {
+        res.setEncoding('utf8');
         let body = '';
         res.on('data', c => body += c);
         res.on('end', () => resolve({ ok: res.statusCode === 200, status: res.statusCode, text: body }));
@@ -681,9 +683,23 @@ async function fetchBiometricUsersFromDevice() {
 
       userList.forEach(u => {
         const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
-        const rawName = String(
-          u.name || u.userName || u.employeeName || u.nameString || u.displayName || u.User?.name || u.UserInfo?.name || ''
-        ).trim();
+        
+        let rawName = '';
+        if (typeof u.name === 'string' && u.name.trim()) rawName = u.name.trim();
+        else if (typeof u.userName === 'string' && u.userName.trim()) rawName = u.userName.trim();
+        else if (typeof u.employeeName === 'string' && u.employeeName.trim()) rawName = u.employeeName.trim();
+        else if (typeof u.nameString === 'string' && u.nameString.trim()) rawName = u.nameString.trim();
+        else if (typeof u.displayName === 'string' && u.displayName.trim()) rawName = u.displayName.trim();
+        else if (u.User && typeof u.User.name === 'string' && u.User.name.trim()) rawName = u.User.name.trim();
+        else if (u.UserInfo && typeof u.UserInfo.name === 'string' && u.UserInfo.name.trim()) rawName = u.UserInfo.name.trim();
+        else {
+          for (const k of Object.keys(u || {})) {
+            if (k.toLowerCase().includes('name') && typeof u[k] === 'string' && u[k].trim()) {
+              rawName = u[k].trim();
+              break;
+            }
+          }
+        }
 
         if (empNo && empNo !== '0') {
           allUsersMap.set(empNo, {
