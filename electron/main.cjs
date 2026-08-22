@@ -617,15 +617,20 @@ async function fetchBiometricUsersFromDevice() {
         }
       });
 
-      const resText = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
+      const res = await isapiDigestFetch('/ISAPI/AccessControl/UserInfo/Search?format=json', {
         method: 'POST',
         body: searchBody
       });
 
+      if (!res || !res.ok || !res.text) break;
+
       let parsed = null;
       try {
-        parsed = JSON.parse(resText);
-      } catch { /* ignore */ }
+        parsed = JSON.parse(res.text);
+      } catch (err) {
+        console.warn('[fetchBiometricUsersFromDevice] JSON parse error:', err.message);
+        break;
+      }
 
       const searchResult = parsed?.UserInfoSearch || {};
       if (typeof searchResult.totalMatches === 'number') {
