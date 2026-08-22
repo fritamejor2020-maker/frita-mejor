@@ -793,13 +793,9 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             }
           });
 
-          if (updatedCount > 0 || createdCount > 0) {
-            push('attendance_contracts', currentContracts);
-            push('attendance_contracts_BRANCH-001', currentContracts);
-            return { employeeContracts: currentContracts };
-          }
-
-          return {};
+          push('attendance_contracts', currentContracts);
+          push('attendance_contracts_BRANCH-001', currentContracts);
+          return { employeeContracts: currentContracts };
         });
 
         const totalChanges = updatedCount + createdCount;
