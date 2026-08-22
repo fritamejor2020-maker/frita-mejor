@@ -578,11 +578,17 @@ async function fetchBiometricUsersFromDevice() {
 
     let userList = [];
     if (parsed && parsed.UserInfoSearch && Array.isArray(parsed.UserInfoSearch.UserInfo)) {
-      userList = parsed.UserInfoSearch.UserInfo.map(u => ({
-        employeeNo: String(u.employeeNo || u.employeeNoString || '').trim(),
-        name: u.name || `Empleado #${u.employeeNo}`,
-        userType: u.userType || 'normal'
-      })).filter(u => u.employeeNo && u.employeeNo !== '0');
+      userList = parsed.UserInfoSearch.UserInfo.map(u => {
+        const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
+        const rawName = String(
+          u.name || u.userName || u.employeeName || u.nameString || u.displayName || u.User?.name || u.UserInfo?.name || ''
+        ).trim();
+        return {
+          employeeNo: empNo,
+          name: rawName || `Empleado #${empNo}`,
+          userType: u.userType || 'normal'
+        };
+      }).filter(u => u.employeeNo && u.employeeNo !== '0');
     }
 
     return { ok: true, users: userList };
