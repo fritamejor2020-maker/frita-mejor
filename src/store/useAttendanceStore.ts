@@ -692,28 +692,34 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           try {
             console.log('[fetchTerminalUsers] Invocando consulta nativa vía fetchBiometricUsers...');
             const res = await electronBridge.fetchBiometricUsers();
-            if (res && res.ok && Array.isArray(res.users)) {
-              userList = res.users;
-              fetchedOk = true;
+            if (res && res.ok && Array.isArray(res.users) && res.users.length > 0) {
+              const hasAnyRealName = res.users.some((u: any) => u.name && !String(u.name).toLowerCase().startsWith('empleado #'));
+              if (hasAnyRealName || res.users.length >= 20) {
+                userList = res.users;
+                fetchedOk = true;
+              }
             }
           } catch (e: any) {
             console.warn('[fetchTerminalUsers Electron IPC error]:', e?.message);
           }
         }
 
-        // 2. Si no es Electron o falló el IPC, realizar petición HTTP directa
-        if (!fetchedOk && terminal) {
+        // 2. Si no es Electron, falló el IPC o trajo datos incompletos, realizar petición HTTP directa
+        if (!fetchedOk) {
           const config: HikvisionDeviceConfig = {
-            ipAddress: terminal.ipAddress,
-            port: terminal.port,
-            username: terminal.username,
-            password: terminal.password,
+            ipAddress: terminal?.ipAddress || '192.168.3.220',
+            port: terminal?.port || 80,
+            username: terminal?.username || 'admin',
+            password: terminal?.password || 'Control.1',
           };
           try {
-            userList = await fetchAllUsers(config);
-            fetchedOk = true;
+            const directUsers = await fetchAllUsers(config);
+            if (directUsers && directUsers.length > 0) {
+              userList = directUsers;
+              fetchedOk = true;
+            }
           } catch (e: any) {
-            console.warn('[fetchTerminalUsers Web error]:', e?.message);
+            console.warn('[fetchTerminalUsers Direct error]:', e?.message);
           }
         }
 
