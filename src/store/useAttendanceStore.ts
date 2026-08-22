@@ -960,23 +960,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 if (row.key.includes('attendance_groups')) useAttendanceStore.setState({ scheduleGroups: val });
                 if (row.key.includes('attendance_contracts')) {
                   const merged = mergeBiometricContracts(val);
-                  useAttendanceStore.setState((state) => {
-                    const existingMap = new Map(state.employeeContracts.map(c => [String(c.employeeNo).trim(), c]));
-                    merged.forEach(c => {
-                      const empNo = String(c.employeeNo).trim();
-                      const isReal = c.fullName && !c.fullName.toLowerCase().startsWith('empleado #');
-                      if (existingMap.has(empNo)) {
-                        const cur = existingMap.get(empNo)!;
-                        const curIsGeneric = !cur.fullName || cur.fullName.toLowerCase().startsWith('empleado #');
-                        if (isReal || curIsGeneric) {
-                          existingMap.set(empNo, { ...cur, ...c, fullName: isReal ? c.fullName : cur.fullName });
-                        }
-                      } else {
-                        existingMap.set(empNo, c);
-                      }
-                    });
-                    return { employeeContracts: Array.from(existingMap.values()) };
-                  });
+                  useAttendanceStore.setState({ employeeContracts: merged });
                 }
                 if (row.key.includes('attendance_logs')) useAttendanceStore.setState({ attendanceLogs: mergeBiometricLogs(val, []) });
                 if (row.key.includes('attendance_overrides')) useAttendanceStore.setState({ shiftOverrides: val });
