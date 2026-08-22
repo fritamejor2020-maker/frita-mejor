@@ -137,18 +137,34 @@ async function runBiometricSync() {
           : (contractState2?.value || []);
         if (!Array.isArray(currentContracts)) currentContracts = [];
 
-        const existingEmpNos = new Set(currentContracts.map(c => String(c.employeeNo || '').trim()));
-        let newContractsAdded = 0;
+        let contractsChanged = 0;
 
         deviceUsers.forEach(u => {
           const empNo = String(u.employeeNo || '').trim();
-          if (empNo && empNo !== '0' && !existingEmpNos.has(empNo)) {
-            newContractsAdded++;
-            existingEmpNos.add(empNo);
+          const devName = String(u.name || u.userName || u.employeeName || u.displayName || '').trim();
+          const hasRealName = devName && !devName.toLowerCase().startsWith('empleado #');
+
+          if (!empNo || empNo === '0') return;
+
+          const existingIdx = currentContracts.findIndex(c => String(c.employeeNo || '').trim() === empNo);
+
+          if (existingIdx >= 0) {
+            const existingContract = currentContracts[existingIdx];
+            const isGeneric = !existingContract.fullName || existingContract.fullName.toLowerCase().startsWith('empleado #');
+            if (hasRealName && (isGeneric || existingContract.fullName !== devName)) {
+              currentContracts[existingIdx] = {
+                ...existingContract,
+                fullName: devName,
+                pinPassword: existingContract.pinPassword || u.password || ''
+              };
+              contractsChanged++;
+              console.log(`[Electron Sync Daemon] 🔄 Actualizado nombre de empleado #${empNo}: '${existingContract.fullName}' -> '${devName}'`);
+            }
+          } else {
             currentContracts.push({
               employeeId: `EMP-${empNo}`,
               employeeNo: empNo,
-              fullName: (u.name && u.name.trim() !== '') ? u.name.trim() : `Empleado #${empNo}`,
+              fullName: hasRealName ? devName : `Empleado #${empNo}`,
               branchId: 'BRANCH-001',
               shiftType: 'VARIABLE',
               weeklyTargetHours: 44,
@@ -158,14 +174,15 @@ async function runBiometricSync() {
               pinPassword: u.password || '',
               cardNo: u.cardNo || ''
             });
-            console.log(`[Electron Sync Daemon] 🆕 Auto-creado nuevo empleado de biométrico: #${empNo} (${u.name || 'Sin nombre'})`);
+            contractsChanged++;
+            console.log(`[Electron Sync Daemon] 🆕 Auto-creado nuevo empleado de biométrico: #${empNo} (${hasRealName ? devName : 'Sin nombre'})`);
           }
         });
 
-        if (newContractsAdded > 0) {
+        if (contractsChanged > 0) {
           await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
           await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
-          console.log(`[Electron Sync Daemon] 🟢 Registradas ${newContractsAdded} personas nuevas automáticamente en la Nube.`);
+          console.log(`[Electron Sync Daemon] 🟢 Sincronizados ${contractsChanged} cambios de nombres/contratos en Supabase.`);
         }
 
         // Auto-sincronizar cambios pendientes de Supabase hacia el biométrico físico
