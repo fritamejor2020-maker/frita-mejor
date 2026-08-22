@@ -45,6 +45,8 @@ export interface EmployeeContract {
   weeklyTargetHours: number; // e.g. 44 or 48
   baseHourlyRate: number;    // $ / hora ordinaria
   overtimeHourlyRate: number;// $ / hora extra
+  payBaseSalary?: boolean;   // true: paga ordinarias por hora | false: sueldo fijo (solo liquida extras)
+  includeInPayroll?: boolean;// true: incluido en la liquidación semanal | false: excluido
   pinPassword?: string;      // Clave de acceso en el biométrico
   cardNo?: string;           // Código de tarjeta RFID asignada
   avatarColor?: string;

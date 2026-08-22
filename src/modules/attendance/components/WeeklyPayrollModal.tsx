@@ -25,6 +25,8 @@ export interface CardStateData {
   weeklyTargetHours: number;
   baseHourlyRate: number;
   overtimeHourlyRate: number;
+  payBaseSalary: boolean;
+  includeInPayroll: boolean;
   grossHours: number;
   deductedTardinessHours: number;
   deductedMissingMarksHours: number;
@@ -87,6 +89,10 @@ function EditableEmployeePayrollCard({
   const [weeklyTargetHours, setWeeklyTargetHours] = useState<number>(contract?.weeklyTargetHours || emp.weeklyTargetHours || 44);
   const [baseHourlyRate, setBaseHourlyRate] = useState<number>(contract?.baseHourlyRate || emp.baseHourlyRate || 6500);
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState<number>(contract?.overtimeHourlyRate || emp.overtimeHourlyRate || 9750);
+  
+  // 99% de trabajadores tienen Sueldo Fijo (payBaseSalary: false por defecto) -> Pagar solo Extras
+  const [payBaseSalary, setPayBaseSalary] = useState<boolean>(contract?.payBaseSalary ?? emp.payBaseSalary ?? false);
+  const [includeInPayroll, setIncludeInPayroll] = useState<boolean>(contract?.includeInPayroll ?? emp.includeInPayroll ?? true);
 
   const [isSaved, setIsSaved] = useState(false);
 
@@ -108,9 +114,10 @@ function EditableEmployeePayrollCard({
   const regularHours = Number(Math.min(netHoursWorked, weeklyTargetHours).toFixed(2));
   const overtimeHours = Number(Math.max(0, netHoursWorked - weeklyTargetHours).toFixed(2));
 
-  const regularPay = Math.round(regularHours * baseHourlyRate);
+  // Si payBaseSalary es false (Sueldo Fijo), regularPay es $0
+  const regularPay = payBaseSalary ? Math.round(regularHours * baseHourlyRate) : 0;
   const overtimePay = Math.round(overtimeHours * overtimeHourlyRate);
-  const totalPay = regularPay + overtimePay;
+  const totalPay = includeInPayroll ? (regularPay + overtimePay) : 0;
 
   // Notificar al componente padre de los cambios completos para la exportación a Excel y resumenes
   React.useEffect(() => {
@@ -121,6 +128,8 @@ function EditableEmployeePayrollCard({
       weeklyTargetHours,
       baseHourlyRate,
       overtimeHourlyRate,
+      payBaseSalary,
+      includeInPayroll,
       grossHours,
       deductedTardinessHours,
       deductedMissingMarksHours,
@@ -138,6 +147,8 @@ function EditableEmployeePayrollCard({
     weeklyTargetHours,
     baseHourlyRate,
     overtimeHourlyRate,
+    payBaseSalary,
+    includeInPayroll,
     grossHours,
     totalPay,
   ]);
@@ -155,6 +166,8 @@ function EditableEmployeePayrollCard({
       weeklyTargetHours: Number(weeklyTargetHours),
       baseHourlyRate: Number(baseHourlyRate),
       overtimeHourlyRate: Number(overtimeHourlyRate),
+      payBaseSalary,
+      includeInPayroll,
     };
     upsertEmployeeContract(updatedContract);
     setIsSaved(true);
@@ -167,6 +180,13 @@ function EditableEmployeePayrollCard({
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
         {/* Nombre e Info del Empleado */}
         <div className="flex items-center gap-3">
+          <input
+            type="checkbox"
+            checked={includeInPayroll}
+            onChange={(e) => setIncludeInPayroll(e.target.checked)}
+            title="Incluir a este trabajador en la liquidación semanal"
+            className="w-4 h-4 accent-amber-500 rounded cursor-pointer shrink-0"
+          />
           <div
             className="w-10 h-10 rounded-full flex items-center justify-center font-black text-xs text-white shadow-sm shrink-0"
             style={{ backgroundColor: emp.avatarColor }}
@@ -174,7 +194,19 @@ function EditableEmployeePayrollCard({
             {emp.initials}
           </div>
           <div>
-            <h4 className="font-black text-sm text-gray-900 leading-tight">{emp.fullName}</h4>
+            <div className="flex items-center gap-2">
+              <h4 className="font-black text-sm text-gray-900 leading-tight">{emp.fullName}</h4>
+              {!payBaseSalary && (
+                <span className="bg-blue-100 text-blue-800 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md border border-blue-200">
+                  Sueldo Fijo
+                </span>
+              )}
+              {!includeInPayroll && (
+                <span className="bg-gray-200 text-gray-600 text-[9px] font-extrabold px-1.5 py-0.5 rounded-md">
+                  Excluido
+                </span>
+              )}
+            </div>
             <span className="text-[10px] font-bold text-gray-400">
               ID #{emp.employeeNo} • Sede: {emp.branchId}
             </span>
@@ -223,7 +255,7 @@ function EditableEmployeePayrollCard({
         {/* Pago Total Calculado */}
         <div className="text-right shrink-0">
           <span className="text-[10px] text-gray-400 block font-bold uppercase">Pago Total Calculado</span>
-          <span className="text-lg font-black text-emerald-600">
+          <span className={`text-lg font-black ${includeInPayroll ? 'text-emerald-600' : 'text-gray-400 line-through'}`}>
             ${totalPay.toLocaleString('es-CO')}
           </span>
         </div>
@@ -302,10 +334,18 @@ function EditableEmployeePayrollCard({
         </div>
       </div>
 
-
-
       {/* ── 3. Parámetros de Contrato & Tarifas ──────────────────────────────── */}
-      <div className="bg-white p-2.5 rounded-xl border border-gray-200 grid grid-cols-3 gap-2 text-xs font-bold">
+      <div className="bg-white p-2.5 rounded-xl border border-gray-200 grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs font-bold">
+        <label className="flex items-center gap-2 cursor-pointer bg-amber-50/70 border border-amber-200/90 p-2 rounded-xl text-xs font-extrabold text-amber-950 col-span-1 sm:col-span-3 hover:bg-amber-100/60 transition-all">
+          <input
+            type="checkbox"
+            checked={payBaseSalary}
+            onChange={(e) => setPayBaseSalary(e.target.checked)}
+            className="w-4 h-4 accent-amber-500 rounded cursor-pointer shrink-0"
+          />
+          <span>Pagar Horas Ordinarias por valor hora (Si está desmarcado = Sueldo Fijo, solo liquida Horas Extras)</span>
+        </label>
+
         <div>
           <label className="text-[9px] text-gray-400 block uppercase">Meta Semanal (h)</label>
           <input
@@ -321,9 +361,12 @@ function EditableEmployeePayrollCard({
           <input
             type="number"
             step="100"
+            disabled={!payBaseSalary}
             value={baseHourlyRate}
             onChange={(e) => setBaseHourlyRate(Math.max(0, Number(e.target.value) || 0))}
-            className="w-full bg-gray-50 border border-gray-300 rounded-lg px-2 py-1 text-xs font-black text-gray-900 outline-none focus:border-amber-500"
+            className={`w-full border rounded-lg px-2 py-1 text-xs font-black outline-none focus:border-amber-500 ${
+              payBaseSalary ? 'bg-gray-50 border-gray-300 text-gray-900' : 'bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed'
+            }`}
           />
         </div>
 
@@ -366,7 +409,9 @@ function EditableEmployeePayrollCard({
         <div className="grid grid-cols-2 gap-2 text-xs font-bold flex-1 w-full sm:w-auto">
           <div className="bg-gray-200/60 rounded-xl p-2 flex justify-between items-center">
             <span>Ordinarias ({regularHours}h x ${baseHourlyRate.toLocaleString('es-CO')}):</span>
-            <span className="font-black text-gray-900">${regularPay.toLocaleString('es-CO')}</span>
+            <span className={`font-black ${payBaseSalary ? 'text-gray-900' : 'text-gray-400'}`}>
+              {payBaseSalary ? `$${regularPay.toLocaleString('es-CO')}` : '$0 (Sueldo Fijo)'}
+            </span>
           </div>
           <div className="bg-emerald-100/70 rounded-xl p-2 flex justify-between items-center text-emerald-900">
             <span>Extras ({overtimeHours}h x ${overtimeHourlyRate.toLocaleString('es-CO')}):</span>
@@ -425,17 +470,23 @@ export function WeeklyPayrollModal({
     setCardsStateMap((prev) => ({ ...prev, [empId]: state }));
   };
 
-  const totalPayrollAmount = displayList.reduce((acc, curr) => {
+  // Solo incluir en los totales y reporte Excel a los trabajadores que tengan includeInPayroll === true
+  const activeLiquidationList = displayList.filter((emp) => {
+    const state = cardsStateMap[emp.employeeId];
+    return state ? state.includeInPayroll : (emp.includeInPayroll ?? true);
+  });
+
+  const totalPayrollAmount = activeLiquidationList.reduce((acc, curr) => {
     const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.totalPay : curr.totalPay);
   }, 0);
 
-  const totalRegularHours = displayList.reduce((acc, curr) => {
+  const totalRegularHours = activeLiquidationList.reduce((acc, curr) => {
     const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.regularHours : curr.regularHours);
   }, 0);
 
-  const totalOvertimeHours = displayList.reduce((acc, curr) => {
+  const totalOvertimeHours = activeLiquidationList.reduce((acc, curr) => {
     const updated = cardsStateMap[curr.employeeId];
     return acc + (updated ? updated.overtimeHours : curr.overtimeHours);
   }, 0);
@@ -465,7 +516,8 @@ export function WeeklyPayrollModal({
 
     const rows: any[][] = [headers];
 
-    displayList.forEach((emp) => {
+    // Exportar únicamente los empleados seleccionados para la liquidación
+    activeLiquidationList.forEach((emp) => {
       const state = cardsStateMap[emp.employeeId];
 
       const dailyMap = state?.dailyHours || {};

@@ -35,6 +35,8 @@ export interface EmployeeWeeklyPayroll {
   overtimeHours: number;
   baseHourlyRate: number;
   overtimeHourlyRate: number;
+  payBaseSalary: boolean;    // true: paga ordinarias por hora | false: sueldo fijo (solo liquida extras)
+  includeInPayroll: boolean; // true: incluido en la liquidación semanal | false: excluido
   regularPay: number;
   overtimePay: number;
   totalPay: number;
@@ -318,7 +320,9 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           }
 
           // Evaluación de Marcas Faltantes y Tardanza
-          const isMissingMarks = !rawFirstIn || !rawLastOut;
+          // Si el día es HOY y el empleado ya marcó entrada pero aún no marca salida (porque sigue en su turno), NO es olvido de marca
+          const isMissingExitToday = wDay.isToday && !!rawFirstIn && !rawLastOut;
+          const isMissingMarks = (!rawFirstIn || !rawLastOut) && !isMissingExitToday;
 
           let isTardy = false;
 
@@ -372,8 +376,6 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
         dailyBlocks[wDay.dateStr] = dayBlocks;
       });
 
-
-
       // Cálculo de Nómina Semanal acumulada con regla de redondeo personalizado
       const grossHours = roundToCustomHalfHour(totalGrossMins / 60);
       const deductedTardinessHours = roundToCustomHalfHour(totalTardyDeductedMins / 60);
@@ -384,7 +386,11 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
       const regularHours = Math.min(netHoursWorked, targetHours);
       const overtimeHours = Math.max(0, +(netHoursWorked - targetHours).toFixed(2));
 
-      const regularPay = Math.round(regularHours * (contract.baseHourlyRate || 6500));
+      // 99% de trabajadores tienen salario fijo (payBaseSalary: false por defecto) -> regularPay = 0
+      const payBaseSalary = contract.payBaseSalary ?? false;
+      const includeInPayroll = contract.includeInPayroll ?? true;
+
+      const regularPay = payBaseSalary ? Math.round(regularHours * (contract.baseHourlyRate || 6500)) : 0;
       const overtimePay = Math.round(overtimeHours * (contract.overtimeHourlyRate || 9750));
       const totalPay = regularPay + overtimePay;
 
@@ -405,6 +411,8 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
         overtimeHours,
         baseHourlyRate: contract.baseHourlyRate || 6500,
         overtimeHourlyRate: contract.overtimeHourlyRate || 9750,
+        payBaseSalary,
+        includeInPayroll,
         regularPay,
         overtimePay,
         totalPay,
