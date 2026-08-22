@@ -27,7 +27,33 @@ let tray = null;
 let isQuitting = false;
 let syncInterval = null;
 
-// ── ISAPI Digest Fetch ──────────────────────────────────────────────────────────
+function md5(str) { return crypto.createHash('md5').update(str).digest('hex'); }
+
+function parseWwwAuthenticate(headerStr) {
+  if (!headerStr || !headerStr.toLowerCase().includes('digest')) return null;
+  const params = {};
+  const regex = /(\w+)=(?:"([^"]*)"|([^\s,]+))/g;
+  let match;
+  while ((match = regex.exec(headerStr)) !== null) {
+    params[match[1]] = match[2] !== undefined ? match[2] : match[3];
+  }
+  return params;
+}
+
+function generateDigestAuthHeader(user, pass, method, uri, challenge) {
+  const realm = challenge?.realm || '';
+  const nonce = challenge?.nonce || '';
+  const qop = challenge?.qop || '';
+  const ncHex = '00000001';
+  const cnonce = '12345678';
+  const ha1 = md5(user + ':' + realm + ':' + pass);
+  const ha2 = md5(method.toUpperCase() + ':' + uri);
+  const response = qop ? md5(ha1 + ':' + nonce + ':' + ncHex + ':' + cnonce + ':auth:' + ha2) : md5(ha1 + ':' + nonce + ':' + ha2);
+  let header = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", response="${response}"`;
+  if (qop) header += `, qop=auth, nc=${ncHex}, cnonce="${cnonce}"`;
+  return header;
+}
+
 async function isapiDigestFetch(pathStr, options = {}) {
   const method = (options.method || 'GET').toUpperCase();
   const bodyData = options.body ? Buffer.from(options.body, 'utf-8') : null;
@@ -48,25 +74,9 @@ async function isapiDigestFetch(pathStr, options = {}) {
     const req = http.request(reqOpts, (res) => {
       if (res.statusCode === 401) {
         const wwwAuth = res.headers['www-authenticate'] || '';
-        const realm = (wwwAuth.match(/realm="([^"]+)"/) || [])[1] || '';
-        const nonce = (wwwAuth.match(/nonce="([^"]+)"/) || [])[1] || '';
-        const qop = (wwwAuth.match(/qop="([^"]+)"/) || [])[1] || '';
-
-        const cnonce = '0a4f113b';
-        const nc = '00000001';
-        const ha1 = crypto.createHash('md5').update(`${HIKVISION_CONFIG.username}:${realm}:${HIKVISION_CONFIG.password}`).digest('hex');
-        const ha2 = crypto.createHash('md5').update(`${method}:${pathStr}`).digest('hex');
+        const challenge = parseWwwAuthenticate(wwwAuth);
+        const authHeader = generateDigestAuthHeader(HIKVISION_CONFIG.username, HIKVISION_CONFIG.password, method, pathStr, challenge);
         
-        let respStr;
-        if (qop) {
-          respStr = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:${qop}:${ha2}`).digest('hex');
-        } else {
-          respStr = crypto.createHash('md5').update(`${ha1}:${nonce}:${ha2}`).digest('hex');
-        }
-
-        let authHeader = `Digest username="${HIKVISION_CONFIG.username}", realm="${realm}", nonce="${nonce}", uri="${pathStr}", response="${respStr}"`;
-        if (qop) authHeader += `, qop=${qop}, nc=${nc}, cnonce="${cnonce}"`;
-
         const retryOpts = {
           ...reqOpts,
           headers: {
