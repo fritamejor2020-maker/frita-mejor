@@ -51,6 +51,13 @@ function timeToMinutes(timeStr: string): number {
   return (parts[0] || 0) * 60 + (parts[1] || 0);
 }
 
+// Convert "HH:mm:ss" or "HH:mm" to seconds from midnight for exact precision
+function timeToSeconds(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(':').map(Number);
+  return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0);
+}
+
 // Format minutes to "HH:mm"
 export function roundToCustomHalfHour(h: number): number {
   if (h <= 0) return 0;
@@ -327,9 +334,10 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
           let isTardy = false;
 
           if (rawFirstIn && assignedShift) {
-            const actualInMins = timeToMinutes(rawFirstIn.slice(0, 5));
-            const shiftStartMins = timeToMinutes(assignedShift.startTime);
-            if (actualInMins - shiftStartMins > 5) {
+            const actualInSecs = timeToSeconds(rawFirstIn);
+            const shiftStartSecs = timeToSeconds(assignedShift.startTime);
+            // Tolerancia estricta de 5:00 minutos exactos (300 segundos). Pasado de 5:00 min (ej. 06:05:01) es llegada tarde.
+            if (actualInSecs - shiftStartSecs > 300) {
               isTardy = true;
             }
           }
