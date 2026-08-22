@@ -208,7 +208,11 @@ export const REAL_BIOMETRIC_USERS = [
   { employeeNo: '38', name: 'Edilma' },
   { employeeNo: '39', name: 'Maye' },
   { employeeNo: '40', name: 'Brigith' },
-  { employeeNo: '41', name: 'Vic' }
+  { employeeNo: '41', name: 'Victor' },
+  { employeeNo: '42', name: 'Brandon' },
+  { employeeNo: '43', name: 'Dirleny' },
+  { employeeNo: '44', name: 'Luis H' },
+  { employeeNo: '45', name: 'Emily' }
 ];
 
 const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) => ({
@@ -227,19 +231,24 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
 
 function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
   const initialMap = new Map<string, EmployeeContract>();
-  INITIAL_CONTRACTS.forEach((c) => initialMap.set(c.employeeNo, c));
+  INITIAL_CONTRACTS.forEach((c) => initialMap.set(String(c.employeeNo).trim(), c));
 
   const map = new Map<string, EmployeeContract>();
   (existing || []).forEach((c) => {
-    // Backfill pinPassword from INITIAL_CONTRACTS if missing
-    if (!c.pinPassword && initialMap.has(c.employeeNo)) {
-      c = { ...c, pinPassword: initialMap.get(c.employeeNo)!.pinPassword };
+    const empNo = String(c.employeeNo).trim();
+    if (initialMap.has(empNo)) {
+      const known = initialMap.get(empNo)!;
+      const isGeneric = !c.fullName || c.fullName.toLowerCase().startsWith('empleado #');
+      if (isGeneric && known.fullName && !known.fullName.toLowerCase().startsWith('empleado #')) {
+        c = { ...c, fullName: known.fullName };
+      }
     }
-    map.set(c.employeeNo, c);
+    map.set(empNo, c);
   });
   INITIAL_CONTRACTS.forEach((c) => {
-    if (!map.has(c.employeeNo)) {
-      map.set(c.employeeNo, c);
+    const empNo = String(c.employeeNo).trim();
+    if (!map.has(empNo)) {
+      map.set(empNo, c);
     }
   });
   return Array.from(map.values());
