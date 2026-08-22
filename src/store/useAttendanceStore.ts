@@ -775,11 +775,15 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           // B) De los registros/marcas del biométrico
           Array.from(logsEmpNos).forEach((empNo, idx) => {
             if (!contractMap.has(empNo)) {
+              const matchedUser = userList.find((u: any) => String(u.employeeNo || u.employeeNoString || '').trim() === empNo);
+              const devName = String(matchedUser?.name || matchedUser?.userName || matchedUser?.employeeName || '').trim();
+              const hasRealName = devName && !devName.toLowerCase().startsWith('empleado #');
+
               contractMap.set(empNo, currentContracts.length);
               currentContracts.push({
                 employeeId: `EMP-${empNo}`,
                 employeeNo: empNo,
-                fullName: `Empleado #${empNo}`,
+                fullName: hasRealName ? devName : `Empleado #${empNo}`,
                 branchId: terminal?.branchId || 'BRANCH-001',
                 shiftType: 'VARIABLE',
                 defaultShiftId: 'SHIFT-MANANA',

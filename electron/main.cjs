@@ -317,11 +317,15 @@ async function runBiometricSync() {
           mappedLogs.forEach(log => {
             const empNo = String(log.employeeNo || '').trim();
             if (empNo && empNo !== '0' && !contractMap.has(empNo)) {
+              const matchedUser = bioUsersRes.users.find(u => String(u.employeeNo || '').trim() === empNo);
+              const devName = String(matchedUser?.name || matchedUser?.userName || matchedUser?.employeeName || '').trim();
+              const hasRealName = devName && !devName.toLowerCase().startsWith('empleado #');
+
               contractMap.set(empNo, currentContracts.length);
               currentContracts.push({
                 employeeId: `EMP-${empNo}`,
                 employeeNo: empNo,
-                fullName: `Empleado #${empNo}`,
+                fullName: hasRealName ? devName : `Empleado #${empNo}`,
                 branchId: 'BRANCH-001',
                 shiftType: 'VARIABLE',
                 weeklyTargetHours: 44,
