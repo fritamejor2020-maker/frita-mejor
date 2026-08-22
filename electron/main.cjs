@@ -249,37 +249,83 @@ async function runBiometricSync() {
         };
       });
 
-    // 3. Auto-crear cualquier empleado detectado en los eventos que aún no exista en contratos
+    // 3. Sincronización automática de usuarios del biométrico (busca nuevos usuarios como Emily #45 y actualiza sus nombres)
     try {
-      const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
-      let currentContracts = contractState?.value || [];
-      if (Array.isArray(currentContracts)) {
-        const existingNos = new Set(currentContracts.map(c => String(c.employeeNo || '').trim()));
-        let addedFromLogs = 0;
-        mappedLogs.forEach(log => {
-          const empNo = String(log.employeeNo || '').trim();
-          if (empNo && empNo !== '0' && !existingNos.has(empNo)) {
-            addedFromLogs++;
-            existingNos.add(empNo);
-            currentContracts.push({
-              employeeId: `EMP-${empNo}`,
-              employeeNo: empNo,
-              fullName: `Empleado #${empNo}`,
-              branchId: 'BRANCH-001',
-              shiftType: 'VARIABLE',
-              weeklyTargetHours: 44,
-              baseHourlyRate: 6500,
-              overtimeHourlyRate: 9750,
-              avatarColor: '#3B82F6'
-            });
+      const bioUsersRes = await fetchBiometricUsersFromDevice();
+      if (bioUsersRes && bioUsersRes.ok && Array.isArray(bioUsersRes.users) && bioUsersRes.users.length > 0) {
+        const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+        let currentContracts = contractState?.value || [];
+        if (Array.isArray(currentContracts)) {
+          const contractMap = new Map();
+          currentContracts.forEach((c, idx) => contractMap.set(String(c.employeeNo || '').trim(), idx));
+          let contractsChanged = false;
+
+          bioUsersRes.users.forEach((u, idx) => {
+            const empNo = String(u.employeeNo || '').trim();
+            const devName = String(u.name || '').trim();
+            const isRealName = devName && !devName.toLowerCase().startsWith('empleado #');
+
+            if (!empNo || empNo === '0') return;
+
+            if (contractMap.has(empNo)) {
+              const existingIdx = contractMap.get(empNo);
+              const existingContract = currentContracts[existingIdx];
+              const isGeneric = !existingContract.fullName || existingContract.fullName.toLowerCase().startsWith('empleado #');
+
+              if (isRealName && (isGeneric || existingContract.fullName !== devName)) {
+                currentContracts[existingIdx] = {
+                  ...existingContract,
+                  fullName: devName
+                };
+                contractsChanged = true;
+              }
+            } else {
+              contractMap.set(empNo, currentContracts.length);
+              currentContracts.push({
+                employeeId: `EMP-${empNo}`,
+                employeeNo: empNo,
+                fullName: isRealName ? devName : `Empleado #${empNo}`,
+                branchId: 'BRANCH-001',
+                shiftType: 'VARIABLE',
+                weeklyTargetHours: 44,
+                baseHourlyRate: 6500,
+                overtimeHourlyRate: 9750,
+                avatarColor: ['#3B82F6', '#10B981', '#F59E0B', '#6366F1', '#EC4899'][idx % 5]
+              });
+              contractsChanged = true;
+            }
+          });
+
+          // También mapear marcaciones crudas si aún no están en contratos
+          mappedLogs.forEach(log => {
+            const empNo = String(log.employeeNo || '').trim();
+            if (empNo && empNo !== '0' && !contractMap.has(empNo)) {
+              contractMap.set(empNo, currentContracts.length);
+              currentContracts.push({
+                employeeId: `EMP-${empNo}`,
+                employeeNo: empNo,
+                fullName: `Empleado #${empNo}`,
+                branchId: 'BRANCH-001',
+                shiftType: 'VARIABLE',
+                weeklyTargetHours: 44,
+                baseHourlyRate: 6500,
+                overtimeHourlyRate: 9750,
+                avatarColor: '#3B82F6'
+              });
+              contractsChanged = true;
+            }
+          });
+
+          if (contractsChanged) {
+            await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
+            await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
+            console.log(`[Electron Sync Daemon] 🟢 Actualizados automáticamente ${currentContracts.length} contratos en Supabase.`);
           }
-        });
-        if (addedFromLogs > 0) {
-          await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
-          await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
         }
       }
-    } catch { /* ignore */ }
+    } catch (uErr) {
+      console.warn('[Electron Sync Daemon User Sync Warning]:', uErr.message);
+    }
 
     const { data: existingState } = await supabase.from('app_state').select('value').eq('key', 'attendance_logs').single();
     const currentLogs = existingState?.value || [];
