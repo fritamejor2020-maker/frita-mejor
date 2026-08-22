@@ -725,61 +725,86 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
           if (empNo && empNo !== '0' && empNo !== 'undefined') logsEmpNos.add(empNo);
         });
 
-        // Combinar usuarios traídos del hardware + usuarios detectados en las marcas del biométrico
-        const existingEmpNos = new Set((get().employeeContracts || []).map((c) => String(c.employeeNo).trim()));
-        const newContracts: EmployeeContract[] = [];
+        let updatedCount = 0;
+        let createdCount = 0;
 
-        // A) De la lista traída del hardware
-        userList.forEach((u: any, idx: number) => {
-          const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
-          if (empNo && empNo !== '0' && !existingEmpNos.has(empNo)) {
-            existingEmpNos.add(empNo);
-            newContracts.push({
-              employeeId: `EMP-${empNo}`,
-              employeeNo: empNo,
-              fullName: u.name && u.name !== `Empleado #${empNo}` ? u.name : `Empleado #${empNo}`,
-              branchId: terminal?.branchId || 'BRANCH-001',
-              shiftType: 'VARIABLE',
-              defaultShiftId: 'SHIFT-MANANA',
-              weeklyTargetHours: 44,
-              baseHourlyRate: 6500,
-              overtimeHourlyRate: 9750,
-              avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
-            });
-          }
-        });
+        set((state) => {
+          const currentContracts = [...state.employeeContracts];
+          const contractMap = new Map<string, number>();
+          currentContracts.forEach((c, idx) => contractMap.set(String(c.employeeNo).trim(), idx));
 
-        // B) De los registros/marcas del biométrico
-        Array.from(logsEmpNos).forEach((empNo, idx) => {
-          if (!existingEmpNos.has(empNo)) {
-            existingEmpNos.add(empNo);
-            newContracts.push({
-              employeeId: `EMP-${empNo}`,
-              employeeNo: empNo,
-              fullName: `Empleado #${empNo}`,
-              branchId: terminal?.branchId || 'BRANCH-001',
-              shiftType: 'VARIABLE',
-              defaultShiftId: 'SHIFT-MANANA',
-              weeklyTargetHours: 44,
-              baseHourlyRate: 6500,
-              overtimeHourlyRate: 9750,
-              avatarColor: AVATAR_COLORS[(userList.length + idx) % AVATAR_COLORS.length],
-            });
-          }
-        });
+          // A) De la lista traída del hardware
+          userList.forEach((u: any, idx: number) => {
+            const empNo = String(u.employeeNo || u.employeeNoString || '').trim();
+            const deviceName = String(u.name || u.userName || u.employeeName || u.nameString || u.displayName || '').trim();
+            const hasRealDeviceName = deviceName && !deviceName.toLowerCase().startsWith('empleado #');
 
-        if (newContracts.length > 0) {
-          set((state) => {
-            const updated = [...state.employeeContracts, ...newContracts];
-            push('attendance_contracts', updated);
-            return { employeeContracts: updated };
+            if (!empNo || empNo === '0') return;
+
+            if (contractMap.has(empNo)) {
+              // Si el contrato ya existe pero tiene un nombre genérico ("Empleado #43") y el reloj tiene un nombre real, ACTUALIZARLO
+              const existingIdx = contractMap.get(empNo)!;
+              const existingContract = currentContracts[existingIdx];
+              const isGenericName = !existingContract.fullName || existingContract.fullName.toLowerCase().startsWith('empleado #');
+
+              if (hasRealDeviceName && (isGenericName || existingContract.fullName !== deviceName)) {
+                currentContracts[existingIdx] = {
+                  ...existingContract,
+                  fullName: deviceName,
+                };
+                updatedCount++;
+              }
+            } else {
+              // Si el contrato NO existe, CREARLO
+              contractMap.set(empNo, currentContracts.length);
+              currentContracts.push({
+                employeeId: `EMP-${empNo}`,
+                employeeNo: empNo,
+                fullName: hasRealDeviceName ? deviceName : `Empleado #${empNo}`,
+                branchId: terminal?.branchId || 'BRANCH-001',
+                shiftType: 'VARIABLE',
+                defaultShiftId: 'SHIFT-MANANA',
+                weeklyTargetHours: 44,
+                baseHourlyRate: 6500,
+                overtimeHourlyRate: 9750,
+                avatarColor: AVATAR_COLORS[idx % AVATAR_COLORS.length],
+              });
+              createdCount++;
+            }
           });
-        }
 
-        const totalNew = newContracts.length;
-        const msg = totalNew > 0
-          ? `¡Éxito! Se importaron ${totalNew} nuevo(s) empleado(s) del biométrico al sistema.`
-          : `Todos los usuarios del biométrico (${get().employeeContracts.length} ya existentes) están 100% al día.`;
+          // B) De los registros/marcas del biométrico
+          Array.from(logsEmpNos).forEach((empNo, idx) => {
+            if (!contractMap.has(empNo)) {
+              contractMap.set(empNo, currentContracts.length);
+              currentContracts.push({
+                employeeId: `EMP-${empNo}`,
+                employeeNo: empNo,
+                fullName: `Empleado #${empNo}`,
+                branchId: terminal?.branchId || 'BRANCH-001',
+                shiftType: 'VARIABLE',
+                defaultShiftId: 'SHIFT-MANANA',
+                weeklyTargetHours: 44,
+                baseHourlyRate: 6500,
+                overtimeHourlyRate: 9750,
+                avatarColor: AVATAR_COLORS[(userList.length + idx) % AVATAR_COLORS.length],
+              });
+              createdCount++;
+            }
+          });
+
+          if (updatedCount > 0 || createdCount > 0) {
+            push('attendance_contracts', currentContracts);
+            return { employeeContracts: currentContracts };
+          }
+
+          return {};
+        });
+
+        const totalChanges = updatedCount + createdCount;
+        const msg = totalChanges > 0
+          ? `¡Éxito! Se sincronizaron ${totalChanges} perfil(es) desde el biométrico (${createdCount} nuevos, ${updatedCount} nombres actualizados).`
+          : `Todos los usuarios del biométrico (${get().employeeContracts.length} registrados) están 100% al día.`;
 
         return { ok: true, users: userList, message: msg };
       },
