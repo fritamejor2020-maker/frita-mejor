@@ -64,10 +64,22 @@ export const VendedorDashboard = () => {
     useInventoryStore.getState().loadFromRemote().catch(() => {});
   }, []);
 
-  // ── 1. Validar identidad del usuario (preserva la sesión activa para el vendedor) ──
+  // ── 1. Validar identidad del usuario: si la sesión en localStorage pertenece a otro usuario, salir ──
   useEffect(() => {
     if (!isSetupComplete || !user) return;
-  }, [user, isSetupComplete]);
+    const sessionUserId = String((useSellerSessionStore.getState() as any).userId || '').trim().toLowerCase();
+    const sessionResp = String(responsibleName || '').trim().toLowerCase();
+    const currentName = String((user as any)?.name || '').trim().toLowerCase();
+    const currentId = String((user as any)?.id || (user as any)?.username || '').trim().toLowerCase();
+
+    const isSameUser = (sessionUserId && sessionUserId === currentId) ||
+                       (sessionResp && (sessionResp === currentName || sessionResp.includes(currentName) || currentName.includes(sessionResp)));
+
+    if (!isSameUser && (user as any).role !== 'ADMIN' && (user as any).role !== 'SUPER_ADMIN') {
+      console.log('[VendedorDashboard] Sesión previa pertenece a otro usuario. Limpiando...');
+      endShift();
+    }
+  }, [user, isSetupComplete, responsibleName]);
 
   // ── 2. Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
   useEffect(() => {

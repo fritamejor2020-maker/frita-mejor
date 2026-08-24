@@ -18,10 +18,21 @@ const MODULE_ROUTES = {
   cierres:             '/cierres',
 };
 
-const getVendedorRoute = () => {
+const getVendedorRoute = (user) => {
   try {
     const raw = localStorage.getItem('frita-seller-session');
-    if (raw && JSON.parse(raw)?.state?.isSetupComplete) return '/vendedor';
+    if (raw) {
+      const parsed = JSON.parse(raw)?.state;
+      if (parsed?.isSetupComplete) {
+        const uId = String(user?.id || user?.username || '').trim().toLowerCase();
+        const uName = String(user?.name || '').trim().toLowerCase();
+        const pId = String(parsed.userId || '').trim().toLowerCase();
+        const pResp = String(parsed.responsibleName || '').trim().toLowerCase();
+
+        const isSameUser = (uId && pId && uId === pId) || (uName && pResp && (uName === pResp || uName.includes(pResp) || pResp.includes(uName)));
+        if (isSameUser) return '/vendedor';
+      }
+    }
   } catch (_) {}
   return '/vendedor-setup';
 };
@@ -98,7 +109,7 @@ export function LoginView() {
     if (access.length > 1) { navigate('/selector', { replace: true }); return; }
     if (access.length === 1) {
       const key = access[0];
-      if (key === 'vendedor-setup' || key === 'vendedor') navigate(getVendedorRoute(), { replace: true });
+      if (key === 'vendedor-setup' || key === 'vendedor') navigate(getVendedorRoute(user), { replace: true });
       else if (key === 'dejador') navigate(getDejadorRoute(), { replace: true });
       else navigate(MODULE_ROUTES[key] ?? '/selector', { replace: true });
       return;
