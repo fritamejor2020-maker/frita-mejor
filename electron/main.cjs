@@ -231,9 +231,9 @@ async function runBiometricSync() {
       console.warn('[Electron Sync Daemon] Warning auto-syncing users:', userErr.message);
     }
 
-    // 2. Consultar eventos de marcación (asistencias)
+    // 2. Consultar eventos de marcación (asistencias) por Huella/Biométrico (major: 5, minor: 38)
     const pathStr = '/ISAPI/AccessControl/AcsEvent?format=json';
-    const initCond = { searchID: "1", searchResultPosition: 0, maxResults: 10, major: 0, minor: 0 };
+    const initCond = { searchID: "1", searchResultPosition: 0, maxResults: 10, major: 5, minor: 38 };
     const res1 = await isapiDigestFetch(pathStr, { method: 'POST', body: JSON.stringify({ AcsEventCond: initCond }) });
     
     if (!res1.ok || !res1.text) {
@@ -244,8 +244,8 @@ async function runBiometricSync() {
     const data1 = JSON.parse(res1.text);
     const totalEnMemoria = data1.AcsEvent?.totalMatches || 0;
 
-    const startPos = Math.max(0, totalEnMemoria - 200);
-    const batchCond = { searchID: "1", searchResultPosition: startPos, maxResults: 200, major: 0, minor: 0 };
+    const startPos = Math.max(0, totalEnMemoria - 100);
+    const batchCond = { searchID: "1", searchResultPosition: startPos, maxResults: 100, major: 5, minor: 38 };
     const res2 = await isapiDigestFetch(pathStr, { method: 'POST', body: JSON.stringify({ AcsEventCond: batchCond }) });
 
     if (!res2.ok || !res2.text) return { ok: false, count: 0, message: 'Error al consultar lote de eventos.' };

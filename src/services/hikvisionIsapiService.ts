@@ -550,8 +550,8 @@ export async function fetchAllEvents(
       searchID: "1",
       searchResultPosition: 0,
       maxResults: 10,
-      major: 0,
-      minor: 0,
+      major: 5,
+      minor: 38,
     };
     if (startTime) initCond.startTime = startTime;
     if (endTime) initCond.endTime = endTime;
@@ -564,7 +564,7 @@ export async function fetchAllEvents(
     if (totalEnMemoria === 0) return [];
 
     // 2. Posición dinámica (searchResultPosition): avanzamos por lotes (0, 30, 60...) recorriendo las marcaciones
-    let posicion = options?.maxEvents ? Math.max(0, totalEnMemoria - options.maxEvents) : 0;
+    let posicion = options?.maxEvents ? Math.max(0, totalEnMemoria - options.maxEvents) : Math.max(0, totalEnMemoria - 150);
 
     do {
       const payload = JSON.stringify({
@@ -572,8 +572,8 @@ export async function fetchAllEvents(
           searchID: "1",
           searchResultPosition: posicion, // <-- Posición dinámica (avanza 0, 30, 60...)
           maxResults: pageSize,           // <-- Paginación estable
-          major: 0,
-          minor: 0,
+          major: 5,
+          minor: 38,
           ...(startTime ? { startTime } : {}),
           ...(endTime ? { endTime } : {}),
         }
