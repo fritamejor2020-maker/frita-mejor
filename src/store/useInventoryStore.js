@@ -711,14 +711,14 @@ export const useInventoryStore = create(
         }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         const filtered = inv.filter(
-          (i) => i && i.type !== 'INSUMO' && i.inTricycles !== false && !DEMO_PRD_IDS.has(i.id)
+          (i) => i && i.type !== 'INSUMO' && (i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true) && !DEMO_PRD_IDS.has(i.id)
         );
-        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []).filter(i => i.type !== 'INSUMO');
+        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []).filter(i => i.type !== 'INSUMO' && (i.inTricycles === true || i.inTricycles === 'true'));
       },
 
       /**
        * Productos del POS del Vendedor de triciclo (Venta Rápida).
-       * Incluye exactamente los productos vendibles en punto de venta.
+       * Incluye exactamente los productos marcados para triciclos (inTricycles === true).
        */
       getVendedorPosItems: () => {
         let inv = get().inventory || [];
@@ -727,9 +727,9 @@ export const useInventoryStore = create(
         }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         const filtered = inv.filter(
-          (i) => i && i.inTricycles !== false && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
+          (i) => i && (i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true) && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
         );
-        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []);
+        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []).filter(i => i.inTricycles === true || i.inTricycles === 'true');
       },
 
 
