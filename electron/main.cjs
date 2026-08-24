@@ -388,6 +388,15 @@ async function runBiometricSync() {
       console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Asistencias 100% al día en la Nube.`);
     }
 
+    // Notificar a la ventana principal de Electron con los datos frescos del biométrico local
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('biometric-sync-data', {
+        users: bioUsersRes?.users || [],
+        logs: mappedLogs || [],
+        contracts: []
+      });
+    }
+
     return { ok: true, count: mappedLogs.length, message: `Sincronización nativa exitosa. Se procesaron ${mappedLogs.length} marcaciones.` };
   } catch (err) {
     console.error('[Electron Sync Daemon Error]:', err.message);

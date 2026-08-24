@@ -5,7 +5,8 @@ const apiObj = {
   syncBiometric: () => ipcRenderer.invoke('sync-biometric-manual'),
   modifyBiometricUser: (data) => ipcRenderer.invoke('modify-biometric-user', data),
   fetchBiometricUsers: () => ipcRenderer.invoke('fetch-biometric-users'),
-  getAppVersion: () => ipcRenderer.invoke('get-app-version')
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  onBiometricSyncData: (callback) => ipcRenderer.on('biometric-sync-data', (_event, value) => callback(value))
 };
 
 contextBridge.exposeInMainWorld('electronAPI', apiObj);

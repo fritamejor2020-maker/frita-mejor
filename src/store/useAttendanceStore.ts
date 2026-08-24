@@ -996,3 +996,22 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
     }
   )
 );
+
+// Suscribirse a la sincronización nativa de la app de Electron por IPC (100% independiente de Supabase)
+if (typeof window !== 'undefined') {
+  const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
+  if (electronBridge && typeof electronBridge.onBiometricSyncData === 'function') {
+    electronBridge.onBiometricSyncData((data: any) => {
+      if (data) {
+        if (Array.isArray(data.contracts) && data.contracts.length > 0) {
+          useAttendanceStore.setState({ employeeContracts: data.contracts });
+        }
+        if (Array.isArray(data.logs) && data.logs.length > 0) {
+          useAttendanceStore.setState((state) => ({
+            attendanceLogs: mergeBiometricLogs([...state.attendanceLogs, ...data.logs], state.deletedLogIds)
+          }));
+        }
+      }
+    });
+  }
+}
