@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase';
 
 export const SellerSetupView = () => {
   const { user } = useAuthStore();
+  const userBranchId = (user as any)?.branchId ?? null;
   const startShift = useSellerSessionStore((state) => state.startShift);
   const { isSetupComplete: sellerSetupComplete, shiftId: activeShiftId, endShift: clearSession } = useSellerSessionStore();
   const sellerViewEnabled = useVehicleStore((s: any) => s.sellerViewEnabled ?? true);
@@ -141,7 +142,7 @@ export const SellerSetupView = () => {
       myUserOpenShifts: Array.from(myMineMap.values()),
       otherOpenShifts: Array.from(othersMap.values())
     };
-  }, [remoteShifts, user]);
+  }, [remoteShifts, user, userBranchId]);
   
   const activeOpenShifts = useMemo(() => {
     return [...myUserOpenShifts, ...otherOpenShifts];
@@ -162,7 +163,6 @@ export const SellerSetupView = () => {
   const pointTypes = allPointTypes.filter(pt => enabledPointTypes[pt.vehicleType] !== false);
 
   const vehicles = useVehicleStore((state: any) => state.vehicles);
-  const userBranchId = (user as any)?.branchId ?? null;
   const selectedTypeObj = pointTypes.find(pt => pt.id === pointType) ?? pointTypes[0];
   const allPointIds = vehicles
     .filter((v: any) =>
