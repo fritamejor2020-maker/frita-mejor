@@ -124,7 +124,7 @@ export const SellerSetupView = () => {
 
       const vehicleKey = String(s.pointId || s.vehicle || s.id).toLowerCase().replace(/[^a-z0-9]/g, '');
 
-      if (isMineByName || isMineById || isVendorMatch) {
+      if (isMineByName || isMineById) {
         const ex = myMineMap.get(vehicleKey);
         // Preservar solo el turno más reciente para el mismo vehículo hoy
         if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
