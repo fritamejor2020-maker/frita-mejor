@@ -207,22 +207,6 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     showStatus('⏳ Consultando lista de personas en el biométrico...', 'info', 0);
 
     try {
-      const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
-
-      // Si estamos en Electron, llamar al canal nativo directo fetchBiometricUsers
-      if (electronBridge && typeof electronBridge.fetchBiometricUsers === 'function') {
-        console.log('[AdminModal] Invocando consulta nativa fetchBiometricUsers...');
-        const res = await electronBridge.fetchBiometricUsers();
-        await loadFromRemote();
-
-        if (res && res.ok) {
-          const totalUsers = res.users?.length || 0;
-          showStatus(`✅ ¡Éxito! Se sincronizaron ${totalUsers} usuarios desde el reloj biométrico.`, 'success');
-          return;
-        }
-      }
-
-      // Si es navegador web puro, ejecutar fetchTerminalUsers
       const res = await fetchTerminalUsers(termId);
       showStatus(res.message, res.ok ? 'success' : 'error');
     } catch (err: any) {
