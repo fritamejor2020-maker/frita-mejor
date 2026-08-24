@@ -342,7 +342,9 @@ function mergeBiometricLogs(existing: RawAttendanceLog[], deletedLogIds: string[
     }
   });
 
-  return Array.from(map.values());
+  const logsList = Array.from(map.values());
+  logsList.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  return logsList.slice(0, 300);
 }
 
 export const useAttendanceStore = create<AttendanceStoreState>()(

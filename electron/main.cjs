@@ -370,22 +370,37 @@ async function runBiometricSync() {
     }
 
     const { data: existingState } = await supabase.from('app_state').select('value').eq('key', 'attendance_logs').single();
-    const currentLogs = existingState?.value || [];
+    let currentLogs = existingState?.value || [];
+    if (!Array.isArray(currentLogs)) currentLogs = [];
+
+    // Determinar el serialNo máximo ya registrado en Supabase para sincronizar solo deltas incrementales
+    const maxSerialNo = currentLogs.reduce((max, l) => {
+      const s = Number(l.serialNo || 0);
+      return s > max ? s : max;
+    }, 0);
+
     const existingIds = new Set(currentLogs.map(l => l.id));
 
-    const toAdd = mappedLogs.filter(l => !existingIds.has(l.id));
+    // Filtrar únicamente los ponchados nuevos cuyas marcas superen el último serialNo o ID registrado
+    const toAdd = mappedLogs.filter(l => {
+      if (existingIds.has(l.id)) return false;
+      if (maxSerialNo > 0 && l.serialNo != null) return Number(l.serialNo) > maxSerialNo;
+      return true;
+    });
 
     if (toAdd.length > 0) {
-      const updated = [...toAdd, ...currentLogs];
+      // Limitar la ventana histórica a los 300 registros más recientes (peso ultra-ligero de ~35 KB)
+      const updated = [...toAdd, ...currentLogs].slice(0, 300);
       await supabase.from('app_state').upsert({ key: 'attendance_logs', value: updated }, { onConflict: 'key' });
       await supabase.from('app_state').upsert({ key: 'attendance_logs_BRANCH-001', value: updated }, { onConflict: 'key' });
-      console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Sincronizadas ${toAdd.length} nuevas asistencias a Supabase.`);
+      console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Sincronizados ${toAdd.length} deltas de asistencia (total ventana: ${updated.length}).`);
     } else {
       if (currentLogs.length === 0 && mappedLogs.length > 0) {
-        await supabase.from('app_state').upsert({ key: 'attendance_logs', value: mappedLogs }, { onConflict: 'key' });
-        await supabase.from('app_state').upsert({ key: 'attendance_logs_BRANCH-001', value: mappedLogs }, { onConflict: 'key' });
+        const trimmed = mappedLogs.slice(0, 300);
+        await supabase.from('app_state').upsert({ key: 'attendance_logs', value: trimmed }, { onConflict: 'key' });
+        await supabase.from('app_state').upsert({ key: 'attendance_logs_BRANCH-001', value: trimmed }, { onConflict: 'key' });
       }
-      console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Asistencias 100% al día en la Nube.`);
+      console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Asistencias 100% al día en la Nube (Delta 0).`);
     }
 
     // Notificar a la ventana principal de Electron con los datos frescos del biométrico local
