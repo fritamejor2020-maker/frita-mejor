@@ -705,23 +705,31 @@ export const useInventoryStore = create(
        * Incluye todos los productos vendibles habilitados para triciclos.
        */
       getDeliveryItems: () => {
-        const inv = get().inventory || [];
+        let inv = get().inventory || [];
+        if (!inv || inv.length === 0) {
+          inv = inventoryBackupSeed || [];
+        }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-        return inv.filter(
-          (i) => i.type !== 'INSUMO' && (i.inTricycles === true || i.inTricycles === undefined || i.inTricycles === 'true' || i.inTricycles !== false) && i.showInTricicloPos !== true && !DEMO_PRD_IDS.has(i.id)
+        const filtered = inv.filter(
+          (i) => i && i.type !== 'INSUMO' && i.inTricycles !== false && !DEMO_PRD_IDS.has(i.id)
         );
+        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []).filter(i => i.type !== 'INSUMO');
       },
 
       /**
        * Productos del POS del Vendedor de triciclo (Venta Rápida).
-       * Incluye exactamente los productos marcados con inTricycles === true.
+       * Incluye exactamente los productos vendibles en punto de venta.
        */
       getVendedorPosItems: () => {
-        const inv = get().inventory || [];
+        let inv = get().inventory || [];
+        if (!inv || inv.length === 0) {
+          inv = inventoryBackupSeed || [];
+        }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-        return inv.filter(
-          (i) => (i.inTricycles === true || i.inTricycles === undefined || i.inTricycles === 'true' || i.inTricycles !== false) && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
+        const filtered = inv.filter(
+          (i) => i && i.inTricycles !== false && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
         );
+        return filtered.length > 0 ? filtered : (inventoryBackupSeed || []);
       },
 
 
