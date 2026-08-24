@@ -260,10 +260,18 @@ export const useLogisticsStore = create(
         }
       });
 
-      const freshPending = Array.from(pendingMap.values()).filter(isTodayItem);
       const freshCompleted = Array.from(completedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
       const freshRejected = Array.from(rejectedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.rejected_at || b.created_at || 0) - new Date(a.rejected_at || a.created_at || 0));
       const freshHistory = Array.from(historyMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+
+      const processedSet = new Set([
+        ...freshCompleted.map(x => x.id),
+        ...freshRejected.map(x => x.id)
+      ]);
+
+      const freshPending = Array.from(pendingMap.values())
+        .filter(isTodayItem)
+        .filter(item => item?.id && !processedSet.has(item.id));
 
       set({
         pendingRequests: freshPending,
