@@ -754,7 +754,7 @@ async function fetchBiometricUsersFromDevice() {
         if (empNo && empNo !== '0') {
           allUsersMap.set(empNo, {
             employeeNo: empNo,
-            name: rawName || `Empleado #${empNo}`,
+            name: rawName,
             userType: u.userType || 'normal'
           });
         }
