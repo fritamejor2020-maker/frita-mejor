@@ -26,6 +26,7 @@ let mainWindow = null;
 let tray = null;
 let isQuitting = false;
 let syncInterval = null;
+let lastTotalMatches = 0;
 
 function md5(str) { return crypto.createHash('md5').update(str).digest('hex'); }
 
@@ -217,21 +218,10 @@ async function runBiometricSync() {
           const devUser = deviceUserMap.get(empNo);
 
           if (devUser) {
-            const actualName = String(devUser.name || '').trim();
-            const actualPin = String(devUser.password || '').trim();
+    // 1. Obtener lista actual de usuarios registrados en el biométrico
+    const bioUsersRes = await fetchBiometricUsersFromDevice();
 
-            if ((expectedName && expectedName !== actualName) || (expectedPin && expectedPin !== actualPin)) {
-              console.log(`[Electron Sync Daemon] 🔄 Sincronizando cambio detectado en Supabase hacia biométrico para Empleado #${empNo}: Nombre ("${actualName}" -> "${expectedName}"), Clave ("${actualPin}" -> "${expectedPin}")`);
-              await pushContractToBiometricDevice(empNo, expectedName, expectedPin);
-            }
-          }
-        }
-      }
-    } catch (userErr) {
-      console.warn('[Electron Sync Daemon] Warning auto-syncing users:', userErr.message);
-    }
-
-    // 2. Consultar eventos de marcación (asistencias) por Huella/Biométrico (major: 5, minor: 38)
+    // 2. Consultar eventos de marcación (asistencias) por totalMatches del biométrico
     const pathStr = '/ISAPI/AccessControl/AcsEvent?format=json';
     const initCond = { searchID: "1", searchResultPosition: 0, maxResults: 10, major: 5, minor: 38 };
     const res1 = await isapiDigestFetch(pathStr, { method: 'POST', body: JSON.stringify({ AcsEventCond: initCond }) });
@@ -244,8 +234,21 @@ async function runBiometricSync() {
     const data1 = JSON.parse(res1.text);
     const totalEnMemoria = data1.AcsEvent?.totalMatches || 0;
 
-    const startPos = Math.max(0, totalEnMemoria - 100);
-    const batchCond = { searchID: "1", searchResultPosition: startPos, maxResults: 100, major: 5, minor: 38 };
+    let startPos = 0;
+    let fetchCount = 100;
+
+    if (lastTotalMatches > 0 && totalEnMemoria > lastTotalMatches) {
+      startPos = lastTotalMatches;
+      fetchCount = Math.max(10, totalEnMemoria - lastTotalMatches);
+      console.log(`[Electron Sync Daemon] 🎯 Detectados ${totalEnMemoria - lastTotalMatches} ponchados nuevos usando totalMatches (${lastTotalMatches} -> ${totalEnMemoria}).`);
+    } else {
+      startPos = Math.max(0, totalEnMemoria - 100);
+      fetchCount = 100;
+    }
+
+    lastTotalMatches = totalEnMemoria;
+
+    const batchCond = { searchID: "1", searchResultPosition: startPos, maxResults: fetchCount, major: 5, minor: 38 };
     const res2 = await isapiDigestFetch(pathStr, { method: 'POST', body: JSON.stringify({ AcsEventCond: batchCond }) });
 
     if (!res2.ok || !res2.text) return { ok: false, count: 0, message: 'Error al consultar lote de eventos.' };
