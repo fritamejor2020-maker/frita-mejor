@@ -108,7 +108,8 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
 
     // 1. Generar los 7 días de la semana (Lunes a Domingo)
     const weekDays: { dateStr: string; dayLabel: string; dayName: string; isToday: boolean }[] = [];
-    const todayStr = new Date().toISOString().slice(0, 10);
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
 
     const monday = new Date(weekStartDate);
     monday.setHours(0, 0, 0, 0);
@@ -118,7 +119,7 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
     for (let i = 0; i < 7; i++) {
       const d = new Date(monday);
       d.setDate(monday.getDate() + i);
-      const dateStr = d.toISOString().slice(0, 10);
+      const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
       const dayName = SHORT_DAYS[d.getDay()];
       const dayNum  = d.getDate();
       weekDays.push({

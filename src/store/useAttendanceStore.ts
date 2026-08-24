@@ -256,24 +256,31 @@ export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
 export function isExplicitAttendancePunch(logOrEv: any): boolean {
   if (!logOrEv) return false;
   if (logOrEv.minor === 22) return true; // Continuous checkOut
+  if (logOrEv.minor === 38 || logOrEv.minor === 1 || logOrEv.minor === 75) return true; // Autenticación biométrica por Huella/Facial
 
   const st = String(logOrEv.attendanceStatus || '').trim().toLowerCase();
-  if (!st || st === 'undefined' || st === 'null' || st === 'invalid' || st === 'none' || st === '0') {
-    return false;
+  if (st && st !== 'undefined' && st !== 'null' && st !== 'invalid' && st !== 'none' && st !== '0') {
+    return (
+      st === 'checkin' ||
+      st === 'check_in' ||
+      st === 'checkout' ||
+      st === 'check_out' ||
+      st === 'entry' ||
+      st === 'exit' ||
+      st === 'overtimein' ||
+      st === 'overtimeout' ||
+      st === 'breakin' ||
+      st === 'breakout'
+    );
   }
 
-  return (
-    st === 'checkin' ||
-    st === 'check_in' ||
-    st === 'checkout' ||
-    st === 'check_out' ||
-    st === 'entry' ||
-    st === 'exit' ||
-    st === 'overtimein' ||
-    st === 'overtimeout' ||
-    st === 'breakin' ||
-    st === 'breakout'
-  );
+  // Si tiene un ID de empleado válido registrado en el biométrico, es un ponchado real de asistencia
+  const empNo = String(logOrEv.employeeNo || logOrEv.employeeNoString || '').trim();
+  if (empNo && empNo !== '0' && empNo !== 'undefined' && empNo !== '18446744073709551613') {
+    return true;
+  }
+
+  return false;
 }
 
 export function isLogDeleted(
