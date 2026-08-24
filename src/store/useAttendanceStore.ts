@@ -231,16 +231,21 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
 
 function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
   const map = new Map<string, EmployeeContract>();
+  
+  // 1. Agregar todos los contratos existentes pasados por parámetro (Supabase / LocalStorage / Estado)
   (existing || []).forEach((c) => {
-    const empNo = String(c.employeeNo).trim();
-    map.set(empNo, c);
+    const empNo = String(c.employeeNo || '').trim();
+    if (empNo) map.set(empNo, c);
   });
+
+  // 2. Agregar cualquier usuario base inicial solo si aún no está en el mapa
   INITIAL_CONTRACTS.forEach((c) => {
-    const empNo = String(c.employeeNo).trim();
-    if (!map.has(empNo)) {
+    const empNo = String(c.employeeNo || '').trim();
+    if (empNo && !map.has(empNo)) {
       map.set(empNo, c);
     }
   });
+
   return Array.from(map.values());
 }
 
