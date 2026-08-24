@@ -3,20 +3,24 @@
 // Maneja push notifications en background (app cerrada / bloqueada)
 // ============================================================
 
-const APP_VERSION = 'v1';
+const APP_VERSION = 'v1.0.5';
 
-// ── NO usar skipWaiting ni clients.claim ──────────────────────
-// Esto evita que un deploy forzado interrumpa la sesión activa del usuario
-// y cause pérdida de datos no sincronizados.
-// La actualización se aplicará naturalmente cuando el usuario cierre y reabra la app.
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  console.log('[SW] Nuevo Service Worker instalado y activado inmediatamente.');
+  console.log('[SW] Nuevo Service Worker v1.0.5 instalado.');
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim());
-  console.log('[SW] Service Worker activado y controlando clientes.');
+  event.waitUntil(
+    caches.keys().then((keys) => {
+      return Promise.all(
+        keys.map((key) => {
+          console.log('[SW] Purgando caché obsoleta en activación:', key);
+          return caches.delete(key);
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
 // ── Recibir push del servidor ────────────────────────────────
