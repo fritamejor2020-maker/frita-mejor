@@ -406,13 +406,26 @@ async function runBiometricSync() {
       console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Asistencias 100% al día en la Nube (Delta 0).`);
     }
 
-    // Notificar a la ventana principal de Electron con los datos frescos del biométrico local
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('biometric-sync-data', {
-        users: bioUsersRes?.users || [],
-        logs: mappedLogs || [],
-        contracts: []
-      });
+    // Notificar a la ventana principal de Electron con los datos frescos del biométrico local y la lista de contratos con sus nombres reales
+    try {
+      const { data: cState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+      const currentContracts = cState?.value || [];
+
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('biometric-sync-data', {
+          users: bioUsersRes?.users || [],
+          logs: mappedLogs || [],
+          contracts: currentContracts
+        });
+      }
+    } catch (e) {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.send('biometric-sync-data', {
+          users: bioUsersRes?.users || [],
+          logs: mappedLogs || [],
+          contracts: []
+        });
+      }
     }
 
     return { ok: true, count: mappedLogs.length, message: `Sincronización nativa exitosa. Se procesaron ${mappedLogs.length} marcaciones.` };
