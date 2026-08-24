@@ -1133,56 +1133,70 @@ export const VendedorDashboard = () => {
 
 
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
-               {restockProducts.map(p => {
-                const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
-                const productPresetValues = getPresetsForProduct(p.id);
-              return (
-                <div key={p.id} className="bg-white rounded-[28px] flex flex-row items-center justify-between p-2 shadow-sm border border-gray-100">
-                  {/* Cápsula izquierda: abreviación + editar */}
-                  <div className="flex items-center gap-1 flex-shrink-0">
-                    <div
-                      className="bg-[#FF4040] text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none"
-                      title={p.name}
-                    >
-                      {getProductAbbreviation(p.name, p.abbreviation)}
+            {restockProducts.length === 0 ? (
+              <div className="bg-white rounded-3xl p-6 text-center shadow-sm border border-amber-200/60 my-4">
+                <Package size={36} className="mx-auto text-amber-400 mb-2" />
+                <h3 className="font-black text-gray-800 text-base mb-1">Cargando catálogo de productos...</h3>
+                <p className="text-xs text-gray-500 font-bold mb-3">Sincronizando productos disponibles desde la nube</p>
+                <button
+                  onClick={() => useInventoryStore.getState().loadFromRemote()}
+                  className="bg-amber-400 hover:bg-amber-500 text-white font-black text-xs px-4 py-2 rounded-full shadow-sm active:scale-95 transition-all"
+                >
+                  ⚡ Cargar Productos
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4">
+                 {restockProducts.map(p => {
+                  const currentQty = restockCart.find((i: any) => i.productId === p.id)?.qty || 0;
+                  const productPresetValues = getPresetsForProduct(p.id);
+                return (
+                  <div key={p.id} className="bg-white rounded-[28px] flex flex-row items-center justify-between p-2 shadow-sm border border-gray-100">
+                    {/* Cápsula izquierda: abreviación + editar */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
+                      <div
+                        className="bg-[#FF4040] text-white font-black text-base px-4 py-2.5 rounded-full min-w-[52px] text-center shadow-sm tracking-wide leading-none"
+                        title={p.name}
+                      >
+                        {getProductAbbreviation(p.name, p.abbreviation)}
+                      </div>
+                      <button
+                        onClick={() => openProductPresets(p.id)}
+                        className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors active:scale-90"
+                        title={`Editar botones de ${p.name}`}
+                      >
+                        <Pencil size={13} />
+                      </button>
                     </div>
-                    <button
-                      onClick={() => openProductPresets(p.id)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:text-amber-500 hover:bg-amber-50 transition-colors active:scale-90"
-                      title={`Editar botones de ${p.name}`}
-                    >
-                      <Pencil size={13} />
-                    </button>
-                  </div>
 
-                  {/* Botones de cantidad */}
-                  <div className="flex gap-1.5 items-center pr-1">
-                     <NumberSelectorGroup
-                       presets={productPresetValues}
-                       value={
-                         productPresetValues.length > 0 && productPresetValues.every((v) => typeof v === 'string')
-                           ? (stringSelections[p.id] || '')
-                           : currentQty
-                       }
-                       onChange={(qty) => {
-                         if (typeof qty === 'string') {
-                           const current = stringSelections[p.id];
-                           const next = current === qty ? '' : qty;
-                           setStringSelections(prev => ({ ...prev, [p.id]: next }));
-                           const diff = (next ? 1 : 0) - currentQty;
-                           addToRestockCart(p.id, diff, p.name, p.abbreviation, next || undefined);
-                         } else {
-                           const diff = qty - currentQty;
-                           addToRestockCart(p.id, diff, p.name, p.abbreviation);
+                    {/* Botones de cantidad */}
+                    <div className="flex gap-1.5 items-center pr-1">
+                       <NumberSelectorGroup
+                         presets={productPresetValues}
+                         value={
+                           productPresetValues.length > 0 && productPresetValues.every((v) => typeof v === 'string')
+                             ? (stringSelections[p.id] || '')
+                             : currentQty
                          }
-                       }}
-                     />
+                         onChange={(qty) => {
+                           if (typeof qty === 'string') {
+                             const current = stringSelections[p.id];
+                             const next = current === qty ? '' : qty;
+                             setStringSelections(prev => ({ ...prev, [p.id]: next }));
+                             const diff = (next ? 1 : 0) - currentQty;
+                             addToRestockCart(p.id, diff, p.name, p.abbreviation, next || undefined);
+                           } else {
+                             const diff = qty - currentQty;
+                             addToRestockCart(p.id, diff, p.name, p.abbreviation);
+                           }
+                         }}
+                       />
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-            </div>
+                );
+              })}
+              </div>
+            )}
             {/* Espaciador para que el último producto no quede detrás del botón flotante */}
             <div style={{ height: '80px' }} aria-hidden="true" />
 

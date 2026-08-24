@@ -708,7 +708,7 @@ export const useInventoryStore = create(
         const inv = get().inventory || [];
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         return inv.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles === true && i.showInTricicloPos !== true && !DEMO_PRD_IDS.has(i.id)
+          (i) => i.type !== 'INSUMO' && (i.inTricycles === true || i.inTricycles === undefined || i.inTricycles === 'true' || i.inTricycles !== false) && i.showInTricicloPos !== true && !DEMO_PRD_IDS.has(i.id)
         );
       },
 
@@ -720,7 +720,7 @@ export const useInventoryStore = create(
         const inv = get().inventory || [];
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         return inv.filter(
-          (i) => i.inTricycles === true && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
+          (i) => (i.inTricycles === true || i.inTricycles === undefined || i.inTricycles === 'true' || i.inTricycles !== false) && i.showInPos !== false && !DEMO_PRD_IDS.has(i.id)
         );
       },
 
