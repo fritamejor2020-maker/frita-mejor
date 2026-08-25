@@ -502,13 +502,35 @@ export function ClientePedirView() {
 
   const fetchCatalog = async () => {
     try {
-      const { data: stateData } = await supabase
-        .from('app_state')
-        .select('value')
-        .eq('key', `inventory_${selectedBranchId}`)
-        .maybeSingle();
+      let items: any[] = [];
 
-      let items = stateData?.value || [];
+      // 1. Intentar primero desde store local rehidratado
+      const storeItems = useInventoryStore.getState().getVendedorPosItems();
+      if (storeItems && storeItems.length > 0) {
+        items = storeItems;
+      }
+
+      // 2. Consultar Supabase por la sede seleccionada si el store no tenía productos cargados
+      if (!items || items.length === 0) {
+        const { data: stateData } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', `inventory_${selectedBranchId}`)
+          .maybeSingle();
+        items = stateData?.value || [];
+      }
+
+      // 3. Consultar sede principal BRANCH-001
+      if (!items || items.length === 0) {
+        const { data: b1Data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'inventory_BRANCH-001')
+          .maybeSingle();
+        items = b1Data?.value || [];
+      }
+
+      // 4. Consultar clave global inventory
       if (!items || items.length === 0) {
         const { data: globalData } = await supabase
           .from('app_state')
@@ -527,22 +549,29 @@ export function ClientePedirView() {
         setPosSettings(settingsData.value);
       }
 
-      const saleItems = (items || []).filter(
-        (i: any) => ['FRITO', 'PRODUCTO', 'CRUDO', 'BEBIDA'].includes(i.type || i.tipo) && i.inTricycles === true
-      );
+      const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+      const NON_PHYSICAL_SERVICES = new Set(['Domicilio Transferencia', 'Producto No Registrado']);
+
+      const saleItems = (items || []).filter((i: any) => {
+        if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+        if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
+        return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+      });
 
       const mappedProducts = saleItems.map((item: any) => ({
         id: item.id,
         name: item.name,
-        price: item.price,
+        price: (item.price && Number(item.price) > 0) ? Number(item.price) : (Number(item.referencePrice) || 0),
         category: item.posCategoryId || 'Fritos',
         description: item.description || 'Recién preparado',
         image_url: item.imageUrl || null,
-        stock: item.qty || 0
+        stock: item.qty || 10
       }));
 
-      setProducts(mappedProducts);
-      setInventorySnapshots([]);
+      if (mappedProducts.length > 0) {
+        setProducts(mappedProducts);
+        setInventorySnapshots([]);
+      }
     } catch (err) {
       console.error('Error fetching catalog:', err);
     }
