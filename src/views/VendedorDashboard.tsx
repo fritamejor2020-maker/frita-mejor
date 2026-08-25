@@ -184,19 +184,52 @@ export const VendedorDashboard = () => {
         const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanUser  = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const cleanTrack = String(trackingId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const cleanResp  = String(responsibleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
         const myPending = orders.find((o: any) => {
           if (o.status !== 'pending') return false;
           const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const matchVendor = (cleanPoint && assigned === cleanPoint) || (cleanUser && assigned === cleanUser) || (cleanTrack && assigned === cleanTrack);
+          const assignedName = String(o.assigned_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          
           const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
-          return matchVendor && !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack);
+          if (rejected.includes(cleanPoint) || rejected.includes(cleanUser) || rejected.includes(cleanTrack) || (cleanResp && rejected.includes(cleanResp))) {
+            return false;
+          }
+
+          // Coincidencia flexible por vehículo (T1, T2...), usuario, responsable o si es un triciclo activo
+          const numMatchAssigned = assigned.match(/\d+/);
+          const numMatchPoint = cleanPoint.match(/\d+/);
+          const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
+
+          const matchVendor = 
+            !assigned ||
+            (cleanPoint && assigned === cleanPoint) ||
+            (cleanUser && assigned === cleanUser) ||
+            (cleanTrack && assigned === cleanTrack) ||
+            (cleanResp && assignedName.includes(cleanResp)) ||
+            (cleanPoint && assignedName.includes(cleanPoint)) ||
+            isSameVehicleNum ||
+            orders.length === 1; // Si hay 1 solo pedido pendiente activo en la sede, cualquier vendedor con turno lo recibe
+
+          return matchVendor;
         });
 
         const myActive = orders.find((o: any) => {
           if (o.status !== 'accepted') return false;
           const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return (cleanPoint && assigned === cleanPoint) || (cleanUser && assigned === cleanUser) || (cleanTrack && assigned === cleanTrack);
+          const assignedName = String(o.assigned_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          
+          const numMatchAssigned = assigned.match(/\d+/);
+          const numMatchPoint = cleanPoint.match(/\d+/);
+          const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
+
+          return (
+            (cleanPoint && assigned === cleanPoint) ||
+            (cleanUser && assigned === cleanUser) ||
+            (cleanTrack && assigned === cleanTrack) ||
+            (cleanResp && assignedName.includes(cleanResp)) ||
+            isSameVehicleNum
+          );
         });
 
         if (myPending) {

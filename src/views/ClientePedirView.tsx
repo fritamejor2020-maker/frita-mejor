@@ -886,14 +886,27 @@ export function ClientePedirView() {
                   zoomControl={false}
                 >
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+                  {/* Marcador del Cliente */}
                   <Marker position={[activeOrder.client_lat, activeOrder.client_lng]} icon={clientIcon} />
 
-                  {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
-                    <Marker 
-                      position={[activeOrder.vendor_lat, activeOrder.vendor_lng]} 
-                      icon={createVendorIcon(activeOrder.vendor_name || 'Vendedor', true, isPickup)} 
-                    />
-                  )}
+                  {/* Marcadores de TODOS los carritos activos en el mapa */}
+                  {vendors.map(v => {
+                    const isAssigned = isAccepted && (
+                      String(v.pointId || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase() ||
+                      String(v.vendorId || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase() ||
+                      String(v.id || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase()
+                    );
+                    const vLat = (isAssigned && activeOrder.vendor_lat) ? activeOrder.vendor_lat : v.lat;
+                    const vLng = (isAssigned && activeOrder.vendor_lng) ? activeOrder.vendor_lng : v.lng;
+
+                    return (
+                      <Marker 
+                        key={v.id || v.vendorId || v.pointId} 
+                        position={[vLat, vLng]} 
+                        icon={createVendorIcon(v.name || 'Vendedor', isAssigned, isPickup)} 
+                      />
+                    );
+                  })}
 
                   {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
                     <Polyline
