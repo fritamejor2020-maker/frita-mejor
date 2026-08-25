@@ -733,10 +733,8 @@ export function ClientePedirView() {
     }
 
     const targetVendor = activeVendorsAround[0];
-    if (!targetVendor) {
-      toast.error('No hay carritos activos disponibles cerca en este momento.');
-      return;
-    }
+    const assignedVendorCode = targetVendor?.pointId || targetVendor?.vendor_id || targetVendor?.id || 'T1';
+    const assignedVendorName = targetVendor?.name || targetVendor?.responsibleName || 'Vendedor Móvil';
 
     setIsSubmitting(true);
     const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
@@ -754,7 +752,6 @@ export function ClientePedirView() {
     });
 
     const orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
-    const assignedVendorCode = targetVendor.pointId || targetVendor.vendor_id || targetVendor.id || 'T1';
 
     const newOrder = {
       id: orderId,
@@ -767,7 +764,7 @@ export function ClientePedirView() {
       total_amount: getCartTotal(),
       status: 'pending',
       assigned_vendor_id: assignedVendorCode,
-      assigned_vendor_name: targetVendor.name || targetVendor.responsibleName || 'Vendedor Móvil',
+      assigned_vendor_name: assignedVendorName,
       client_token: token,
       created_at: new Date().toISOString(),
       rejected_vendor_ids: [],
@@ -775,17 +772,22 @@ export function ClientePedirView() {
     };
 
     try {
-      // 1. Guardar instantáneamente en app_state (soporta 50ms de respuesta sin timeouts de la BD)
-      const { data: stateData } = await supabase
-        .from('app_state')
-        .select('value')
-        .eq('key', 'customer_delivery_requests')
-        .maybeSingle();
+      // 1. Guardar instantáneamente en app_state con timeout de protección anti-bloqueo
+      const pushPromise = (async () => {
+        const { data: stateData } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
 
-      const existingOrders: any[] = stateData?.value || [];
-      const updatedOrders = [newOrder, ...existingOrders.filter((o: any) => o?.id !== orderId)].slice(0, 50);
+        const existingOrders: any[] = stateData?.value || [];
+        const updatedOrders = [newOrder, ...existingOrders.filter((o: any) => o?.id !== orderId)].slice(0, 50);
 
-      await push('customer_delivery_requests', updatedOrders);
+        await push('customer_delivery_requests', updatedOrders);
+      })();
+
+      const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2500));
+      await Promise.race([pushPromise, timeoutPromise]);
 
       // Intento secundario no bloqueante en la tabla SQL delivery_requests (si existe)
       Promise.resolve(supabase.from('delivery_requests').insert({

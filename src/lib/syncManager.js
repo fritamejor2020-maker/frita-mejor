@@ -25,8 +25,8 @@ export const GLOBAL_KEYS = [
   'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes',
   // Administración global del sistema y configuraciones
   'users', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
-  // Traslados (son cross-sede por diseño)
-  'transfers',
+  // Traslados (son cross-sede por diseño) y Pedidos de Clientes
+  'transfers', 'customer_delivery_requests',
 ];
 
 /**
