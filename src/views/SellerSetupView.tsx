@@ -25,15 +25,19 @@ export const SellerSetupView = () => {
 
     const fetchAndVerify = async () => {
       try {
-        // Fetch directo a Supabase — fuente de verdad real
-        const { data } = await supabase
+        // Fetch directo a Supabase con timeout de 1.8s anti-congelamiento
+        const fetchPromise = supabase
           .from('app_state')
           .select('value')
           .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
 
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: null }), 1800));
+        const res: any = await Promise.race([fetchPromise, timeoutPromise]);
+        const data = res?.data;
+
         if (cancelled) return;
 
-        if (data) {
+        if (data && Array.isArray(data) && data.length > 0) {
           // Merge con "versión cerrada siempre gana"
           const shiftMap = new Map<string, any>();
           data.forEach((r: any) => {
@@ -79,13 +83,14 @@ export const SellerSetupView = () => {
               clearSession();
             }
           }
+        } else {
+          // Si Supabase tardó o no retornó datos, usar los turnos guardados en el store local
+          if (!cancelled) setRemoteShifts(useInventoryStore.getState().posShifts || []);
         }
       } catch (e) {
-        // En caso de error de red, caer al store local pero marcarlo como cargado
         if (!cancelled) setRemoteShifts(useInventoryStore.getState().posShifts || []);
       }
 
-      // También lanzar loadFromRemote para sincronizar todo el resto del store
       useInventoryStore.getState().loadFromRemote().catch(() => {});
     };
 
