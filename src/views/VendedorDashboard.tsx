@@ -152,26 +152,62 @@ export const VendedorDashboard = () => {
   const [pendingDelivery, setPendingDelivery] = useState<any>(null);
   const [activeDelivery, setActiveDelivery] = useState<any>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
 
+  // 1. Efecto Reactivo Principal vía Store + WebSocket
   useEffect(() => {
-    if (!trackingId || !isSetupComplete) return;
+    const orders: any[] = customerDeliveryRequests || [];
+    const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanUser  = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanTrack = String(trackingId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const cleanResp  = String(responsibleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 
-    // 1. Cargar si ya hay un pedido activo aceptado por mí
-    const fetchActiveDelivery = async () => {
-      const { data } = await supabase
-        .from('delivery_requests')
-        .select('*')
-        .eq('assigned_vendor_id', trackingId)
-        .eq('status', 'accepted')
-        .limit(1);
-      
-      if (data && data.length > 0) {
-        setActiveDelivery(data[0]);
+    const myPending = orders.find((o: any) => {
+      if (o.status !== 'pending') return false;
+      const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
+      return !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack) && (!cleanResp || !rejected.includes(cleanResp));
+    });
+
+    const myActive = orders.find((o: any) => {
+      if (o.status !== 'accepted') return false;
+      const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const assignedName = String(o.assigned_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const numMatchAssigned = assigned.match(/\d+/);
+      const numMatchPoint = cleanPoint.match(/\d+/);
+      const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
+
+      return (
+        (cleanPoint && assigned === cleanPoint) ||
+        (cleanUser && assigned === cleanUser) ||
+        (cleanTrack && assigned === cleanTrack) ||
+        (cleanResp && assignedName.includes(cleanResp)) ||
+        isSameVehicleNum
+      );
+    });
+
+    if (myPending) {
+      setPendingDelivery(myPending);
+      if (!audioRef.current) {
+        audioRef.current = new Audio('/sounds/mixkit_bell.wav');
+        audioRef.current.loop = true;
       }
-    };
+      audioRef.current.play().catch(() => {});
+    } else {
+      setPendingDelivery(null);
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
+    }
 
-    // 2. Cargar si hay algún pedido pendiente asignado a mí
-    // ── Sincronizar pedidos de cliente en tiempo real vía app_state ──
+    if (myActive) {
+      setActiveDelivery(myActive);
+    } else {
+      setActiveDelivery(null);
+    }
+  }, [customerDeliveryRequests, pointId, trackingId, user, responsibleName]);
+
+  // 2. Respaldo de Polling Directo cada 2.5s a Supabase app_state
+  useEffect(() => {
     const syncCustomerOrders = async () => {
       try {
         const { data } = await supabase
@@ -180,66 +216,16 @@ export const VendedorDashboard = () => {
           .eq('key', 'customer_delivery_requests')
           .maybeSingle();
 
-        const orders: any[] = data?.value || [];
-        const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanUser  = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanTrack = String(trackingId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const cleanResp  = String(responsibleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-        const myPending = orders.find((o: any) => {
-          if (o.status !== 'pending') return false;
-          
-          // Si este vendedor específico rechazó previamente el pedido, no mostrárselo
-          const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
-          if (rejected.includes(cleanPoint) || rejected.includes(cleanUser) || rejected.includes(cleanTrack) || (cleanResp && rejected.includes(cleanResp))) {
-            return false;
-          }
-
-          // Todo vendedor activo en la sede recibe la notificación de pedido pendiente
-          return true;
-        });
-
-        const myActive = orders.find((o: any) => {
-          if (o.status !== 'accepted') return false;
-          const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const assignedName = String(o.assigned_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          
-          const numMatchAssigned = assigned.match(/\d+/);
-          const numMatchPoint = cleanPoint.match(/\d+/);
-          const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
-
-          return (
-            (cleanPoint && assigned === cleanPoint) ||
-            (cleanUser && assigned === cleanUser) ||
-            (cleanTrack && assigned === cleanTrack) ||
-            (cleanResp && assignedName.includes(cleanResp)) ||
-            isSameVehicleNum
-          );
-        });
-
-        if (myPending) {
-          setPendingDelivery(myPending);
-          if (!audioRef.current) {
-            audioRef.current = new Audio('/sounds/mixkit_bell.wav');
-            audioRef.current.loop = true;
-          }
-          audioRef.current.play().catch(() => {});
-        } else {
-          setPendingDelivery(null);
-        }
-
-        if (myActive) {
-          setActiveDelivery(myActive);
-        } else {
-          setActiveDelivery(null);
+        if (data?.value && Array.isArray(data.value)) {
+          useLogisticsStore.setState({ customerDeliveryRequests: data.value });
         }
       } catch (e) {}
     };
 
     syncCustomerOrders();
-    const syncInterval = setInterval(syncCustomerOrders, 3000);
+    const interval = setInterval(syncCustomerOrders, 2500);
 
-    const channel = supabase.channel(`vendor-delivery-sync-${trackingId}`)
+    const channel = supabase.channel(`vendor-delivery-direct-sync`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -251,13 +237,10 @@ export const VendedorDashboard = () => {
       .subscribe();
 
     return () => {
-      clearInterval(syncInterval);
+      clearInterval(interval);
       supabase.removeChannel(channel);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
     };
-  }, [trackingId, isSetupComplete, pointId]);
+  }, []);
 
   const handleAcceptDelivery = async (orderId: string) => {
     if (audioRef.current) {
@@ -734,7 +717,6 @@ export const VendedorDashboard = () => {
     }
   };
 
-  const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
   const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const cleanUser  = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const cleanTrack = String(trackingId || '').toLowerCase().replace(/[^a-z0-9]/g, '');

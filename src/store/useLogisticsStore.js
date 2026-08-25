@@ -113,10 +113,11 @@ export const useLogisticsStore = create(
       // Estructura: [{ productId: number, qty: number, name: string }]
       restockCart: [],
   
-  // Estado Auxiliar Logística: View pending requests
+  // Estado Auxiliar Logística: View pending requests & Customer Delivery Orders
   pendingRequests: [],
   completedRequests: [],
   rejectedRequests: [],
+  customerDeliveryRequests: [],
 
   // ===============================
   // ACCIONES VENDEDOR
