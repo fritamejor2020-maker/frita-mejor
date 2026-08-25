@@ -151,9 +151,9 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.
   // Si es operativo, solo a su sede.
-  const effectiveBranches = branchId === null
+  const effectiveBranches = (branchId === null || branchId === undefined)
     ? (allBranchIds.length > 0 ? allBranchIds : ['BRANCH-001'])
-    : [branchId];
+    : [branchId || 'BRANCH-001'];
 
   for (const bid of effectiveBranches) {
     // ── POS & Inventario ──
