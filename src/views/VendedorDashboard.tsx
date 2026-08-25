@@ -940,27 +940,38 @@ export const VendedorDashboard = () => {
               </div>
             ) : (
               <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-                {posProducts.map(p => (
-                  <button
-                    key={p.id}
-                    onClick={() => {
-                      if (p.variablePrice === true || !p.price || p.price <= 0) {
-                         setVariablePriceProduct(p);
-                         setVariablePriceInput(p.referencePrice ? String(p.referencePrice) : '');
-                      } else {
-                         addToCart(p, 1);
-                      }
-                    }}
-                    className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
-                  >
-                    <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
-                      {p.name}
-                    </span>
-                    <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
-                      {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
-                    </span>
-                  </button>
-                ))}
+                {posProducts.map(p => {
+                  const isVar = p && (
+                    p.variablePrice === true ||
+                    String(p.variablePrice) === 'true' ||
+                    p.variablePrice === 1 ||
+                    String(p.variablePrice) === '1' ||
+                    p.isVariable === true ||
+                    !p.price ||
+                    Number(p.price) <= 0
+                  );
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => {
+                        if (isVar) {
+                           setVariablePriceProduct(p);
+                           setVariablePriceInput(p.referencePrice ? String(p.referencePrice) : '');
+                        } else {
+                           addToCart(p, 1);
+                        }
+                      }}
+                      className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
+                    >
+                      <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
+                        {p.name}
+                      </span>
+                      <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
+                        {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             )}
           </div>
