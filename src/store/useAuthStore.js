@@ -247,8 +247,12 @@ export const useAuthStore = create(
         } catch (_) {}
 
         const activeBranchId = found.branchId || selectedBranchId || 'BRANCH-001';
-        set({ user: found, activeBranchId, loading: false, error: null });
-        return { ok: true, user: found };
+        const userWithBranch = {
+          ...found,
+          branchId: found.role === 'ADMIN' ? null : (found.branchId || activeBranchId)
+        };
+        set({ user: userWithBranch, activeBranchId, loading: false, error: null });
+        return { ok: true, user: userWithBranch };
       },
 
 
