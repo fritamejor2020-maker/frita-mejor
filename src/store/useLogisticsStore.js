@@ -251,19 +251,43 @@ export const useLogisticsStore = create(
         const k = row.key || '';
         const val = Array.isArray(row.value) ? row.value : [];
         if (k.startsWith('pendingRequests')) {
-          val.forEach(item => { if (item?.id) pendingMap.set(item.id, item); });
+          val.forEach(item => {
+            if (!item?.id) return;
+            const existing = pendingMap.get(item.id);
+            if (!existing || new Date(item.created_at || 0).getTime() >= new Date(existing.created_at || 0).getTime()) {
+              pendingMap.set(item.id, item);
+            }
+          });
         } else if (k.startsWith('completedRequests')) {
-          val.forEach(item => { if (item?.id) completedMap.set(item.id, item); });
+          val.forEach(item => {
+            if (!item?.id) return;
+            const existing = completedMap.get(item.id);
+            if (!existing || new Date(item.completed_at || item.created_at || 0).getTime() >= new Date(existing.completed_at || existing.created_at || 0).getTime()) {
+              completedMap.set(item.id, item);
+            }
+          });
         } else if (k.startsWith('rejectedRequests')) {
-          val.forEach(item => { if (item?.id) rejectedMap.set(item.id, item); });
+          val.forEach(item => {
+            if (!item?.id) return;
+            const existing = rejectedMap.get(item.id);
+            if (!existing || new Date(item.rejected_at || item.created_at || 0).getTime() >= new Date(existing.rejected_at || existing.created_at || 0).getTime()) {
+              rejectedMap.set(item.id, item);
+            }
+          });
         } else if (k.startsWith('loadHistory')) {
-          val.forEach(item => { if (item?.id) historyMap.set(item.id, item); });
+          val.forEach(item => {
+            if (!item?.id) return;
+            const existing = historyMap.get(item.id);
+            if (!existing || new Date(item.timestamp || 0).getTime() >= new Date(existing.timestamp || 0).getTime()) {
+              historyMap.set(item.id, item);
+            }
+          });
         }
       });
 
-      const freshCompleted = Array.from(completedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.completed_at || b.created_at || 0) - new Date(a.completed_at || a.created_at || 0));
-      const freshRejected = Array.from(rejectedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.rejected_at || b.created_at || 0) - new Date(a.rejected_at || a.created_at || 0));
-      const freshHistory = Array.from(historyMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+      const freshCompleted = Array.from(completedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.completed_at || b.created_at || 0).getTime() - new Date(a.completed_at || a.created_at || 0).getTime());
+      const freshRejected = Array.from(rejectedMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.rejected_at || b.created_at || 0).getTime() - new Date(a.rejected_at || a.created_at || 0).getTime());
+      const freshHistory = Array.from(historyMap.values()).filter(isTodayItem).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
 
       const processedSet = new Set([
         ...freshCompleted.map(x => x.id),

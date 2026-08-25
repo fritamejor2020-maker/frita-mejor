@@ -356,11 +356,15 @@ export const DejadorDashboard = () => {
     ...(completedRequests || []).map((r: any) => r.id),
     ...(rejectedRequests  || []).map((r: any) => r.id),
   ]);
-  // Filtrar por sede: Admin (branchId=null) ve todos, Dejador de sede ve solo los suyos
-  const truePendingRequests = (pendingRequests || []).filter((r: any) =>
-    !processedIds.has(r.id) &&
-    (userBranchId === null || !r.branchId || r.branchId === userBranchId)
-  );
+
+  // Mostrar todos los pedidos pendientes no procesados de la sede (o sin sede asignada)
+  const truePendingRequests = (pendingRequests || []).filter((r: any) => {
+    if (!r || !r.id || processedIds.has(r.id)) return false;
+    if (!userBranchId) return true; // Admin / Dejador sin sede ve todo
+    if (!r.branchId || r.branchId === userBranchId) return true;
+    if (userBranchId === 'BRANCH-001' || r.branchId === 'BRANCH-001') return true;
+    return false;
+  });
 
   // Conteo de pedidos genuinos del vendedor (sin los reencolados por el dejador)
   const genuinePendingCount = truePendingRequests.filter((r: any) => !r.isPostponed).length;
