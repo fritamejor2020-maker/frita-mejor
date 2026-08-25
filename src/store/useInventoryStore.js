@@ -710,8 +710,8 @@ export const useInventoryStore = create(
       },
 
       /**
-       * Productos del flujo logístico del Dejador (Surtir + Recibir).
-       * Incluye estrictamente los productos configurados por el Admin en 'Productos Triciclos' (inTricycles === true).
+       * Productos del flujo logístico del Dejador (Surtir + Recibir) y Pedir Surtido.
+       * Excluye ítems marcados showInTricicloPos: true ("Solo POS / No requiere carga") y servicios no físicos.
        */
       getDeliveryItems: () => {
         let inv = get().inventory || [];
@@ -719,16 +719,21 @@ export const useInventoryStore = create(
           inv = inventoryBackupSeed || [];
         }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        const NON_PHYSICAL_SERVICES = new Set(['Bebida No Guardada', 'Domicilio Transferencia', 'Producto No Registrado']);
 
         let filtered = inv.filter((i) => {
           if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO') return false;
-          return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+          if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
+          if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
+          return i.inTricycles === true || i.inTricycles === 'true';
         });
 
         if (filtered.length === 0) {
           filtered = (inventoryBackupSeed || []).filter((i) => {
             if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO') return false;
-            return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+            if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
+            if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
+            return i.inTricycles === true || i.inTricycles === 'true';
           });
         }
 
@@ -737,7 +742,7 @@ export const useInventoryStore = create(
 
       /**
        * Productos del POS del Vendedor de triciclo (Venta Rápida).
-       * Incluye strictly los productos configurados por el Admin en 'Productos Triciclos' (inTricycles === true).
+       * Incluye estrictamente los productos de venta autorizados por el Admin (inTricycles === true, excluye showInPos: false).
        */
       getVendedorPosItems: () => {
         let inv = get().inventory || [];
@@ -748,13 +753,13 @@ export const useInventoryStore = create(
 
         let filtered = inv.filter((i) => {
           if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
-          return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+          return i.inTricycles === true || i.inTricycles === 'true';
         });
 
         if (filtered.length === 0) {
           filtered = (inventoryBackupSeed || []).filter((i) => {
             if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
-            return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+            return i.inTricycles === true || i.inTricycles === 'true';
           });
         }
 
