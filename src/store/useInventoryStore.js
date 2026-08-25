@@ -1559,22 +1559,28 @@ export const useInventoryStore = create(
        */
       updateVendorLocation: (vendorId, lat, lng, name, pointId, openedAt, shift) => {
         const now = new Date().toISOString();
-        const locationKey = pointId || vendorId;
-        set((s) => ({
-          vendorLocations: {
-            ...(s.vendorLocations || {}),
-            [locationKey]: {
-              lat,
-              lng,
-              name,
-              pointId: pointId || vendorId,
-              updatedAt: now,
-              openedAt: openedAt || s.vendorLocations?.[locationKey]?.openedAt || now,
-              shift: shift || s.vendorLocations?.[locationKey]?.shift || 'AM',
-              isActive: true,
-            },
-          }
-        }));
+        const primaryKey = pointId || vendorId || name;
+        if (!primaryKey || !lat || !lng) return;
+
+        const locObj = {
+          lat: Number(lat),
+          lng: Number(lng),
+          name: name || pointId || 'Vendedor',
+          pointId: pointId || vendorId || primaryKey,
+          vendorId: vendorId || pointId || primaryKey,
+          updatedAt: now,
+          openedAt: openedAt || now,
+          shift: shift || 'AM',
+          isActive: true,
+        };
+
+        set((s) => {
+          const prev = s.vendorLocations || {};
+          const next = { ...prev, [primaryKey]: locObj };
+          if (pointId && pointId !== primaryKey) next[pointId] = locObj;
+          if (vendorId && vendorId !== primaryKey) next[vendorId] = locObj;
+          return { vendorLocations: next };
+        });
         syncKey('vendorLocations', useInventoryStore.getState().vendorLocations);
       },
 

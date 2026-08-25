@@ -125,6 +125,8 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   // Presence data — se fusiona con datos de la BD
   const presenceRef = useRef<Map<string, VendorLocation>>(new Map());
   const dbRef = useRef<Map<string, VendorLocation>>(new Map());
+  // Memoria persistente para evitar parpadeos si la red cae 10 segundos
+  const lastKnownLocationsRef = useRef<Map<string, VendorLocation>>(new Map());
 
   // Cargar datos remotos y turnos al abrir el mapa y periódicamente
   useEffect(() => {
@@ -149,7 +151,6 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
             if (!existing) {
               shiftMap.set(s.id, s);
             } else if (!existing.closedAt && s.closedAt) {
-              // ¡Un registro CERRADO prevalece sobre un registro obsoleto abierto!
               shiftMap.set(s.id, s);
             } else if (existing.closedAt && s.closedAt) {
               const existingTime = new Date(existing.closedAt || 0).getTime();
@@ -181,7 +182,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     loadState();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
-    const interval = setInterval(loadState, 6000);
+    const interval = setInterval(loadState, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -276,14 +277,14 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
       const uniqueKey = vehicleCode || cleanName || cleanPoint;
 
-      // Buscar en Presence (en vivo)
+      // 1. Buscar en Presence (en vivo)
       let loc = Array.from(presenceRef.current.values()).find(p => {
         const pP = String(p.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         const pN = String(p.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         return (cleanLowerP && pP === cleanLowerP) || (cleanLowerN && pN === cleanLowerN);
       });
 
-      // Buscar en DB (persistida)
+      // 2. Buscar en DB (persistida)
       if (!loc) {
         loc = Array.from(dbRef.current.values()).find(d => {
           const dP = String(d.pointId || d.vendorId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -292,7 +293,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         });
       }
 
-      // Buscar en store local (vendorLocationsFromStore)
+      // 3. Buscar en store local (vendorLocationsFromStore)
       if (!loc) {
         const saved = vendorLocationsFromStore[rawPoint] ||
                       vendorLocationsFromStore[cleanPoint] ||
@@ -315,10 +316,20 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         }
       }
 
+      // 4. Buscar en memoria persistente local (lastKnownLocationsRef)
+      if (!loc) {
+        loc = lastKnownLocationsRef.current.get(uniqueKey) ||
+              Array.from(lastKnownLocationsRef.current.values()).find(k => {
+                const kP = String(k.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const kN = String(k.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                return (cleanLowerP && kP === cleanLowerP) || (cleanLowerN && kN === cleanLowerN);
+              });
+      }
+
       const lat = (loc?.lat && !isNaN(Number(loc.lat))) ? Number(loc.lat) : mapCenter[0];
       const lng = (loc?.lng && !isNaN(Number(loc.lng))) ? Number(loc.lng) : mapCenter[1];
 
-      finalVendorsMap.set(uniqueKey, {
+      const vendorItem: VendorLocation = {
         vendorId: loc?.vendorId || userId || uniqueKey,
         pointId: rawPoint,
         name: rawName,
@@ -326,7 +337,14 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
         lng,
         updatedAt: loc?.updatedAt || s.openedAt || new Date().toISOString(),
         source: loc?.source || (loc?.lat ? 'db' : 'offline'),
-      });
+      };
+
+      // Si tenemos coordenadas reales, guardar en la memoria incondicional para que nunca desaparezca
+      if (loc && loc.lat && loc.lng && (loc.lat !== mapCenter[0] || loc.lng !== mapCenter[1])) {
+        lastKnownLocationsRef.current.set(uniqueKey, vendorItem);
+      }
+
+      finalVendorsMap.set(uniqueKey, vendorItem);
     });
 
     let result = Array.from(finalVendorsMap.values());
@@ -338,14 +356,6 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
 
     if (result.length > 0) {
       setVendors(result);
-    } else {
-      // Prevenir reseteos temporales a 0 si en el store aún hay turnos activos
-      const hasActiveVendorShifts = (posShiftsFromStore || []).some((s: any) =>
-        !s.closedAt && (String(s.type || '').toUpperCase() === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')))
-      );
-      if (!hasActiveVendorShifts) {
-        setVendors([]);
-      }
     }
   };
 
