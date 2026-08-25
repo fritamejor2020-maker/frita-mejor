@@ -925,28 +925,44 @@ export const VendedorDashboard = () => {
         
         {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (
-          <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
-            {posProducts.map(p => (
-              <button
-                key={p.id}
-                onClick={() => {
-                  if (p.variablePrice === true || !p.price || p.price <= 0) {
-                     setVariablePriceProduct(p);
-                     setVariablePriceInput(p.referencePrice ? String(p.referencePrice) : '');
-                  } else {
-                     addToCart(p, 1);
-                  }
-                }}
-                className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
-              >
-                <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
-                  {p.name}
-                </span>
-                <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
-                  {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
-                </span>
-              </button>
-            ))}
+          <div>
+            {posProducts.length === 0 ? (
+              <div className="bg-white rounded-3xl p-6 text-center shadow-sm border border-amber-200/60 my-4">
+                <ShoppingCart size={36} className="mx-auto text-amber-400 mb-2" />
+                <h3 className="font-black text-gray-800 text-base mb-1">Cargando productos de venta...</h3>
+                <p className="text-xs text-gray-500 font-bold mb-3">Obteniendo productos autorizados para triciclos</p>
+                <button
+                  onClick={() => useInventoryStore.getState().loadFromRemote()}
+                  className="bg-amber-400 hover:bg-amber-500 text-white font-black text-xs px-4 py-2 rounded-full shadow-sm active:scale-95 transition-all"
+                >
+                  ⚡ Actualizar Venta Rápida
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 sm:grid-cols-3 lg:grid-cols-5 gap-2 sm:gap-4">
+                {posProducts.map(p => (
+                  <button
+                    key={p.id}
+                    onClick={() => {
+                      if (p.variablePrice === true || !p.price || p.price <= 0) {
+                         setVariablePriceProduct(p);
+                         setVariablePriceInput(p.referencePrice ? String(p.referencePrice) : '');
+                      } else {
+                         addToCart(p, 1);
+                      }
+                    }}
+                    className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
+                  >
+                    <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
+                      {p.name}
+                    </span>
+                    <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
+                      {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
