@@ -503,18 +503,30 @@ export function AdminVehicleInventoryTab() {
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
+        .or('key.ilike.posShifts%,key.ilike.deletedShiftIds%');
 
       if (!error && data) {
         const map: Record<string, any> = {};
         data.forEach((row: any) => { map[row.key] = row.value; });
 
         const shiftMap = new Map<string, any>();
-        [
-          ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
-          ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
-          ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
-        ].forEach((s: any) => {
+
+        // Recopilar de TODAS las llaves de posShifts encontradas en app_state
+        Object.keys(map).forEach(key => {
+          if (key.includes('posShifts') && Array.isArray(map[key])) {
+            map[key].forEach((s: any) => {
+              if (!s?.id) return;
+              const existing = shiftMap.get(s.id);
+              if (!existing || (!existing.closedAt && s.closedAt)) {
+                shiftMap.set(s.id, s);
+              }
+            });
+          }
+        });
+
+        // Recopilar de Zustand store también
+        const storeShifts = useInventoryStore.getState().posShifts || [];
+        storeShifts.forEach((s: any) => {
           if (!s?.id) return;
           const existing = shiftMap.get(s.id);
           if (!existing || (!existing.closedAt && s.closedAt)) {
@@ -524,16 +536,18 @@ export function AdminVehicleInventoryTab() {
 
         const allShifts = Array.from(shiftMap.values());
 
-        // Filtrar tombstones
-        const deletedIds = new Set<string>([
-          ...((map['deletedShiftIds'] || []) as string[]),
-          ...((map['deletedShiftIds_BRANCH-001'] || []) as string[]),
-        ]);
-        const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
+        // Recopilar tombstones
+        const deletedIds = new Set<string>();
+        Object.keys(map).forEach(key => {
+          if (key.includes('deletedShiftIds') && Array.isArray(map[key])) {
+            map[key].forEach((id: string) => deletedIds.add(id));
+          }
+        });
 
+        const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
         setSupabaseShifts(filtered);
 
-        // También actualizar el store de Zustand para que quede sincronizado con Cierres Finanzas
+        // También actualizar el store de Zustand para que quede sincronizado
         useInventoryStore.setState({ posShifts: filtered });
       }
     } catch (e) {
@@ -552,19 +566,21 @@ export function AdminVehicleInventoryTab() {
     // Forzar término de carga en máximo 1.5s para no bloquear la pantalla
     const safetyTimeout = setTimeout(() => setSupabaseLoaded(true), 1500);
 
-    // Intervalo de respaldo cada 5 segundos
-    const interval = setInterval(loadShiftsFromSupabase, 5000);
+    // Intervalo de respaldo cada 3 segundos
+    const interval = setInterval(loadShiftsFromSupabase, 3000);
 
     // Canal Realtime para cambios instantáneos
     const channel = supabase
-      .channel('admin-shifts-live-sync')
+      .channel(`admin-shifts-live-sync-${Date.now()}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'app_state',
-        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
-      }, () => {
-        loadShiftsFromSupabase();
+        table: 'app_state'
+      }, (payload) => {
+        const key = payload.new?.key || '';
+        if (key.includes('posShifts') || key.includes('vendorLocations')) {
+          loadShiftsFromSupabase();
+        }
       })
       .subscribe();
 
@@ -598,11 +614,10 @@ export function AdminVehicleInventoryTab() {
     const combined = [...supabaseShifts, ...(posShifts || [])];
 
     const isVehicleShift = (s: any) => {
-      if (!s) return false;
-      if (s.type === 'VENDEDOR') return true;
-      if (s.type === 'POS' && s.pointId && String(s.pointId).toLowerCase().startsWith('t')) return true;
-      if (s.pointId && (String(s.pointId).toLowerCase().startsWith('t') || String(s.pointId).toLowerCase().includes('triciclo'))) return true;
-      if (s.vehicle) return true;
+      if (!s || !s.id) return false;
+      // Mostrar cualquier turno de VENDEDOR, POS, vehículo o punto de venta registrado
+      if (s.type === 'VENDEDOR' || s.type === 'POS' || s.type === 'VEHICULO') return true;
+      if (s.pointId || s.vehicle || s.responsibleName || s.userName || s.sellerName) return true;
       return false;
     };
 
