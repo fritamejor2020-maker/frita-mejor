@@ -1010,21 +1010,32 @@ export function ClientePedirView() {
                 </div>
               )}
 
-              {isPending && (
-                <div className="space-y-3 py-2">
-                  <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-3xl mx-auto animate-bounce shadow-sm">
-                    🔎
+              {isPending && (() => {
+                const targetVendorName = activeOrder.assigned_vendor_name || activeOrder.assigned_vendor_id || activeOrder.vendor_name || 'Triciclo Cercano';
+                return (
+                  <div className="space-y-3 py-2">
+                    <div className="w-16 h-16 rounded-full bg-amber-100 text-amber-600 flex items-center justify-center text-3xl mx-auto animate-bounce shadow-sm">
+                      🔎
+                    </div>
+                    <h2 className="text-lg font-black text-gray-900">Buscando Carrito Disponible...</h2>
+                    
+                    <div className="bg-amber-50 border border-amber-200/80 rounded-2xl p-3.5 space-y-1 text-center">
+                      <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest block">Pedido dirigido a:</span>
+                      <div className="flex items-center justify-center gap-2 text-sm font-black text-gray-950">
+                        <span className="text-base">🚲</span>
+                        <span>{targetVendorName}</span>
+                      </div>
+                    </div>
+
+                    <p className="text-xs font-bold text-gray-500 leading-snug">
+                      Notificando al puesto en tiempo real. Si no está disponible, el sistema reasignará automáticamente al siguiente carrito más cercano.
+                    </p>
+                    <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mt-3">
+                      <div className="bg-[#FF4040] h-full rounded-full animate-[pulse_1.2s_infinite]" style={{ width: '75%' }}></div>
+                    </div>
                   </div>
-                  <h2 className="text-lg font-black text-gray-900">Buscando Carrito Disponible...</h2>
-                  <p className="text-xs font-bold text-gray-500 leading-snug">
-                    Notificando la orden a <span className="text-[#FF4040] font-black">{activeOrder.vendor_name || 'repartidores cercanos'}</span>. 
-                    Si no está disponible, el sistema reasignará automáticamente al siguiente carrito más cercano.
-                  </p>
-                  <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden mt-3">
-                    <div className="bg-[#FF4040] h-full rounded-full animate-[pulse_1.2s_infinite]" style={{ width: '75%' }}></div>
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {isAccepted && (
                 <div className="space-y-3 py-2">

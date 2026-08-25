@@ -46,6 +46,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   const applicators = {};
 
   // ── Globales (sin sufijo) ──
+  applicators['customer_delivery_requests'] = (v) => useLogisticsStore.setState({ customerDeliveryRequests: v });
   applicators['inventory']         = (v) => {
     if (Array.isArray(v)) {
       const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);

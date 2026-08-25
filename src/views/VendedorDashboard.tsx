@@ -922,6 +922,42 @@ export const VendedorDashboard = () => {
         activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-2 sm:my-3' : 'mt-8'
       }`}>
         
+        {/* BANNER DE PEDIDO PENDIENTE (ALERTA URGENTE EN TODAS LAS PESTAÑAS) */}
+        {pendingDelivery && (
+          <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-[32px] p-5 text-gray-950 shadow-2xl shadow-amber-200/80 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-4 border-white animate-bounce">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-white/30 rounded-2xl flex items-center justify-center text-2xl shrink-0 mt-0.5 animate-pulse">
+                🔔
+              </div>
+              <div className="flex flex-col gap-0.5">
+                <span className="bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider w-max">
+                  ¡Nuevo Pedido Pendiente!
+                </span>
+                <h3 className="font-black text-lg text-gray-950 leading-tight">
+                  {pendingDelivery.client_name} ({formatMoney(pendingDelivery.total_amount)})
+                </h3>
+                <p className="text-xs font-bold text-amber-950/80 leading-snug">
+                  📍 {pendingDelivery.client_address || 'Cliente en mapa'} · 📞 {pendingDelivery.client_phone}
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => handleRejectDelivery(pendingDelivery.id)}
+                className="bg-white/80 hover:bg-white text-red-600 font-black py-3 px-4 rounded-2xl shadow-sm text-xs transition-all active:scale-95 flex items-center gap-1"
+              >
+                <X size={16} strokeWidth={3} /> Rechazar
+              </button>
+              <button
+                onClick={() => handleAcceptDelivery(pendingDelivery.id)}
+                className="bg-green-600 hover:bg-green-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg text-sm transition-all active:scale-95 flex items-center gap-1.5"
+              >
+                <Check size={18} strokeWidth={3} /> ACEPTAR PEDIDO
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* BANNER DE PEDIDO ACTIVO (CAMINO AL CLIENTE) */}
         {activeDelivery && (
           <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-[32px] p-5 text-white shadow-xl shadow-green-200/50 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-4 border-white animate-pulse">
