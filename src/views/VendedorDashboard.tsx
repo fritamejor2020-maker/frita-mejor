@@ -976,18 +976,13 @@ export const VendedorDashboard = () => {
                            addToCart(p, 1);
                         }
                       }}
-                      className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1 relative"
+                      className="bg-white rounded-2xl shadow-sm border-2 border-transparent hover:border-[#FF4040] transition-all duration-200 active:scale-95 flex flex-col items-center justify-center text-center p-3 sm:p-5 min-h-[90px] sm:min-h-[125px] hover:-translate-y-0.5 hover:shadow-md group gap-1"
                     >
-                      {isVar && (
-                        <span className="absolute top-1.5 right-1.5 bg-amber-400 text-white font-black text-[9px] px-1.5 py-0.5 rounded-full uppercase shadow-xs">
-                          LIBRE
-                        </span>
-                      )}
                       <span className="font-black text-gray-900 text-xs sm:text-base tracking-tight group-hover:text-[#FF4040] transition-colors leading-tight uppercase line-clamp-2">
                         {p.name}
                       </span>
                       <span className="text-[#FF4040] font-black text-xs sm:text-sm leading-tight">
-                        {isVar ? 'Precio Variable' : formatMoney(p.price || 0)}
+                        {formatMoney((p.price && p.price > 0) ? p.price : (p.referencePrice || 0))}
                       </span>
                     </button>
                   );
@@ -2021,21 +2016,16 @@ export const VendedorDashboard = () => {
 
       {/* MODAL PRECIO VARIABLE */}
       {variablePriceProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-[32px] p-6 shadow-2xl w-full max-w-sm animate-modal-in text-center border-4 border-amber-400">
-             <span className="bg-amber-400 text-white font-black text-[10px] px-3 py-1 rounded-full uppercase tracking-wider mb-2 inline-block shadow-xs">
-               ⚡ Precio Libre / Variable
-             </span>
-             <h3 className="font-black text-2xl text-gray-900 mb-1">{variablePriceProduct.name}</h3>
-             <p className="text-gray-500 font-bold text-xs mb-4">Ingresa el valor a cobrar o selecciona un botón rápido</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white rounded-[32px] p-7 shadow-2xl w-full max-w-sm animate-modal-in text-center">
+             <h3 className="font-black text-2xl text-gray-900 mb-2">{variablePriceProduct.name}</h3>
+             <p className="text-gray-500 font-bold mb-6">Ingresa el precio de venta (Precio Variable).</p>
              
-             {/* Campo de Entrada de Precio */}
-             <div className="relative mb-4">
-                <span className="absolute left-5 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">$</span>
+             <div className="relative mb-6">
+                <span className="absolute left-6 top-1/2 -translate-y-1/2 text-2xl font-black text-gray-400">$</span>
                 <input 
                   autoFocus 
                   type="number"
-                  inputMode="numeric"
                   value={variablePriceInput}
                   onChange={e => setVariablePriceInput(e.target.value)}
                   onFocus={e => e.target.select()}
@@ -2051,39 +2041,19 @@ export const VendedorDashboard = () => {
                        setVariablePriceInput('');
                     }
                   }}
-                  className="w-full bg-amber-50/50 border-2 border-amber-300 focus:border-[#FF4040] rounded-[24px] py-3.5 pl-12 pr-6 text-3xl font-black text-gray-900 outline-none text-center transition-colors shadow-inner"
+                  className="w-full bg-gray-50 border-2 border-gray-200 focus:border-[#FF4040] rounded-[24px] py-4 pl-12 pr-6 text-3xl font-black text-gray-900 outline-none text-center transition-colors"
                   placeholder="0"
                 />
              </div>
 
-             {/* Botones de Acceso Rápido de Precio */}
-             <div className="grid grid-cols-4 gap-2 mb-5">
-               {[500, 1000, 2000, 3000, 4000, 5000, 7000, 10000, 11000, 15000, 20000, 30000].map((quickVal) => (
-                 <button
-                   key={quickVal}
-                   type="button"
-                   onClick={() => setVariablePriceInput(String(quickVal))}
-                   className={`py-2 px-1 rounded-xl font-black text-xs transition-all active:scale-95 border ${
-                     String(variablePriceInput) === String(quickVal)
-                       ? 'bg-[#FF4040] text-white border-[#FF4040] shadow-sm'
-                       : 'bg-gray-100 text-gray-700 border-gray-200 hover:bg-amber-100 hover:border-amber-300'
-                   }`}
-                 >
-                   ${quickVal >= 1000 ? `${quickVal / 1000}k` : quickVal}
-                 </button>
-               ))}
-             </div>
-
              <div className="flex gap-3">
                 <button 
-                  type="button"
                   onClick={() => { setVariablePriceProduct(null); setVariablePriceInput(''); }} 
-                  className="flex-1 py-3.5 rounded-2xl bg-gray-100 text-gray-600 font-black text-base hover:bg-gray-200 transition-colors active:scale-95"
+                  className="flex-1 py-3 rounded-2xl bg-gray-100 text-gray-600 font-bold text-lg hover:bg-gray-200 transition-colors active:scale-95"
                 >
                   Cancelar
                 </button>
                 <button 
-                  type="button"
                   onClick={() => {
                     const price = parseInt(variablePriceInput);
                     if (isNaN(price) || price <= 0) {
@@ -2094,9 +2064,9 @@ export const VendedorDashboard = () => {
                     setVariablePriceProduct(null);
                     setVariablePriceInput('');
                   }} 
-                  className="flex-1 py-3.5 rounded-2xl bg-[#FF4040] text-white font-black text-base shadow-lg shadow-red-200 hover:bg-red-500 transition-colors active:scale-95 flex items-center justify-center gap-1.5"
+                  className="flex-1 py-3 rounded-2xl bg-[#FF4040] text-white font-black text-lg shadow-lg hover:bg-red-500 transition-colors active:scale-95"
                 >
-                  <Check size={20} strokeWidth={3} /> Confirmar
+                  Confirmar
                 </button>
              </div>
           </div>
