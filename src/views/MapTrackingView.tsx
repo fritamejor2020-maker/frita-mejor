@@ -27,10 +27,11 @@ const DEFAULT_ZOOM = 14;
 const CHANNEL = 'vendor-tracking';
 
 // ── Ícono personalizado para el vendedor ─────────────────────────────────────
-const createVendorIcon = (name: string, stale: boolean, offline = false) => {
+const createVendorIcon = (name: string, stale: boolean, offline = false, vehicleType = 'tricycle') => {
   const color  = offline ? '#e5e7eb' : stale ? '#9ca3af' : '#FFB700';
   const border = offline ? '#9ca3af' : stale ? '#6b7280' : '#e67e00';
-  const emoji  = offline ? '📍' : '🛵';
+  const isMoto = String(vehicleType).toLowerCase().includes('moto') || String(vehicleType).toLowerCase().includes('domicilio');
+  const emoji  = offline ? '📍' : (isMoto ? '🛵' : '🚲');
   const extra  = offline ? 'opacity:0.75; filter:grayscale(0.5);' : '';
   return L.divIcon({
     className: '',

@@ -40,30 +40,37 @@ const clientIcon = L.divIcon({
   iconAnchor: [25, 45],
 });
 
-const createVendorIcon = (name: string, isSelected: boolean, isStationary = false) => L.divIcon({
-  className: '',
-  html: `
-    <div style="
-      display: flex; flex-direction: column; align-items: center;
-      filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
-    ">
+const createVendorIcon = (name: string, isSelected: boolean, vehicleType = 'tricycle') => {
+  const isMoto = String(vehicleType).toLowerCase().includes('moto') || String(vehicleType).toLowerCase().includes('domicilio');
+  const emoji = isMoto ? '🛵' : '🚲';
+  const bgColor = isSelected ? '#FF4040' : '#FFB700';
+  const borderColor = isSelected ? '#FF4040' : '#e67e00';
+
+  return L.divIcon({
+    className: '',
+    html: `
       <div style="
-        background: ${isSelected ? '#FF4040' : (isStationary ? '#3b82f6' : '#FFB700')}; 
-        border: 3px solid white;
-        border-radius: 50%; width: 46px; height: 46px;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 24px; transition: all 0.2s;
-      ">${isStationary ? '🏪' : '🛵'}</div>
-      <div style="
-        background: white; border: 2px solid ${isSelected ? '#FF4040' : (isStationary ? '#3b82f6' : '#FFB700')};
-        border-radius: 10px; padding: 2px 8px;
-        font-size: 9px; font-weight: 900; color: #1f2937;
-        margin-top: 2px; white-space: nowrap; max-width: 100px; overflow: hidden;
-      ">${name}</div>
-    </div>`,
-  iconSize: [60, 60],
-  iconAnchor: [30, 44],
-});
+        display: flex; flex-direction: column; align-items: center;
+        filter: drop-shadow(0 4px 6px rgba(0,0,0,0.35));
+      ">
+        <div style="
+          background: ${bgColor}; 
+          border: 3px solid white;
+          border-radius: 50%; width: 46px; height: 46px;
+          display: flex; align-items: center; justify-content: center;
+          font-size: 24px; transition: all 0.2s;
+        ">${emoji}</div>
+        <div style="
+          background: white; border: 2px solid ${borderColor};
+          border-radius: 10px; padding: 2px 8px;
+          font-size: 9px; font-weight: 900; color: #1f2937;
+          margin-top: 2px; white-space: nowrap; max-width: 100px; overflow: hidden;
+        ">${name}</div>
+      </div>`,
+    iconSize: [60, 60],
+    iconAnchor: [30, 44],
+  });
+};
 
 function MapController({
   onLocationChange,
