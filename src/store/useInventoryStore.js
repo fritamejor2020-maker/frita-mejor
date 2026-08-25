@@ -38,6 +38,15 @@ function syncKey(key, value) {
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 
+  if (key === 'inventory' || key === 'products') {
+    markLocalWrite(key, null);
+    markLocalWrite(key, 'BRANCH-001');
+    Promise.allSettled([
+      push(key, value, null),
+      push(key, value, 'BRANCH-001'),
+    ]).catch(() => {});
+  }
+
   // Para BRANCH_KEYS: también actualizar la llave legacy sin sufijo para mantener ambas en 100% sincronía
   if (BRANCH_KEYS.includes(key)) {
     push(key, value, null).catch(() => {});
@@ -352,7 +361,7 @@ export const useInventoryStore = create(
         try {
           const user = useAuthStore.getState().user;
           const isAdmin = user?.role === 'ADMIN';
-          const branchId = isAdmin ? null : (user?.branchId ?? null);
+          const branchId = isAdmin ? null : (user?.branchId || 'BRANCH-001');
 
           // Obtener IDs de todas las sedes para el Admin
           let allBranchIds = ['BRANCH-001'];
