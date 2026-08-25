@@ -172,6 +172,24 @@ export function ClientePedirView() {
   const [inventorySnapshots, setInventorySnapshots] = useState<any[]>([]);
   const [posSettings, setPosSettings] = useState<any>(null);
 
+  // Evaluar si existen vehículos de domicilio móvil activos (ej. motos repartidoras)
+  // Si solo hay triciclos en ruta fija, se desactiva la opción "Que el Carrito Móvil Venga a Mí"
+  const hasMobileDeliveryVehicles = useMemo(() => {
+    if (posSettings?.deliveryControl?.enableMobileDelivery === true) return true;
+    return (vendors || []).some((v: any) => {
+      const pId = String(v.pointId || v.id || '').toLowerCase();
+      const type = String(v.type || '').toLowerCase();
+      const name = String(v.name || '').toLowerCase();
+      return type.includes('domicilio') || type.includes('moto') || name.includes('domicilio') || name.includes('repartidor') || pId.includes('domicilio');
+    });
+  }, [vendors, posSettings]);
+
+  useEffect(() => {
+    if (!hasMobileDeliveryVehicles) {
+      setDeliveryMode('pickup');
+    }
+  }, [hasMobileDeliveryVehicles]);
+
   // --- Formulario Checkout ---
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
@@ -1356,42 +1374,59 @@ export function ClientePedirView() {
 
             {/* SELECCIÓN SI EL CARRITO VA AL CLIENTE O EL CLIENTE VA AL CARRITO */}
             <div className="space-y-2">
-              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">¿Cómo deseas recibir tu pedido?</h3>
-              <div className="grid grid-cols-2 gap-2.5">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (!isInsideCoverage) {
-                      toast.error('Tu ubicación actual está fuera del perímetro de domicilio.');
-                      return;
-                    }
-                    setDeliveryMode('delivery');
-                  }}
-                  className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
-                    deliveryMode === 'delivery'
-                      ? 'bg-[#FF4040] text-white border-[#FF4040] shadow-md'
-                      : !isInsideCoverage
-                      ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed'
-                      : 'bg-gray-50 text-gray-700 border-gray-100'
-                  }`}
-                >
-                  <span className="text-3xl">🛵</span>
-                  <span className="leading-tight">Que el Carrito Móvil Venga a Mí</span>
-                </button>
+              <h3 className="text-xs font-black text-gray-400 uppercase tracking-widest">
+                {hasMobileDeliveryVehicles ? '¿Cómo deseas recibir tu pedido?' : 'Punto de Entrega'}
+              </h3>
 
-                <button
-                  type="button"
-                  onClick={() => setDeliveryMode('pickup')}
-                  className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
-                    deliveryMode === 'pickup'
-                      ? 'bg-blue-600 text-white border-blue-600 shadow-md'
-                      : 'bg-gray-50 text-gray-700 border-gray-100'
-                  }`}
-                >
-                  <span className="text-3xl">📍</span>
-                  <span className="leading-tight">Voy a Recoger al Triciclo</span>
-                </button>
-              </div>
+              {hasMobileDeliveryVehicles ? (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isInsideCoverage) {
+                        toast.error('Tu ubicación actual está fuera del perímetro de domicilio.');
+                        return;
+                      }
+                      setDeliveryMode('delivery');
+                    }}
+                    className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
+                      deliveryMode === 'delivery'
+                        ? 'bg-[#FF4040] text-white border-[#FF4040] shadow-md'
+                        : !isInsideCoverage
+                        ? 'bg-gray-100 text-gray-400 border-gray-200 opacity-60 cursor-not-allowed'
+                        : 'bg-gray-50 text-gray-700 border-gray-100'
+                    }`}
+                  >
+                    <span className="text-3xl">🛵</span>
+                    <span className="leading-tight">Que el Carrito Móvil Venga a Mí</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setDeliveryMode('pickup')}
+                    className={`p-4 rounded-2xl font-black text-xs flex flex-col items-center text-center gap-1.5 transition-all border-2 active:scale-95 ${
+                      deliveryMode === 'pickup'
+                        ? 'bg-blue-600 text-white border-blue-600 shadow-md'
+                        : 'bg-gray-50 text-gray-700 border-gray-100'
+                    }`}
+                  >
+                    <span className="text-3xl">📍</span>
+                    <span className="leading-tight">Voy a Recoger al Triciclo</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-blue-600 text-white flex items-center justify-center text-2xl font-black shrink-0 shadow-sm">
+                    📍
+                  </div>
+                  <div>
+                    <h4 className="font-black text-blue-950 text-xs uppercase tracking-tight">Recoger en el Triciclo Cercano</h4>
+                    <p className="text-[11px] font-bold text-blue-700 leading-snug mt-0.5">
+                      Los carritos están en sus rutas habituales. Tu pedido estará listo para retirar en el puesto más cercano.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* FORMULARIO */}
