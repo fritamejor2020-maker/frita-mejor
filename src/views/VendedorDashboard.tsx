@@ -860,31 +860,7 @@ export const VendedorDashboard = () => {
     >
       {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
       <ActiveCallBanner currentUserId={pointId || trackingId} />
-      
-      {/* BANNER FLOTANTE DE ALERTA NO BLOQUEANTE CUANDO EL VENDEDOR ESTÁ EN OTRA PESTAÑA */}
-      {pendingDelivery && activeTab !== 'deliveries' && (
-        <div 
-          onClick={() => setActiveTab('deliveries')}
-          className="fixed top-3 inset-x-3 z-[9999] max-w-lg mx-auto bg-amber-400 hover:bg-amber-500 text-gray-950 font-black p-3.5 rounded-2xl shadow-2xl flex items-center justify-between cursor-pointer border-2 border-white animate-bounce"
-        >
-          <div className="flex items-center gap-2.5">
-            <span className="text-2xl animate-pulse">🔔</span>
-            <div className="leading-tight">
-              <span className="text-[9px] font-black uppercase tracking-wider bg-[#FF4040] text-white px-2 py-0.5 rounded-full inline-block mb-0.5">
-                ¡Nuevo Pedido Recibido!
-              </span>
-              <p className="text-xs font-black text-gray-950">
-                {pendingDelivery.client_name} · <span className="text-red-700">{formatMoney(pendingDelivery.total_amount)}</span>
-              </p>
-            </div>
-          </div>
-          <span className="bg-gray-950 text-white text-[11px] font-black px-3 py-2 rounded-xl shadow-xs shrink-0 flex items-center gap-1">
-            Ver Pedido →
-          </span>
-        </div>
-      )}
-
-      {/* HEADER ULTRA COMPACTO */}
+           {/* HEADER ULTRA COMPACTO */}
       <div className="w-full bg-white shadow-sm relative z-10 rounded-b-2xl overflow-hidden">
         <div className="max-w-7xl mx-auto px-3.5 sm:px-6 py-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2 flex-wrap min-w-0 flex-1">
@@ -917,7 +893,7 @@ export const VendedorDashboard = () => {
             )}
           </div>
 
-          {/* Botón salir alineado dentro del flujo flex */}
+          {/* Botón salir */}
           <button
              onClick={() => signOut()}
              title="Salir (el turno sigue activo)"
@@ -931,78 +907,6 @@ export const VendedorDashboard = () => {
       <div className={`w-full max-w-7xl mx-auto px-2 sm:px-6 ${
         activeTab === 'chat' ? 'flex-1 min-h-0 flex flex-col overflow-hidden my-2 sm:my-3' : 'mt-8'
       }`}>
-        
-        {/* BANNER DE PEDIDO PENDIENTE (ALERTA URGENTE EN TODAS LAS PESTAÑAS) */}
-        {pendingDelivery && (
-          <div className="bg-gradient-to-br from-amber-400 via-amber-500 to-amber-600 rounded-[32px] p-5 text-gray-950 shadow-2xl shadow-amber-200/80 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-4 border-white animate-bounce">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-white/30 rounded-2xl flex items-center justify-center text-2xl shrink-0 mt-0.5 animate-pulse">
-                🔔
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="bg-red-600 text-white text-[9px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-wider w-max">
-                  ¡Nuevo Pedido Pendiente!
-                </span>
-                <h3 className="font-black text-lg text-gray-950 leading-tight">
-                  {pendingDelivery.client_name} ({formatMoney(pendingDelivery.total_amount)})
-                </h3>
-                <p className="text-xs font-bold text-amber-950/80 leading-snug">
-                  📍 {pendingDelivery.client_address || 'Cliente en mapa'} · 📞 {pendingDelivery.client_phone}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => handleRejectDelivery(pendingDelivery.id)}
-                className="bg-white/80 hover:bg-white text-red-600 font-black py-3 px-4 rounded-2xl shadow-sm text-xs transition-all active:scale-95 flex items-center gap-1"
-              >
-                <X size={16} strokeWidth={3} /> Rechazar
-              </button>
-              <button
-                onClick={() => handleAcceptDelivery(pendingDelivery.id)}
-                className="bg-green-600 hover:bg-green-700 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg text-sm transition-all active:scale-95 flex items-center gap-1.5"
-              >
-                <Check size={18} strokeWidth={3} /> ACEPTAR PEDIDO
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* BANNER DE PEDIDO ACTIVO (CAMINO AL CLIENTE) */}
-        {activeDelivery && (
-          <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-[32px] p-5 text-white shadow-xl shadow-green-200/50 mb-6 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-4 border-white animate-pulse">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center text-2xl shrink-0 mt-0.5">
-                🛵
-              </div>
-              <div className="flex flex-col gap-0.5">
-                <span className="bg-white/20 text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider w-max">
-                  Pedido Activo en Curso
-                </span>
-                <h3 className="text-lg font-black leading-tight">Cliente: {activeDelivery.client_name}</h3>
-                <p className="text-xs font-bold opacity-90">
-                  📞 <a href={`tel:${activeDelivery.client_phone}`} className="underline font-black">{activeDelivery.client_phone}</a>
-                  {activeDelivery.client_address && ` · 📍 ${activeDelivery.client_address}`}
-                </p>
-                <div className="flex flex-wrap gap-1 mt-1.5">
-                  {(activeDelivery.items || []).map((item: any, i: number) => (
-                    <span key={i} className="text-[10px] bg-white/10 font-bold px-2 py-0.5 rounded-full">
-                      {item.name} ×{item.qty}
-                    </span>
-                  ))}
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => handleCompleteDelivery(activeDelivery.id)}
-              className="bg-white hover:bg-green-50 text-green-700 font-black py-3.5 px-6 rounded-2xl shadow-md transition-all active:scale-95 text-sm whitespace-nowrap shrink-0 flex items-center justify-center gap-1.5"
-            >
-              <CheckCircle size={16} strokeWidth={2.5} /> ENTREGAR PEDIDO
-            </button>
-          </div>
-        )}
-        
-        {/* SUBVISTA: POS (Venta Rápida) */}
         {activeTab === 'pos' && (
           <div>
             {posProducts.length === 0 ? (
