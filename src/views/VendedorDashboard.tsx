@@ -724,46 +724,55 @@ export const VendedorDashboard = () => {
       // 2. Detener GPS
       try { gpsStop().catch(() => {}); } catch (_) {}
 
-      // 3. Escribir directamente a Supabase para garantizar cierre remoto
+      // 3. Escribir directamente a Supabase para garantizar cierre remoto absoluto en TODAS las llaves de posShifts y vendorLocations
       try {
-        const keysToUpdate = [
-          'posShifts',
-          `posShifts_${activeBranchId}`,
-          'posShifts_BRANCH-001',
-          'posShifts_master_history'
-        ];
-
         const { data: remoteData } = await supabase
           .from('app_state')
           .select('key, value')
-          .in('key', keysToUpdate);
+          .or('key.ilike.posShifts%,key.ilike.vendorLocations%');
 
         const upsertPromises = (remoteData || []).map(row => {
-          const list = Array.isArray(row.value) ? row.value : [];
-          let modified = false;
-          const closedList = list.map((s: any) => {
-            if (s.type !== 'VENDEDOR' || s.closedAt) return s;
-            const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
-            const isMatchByPoint = matchesPointId(s.pointId, pointId);
-            const isMatchByName = s.responsibleName && responsibleName &&
-              String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
+          const k = row.key || '';
+          if (k.includes('posShifts')) {
+            const list = Array.isArray(row.value) ? row.value : [];
+            let modified = false;
+            const closedList = list.map((s: any) => {
+              if (s.closedAt) return s;
+              const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
+              const isMatchByPoint = matchesPointId(s.pointId, pointId);
+              const isMatchByName = s.responsibleName && responsibleName &&
+                String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
 
-            if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
-              modified = true;
-              return { ...s, ...finalShift, id: s.id, closedAt: closeTime };
+              if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
+                modified = true;
+                return { ...s, ...finalShift, id: s.id, closedAt: closeTime };
+              }
+              return s;
+            });
+
+            if (!modified) {
+              closedList.push(finalShift);
             }
-            return s;
-          });
 
-          if (!modified) {
-            closedList.push(finalShift);
+            return supabase.from('app_state').upsert({
+              key: row.key,
+              value: closedList,
+              updated_at: closeTime
+            }, { onConflict: 'key' });
+          } else if (k.includes('vendorLocations')) {
+            const locMap = (row.value && typeof row.value === 'object') ? { ...row.value } : {};
+            Object.keys(locMap).forEach(vk => {
+              if (matchesPointId(vk, pointId) || matchesPointId(locMap[vk]?.pointId, pointId)) {
+                locMap[vk] = { ...locMap[vk], isActive: false, updatedAt: closeTime };
+              }
+            });
+            return supabase.from('app_state').upsert({
+              key: row.key,
+              value: locMap,
+              updated_at: closeTime
+            }, { onConflict: 'key' });
           }
-
-          return supabase.from('app_state').upsert({
-            key: row.key,
-            value: closedList,
-            updated_at: closeTime
-          }, { onConflict: 'key' });
+          return Promise.resolve();
         });
 
         await Promise.allSettled([

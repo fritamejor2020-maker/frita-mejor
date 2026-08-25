@@ -623,24 +623,38 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    // ── Deduplicar por ID exacto preservando el estado más completo / cerrado ──
-    const byId = new Map<string, any>();
+    // ── Deduplicar por vehículo y fecha preservando el estado CERRADO más reciente ──
+    const vehicleDateMap = new Map<string, any>();
     raw.forEach((s: any) => {
       if (!s?.id) return;
-      const existing = byId.get(s.id);
+      const rawP = s.pointId || s.vehicle || 'PUNTO';
+      const cleanP = String(rawP).toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const numMatch = cleanP.match(/\d+/);
+      const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanP;
+      const sDate = s.fecha || s.date || dateOf(s.openedAt || s.closedAt || '');
+
+      const key = `${vehicleCode}_${sDate || 'TODAY'}`;
+      const existing = vehicleDateMap.get(key);
+
       if (!existing) {
-        byId.set(s.id, s);
-      } else if (!existing.closedAt && s.closedAt) {
-        // Preferir el que tiene cierre
-        byId.set(s.id, s);
-      } else if (s.closedAt && existing.closedAt) {
-        if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-          byId.set(s.id, s);
+        vehicleDateMap.set(key, s);
+      } else {
+        // Preferir el turno que tenga cierre registrado para ese vehículo hoy
+        if (!existing.closedAt && s.closedAt) {
+          vehicleDateMap.set(key, s);
+        } else if (existing.closedAt && s.closedAt) {
+          if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+            vehicleDateMap.set(key, s);
+          }
+        } else if (!existing.closedAt && !s.closedAt) {
+          if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
+            vehicleDateMap.set(key, s);
+          }
         }
       }
     });
 
-    return Array.from(byId.values());
+    return Array.from(vehicleDateMap.values());
   }, [posShifts, supabaseShifts]);
 
   // Fecha de hoy local
