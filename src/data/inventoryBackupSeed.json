@@ -337,7 +337,8 @@
     "referencePrice": 700,
     "sortOrder": 17,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-64",
@@ -357,7 +358,8 @@
     "referencePrice": 1000,
     "sortOrder": 18,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-12",
@@ -377,7 +379,8 @@
     "referencePrice": 2500,
     "sortOrder": 19,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-14",
@@ -397,7 +400,8 @@
     "referencePrice": 2500,
     "sortOrder": 20,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-15",
@@ -417,7 +421,8 @@
     "referencePrice": 2500,
     "sortOrder": 21,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-13",
@@ -437,7 +442,8 @@
     "referencePrice": 2000,
     "sortOrder": 22,
     "inTricycles": true,
-    "showInPos": true
+    "showInPos": true,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-16",
@@ -455,7 +461,8 @@
     "posCategoryId": "CAT-1784042382916",
     "variablePrice": true,
     "referencePrice": 0,
-    "sortOrder": 122
+    "sortOrder": 122,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-17",
@@ -473,7 +480,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 12000,
-    "sortOrder": 123
+    "sortOrder": 123,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-18",
@@ -491,7 +499,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 124
+    "sortOrder": 124,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-19",
@@ -509,7 +518,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 125
+    "sortOrder": 125,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-20",
@@ -527,7 +537,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3000,
-    "sortOrder": 126
+    "sortOrder": 126,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-21",
@@ -545,7 +556,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 127
+    "sortOrder": 127,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-22",
@@ -563,7 +575,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 128
+    "sortOrder": 128,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-23",
@@ -581,7 +594,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 129
+    "sortOrder": 129,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-24",
@@ -599,7 +613,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 130
+    "sortOrder": 130,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-25",
@@ -617,7 +632,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 9500,
-    "sortOrder": 131
+    "sortOrder": 131,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-26",
@@ -635,7 +651,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 132
+    "sortOrder": 132,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-27",
@@ -653,7 +670,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 133
+    "sortOrder": 133,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-28",
@@ -671,7 +689,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 9500,
-    "sortOrder": 134
+    "sortOrder": 134,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-29",
@@ -689,7 +708,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 135
+    "sortOrder": 135,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-30",
@@ -707,7 +727,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 136
+    "sortOrder": 136,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-31",
@@ -725,7 +746,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 137
+    "sortOrder": 137,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-32",
@@ -743,7 +765,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 138
+    "sortOrder": 138,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-33",
@@ -761,7 +784,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 139
+    "sortOrder": 139,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-34",
@@ -779,7 +803,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 140
+    "sortOrder": 140,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-35",
@@ -797,7 +822,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2000,
-    "sortOrder": 141
+    "sortOrder": 141,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-36",
@@ -815,7 +841,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 142
+    "sortOrder": 142,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-37",
@@ -833,7 +860,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 143
+    "sortOrder": 143,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-38",
@@ -851,7 +879,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2000,
-    "sortOrder": 144
+    "sortOrder": 144,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-39",
@@ -869,7 +898,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 145
+    "sortOrder": 145,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-40",
@@ -887,7 +917,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 146
+    "sortOrder": 146,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-41",
@@ -905,7 +936,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2000,
-    "sortOrder": 147
+    "sortOrder": 147,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-42",
@@ -923,7 +955,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 148
+    "sortOrder": 148,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-43",
@@ -941,7 +974,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 149
+    "sortOrder": 149,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-44",
@@ -959,7 +993,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 150
+    "sortOrder": 150,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-45",
@@ -977,7 +1012,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 151
+    "sortOrder": 151,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-46",
@@ -995,7 +1031,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 152
+    "sortOrder": 152,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-47",
@@ -1013,7 +1050,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 6500,
-    "sortOrder": 153
+    "sortOrder": 153,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-48",
@@ -1031,7 +1069,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 154
+    "sortOrder": 154,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-49",
@@ -1049,7 +1088,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2500,
-    "sortOrder": 155
+    "sortOrder": 155,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-50",
@@ -1067,7 +1107,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 156
+    "sortOrder": 156,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-51",
@@ -1085,7 +1126,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 157
+    "sortOrder": 157,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-52",
@@ -1103,7 +1145,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2500,
-    "sortOrder": 158
+    "sortOrder": 158,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-53",
@@ -1121,7 +1164,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2000,
-    "sortOrder": 159
+    "sortOrder": 159,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-54",
@@ -1159,7 +1203,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 2500,
-    "sortOrder": 161
+    "sortOrder": 161,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-56",
@@ -1177,7 +1222,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 162
+    "sortOrder": 162,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-59",
@@ -1195,7 +1241,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3000,
-    "sortOrder": 165
+    "sortOrder": 165,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-60",
@@ -1213,7 +1260,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 500,
-    "sortOrder": 166
+    "sortOrder": 166,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-61",
@@ -1285,7 +1333,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 174
+    "sortOrder": 174,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-69",
@@ -1303,7 +1352,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 1000,
-    "sortOrder": 175
+    "sortOrder": 175,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-70",
@@ -1321,7 +1371,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 1500,
-    "sortOrder": 176
+    "sortOrder": 176,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-72",
@@ -1339,7 +1390,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 8000,
-    "sortOrder": 178
+    "sortOrder": 178,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-73",
@@ -1357,7 +1409,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4500,
-    "sortOrder": 179
+    "sortOrder": 179,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-74",
@@ -1375,7 +1428,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4500,
-    "sortOrder": 180
+    "sortOrder": 180,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-75",
@@ -1393,7 +1447,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4500,
-    "sortOrder": 181
+    "sortOrder": 181,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-76",
@@ -1411,7 +1466,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 182
+    "sortOrder": 182,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-77",
@@ -1429,7 +1485,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3000,
-    "sortOrder": 183
+    "sortOrder": 183,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-78",
@@ -1447,7 +1504,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 4000,
-    "sortOrder": 184
+    "sortOrder": 184,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-79",
@@ -1465,7 +1523,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3000,
-    "sortOrder": 185
+    "sortOrder": 185,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-80",
@@ -1483,7 +1542,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 3500,
-    "sortOrder": 186
+    "sortOrder": 186,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-81",
@@ -1537,7 +1597,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 12000,
-    "sortOrder": 189
+    "sortOrder": 189,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-84",
@@ -1575,7 +1636,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 5000,
-    "sortOrder": 191
+    "sortOrder": 191,
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-86",
@@ -1629,7 +1691,8 @@
     "posCategoryId": "CAT-002",
     "variablePrice": false,
     "referencePrice": 7500,
-    "sortOrder": 194
+    "sortOrder": 194,
+    "showInTricicloPos": true
   },
   {
     "id": "INS-001",

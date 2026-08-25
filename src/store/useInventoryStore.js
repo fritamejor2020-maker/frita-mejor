@@ -722,7 +722,7 @@ export const useInventoryStore = create(
         const NON_PHYSICAL_SERVICES = new Set(['Bebida No Guardada', 'Domicilio Transferencia', 'Producto No Registrado']);
 
         let filtered = inv.filter((i) => {
-          if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO') return false;
+          if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.type === 'BEBIDA' || i.posCategoryId === 'CAT-002') return false;
           if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
           if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
           return i.inTricycles === true || i.inTricycles === 'true';
@@ -730,7 +730,7 @@ export const useInventoryStore = create(
 
         if (filtered.length === 0) {
           filtered = (inventoryBackupSeed || []).filter((i) => {
-            if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO') return false;
+            if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.type === 'BEBIDA' || i.posCategoryId === 'CAT-002') return false;
             if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
             if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
             return i.inTricycles === true || i.inTricycles === 'true';
