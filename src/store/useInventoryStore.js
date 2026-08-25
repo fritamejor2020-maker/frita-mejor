@@ -702,7 +702,7 @@ export const useInventoryStore = create(
 
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir).
-       * Incluye exactamente los productos vendibles habilitados para triciclos.
+       * Incluye estrictamente los productos configurados por el Admin en 'Productos Triciclos' (inTricycles === true).
        */
       getDeliveryItems: () => {
         let inv = get().inventory || [];
@@ -710,28 +710,16 @@ export const useInventoryStore = create(
           inv = inventoryBackupSeed || [];
         }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-        const OFFICIAL_TRICYCLE_NAMES = new Set([
-          'Empanada', 'Pastel', 'Maduro', 'Chorizo', 'Hamburguesa de Patacón',
-          'Hamburguesa de Arepa', 'Hamburguesa Sencilla', 'Bofe', 'Rellena',
-          'Chicharrón', 'Hueso', 'Arepa de Huevo', 'Chunchulla', 'Picada',
-          'Hamburguesa de Pollo', 'Azadura', 'Café', 'Café con Leche',
-          'Limonada', 'Avena 10 Oz', 'Masato 10 Oz', 'Bebida 7 Oz',
-          'Gatorade 500 ml', 'Arepamix', 'Cambio'
-        ]);
 
-        const filtered = inv.filter((i) => {
+        return inv.filter((i) => {
           if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO') return false;
-          if (i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true) return true;
-          if (i.inTricycles === undefined && OFFICIAL_TRICYCLE_NAMES.has(i.name?.trim())) return true;
-          return false;
+          return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
         });
-
-        return filtered;
       },
 
       /**
        * Productos del POS del Vendedor de triciclo (Venta Rápida).
-       * Incluye exactamente los productos vendibles en punto de venta de triciclo.
+       * Incluye estrictamente los productos configurados por el Admin en 'Productos Triciclos' (inTricycles === true).
        */
       getVendedorPosItems: () => {
         let inv = get().inventory || [];
@@ -739,23 +727,11 @@ export const useInventoryStore = create(
           inv = inventoryBackupSeed || [];
         }
         const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-        const OFFICIAL_TRICYCLE_NAMES = new Set([
-          'Empanada', 'Pastel', 'Maduro', 'Chorizo', 'Hamburguesa de Patacón',
-          'Hamburguesa de Arepa', 'Hamburguesa Sencilla', 'Bofe', 'Rellena',
-          'Chicharrón', 'Hueso', 'Arepa de Huevo', 'Chunchulla', 'Picada',
-          'Hamburguesa de Pollo', 'Azadura', 'Café', 'Café con Leche',
-          'Limonada', 'Avena 10 Oz', 'Masato 10 Oz', 'Bebida 7 Oz',
-          'Gatorade 500 ml', 'Arepamix'
-        ]);
 
-        const filtered = inv.filter((i) => {
+        return inv.filter((i) => {
           if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
-          if (i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true) return true;
-          if (i.inTricycles === undefined && OFFICIAL_TRICYCLE_NAMES.has(i.name?.trim())) return true;
-          return false;
+          return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
         });
-
-        return filtered;
       },
 
 
