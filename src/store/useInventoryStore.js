@@ -757,6 +757,15 @@ export const useInventoryStore = create(
           if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
           return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
         });
+
+        if (filtered.length === 0) {
+          filtered = (inventoryBackupSeed || []).filter((i) => {
+            if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+            return i.inTricycles === true || TRICYCLE_NAMES.has(i.name?.trim());
+          });
+        }
+
+        return filtered || [];
       },
 
 

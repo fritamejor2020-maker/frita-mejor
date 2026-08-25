@@ -47,11 +47,11 @@ export const VendedorDashboard = () => {
   const vendedorTemplates = loadTemplates?.filter((t: any) =>
     t.role === 'VENDEDOR' && (!t.userId || t.userId === (user as any)?.id)
   ) || [];
-  const products = getVendedorPosItems();
-  const posProducts = products.filter((p) => p.showInPos !== false);
+  const products = getVendedorPosItems() || [];
+  const posProducts = (products || []).filter((p) => p && p.showInPos !== false);
   // Para pedir surtido: incluye productos con showInPos:false (ej. "Cambio")
   // pero excluye los marcados showInTricicloPos:true (solo POS, no requieren carga)
-  const restockProducts = getDeliveryItems();
+  const restockProducts = getDeliveryItems() || [];
 
   // Modales propios (window.confirm/prompt bloqueados en Android PWA)
   const [showSaveTemplate, setShowSaveTemplate] = useState(false);
