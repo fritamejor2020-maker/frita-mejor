@@ -236,7 +236,7 @@
     "variablePrice": false,
     "referencePrice": 4000,
     "sortOrder": 12,
-    "inTricycles": true,
+    "inTricycles": false,
     "showInPos": true
   },
   {
@@ -256,7 +256,7 @@
     "variablePrice": false,
     "referencePrice": 8000,
     "sortOrder": 13,
-    "inTricycles": true,
+    "inTricycles": false,
     "showInPos": true
   },
   {
@@ -276,7 +276,7 @@
     "variablePrice": false,
     "referencePrice": 30000,
     "sortOrder": 14,
-    "inTricycles": true,
+    "inTricycles": false,
     "showInPos": true
   },
   {
@@ -296,7 +296,7 @@
     "variablePrice": false,
     "referencePrice": 5500,
     "sortOrder": 15,
-    "inTricycles": true,
+    "inTricycles": false,
     "showInPos": true
   },
   {
@@ -1140,7 +1140,7 @@
     "variablePrice": false,
     "referencePrice": 4000,
     "sortOrder": 160,
-    "inTricycles": true,
+    "inTricycles": false,
     "showInPos": true
   },
   {
