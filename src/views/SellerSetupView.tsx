@@ -135,7 +135,7 @@ export const SellerSetupView = () => {
         if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
           myMineMap.set(vehicleKey, s);
         }
-      } else if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN' || user.role === 'MANAGER') {
+      } else {
         const ex = othersMap.get(vehicleKey);
         if (!ex || new Date(s.openedAt || 0).getTime() > new Date(ex.openedAt || 0).getTime()) {
           othersMap.set(vehicleKey, s);
@@ -288,31 +288,19 @@ export const SellerSetupView = () => {
     );
 
     if (openShift) {
-      const shiftResp = String(openShift.responsibleName || '').trim().toLowerCase();
-      const shiftUid = String(openShift.userId || openShift.createdBy || '').trim().toLowerCase();
-
-      const isOwner = (currentUserId && shiftUid && shiftUid === currentUserId) ||
-                      (currentUserName && shiftResp && shiftResp === currentUserName) ||
-                      (user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN' || user?.role === 'MANAGER');
-
-      if (isOwner) {
-        // Reanudar turno abierto existente
-        startShift({
-          id: openShift.id,
-          pointId,
-          shift: openShift.shift || shift,
-          pointType: openShift.pointType || pointType,
-          responsibleName: openShift.responsibleName || finalResponsibleName,
-          openedAt: openShift.openedAt,
-          userId: user?.id || user?.username,
-          branchId: openShift.branchId || effectiveBranchId,
-        });
-        navigate('/vendedor');
-        return;
-      } else {
-        alert(`⚠️ El vehículo/punto "${pointId}" ya tiene un turno abierto en la jornada "${shift}" por el usuario "${openShift.responsibleName || 'otro vendedor'}".\n\nSolo el usuario que abrió este turno puede reanudarlo en cualquier dispositivo.`);
-        return;
-      }
+      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo sin bloquear
+      startShift({
+        id: openShift.id,
+        pointId,
+        shift: openShift.shift || shift,
+        pointType: openShift.pointType || pointType,
+        responsibleName: openShift.responsibleName || finalResponsibleName,
+        openedAt: openShift.openedAt,
+        userId: user?.id || user?.username,
+        branchId: openShift.branchId || effectiveBranchId,
+      });
+      navigate('/vendedor');
+      return;
     }
 
     // 2. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
