@@ -46,6 +46,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   const applicators = {};
 
   // ── Globales (sin sufijo) ──
+  applicators['inventory']         = (v) => {
+    if (Array.isArray(v)) {
+      const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+      const deletedInvIds = new Set(useInventoryStore.getState().deletedInventoryIds || []);
+      const filtered = v.filter(i => i?.id && !deletedInvIds.has(i.id) && !DEMO_PRD_SET.has(i.id));
+      useInventoryStore.setState({ inventory: filtered });
+    }
+  };
   applicators['warehouses']        = (v) => useInventoryStore.setState({ warehouses: v });
   applicators['products']          = (v) => useInventoryStore.setState({ products: v });
   applicators['movements']         = (v) => useInventoryStore.setState({ movements: v });
@@ -148,7 +156,15 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     : [branchId];
 
   for (const bid of effectiveBranches) {
-    // ── POS ──
+    // ── POS & Inventario ──
+    applicators[`inventory_${bid}`]        = (v) => {
+      if (Array.isArray(v)) {
+        const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
+        const deletedInvIds = new Set(useInventoryStore.getState().deletedInventoryIds || []);
+        const filtered = v.filter(i => i?.id && !deletedInvIds.has(i.id) && !DEMO_PRD_SET.has(i.id));
+        useInventoryStore.setState({ inventory: filtered });
+      }
+    };
     applicators[`posSettings_${bid}`]      = (v) => useInventoryStore.setState({ posSettings: v });
     applicators[`posShifts_${bid}`]        = (v) => {
       const state = useInventoryStore.getState();
