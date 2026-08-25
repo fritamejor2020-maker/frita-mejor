@@ -206,7 +206,7 @@ export const VendedorDashboard = () => {
     }
   }, [customerDeliveryRequests, pointId, trackingId, user, responsibleName]);
 
-  // 2. Respaldo de Polling Directo cada 2.5s a Supabase app_state
+  // 2. Respaldo de Polling Directo ultra-rápido (1.5s) a Supabase app_state + Auto-rotación de 60s
   useEffect(() => {
     const syncCustomerOrders = async () => {
       try {
@@ -216,16 +216,83 @@ export const VendedorDashboard = () => {
           .eq('key', 'customer_delivery_requests')
           .maybeSingle();
 
-        if (data?.value && Array.isArray(data.value)) {
-          useLogisticsStore.setState({ customerDeliveryRequests: data.value });
+        let orders: any[] = (data?.value && Array.isArray(data.value)) ? data.value : [];
+        if (orders.length === 0) {
+          try {
+            const cached = localStorage.getItem('fm_customer_delivery_requests');
+            if (cached) orders = JSON.parse(cached);
+          } catch (e) {}
+        } else {
+          try {
+            localStorage.setItem('fm_customer_delivery_requests', JSON.stringify(orders));
+          } catch (e) {}
+        }
+
+        // ── MOTOR DE AUTO-ROTACIÓN (60 SEGUNDOS SIN RESPUESTA) ──
+        const now = Date.now();
+        let hasRotated = false;
+
+        const updatedOrders = orders.map((o: any) => {
+          if (o.status !== 'pending') return o;
+          const assignedTime = new Date(o.assigned_at || o.created_at || 0).getTime();
+          const elapsedSeconds = (now - assignedTime) / 1000;
+
+          if (elapsedSeconds < 60) return o; // Aún no cumple 1 minuto sin responder
+
+          // ¡Pasaron 60 segundos sin que el vendedor acepte!
+          hasRotated = true;
+          const currentTarget = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const prevRejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
+          if (currentTarget && !prevRejected.includes(currentTarget)) {
+            prevRejected.push(currentTarget);
+          }
+
+          // Buscar todos los turnos abiertos de vendedores en posShifts
+          const allShifts = useInventoryStore.getState().posShifts || [];
+          const activeSellers = allShifts.filter((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR');
+
+          const nextSellerShift = activeSellers.find((s: any) => {
+            const pId = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const uId = String(s.userId || s.userName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            const rName = String(s.responsibleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+            return !prevRejected.includes(pId) && !prevRejected.includes(uId) && (!rName || !prevRejected.includes(rName));
+          });
+
+          if (nextSellerShift) {
+            const nextCode = nextSellerShift.pointId || nextSellerShift.vehicle || 'T2';
+            const nextName = nextSellerShift.responsibleName || nextSellerShift.userName || nextCode;
+            console.log(`[AutoRotate 60s] Reasignando pedido ${o.id} de ${o.assigned_vendor_name} a ${nextName}`);
+            return {
+              ...o,
+              assigned_vendor_id: nextCode,
+              assigned_vendor_name: nextName,
+              assigned_at: new Date().toISOString(),
+              rejected_vendor_ids: prevRejected,
+            };
+          } else {
+            console.log(`[AutoRotate 60s] Ningún vendedor aceptó el pedido ${o.id}. Marcando como rechazado.`);
+            return {
+              ...o,
+              status: 'rejected',
+              rejected_at: new Date().toISOString(),
+              rejected_vendor_ids: prevRejected,
+            };
+          }
+        });
+
+        if (hasRotated) {
+          useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
+          push('customer_delivery_requests', updatedOrders).catch(() => {});
+        } else {
+          useLogisticsStore.setState({ customerDeliveryRequests: orders });
         }
       } catch (e) {}
     };
 
     syncCustomerOrders();
-    const interval = setInterval(syncCustomerOrders, 2500);
+    const interval = setInterval(syncCustomerOrders, 1500);
 
-    const channel = supabase.channel(`vendor-delivery-direct-sync`)
+    const channel = supabase.channel(`vendor-delivery-direct-sync-${Date.now()}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',

@@ -643,6 +643,53 @@ export function ClientePedirView() {
           if (match.status === 'completed' || match.status === 'rejected') {
             return true;
           }
+
+          // ── REGLA DE AUTO-ROTACIÓN: 60s (1 MINUTO) SIN RESPUESTA EN CLIENTE ──
+          if (match.status === 'pending') {
+            const assignedTime = new Date(match.assigned_at || match.created_at || 0).getTime();
+            const elapsedSeconds = (Date.now() - assignedTime) / 1000;
+
+            if (elapsedSeconds >= 60) {
+              const currentVendorId = String(match.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+              const prevRejected = (match.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
+              if (currentVendorId && !prevRejected.includes(currentVendorId)) {
+                prevRejected.push(currentVendorId);
+              }
+
+              // Buscar el siguiente carrito activo más cercano que no haya sido intentado
+              const nextVendor = activeVendorsAround.find(v => {
+                const vCode = String(v.pointId || v.id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                const vUser = String(v.vendorId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                return !prevRejected.includes(vCode) && !prevRejected.includes(vUser);
+              });
+
+              if (nextVendor) {
+                const nextCode = nextVendor.pointId || nextVendor.id || 'T2';
+                const nextName = nextVendor.name || nextVendor.responsibleName || nextCode;
+                toast.error(`⏱️ ${match.assigned_vendor_name || 'El carrito anterior'} no respondió en 1 min. ¡Reasignando a ${nextName}!`);
+                
+                const updatedMatch = {
+                  ...match,
+                  assigned_vendor_id: nextCode,
+                  assigned_vendor_name: nextName,
+                  assigned_at: new Date().toISOString(),
+                  rejected_vendor_ids: prevRejected,
+                };
+                setActiveOrder(updatedMatch);
+
+                const updatedOrders = orders.map((o: any) => o.id === activeOrderId ? updatedMatch : o);
+                push('customer_delivery_requests', updatedOrders).catch(() => {});
+              } else {
+                toast.error('😢 Ningún carrito disponible pudo responder en este momento.');
+                const rejectedMatch = { ...match, status: 'rejected', rejected_vendor_ids: prevRejected };
+                setActiveOrder(rejectedMatch);
+
+                const updatedOrders = orders.map((o: any) => o.id === activeOrderId ? rejectedMatch : o);
+                push('customer_delivery_requests', updatedOrders).catch(() => {});
+                return true;
+              }
+            }
+          }
         }
       } catch (e) {}
       return false;
@@ -651,7 +698,7 @@ export function ClientePedirView() {
     const isFinished = await checkStateOrder();
     if (isFinished) return;
 
-    const channel = supabase.channel(`order-track-${activeOrderId}`)
+    const channel = supabase.channel(`order-track-${activeOrderId}-${Date.now()}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
@@ -668,7 +715,7 @@ export function ClientePedirView() {
         clearInterval(interval);
         supabase.removeChannel(channel);
       }
-    }, 3000);
+    }, 2500);
 
     return () => {
       clearInterval(interval);
