@@ -316,33 +316,35 @@ export const VendedorDashboard = () => {
     }
 
     try {
-      const { data } = await supabase
-        .from('app_state')
-        .select('value')
-        .eq('key', 'customer_delivery_requests')
-        .maybeSingle();
-
-      const orders: any[] = data?.value || [];
-      const idx = orders.findIndex((o: any) => o.id === orderId);
+      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
       if (idx !== -1) {
-        orders[idx] = {
-          ...orders[idx],
+        const acceptedOrder = {
+          ...currentOrders[idx],
           status: 'accepted',
           accepted_at: new Date().toISOString(),
           accepted_vendor_name: responsibleName || pointId || 'Vendedor'
         };
-        await push('customer_delivery_requests', orders);
-        setActiveDelivery(orders[idx]);
+        const updatedOrders = [...currentOrders];
+        updatedOrders[idx] = acceptedOrder;
+
+        // 1. Estado local e instantáneo en 0ms
+        useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
+        setActiveDelivery(acceptedOrder);
         setPendingDelivery(null);
         toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
+
+        // 2. Persistir en Supabase en segundo plano
+        push('customer_delivery_requests', updatedOrders).catch(() => {});
+        try {
+          localStorage.setItem('fm_customer_delivery_requests', JSON.stringify(updatedOrders));
+        } catch (e) {}
+      } else {
+        setPendingDelivery(null);
       }
     } catch (e) {
-      toast.error('Error al aceptar el pedido.');
+      console.error(e);
     }
-
-    Promise.resolve(supabase.from('delivery_requests')
-      .update({ status: 'accepted', accepted_at: new Date().toISOString() })
-      .eq('id', orderId)).catch(() => {});
   };
 
   const handleRejectDelivery = async (orderId: string) => {
@@ -352,68 +354,71 @@ export const VendedorDashboard = () => {
     }
 
     try {
-      const { data } = await supabase
-        .from('app_state')
-        .select('value')
-        .eq('key', 'customer_delivery_requests')
-        .maybeSingle();
+      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
+      if (idx === -1) {
+        setPendingDelivery(null);
+        return;
+      }
 
-      const orders: any[] = data?.value || [];
-      const idx = orders.findIndex((o: any) => o.id === orderId);
-      if (idx === -1) return;
-
-      const order = orders[idx];
-      const rejectedList = Array.from(new Set([...(order.rejected_vendor_ids || []), trackingId, pointId].filter(Boolean)));
+      const order = currentOrders[idx];
+      const cleanCurrentPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanCurrentUser = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const rejectedList = Array.from(new Set([
+        ...(order.rejected_vendor_ids || []),
+        cleanCurrentPoint,
+        cleanCurrentUser,
+        pointId,
+        trackingId
+      ].filter(Boolean)));
 
       // Buscar otros vendedores con turno ABIERTO de HOY
       const currentShifts = useInventoryStore.getState().posShifts || [];
       const activeVendorShifts = currentShifts.filter((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR');
 
-      const locations = useInventoryStore.getState().vendorLocations || {};
+      const nextSellerShift = activeVendorShifts.find((s: any) => {
+        const vPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const vUser  = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        return !rejectedList.some((r: any) => {
+          const cleanR = String(r).toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanR === vPoint || cleanR === vUser;
+        });
+      });
 
-      const candidates = activeVendorShifts
-        .filter((s: any) => {
-          const vPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const vUser  = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return !rejectedList.some((r: string) => {
-            const cleanR = String(r).toLowerCase().replace(/[^a-z0-9]/g, '');
-            return cleanR === vPoint || cleanR === vUser;
-          });
-        })
-        .map((s: any) => {
-          const pId = s.pointId || s.vehicle;
-          const loc = locations[pId] || Object.values(locations).find((l: any) => l.pointId === pId);
-          const lat = loc?.lat || 1.8485;
-          const lng = loc?.lng || -76.0522;
-          const distance = getHaversineDistance(order.client_lat, order.client_lng, lat, lng);
-          return { shift: s, pId, name: s.responsibleName || pId, distance };
-        })
-        .sort((a, b) => a.distance - b.distance);
-
-      if (candidates.length > 0) {
-        // Reasignar al siguiente carrito más cercano
-        const nextVendor = candidates[0];
-        orders[idx] = {
+      let updatedOrder: any;
+      if (nextSellerShift) {
+        const nextCode = nextSellerShift.pointId || nextSellerShift.vehicle || 'T2';
+        const nextName = nextSellerShift.responsibleName || nextSellerShift.userName || nextCode;
+        updatedOrder = {
           ...order,
-          assigned_vendor_id: nextVendor.pId,
-          assigned_vendor_name: nextVendor.name,
+          assigned_vendor_id: nextCode,
+          assigned_vendor_name: nextName,
+          assigned_at: new Date().toISOString(),
           rejected_vendor_ids: rejectedList,
           status: 'pending'
         };
-        toast.info(`Pedido reasignado al siguiente carrito más cercano (${nextVendor.pId}) 🛵`);
+        toast.info(`Pedido reasignado al siguiente carrito (${nextCode}) 🛵`);
       } else {
-        // No hay más carritos disponibles
-        orders[idx] = {
+        updatedOrder = {
           ...order,
           rejected_vendor_ids: rejectedList,
           status: 'rejected'
         };
-        toast.info('No hay más carritos disponibles para este pedido.');
+        toast.info('No hay más carritos disponibles.');
       }
 
-      await push('customer_delivery_requests', orders);
+      const updatedOrders = [...currentOrders];
+      updatedOrders[idx] = updatedOrder;
 
+      // 1. Estado local e instantáneo en 0ms
+      useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
       setPendingDelivery(null);
+
+      // 2. Persistir en Supabase en segundo plano
+      push('customer_delivery_requests', updatedOrders).catch(() => {});
+      try {
+        localStorage.setItem('fm_customer_delivery_requests', JSON.stringify(updatedOrders));
+      } catch (e) {}
     } catch (err: any) {
       console.error('Error rejecting delivery:', err);
     }
@@ -856,67 +861,26 @@ export const VendedorDashboard = () => {
       {/* 📞 Banner Flotante Global de Llamada Activa (Funciona en todas las pestañas) */}
       <ActiveCallBanner currentUserId={pointId || trackingId} />
       
-      {/* OVERLAY DE PEDIDO ENTRANTE (UBER-STYLE ALERT) */}
-      {pendingDelivery && (
-        <div className="fixed inset-0 bg-black/85 backdrop-blur-sm z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[40px] w-full max-w-md p-6 sm:p-8 shadow-2xl border-4 border-[#FFB700] animate-bounce flex flex-col gap-5 text-center relative overflow-hidden">
-            <div className="absolute top-0 inset-x-0 h-3 bg-gradient-to-r from-amber-400 via-red-500 to-amber-400"></div>
-            
-            <div className="w-20 h-20 bg-amber-100 rounded-full flex items-center justify-center text-4xl mx-auto border-4 border-amber-300 animate-pulse">
-              🔔
-            </div>
-
-            <div>
-              <span className="bg-[#FF4040] text-white font-black text-xs px-3 py-1 rounded-full uppercase tracking-wider">
+      {/* BANNER FLOTANTE DE ALERTA NO BLOQUEANTE CUANDO EL VENDEDOR ESTÁ EN OTRA PESTAÑA */}
+      {pendingDelivery && activeTab !== 'deliveries' && (
+        <div 
+          onClick={() => setActiveTab('deliveries')}
+          className="fixed top-3 inset-x-3 z-[9999] max-w-lg mx-auto bg-amber-400 hover:bg-amber-500 text-gray-950 font-black p-3.5 rounded-2xl shadow-2xl flex items-center justify-between cursor-pointer border-2 border-white animate-bounce"
+        >
+          <div className="flex items-center gap-2.5">
+            <span className="text-2xl animate-pulse">🔔</span>
+            <div className="leading-tight">
+              <span className="text-[9px] font-black uppercase tracking-wider bg-[#FF4040] text-white px-2 py-0.5 rounded-full inline-block mb-0.5">
                 ¡Nuevo Pedido Recibido!
               </span>
-              <h3 className="text-2xl font-black text-gray-900 mt-2 leading-none">{pendingDelivery.client_name}</h3>
-              <p className="text-sm font-bold text-gray-400 mt-1">📞 {pendingDelivery.client_phone}</p>
-            </div>
-
-            {/* Address & Items */}
-            <div className="bg-gray-50 rounded-3xl p-4 text-left flex flex-col gap-2 border border-gray-100">
-              {pendingDelivery.client_address && (
-                <div className="text-xs font-bold text-gray-700">
-                  <span className="text-gray-400 block text-[9px] font-black uppercase tracking-wider">Dirección de Entrega:</span>
-                  📍 {pendingDelivery.client_address}
-                </div>
-              )}
-              
-              <div>
-                <span className="text-gray-400 block text-[9px] font-black uppercase tracking-wider mb-1">Productos Solicitados:</span>
-                <div className="flex flex-col gap-1 max-h-32 overflow-y-auto pr-1">
-                  {(pendingDelivery.items || []).map((item: any, i: number) => (
-                    <div key={i} className="flex justify-between font-bold text-xs text-gray-700">
-                      <span>{item.name} <span className="text-[#FF4040]">× {item.qty}</span></span>
-                      <span className="font-black text-gray-900">{formatMoney(item.price * item.qty)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="pt-2 border-t border-gray-200/50 flex justify-between items-center mt-1">
-                <span className="text-xs font-black text-gray-400 uppercase tracking-wide">Monto Total:</span>
-                <span className="text-lg font-black text-gray-900">{formatMoney(pendingDelivery.total_amount)}</span>
-              </div>
-            </div>
-
-            {/* Botones */}
-            <div className="grid grid-cols-2 gap-3 mt-2">
-              <button
-                onClick={() => handleRejectDelivery(pendingDelivery.id)}
-                className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-black py-4 px-6 rounded-2xl border-2 border-red-100 transition-all active:scale-95 text-base flex items-center justify-center gap-1.5"
-              >
-                <X size={18} strokeWidth={3} /> Rechazar
-              </button>
-              <button
-                onClick={() => handleAcceptDelivery(pendingDelivery.id)}
-                className="bg-green-500 hover:bg-green-600 text-white font-black py-4 px-6 rounded-2xl shadow-lg shadow-green-200 transition-all active:scale-95 text-base flex items-center justify-center gap-1.5"
-              >
-                <Check size={18} strokeWidth={3} /> Aceptar
-              </button>
+              <p className="text-xs font-black text-gray-950">
+                {pendingDelivery.client_name} · <span className="text-red-700">{formatMoney(pendingDelivery.total_amount)}</span>
+              </p>
             </div>
           </div>
+          <span className="bg-gray-950 text-white text-[11px] font-black px-3 py-2 rounded-xl shadow-xs shrink-0 flex items-center gap-1">
+            Ver Pedido →
+          </span>
         </div>
       )}
 
