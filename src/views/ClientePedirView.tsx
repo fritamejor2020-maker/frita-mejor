@@ -385,11 +385,13 @@ export function ClientePedirView() {
       });
       allShifts.push(...(useInventoryStore.getState().posShifts || []));
 
-      // 1. Recopilar todos los turnos verdaderamente ABIERTOS (closedAt === null)
-      const openShiftsMap = new Map<string, any>();
+      const today = new Date().toISOString().slice(0, 10);
 
       allShifts.forEach((s: any) => {
         if (!s || s.closedAt || !s.id || deletedIds.has(s.id)) return;
+        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+        if (shiftDate && shiftDate < today) return;
+
         const typeStr = String(s.type || '').toUpperCase();
         const pIdStr = String(s.pointId || s.vehicle || '').toLowerCase();
         const respStr = String(s.responsibleName || s.userName || '').toLowerCase();

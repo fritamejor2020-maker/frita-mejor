@@ -550,8 +550,8 @@ export function AdminVehicleInventoryTab() {
     // Forzar término de carga en máximo 1.5s para no bloquear la pantalla
     const safetyTimeout = setTimeout(() => setSupabaseLoaded(true), 1500);
 
-    // Intervalo de respaldo cada 3 segundos
-    const interval = setInterval(loadShiftsFromSupabase, 3000);
+    // Intervalo de respaldo cada 10 segundos
+    const interval = setInterval(loadShiftsFromSupabase, 10000);
 
     // Canal Realtime para cambios instantáneos
     const channel = supabase
@@ -848,13 +848,28 @@ export function AdminVehicleInventoryTab() {
                   if (s && s.id) shiftMap.set(s.id, s);
                 });
 
+                // Calcular ventas teóricas antes de cerrar forzosamente
+                const sDate = shift.fecha || shift.date || dateOf(shift.openedAt || shift.closedAt || '');
+                const logCalc = buildShiftLogistics(
+                  shift, targetPointId, sDate, shift.openedAt, closedAt, loadHistory, completedRequests, priceMap, allShifts
+                );
+                const theorySalesVal = logCalc.totalVendidoPesos || 0;
+
                 let shiftModified = false;
                 shiftMap.forEach((s: any, id: string) => {
                   const matchPoint = matchVehicleId(s.pointId, targetPointId);
                   const matchId = s.id === shift.id;
                   if ((matchPoint || matchId) && !s.closedAt) {
                     shiftModified = true;
-                    shiftMap.set(id, { ...s, closedAt, forcedByAdmin: true });
+                    shiftMap.set(id, {
+                      ...s,
+                      closedAt,
+                      forcedByAdmin: true,
+                      theorySales: theorySalesVal,
+                      realAmount: theorySalesVal,
+                      cashAmount: theorySalesVal,
+                      totalVendido: logCalc.totalVendido,
+                    });
                   }
                 });
 
@@ -866,6 +881,10 @@ export function AdminVehicleInventoryTab() {
                     closedAt,
                     forcedByAdmin: true,
                     type: 'VENDEDOR',
+                    theorySales: theorySalesVal,
+                    realAmount: theorySalesVal,
+                    cashAmount: theorySalesVal,
+                    totalVendido: logCalc.totalVendido,
                   });
                 }
 

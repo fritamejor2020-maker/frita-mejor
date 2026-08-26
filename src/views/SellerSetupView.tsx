@@ -56,7 +56,11 @@ export const SellerSetupView = () => {
               const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
               if (shiftDate && shiftDate < today) {
                 autoClosedCount++;
-                return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+                return {
+                  ...s,
+                  closedAt: s.closedAt || new Date(`${shiftDate}T23:59:59`).toISOString(),
+                  _autoClosedStale: true,
+                };
               }
             }
             return s;
