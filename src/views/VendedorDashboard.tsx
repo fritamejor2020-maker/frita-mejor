@@ -784,6 +784,9 @@ export const VendedorDashboard = () => {
 
           await Promise.allSettled([
             ...upsertPromises,
+            supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId || 'BRANCH-001'}`, value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
             push('posShifts', updatedShifts, activeBranchId),
             push('posShifts', updatedShifts, null),
             supabase
