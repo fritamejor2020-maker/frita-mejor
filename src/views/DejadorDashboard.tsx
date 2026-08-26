@@ -262,10 +262,11 @@ export const DejadorDashboard = () => {
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().loadFromRemote().catch(() => {});
 
+    // Intervalo de respaldo de 15s (el canal Realtime ya notifica los cambios al instante)
     const interval = setInterval(() => {
       loadRemoteShifts();
       useLogisticsStore.getState().loadFromRemote().catch(() => {});
-    }, 3000);
+    }, 15000);
 
     const channel = supabase
       .channel('dejador-logistics-realtime-sync')
