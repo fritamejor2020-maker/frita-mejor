@@ -348,15 +348,22 @@ function createMainWindow() {
     }
   });
 
-  // Garantizar foco nativo al restaurar o mostrar
+  // Garantizar foco nativo al enfocar, restaurar o mostrar la ventana en Windows
+  mainWindow.on('focus', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.focus();
+    }
+  });
   mainWindow.on('restore', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.focus();
+      mainWindow.webContents.focus();
     }
   });
   mainWindow.on('show', () => {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.focus();
+      mainWindow.webContents.focus();
     }
   });
 
@@ -729,6 +736,23 @@ ipcMain.handle('get-app-version', () => {
 
 // ── Ciclo de Vida de la App ────────────────────────────────────────────────────
 app.whenReady().then(() => {
+  // Registrar menú de aplicación nativo con roles de Edición para habilitar teclado, copiar/pegar y foco en inputs
+  const template = [
+    {
+      label: 'Editar',
+      submenu: [
+        { role: 'undo', label: 'Deshacer' },
+        { role: 'redo', label: 'Rehacer' },
+        { type: 'separator' },
+        { role: 'cut', label: 'Cortar' },
+        { role: 'copy', label: 'Copiar' },
+        { role: 'paste', label: 'Pegar' },
+        { role: 'selectAll', label: 'Seleccionar todo' }
+      ]
+    }
+  ];
+  Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+
   createMainWindow();
   createTray();
 

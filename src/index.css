@@ -49,8 +49,10 @@ button:active, [role="button"]:active {
   }
 }
 
-/* ─── Inputs: transición suave de foco y cursor caret forzado para Electron ─ */
+/* ─── Inputs: transición suave de foco, selección de texto y cursor caret para Electron ─ */
 input, textarea, select, [contenteditable="true"] {
+  -webkit-user-select: text !important;
+  user-select: text !important;
   caret-color: #d97706 !important;
   transition: border-color 0.2s ease,
               box-shadow 0.2s ease,
