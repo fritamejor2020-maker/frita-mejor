@@ -276,29 +276,10 @@ export const SellerSetupView = () => {
       }
     }
 
-    // 1. Consulta directa en tiempo real a Supabase antes de decidir si abrir o reanudar
-    let latestShifts = shiftsList;
-    try {
-      const { data: freshData } = await supabase
-        .from('app_state')
-        .select('value')
-        .or('key.ilike.posShifts%');
+    // 1. Evaluar en memoria de inmediato (0ms latencia) usando el estado verificado de remoteShifts / store
+    const latestShifts = shiftsList;
 
-      if (freshData && Array.isArray(freshData)) {
-        const freshMap = new Map<string, any>();
-        freshData.forEach((row: any) => {
-          (row.value || []).forEach((s: any) => {
-            if (s?.id) {
-              const ex = freshMap.get(s.id);
-              if (!ex || (!ex.closedAt && s.closedAt)) freshMap.set(s.id, s);
-            }
-          });
-        });
-        latestShifts = Array.from(freshMap.values());
-      }
-    } catch (_) {}
-
-    // 2. Buscar si existe CUALQUIER turno ABIERTO para este vehículo hoy en la nube
+    // 2. Buscar si existe CUALQUIER turno ABIERTO para este vehículo hoy
     const openShift = latestShifts.find((s: any) => {
       if (s.closedAt) return false;
       const isVendorType = String(s.type || '').toUpperCase() === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t'));
@@ -314,7 +295,7 @@ export const SellerSetupView = () => {
     });
 
     if (openShift) {
-      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo sin duplicar
+      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo de inmediato (0ms)
       startShift({
         id: openShift.id,
         pointId: openShift.pointId || pointId,
@@ -329,7 +310,7 @@ export const SellerSetupView = () => {
       return;
     }
 
-    // 2. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
+    // 3. Verificar si el turno para este vehículo + jornada YA fue cerrado hoy
     const closedShift = shiftsList.find(
       (s: any) => s.type === 'VENDEDOR' &&
         String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
@@ -347,22 +328,12 @@ export const SellerSetupView = () => {
       if (!allowNew) return;
     }
 
-    // Crear nuevo turno (no existe uno para este punto+jornada hoy)
+    // 4. Crear nuevo turno de inmediato en estado local (0ms)
     const openedAt = new Date().toISOString();
     const cleanResp = String(finalResponsibleName).toLowerCase().replace(/[^a-z0-9]/g, '');
     const jornadaSlug = String(shift).toLowerCase().replace(/[^a-z0-9]/g, '');
     const uniqueShiftId = `SHIFT-VENDOR-${cleanBranch}-${cleanPoint}-${cleanResp || 'vendor'}-${today}-${jornadaSlug}-${Date.now()}`;
 
-    startShift({
-      id: uniqueShiftId,
-      pointId,
-      shift,
-      pointType,
-      responsibleName: finalResponsibleName,
-      openedAt,
-      userId: user?.id || user?.username,
-      branchId: effectiveBranchId,
-    });
     const newShiftRecord = {
       id: uniqueShiftId,
       openedAt,
@@ -377,41 +348,32 @@ export const SellerSetupView = () => {
       closedAt: null,
     };
 
-    const currentShiftsList = useInventoryStore.getState().posShifts || [];
-    const allShifts = [...currentShiftsList.filter((s: any) => s.id !== uniqueShiftId), newShiftRecord];
-    useInventoryStore.setState({ posShifts: allShifts });
-
-    push('posShifts', allShifts, effectiveBranchId).catch(() => {});
-    push('posShifts', allShifts, null).catch(() => {});
-
-    // ⚡ Sincronización remota asíncrona en segundo plano (NO bloquea la navegación en iPad)
-    supabase
-      .from('app_state')
-      .select('key, value')
-      .in('key', ['posShifts', `posShifts_${effectiveBranchId}`, 'posShifts_BRANCH-001', 'posShifts_master_history'])
-      .then(({ data }) => {
-        const shiftMap = new Map<string, any>();
-        (data || []).forEach((row: any) => {
-          (Array.isArray(row.value) ? row.value : []).forEach((s: any) => {
-            if (s?.id) shiftMap.set(s.id, s);
-          });
-        });
-        allShifts.forEach((s: any) => {
-          if (s?.id) shiftMap.set(s.id, s);
-        });
-        const mergedList = Array.from(shiftMap.values());
-        const nowIso = new Date().toISOString();
-        Promise.allSettled([
-          supabase.from('app_state').upsert({ key: 'posShifts', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedList, updated_at: nowIso }, { onConflict: 'key' }),
-        ]).catch(() => {});
-      })
-      .catch(() => {});
-
-    // Navegar de inmediato sin esperar la red (0ms de latencia)
+    // 5. Iniciar sesión localmente e ingresar de inmediato (0ms latencia)
+    startShift({
+      id: uniqueShiftId,
+      pointId,
+      shift,
+      pointType,
+      responsibleName: finalResponsibleName,
+      openedAt,
+      userId: user?.id || user?.username,
+      branchId: effectiveBranchId,
+    });
     navigate('/vendedor');
+
+    // 6. Sincronizar con Supabase en segundo plano sin congelar la pantalla
+    (async () => {
+      try {
+        await Promise.allSettled([
+          push('posShifts', allShifts, effectiveBranchId),
+          push('posShifts', allShifts, null),
+          supabase.from('app_state').upsert({ key: 'posShifts', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
+          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
+        ]);
+      } catch (_) {}
+    })();
   };
 
   // 🔄 Mientras verifica turnos remotos:
