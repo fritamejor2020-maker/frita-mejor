@@ -711,8 +711,8 @@ export const useInventoryStore = create(
 
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir) y Pedir Surtido del Vendedor.
-       * Incluye TODOS los productos y artículos físicos habilitados (incluyendo los 'No POS' como Vasos 10 OZ, Vasos 7 OZ, Cambio)
-       * para garantizar que tanto Dejadores como Vendedores vean y operen exactamente la misma lista de insumos y productos.
+       * Incluye ESTRICTAMENTE los productos configurados en Admin ➔ Triciclos & Flota ➔ Productos Triciclos (inTricycles === true),
+       * incluyendo los ítems 'No POS' habilitados allí como Vasos 10 OZ, Vasos 7 OZ, Cambio.
        */
       getDeliveryItems: () => {
         let inv = get().inventory || [];
@@ -726,8 +726,8 @@ export const useInventoryStore = create(
           if (!i || !i.id || DEMO_PRD_IDS.has(i.id)) return false;
           if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
           if (i.active === false || String(i.active) === 'false') return false;
-          if (i.inTricycles === false || String(i.inTricycles) === 'false') return false;
-          return true;
+          // Exigir estrictamente que esté configurado en "Productos Triciclos" (inTricycles === true)
+          return i.inTricycles === true || i.inTricycles === 'true';
         };
 
         let filtered = inv.filter(isDeliveryItem);
