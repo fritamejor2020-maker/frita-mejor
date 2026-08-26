@@ -1250,18 +1250,22 @@ export const VendedorDashboard = () => {
               // Filtrar por punto de venta Y por jornada actual (solo desde que abrió este turno)
               // Esto evita mostrar pedidos de jornadas anteriores o de otros vendedores
               const shiftStart = openedAt ? new Date(openedAt).getTime() : 0;
-              const isThisShift = (r: any) =>
-                r.requester_point_id === pointId &&
-                new Date(r.created_at).getTime() >= shiftStart;
+              const completedSet = new Set((completedRequests || []).map((r: any) => r.id));
+              const rejectedSet  = new Set((rejectedRequests  || []).map((r: any) => r.id));
+              const processedSet = new Set([...completedSet, ...rejectedSet]);
 
-              const myPending   = (pendingRequests   || []).filter(isThisShift);
+              const isThisShift = (r: any) =>
+                (r.requester_point_id === pointId || r.pointId === pointId) &&
+                new Date(r.created_at || 0).getTime() >= shiftStart;
+
+              const myPending   = (pendingRequests   || []).filter(r => isThisShift(r) && !processedSet.has(r.id));
               const myCompleted = (completedRequests || []).filter(isThisShift);
               const myRejected  = (rejectedRequests  || []).filter(isThisShift);
               const allMine = [
                 ...myPending.map((r: any) => ({ ...r, _status: 'pending' })),
                 ...myCompleted.map((r: any) => ({ ...r, _status: 'completed' })),
                 ...myRejected.map((r: any) => ({ ...r, _status: 'rejected' })),
-              ].sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+              ].sort((a: any, b: any) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()
               ).slice(0, 15);
 
               if (allMine.length === 0) return null;
