@@ -216,25 +216,15 @@ export const useLogisticsStore = create(
       .find((v) => (v.abbreviation || v.name) === pointId)?.branchId ?? null;
     const senderBranchId = userBranchId ?? vehicleBranchId;
 
-    // Intentar capturar ubicación GPS del vendedor al momento del pedido
+    // Capturar última ubicación GPS conocida del vendedor desde el store de forma instantánea (0ms)
     let location = null;
     try {
-      if (navigator.geolocation) {
-        const pos = await new Promise((resolve, reject) => {
-          navigator.geolocation.getCurrentPosition(resolve, reject, {
-            enableHighAccuracy: true,
-            timeout: 5000,
-            maximumAge: 60000,
-          });
-        });
-        location = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-        };
+      const locMap = (globalThis.__inventoryStore__ || { getState: () => ({}) }).getState().vendorLocations || {};
+      const knownLoc = locMap[pointId] || Object.values(locMap).find((l) => l?.pointId === pointId || l?.name === pointId);
+      if (knownLoc?.lat && knownLoc?.lng) {
+        location = { lat: knownLoc.lat, lng: knownLoc.lng };
       }
-    } catch (_) {
-      // GPS no disponible o denegado — se envía sin ubicación
-    }
+    } catch (_) {}
 
     const newRequest = {
       id: `REQ-${Date.now()}`,

@@ -241,7 +241,7 @@ async function _writeToSupabaseImpl(key, value) {
     }
   }
 
-  if ((key === 'loadHistory' || key.startsWith('loadHistory_') || key === 'completedRequests' || key.startsWith('completedRequests_')) && Array.isArray(value)) {
+  if ((key === 'pendingRequests' || key.startsWith('pendingRequests_') || key === 'loadHistory' || key.startsWith('loadHistory_') || key === 'completedRequests' || key.startsWith('completedRequests_')) && Array.isArray(value)) {
     try {
       const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
       if (data && Array.isArray(data.value) && data.value.length > 0) {
@@ -251,7 +251,7 @@ async function _writeToSupabaseImpl(key, value) {
         value = Array.from(itemMap.values());
       }
     } catch (e) {
-      console.warn('[SyncManager] Error merging history before write:', e);
+      console.warn('[SyncManager] Error merging requests/history before write:', e);
     }
   }
 
