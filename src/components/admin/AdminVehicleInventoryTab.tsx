@@ -607,7 +607,7 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    // ── Deduplicar por vehículo y fecha preservando el estado CERRADO más reciente ──
+    // ── Deduplicar por vehículo y fecha preservando la sesión más RECIENTE en tiempo ──
     const vehicleDateMap = new Map<string, any>();
     raw.forEach((s: any) => {
       if (!s?.id) return;
@@ -623,15 +623,15 @@ export function AdminVehicleInventoryTab() {
       if (!existing) {
         vehicleDateMap.set(key, s);
       } else {
-        // Preferir el turno que tenga cierre registrado para ese vehículo hoy
-        if (!existing.closedAt && s.closedAt) {
+        const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
+        const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
+
+        // 1. El turno con fecha de apertura más reciente gana siempre (permite reabrir un vehículo tras cerrar)
+        if (sTime > exTime + 30000) {
           vehicleDateMap.set(key, s);
-        } else if (existing.closedAt && s.closedAt) {
-          if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-            vehicleDateMap.set(key, s);
-          }
-        } else if (!existing.closedAt && !s.closedAt) {
-          if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
+        } else if (Math.abs(sTime - exTime) <= 30000) {
+          // Si pertenecen a la misma sesión exacta, preferir la versión que tenga cierre o más datos
+          if (!existing.closedAt && s.closedAt) {
             vehicleDateMap.set(key, s);
           }
         }
