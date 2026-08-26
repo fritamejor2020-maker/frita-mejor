@@ -347,11 +347,12 @@ export const useInventoryStore = create(
       // Mientras sea false, syncKey() rechaza todas las escrituras a la nube.
       _hasLoadedRemote: false,
 
-      // ─── CARGA REMOTA (al arrancar la app) ───────────────────────────────────
-      // Descarga el estado de Supabase y lo aplica encima del caché local.
-      // Multisede: descarga solo las llaves de la sede del usuario activo
-      // (o todas las sedes si es Admin). Incluye soporte legacy para migrar
-      // datos de la versión anterior (llaves sin sufijo).
+      // ─── CARGA REMOTA NETWORK-FIRST CON CACHÉ OFFLINE DE RESPALDO ───────────
+      // ESTRATEGIA:
+      // 1. Si HAY internet: Consulta primero a Supabase (Network-First).
+      //    Los datos autoritativos de la nube REEMPLAZAN el estado local de localStorage.
+      // 2. Si NO HAY internet (offline): Captura el error y usa el respaldo local
+      //    guardado en localStorage para permitir operar sin interrupción.
       loadFromRemote: async () => {
         if (sessionStorage.getItem('__reset_done__') === '1') {
           sessionStorage.removeItem('__reset_done__');
@@ -359,6 +360,7 @@ export const useInventoryStore = create(
           return;
         }
         try {
+          console.log('[SyncEngine] 🌐 Iniciando verificación Network-First en Supabase...');
           const user = useAuthStore.getState().user;
           const isAdmin = user?.role === 'ADMIN';
           const branchId = isAdmin ? null : (user?.branchId || 'BRANCH-001');
