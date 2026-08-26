@@ -102,7 +102,7 @@ function syncLogisticsPartition(
 
   const pushes = [
     push('pendingRequests', pendingSlice, bid),
-    push('pendingRequests', pendingSlice, null),
+    push('pendingRequests', pendingReqs, null),
   ];
 
   if (syncCompleted) {
@@ -110,7 +110,7 @@ function syncLogisticsPartition(
     markLocalWrite('completedRequests', bid);
     markLocalWrite('completedRequests', null);
     pushes.push(push('completedRequests', completedSlice, bid));
-    pushes.push(push('completedRequests', completedSlice, null));
+    pushes.push(push('completedRequests', completedReqs, null));
   }
 
   if (syncRejected) {
@@ -118,7 +118,7 @@ function syncLogisticsPartition(
     markLocalWrite('rejectedRequests', bid);
     markLocalWrite('rejectedRequests', null);
     pushes.push(push('rejectedRequests', rejectedSlice, bid));
-    pushes.push(push('rejectedRequests', rejectedSlice, null));
+    pushes.push(push('rejectedRequests', rejectedReqs, null));
   }
 
   Promise.allSettled(pushes).catch(() => {});
