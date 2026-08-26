@@ -349,7 +349,9 @@ export const useLogisticsStore = create(
 
       const processedSet = new Set([
         ...freshCompleted.map(x => x.id),
-        ...freshRejected.map(x => x.id)
+        ...freshRejected.map(x => x.id),
+        ...(get().completedRequests || []).map(x => x?.id).filter(Boolean),
+        ...(get().rejectedRequests || []).map(x => x?.id).filter(Boolean),
       ]);
 
       const freshPending = Array.from(pendingMap.values())
