@@ -827,10 +827,14 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
       pushUserToTerminal: async (terminalId, contract) => {
         // 1. Si estamos ejecutando dentro de la app de Electron, invocar el canal IPC nativo en segundo plano
-        if (typeof window !== 'undefined' && (window as any).electronAPI?.modifyBiometricUser) {
+        const electronBridge = typeof window !== 'undefined'
+          ? ((window as any).electronAPI?.modifyBiometricUser ? (window as any).electronAPI : ((window as any).cajeroAPI?.modifyBiometricUser ? (window as any).cajeroAPI : null))
+          : null;
+
+        if (electronBridge) {
           try {
             console.log('[PushUser] Ejecutando modificación nativa vía Electron IPC...');
-            const res = await (window as any).electronAPI.modifyBiometricUser({
+            const res = await electronBridge.modifyBiometricUser({
               employeeNo: String(contract.employeeNo),
               name: contract.fullName,
               password: String(contract.pinPassword || '1234')
