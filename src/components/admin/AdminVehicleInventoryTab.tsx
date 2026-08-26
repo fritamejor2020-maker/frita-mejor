@@ -737,15 +737,10 @@ export function AdminVehicleInventoryTab() {
     });
   }, [allShifts, filterDate, filterShift]);
 
-  // Contar sólo turnos abiertos en curso reales (si no hay filtro de fecha activo, contar los de hoy)
+  // Contar todos los turnos abiertos en curso reales (!closedAt)
   const activeCount = useMemo(() => {
-    return filteredShifts.filter((s: any) => {
-      if (s.closedAt) return false;
-      const sDate = s.fecha || s.date || dateOf(s.openedAt || '');
-      if (!filterDate && sDate && sDate < today) return false;
-      return true;
-    }).length;
-  }, [filteredShifts, filterDate, today]);
+    return filteredShifts.filter((s: any) => !s.closedAt).length;
+  }, [filteredShifts]);
 
   const closedCount = filteredShifts.filter((s: any) => !!s.closedAt).length;
   const uniqueDates = new Set(filteredShifts.map((s: any) => s.fecha || s.date || dateOf(s.closedAt || s.openedAt || ''))).size;
