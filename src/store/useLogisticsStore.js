@@ -280,10 +280,23 @@ export const useLogisticsStore = create(
 
   loadFromRemote: async () => {
     try {
+      const user = useAuthStore.getState().user;
+      const userBranchId = user?.branchId || 'BRANCH-001';
+      const keysToFetch = [
+        'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
+        'pendingRequests_BRANCH-001', 'completedRequests_BRANCH-001', 'rejectedRequests_BRANCH-001', 'loadHistory_BRANCH-001'
+      ];
+      if (userBranchId && userBranchId !== 'BRANCH-001') {
+        keysToFetch.push(`pendingRequests_${userBranchId}`);
+        keysToFetch.push(`completedRequests_${userBranchId}`);
+        keysToFetch.push(`rejectedRequests_${userBranchId}`);
+        keysToFetch.push(`loadHistory_${userBranchId}`);
+      }
+
       const { data } = await supabase
         .from('app_state')
         .select('key, value')
-        .or('key.ilike.pendingRequests%,key.ilike.completedRequests%,key.ilike.rejectedRequests%,key.ilike.loadHistory%');
+        .in('key', keysToFetch);
 
       if (!data) return;
 
