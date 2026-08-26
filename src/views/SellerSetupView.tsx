@@ -276,22 +276,48 @@ export const SellerSetupView = () => {
       }
     }
 
-    // ── Regla: 1 turno por vehículo por jornada (AM/MD/PM) por sede por día ──
-    // 1. Buscar si hay turno ABIERTO para este vehículo + jornada + sede hoy
-    const openShift = shiftsList.find(
-      (s: any) => s.type === 'VENDEDOR' &&
-        String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
-        s.shift === shift &&
-        (s.branchId === effectiveBranchId || !s.branchId || userBranchId === null) &&
-        !s.closedAt &&
-        (s.openedAt || s.fecha || '').startsWith(today)
-    );
+    // 1. Consulta directa en tiempo real a Supabase antes de decidir si abrir o reanudar
+    let latestShifts = shiftsList;
+    try {
+      const { data: freshData } = await supabase
+        .from('app_state')
+        .select('value')
+        .or('key.ilike.posShifts%');
+
+      if (freshData && Array.isArray(freshData)) {
+        const freshMap = new Map<string, any>();
+        freshData.forEach((row: any) => {
+          (row.value || []).forEach((s: any) => {
+            if (s?.id) {
+              const ex = freshMap.get(s.id);
+              if (!ex || (!ex.closedAt && s.closedAt)) freshMap.set(s.id, s);
+            }
+          });
+        });
+        latestShifts = Array.from(freshMap.values());
+      }
+    } catch (_) {}
+
+    // 2. Buscar si existe CUALQUIER turno ABIERTO para este vehículo hoy en la nube
+    const openShift = latestShifts.find((s: any) => {
+      if (s.closedAt) return false;
+      const isVendorType = String(s.type || '').toUpperCase() === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t'));
+      if (!isVendorType) return false;
+
+      const shiftPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (shiftPoint !== cleanPoint) return false;
+
+      const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+      if (shiftDate && shiftDate < today) return false;
+
+      return true;
+    });
 
     if (openShift) {
-      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo sin bloquear
+      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo sin duplicar
       startShift({
         id: openShift.id,
-        pointId,
+        pointId: openShift.pointId || pointId,
         shift: openShift.shift || shift,
         pointType: openShift.pointType || pointType,
         responsibleName: openShift.responsibleName || finalResponsibleName,
