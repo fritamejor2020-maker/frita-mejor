@@ -361,20 +361,10 @@ export function ClientePedirView() {
 
   const fetchVendors = async () => {
     try {
-      const keysToFetch = [
-        'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
-        'vendorLocations', 'vendorLocations_BRANCH-001',
-        'deletedShiftIds', 'deletedShiftIds_BRANCH-001'
-      ];
-      if (selectedBranchId && selectedBranchId !== 'BRANCH-001') {
-        keysToFetch.push(`posShifts_${selectedBranchId}`);
-        keysToFetch.push(`vendorLocations_${selectedBranchId}`);
-      }
-
       const { data } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', keysToFetch);
+        .or('key.ilike.posShifts%,key.ilike.vendorLocations%,key.ilike.deletedShiftIds%');
 
       if (!data) return;
 

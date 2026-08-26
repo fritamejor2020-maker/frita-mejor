@@ -351,21 +351,8 @@ export const SellerSetupView = () => {
       closedAt: null,
     };
 
-    // Auto-cerrar turnos anteriores del mismo vendedor o del mismo vehículo antes de guardar el nuevo
-    const nowIso = new Date().toISOString();
     const currentShiftsList = useInventoryStore.getState().posShifts || [];
-    const cleanedShifts = currentShiftsList.map((s: any) => {
-      if (s.type === 'VENDEDOR' && !s.closedAt) {
-        const isSamePoint = String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint;
-        const isSameUser = currentUserName && String(s.responsibleName || '').trim().toLowerCase() === currentUserName;
-        if (isSamePoint || isSameUser) {
-          return { ...s, closedAt: nowIso, _autoClosedOnNewStart: true };
-        }
-      }
-      return s;
-    });
-
-    const allShifts = [...cleanedShifts.filter((s: any) => s.id !== uniqueShiftId), newShiftRecord];
+    const allShifts = [...currentShiftsList.filter((s: any) => s.id !== uniqueShiftId), newShiftRecord];
     useInventoryStore.setState({ posShifts: allShifts });
 
     push('posShifts', allShifts, effectiveBranchId).catch(() => {});

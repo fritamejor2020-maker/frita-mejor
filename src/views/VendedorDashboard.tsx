@@ -718,79 +718,83 @@ export const VendedorDashboard = () => {
         updatedShifts.push(finalShift);
       }
 
+      // 1. Actualizar localmente posShifts e inventario de inmediato (0ms latencia)
       useInventoryStore.setState({ posShifts: updatedShifts });
       useInventoryStore.getState().clearVendorLocation(pointId);
 
-      // 2. Detener GPS
+      // 2. Detener GPS inmediatamente
       try { gpsStop().catch(() => {}); } catch (_) {}
 
-      // 3. Escribir directamente a Supabase para garantizar cierre remoto absoluto en TODAS las llaves de posShifts y vendorLocations
-      try {
-        const { data: remoteData } = await supabase
-          .from('app_state')
-          .select('key, value')
-          .or('key.ilike.posShifts%,key.ilike.vendorLocations%');
-
-        const upsertPromises = (remoteData || []).map(row => {
-          const k = row.key || '';
-          if (k.includes('posShifts')) {
-            const list = Array.isArray(row.value) ? row.value : [];
-            let modified = false;
-            const closedList = list.map((s: any) => {
-              if (s.closedAt) return s;
-              const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
-              const isMatchByPoint = matchesPointId(s.pointId, pointId);
-              const isMatchByName = s.responsibleName && responsibleName &&
-                String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
-
-              if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
-                modified = true;
-                return { ...s, ...finalShift, id: s.id, closedAt: closeTime };
-              }
-              return s;
-            });
-
-            if (!modified) {
-              closedList.push(finalShift);
-            }
-
-            return supabase.from('app_state').upsert({
-              key: row.key,
-              value: closedList,
-              updated_at: closeTime
-            }, { onConflict: 'key' });
-          } else if (k.includes('vendorLocations')) {
-            const locMap = (row.value && typeof row.value === 'object') ? { ...row.value } : {};
-            Object.keys(locMap).forEach(vk => {
-              if (matchesPointId(vk, pointId) || matchesPointId(locMap[vk]?.pointId, pointId)) {
-                locMap[vk] = { ...locMap[vk], isActive: false, updatedAt: closeTime };
-              }
-            });
-            return supabase.from('app_state').upsert({
-              key: row.key,
-              value: locMap,
-              updated_at: closeTime
-            }, { onConflict: 'key' });
-          }
-          return Promise.resolve();
-        });
-
-        await Promise.allSettled([
-          ...upsertPromises,
-          push('posShifts', updatedShifts, activeBranchId),
-          push('posShifts', updatedShifts, null),
-          supabase
-            .from('vendor_locations')
-            .update({ is_active: false })
-            .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
-        ]);
-      } catch (eSync) {
-        console.warn('[VendedorClose Remote Sync]:', eSync);
-      }
-
+      // 3. Notificar y cerrar sesión de inmediato en la interfaz (0ms)
       toast.success('Jornada cerrada');
       endShift();
       signOut();
+
+      // 4. Sincronización remota con Supabase ejecutada en segundo plano sin congelar la pantalla
+      (async () => {
+        try {
+          const { data: remoteData } = await supabase
+            .from('app_state')
+            .select('key, value')
+            .or('key.ilike.posShifts%,key.ilike.vendorLocations%');
+
+          const upsertPromises = (remoteData || []).map(row => {
+            const k = row.key || '';
+            if (k.includes('posShifts')) {
+              const list = Array.isArray(row.value) ? row.value : [];
+              let modified = false;
+              const closedList = list.map((s: any) => {
+                if (s.closedAt) return s;
+                const isMatchByShiftId = currentShiftId && s.id === currentShiftId;
+                const isMatchByPoint = matchesPointId(s.pointId, pointId);
+                const isMatchByName = s.responsibleName && responsibleName &&
+                  String(s.responsibleName).trim().toLowerCase() === String(responsibleName).trim().toLowerCase();
+
+                if (isMatchByShiftId || isMatchByPoint || isMatchByName) {
+                  modified = true;
+                  return { ...s, ...finalShift, id: s.id, closedAt: closeTime };
+                }
+                return s;
+              });
+
+              if (!modified) {
+                closedList.push(finalShift);
+              }
+
+              return supabase.from('app_state').upsert({
+                key: row.key,
+                value: closedList,
+                updated_at: closeTime
+              }, { onConflict: 'key' });
+            } else if (k.includes('vendorLocations')) {
+              const locMap = (row.value && typeof row.value === 'object') ? { ...row.value } : {};
+              Object.keys(locMap).forEach(vk => {
+                if (matchesPointId(vk, pointId) || matchesPointId(locMap[vk]?.pointId, pointId)) {
+                  locMap[vk] = { ...locMap[vk], isActive: false, updatedAt: closeTime };
+                }
+              });
+              return supabase.from('app_state').upsert({
+                key: row.key,
+                value: locMap,
+                updated_at: closeTime
+              }, { onConflict: 'key' });
+            }
+            return Promise.resolve();
+          });
+
+          await Promise.allSettled([
+            ...upsertPromises,
+            push('posShifts', updatedShifts, activeBranchId),
+            push('posShifts', updatedShifts, null),
+            supabase
+              .from('vendor_locations')
+              .update({ is_active: false })
+              .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
+          ]);
+        } catch (eSync) {
+          console.warn('[VendedorClose Remote Background Sync]:', eSync);
+        }
+      })();
     } catch (err: any) {
       console.warn('[VendedorClose Error]:', err?.message);
       endShift();
