@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
-import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady } from '../lib/syncManager';
+import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady, atomicUpdateItem, atomicAppendItem, atomicRemoveItem } from '../lib/syncManager';
 import { markLocalWrite, applyRemoteSnapshot } from '../lib/useRealtimeSync';
 import { safeJSONStorage } from '../utils/safeStorage';
 import inventoryBackupSeed from '../data/inventoryBackupSeed.json';
@@ -1183,12 +1183,20 @@ export const useInventoryStore = create(
         };
         set((s) => ({ inventory: [...s.inventory, newItem] }));
         syncKey('inventory', useInventoryStore.getState().inventory);
+        atomicAppendItem('inventory', null, newItem);
+        atomicAppendItem('inventory', 'BRANCH-001', newItem);
       },
       setInventory: (newInventory) => {
         set({ inventory: newInventory });
         syncKey('inventory', newInventory);
       },
-      updateInventoryItem: (id, data) => { set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) })); syncKey('inventory', useInventoryStore.getState().inventory); },
+      updateInventoryItem: (id, data) => {
+        set((s) => ({ inventory: s.inventory.map((i) => i.id === id ? { ...i, ...data } : i) }));
+        const updatedItem = useInventoryStore.getState().inventory.find(i => i.id === id);
+        syncKey('inventory', useInventoryStore.getState().inventory);
+        atomicUpdateItem('inventory', null, id, data);
+        atomicUpdateItem('inventory', 'BRANCH-001', id, data);
+      },
       deleteInventoryItem: (id) => {
         set((s) => ({
           inventory: s.inventory.filter((i) => i.id !== id),
@@ -1196,6 +1204,8 @@ export const useInventoryStore = create(
         }));
         syncKey('inventory', useInventoryStore.getState().inventory);
         syncKey('deletedInventoryIds', useInventoryStore.getState().deletedInventoryIds);
+        atomicRemoveItem('inventory', null, id);
+        atomicRemoveItem('inventory', 'BRANCH-001', id);
       },
 
       // Productos

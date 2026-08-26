@@ -16,13 +16,87 @@ const SYNC_LISTENERS = new Set();
 
 // Mutex por key para serializar escrituras y evitar race conditions
 const _writeLocks = new Map();
-async function withWriteLock(key, fn) {
+export async function withWriteLock(key, fn) {
   while (_writeLocks.has(key)) {
     try { await _writeLocks.get(key); } catch (_) {}
   }
   const promise = fn();
   _writeLocks.set(key, promise);
   try { return await promise; } finally { _writeLocks.delete(key); }
+}
+
+/**
+ * Actualiza atómicamente un solo ítem por ID dentro de una llave de Supabase.
+ * Evita pisar cambios de otros dispositivos y protege la integridad de los datos.
+ */
+export async function atomicUpdateItem(key, branchId, itemId, patch) {
+  const supabaseKey = getBranchKey(key, branchId);
+  return withWriteLock(supabaseKey, async () => {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      let updated = false;
+      const merged = existing.map(item => {
+        if (item?.id === itemId) {
+          updated = true;
+          return { ...item, ...patch };
+        }
+        return item;
+      });
+      if (!updated && patch) {
+        merged.unshift({ id: itemId, ...patch });
+      }
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    } catch (e) {
+      console.warn(`[SyncManager] atomicUpdateItem error (${supabaseKey}):`, e?.message);
+    }
+  });
+}
+
+/**
+ * Agrega un nuevo ítem atómicamente al inicio del arreglo remoto.
+ */
+export async function atomicAppendItem(key, branchId, newItem) {
+  if (!newItem?.id) return;
+  const supabaseKey = getBranchKey(key, branchId);
+  return withWriteLock(supabaseKey, async () => {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const filtered = existing.filter(i => i?.id !== newItem.id);
+      const merged = [newItem, ...filtered];
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    } catch (e) {
+      console.warn(`[SyncManager] atomicAppendItem error (${supabaseKey}):`, e?.message);
+    }
+  });
+}
+
+/**
+ * Remueve un ítem por ID atómicamente del arreglo remoto.
+ */
+export async function atomicRemoveItem(key, branchId, itemId) {
+  if (!itemId) return;
+  const supabaseKey = getBranchKey(key, branchId);
+  return withWriteLock(supabaseKey, async () => {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const merged = existing.filter(i => i?.id !== itemId);
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
+    } catch (e) {
+      console.warn(`[SyncManager] atomicRemoveItem error (${supabaseKey}):`, e?.message);
+    }
+  });
 }
 
 // ─── Clasificación de llaves ───────────────────────────────────────────────────
