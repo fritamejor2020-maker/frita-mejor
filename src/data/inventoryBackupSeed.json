@@ -1777,5 +1777,47 @@
     "warehouseId": "BOD-002",
     "imageUrl": "",
     "posCategoryId": ""
+  },
+  {
+    "id": "PRD-VASOS-10OZ",
+    "qty": 0,
+    "name": "Vasos 10 OZ",
+    "type": "PRODUCTO",
+    "unit": "unidades",
+    "alert": 0,
+    "price": 2500,
+    "inTricycles": true,
+    "showInPos": false,
+    "showInTricicloPos": false,
+    "abbreviation": "V10",
+    "inventoryPresets": [50, 100]
+  },
+  {
+    "id": "PRD-VASOS-7OZ",
+    "qty": 0,
+    "name": "Vasos 7 Onzas",
+    "type": "PRODUCTO",
+    "unit": "unidades",
+    "alert": 0,
+    "price": 2000,
+    "inTricycles": true,
+    "showInPos": false,
+    "showInTricicloPos": false,
+    "abbreviation": "V7",
+    "inventoryPresets": [50, 100]
+  },
+  {
+    "id": "PRD-CAMBIO",
+    "qty": 0,
+    "name": "Cambio",
+    "type": "PRODUCTO",
+    "unit": "unidades",
+    "alert": 0,
+    "price": 0,
+    "inTricycles": true,
+    "showInPos": false,
+    "showInTricicloPos": false,
+    "abbreviation": "CAM",
+    "inventoryPresets": ["MON", "2k", "50k"]
   }
 ]

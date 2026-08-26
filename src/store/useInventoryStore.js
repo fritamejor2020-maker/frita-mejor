@@ -1623,8 +1623,12 @@ export const useInventoryStore = create(
     {
       name: 'frita-mejor-inventory',
       storage: safeJSONStorage,
-      version: 13, // v13: fix cashDrawerCode format + proteger posSettings
+      version: 14, // v14: forzar invalidez de caché local e inclusión de Vasos y Cambio
       migrate: (persisted, fromVersion) => {
+        if (fromVersion < 14) {
+          // Vaciar inventario en rehidratación para forzar descarga limpia desde Supabase
+          persisted.inventory = [];
+        }
         // v9 → v10: agregar branchId a cajas POS que no lo tienen
         if (fromVersion < 10) {
           const registers = persisted.posRegisters || [];
