@@ -343,15 +343,41 @@ export const useLogisticsStore = create(
         }
       });
 
-      const freshCompleted = Array.from(completedMap.values()).filter(x => isRecentItem(x, 60)).sort((a, b) => new Date(b.completed_at || b.created_at || 0).getTime() - new Date(a.completed_at || a.created_at || 0).getTime());
-      const freshRejected = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, 60)).sort((a, b) => new Date(b.rejected_at || b.created_at || 0).getTime() - new Date(a.rejected_at || a.created_at || 0).getTime());
+      const freshCompletedRaw = Array.from(completedMap.values()).filter(x => isRecentItem(x, 60));
+      const freshRejectedRaw = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, 60));
       const freshHistory = Array.from(historyMap.values()).filter(x => isRecentItem(x, 60)).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+
+      // 🛡️ PRESERVAR los ítems completados o rechazados localmente en los últimos 15 minutos
+      // Esto evita que la latencia de red de Supabase los resucite temporalmente como pendientes (flicker)
+      const nowMs = Date.now();
+      const localCompleted = (get().completedRequests || []).filter(r => {
+        if (!r?.id) return false;
+        const compTime = new Date(r.completed_at || r.created_at || 0).getTime();
+        return (nowMs - compTime) < 15 * 60 * 1000;
+      });
+
+      const localRejected = (get().rejectedRequests || []).filter(r => {
+        if (!r?.id) return false;
+        const rejTime = new Date(r.rejected_at || r.created_at || 0).getTime();
+        return (nowMs - rejTime) < 15 * 60 * 1000;
+      });
+
+      const mergedCompletedMap = new Map();
+      [...freshCompletedRaw, ...localCompleted].forEach(item => {
+        if (item?.id) mergedCompletedMap.set(item.id, item);
+      });
+
+      const mergedRejectedMap = new Map();
+      [...freshRejectedRaw, ...localRejected].forEach(item => {
+        if (item?.id) mergedRejectedMap.set(item.id, item);
+      });
+
+      const freshCompleted = Array.from(mergedCompletedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0).getTime() - new Date(a.completed_at || a.created_at || 0).getTime());
+      const freshRejected = Array.from(mergedRejectedMap.values()).sort((a, b) => new Date(b.rejected_at || b.created_at || 0).getTime() - new Date(a.rejected_at || a.created_at || 0).getTime());
 
       const processedSet = new Set([
         ...freshCompleted.map(x => x.id),
         ...freshRejected.map(x => x.id),
-        ...(get().completedRequests || []).map(x => x?.id).filter(Boolean),
-        ...(get().rejectedRequests || []).map(x => x?.id).filter(Boolean),
       ]);
 
       const freshPending = Array.from(pendingMap.values())
