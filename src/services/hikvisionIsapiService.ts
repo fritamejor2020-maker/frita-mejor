@@ -545,13 +545,12 @@ export async function fetchAllEvents(
   const endTime = options?.endTime;
 
   try {
-    // 1. Obtener primera página y totalEnMemoria del biométrico
+    // 1. Obtener primera página y totalEnMemoria del biométrico (sin filtrar por minor para incluir Huella 38, Contraseña 181, Tarjeta 1 y Rostro 17)
     const initCond: any = {
       searchID: "1",
       searchResultPosition: 0,
       maxResults: 10,
       major: 5,
-      minor: 38,
     };
     if (startTime) initCond.startTime = startTime;
     if (endTime) initCond.endTime = endTime;
@@ -573,7 +572,6 @@ export async function fetchAllEvents(
           searchResultPosition: posicion, // <-- Posición dinámica (avanza 0, 30, 60...)
           maxResults: pageSize,           // <-- Paginación estable
           major: 5,
-          minor: 38,
           ...(startTime ? { startTime } : {}),
           ...(endTime ? { endTime } : {}),
         }

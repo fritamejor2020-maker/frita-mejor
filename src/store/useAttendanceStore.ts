@@ -261,7 +261,7 @@ export const INITIAL_BIOMETRIC_LOGS: RawAttendanceLog[] = [];
 export function isExplicitAttendancePunch(logOrEv: any): boolean {
   if (!logOrEv) return false;
   if (logOrEv.minor === 22) return true; // Continuous checkOut
-  if (logOrEv.minor === 38 || logOrEv.minor === 1 || logOrEv.minor === 75) return true; // Autenticación biométrica por Huella/Facial
+  if (logOrEv.minor === 38 || logOrEv.minor === 181 || logOrEv.minor === 5 || logOrEv.minor === 2 || logOrEv.minor === 1 || logOrEv.minor === 75) return true; // Autenticación biométrica por Huella/Password/Facial/Tarjeta
 
   const st = String(logOrEv.attendanceStatus || '').trim().toLowerCase();
   if (st && st !== 'undefined' && st !== 'null' && st !== 'invalid' && st !== 'none' && st !== '0') {
@@ -603,7 +603,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
 
-                const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75;
+                const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 181 || ev.minor === 5 || ev.minor === 2 || ev.minor === 1 || ev.minor === 75;
                 if ((!rawNo || rawNo === '0') && isAuthEvent) {
                   rawNo = '24';
                   ev.employeeNoString = '24';
@@ -620,7 +620,8 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
               .map((ev: any) => {
                 let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
                 if (CARD_TO_EMP[rawNo]) rawNo = CARD_TO_EMP[rawNo];
-                if ((!rawNo || rawNo === '0') && (ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75)) {
+                const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 181 || ev.minor === 5 || ev.minor === 2 || ev.minor === 1 || ev.minor === 75;
+                if ((!rawNo || rawNo === '0') && isAuthEvent) {
                   rawNo = '24';
                 }
 

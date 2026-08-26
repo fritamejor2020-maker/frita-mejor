@@ -154,14 +154,15 @@ async function runBiometricSync() {
     const mappedLogs = lote
       .filter(ev => {
         let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '').trim();
-        const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75;
+        const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 181 || ev.minor === 5 || ev.minor === 2 || ev.minor === 1 || ev.minor === 75;
         if ((!rawNo || rawNo === '0') && isAuthEvent) rawNo = '24';
         if (rawNo === '18446744073709551613' || rawNo === '') return false;
         return true;
       })
       .map(ev => {
         let rawNo = String(ev.employeeNoString || ev.employeeNo || ev.cardNo || '0').trim();
-        if ((!rawNo || rawNo === '0') && (ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 1 || ev.minor === 75)) {
+        const isAuthEvent = ev.minor === 21 || ev.minor === 22 || ev.minor === 38 || ev.minor === 181 || ev.minor === 5 || ev.minor === 2 || ev.minor === 1 || ev.minor === 75;
+        if ((!rawNo || rawNo === '0') && isAuthEvent) {
           rawNo = '24';
         }
         const rawStatus = String(ev.attendanceStatus || '').toLowerCase();
