@@ -186,21 +186,25 @@ async function _writeToSupabaseImpl(key, value) {
           if (!existing) {
             shiftMap.set(s.id, s);
           } else {
-            const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
-            const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
-
-            // Si el objeto local 's' es de una sesión abierta recién iniciada (o más reciente), se respeta la reapertura
-            if (!s.closedAt && existing.closedAt && sTime >= exTime) {
+            // Si el remoto o local fue CERRADO FORZOSAMENTE por el Admin, ESE cierre forzado NUNCA se re-abre por sync de fondo
+            if (existing.forcedByAdmin || existing._forcedClosedByAdmin) {
+              shiftMap.set(s.id, existing);
+            } else if (s.forcedByAdmin || s._forcedClosedByAdmin) {
               shiftMap.set(s.id, s);
-            } else if (existing.closedAt && !s.closedAt && sTime < exTime) {
-              // Remoto cerrado más reciente -> mantener cerrado
-              shiftMap.set(s.id, { ...s, ...existing });
-            } else if (!existing.closedAt && s.closedAt) {
-              // Local cerrado gana sobre remoto abierto
-              shiftMap.set(s.id, { ...existing, ...s });
             } else {
-              // Ambos abiertos o ambos cerrados -> s (local) actualiza los datos
-              shiftMap.set(s.id, { ...existing, ...s });
+              const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
+              const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
+
+              if (!s.closedAt && existing.closedAt && sTime > exTime + 60000) {
+                // Solo reapertura si s fue abierto al menos 1 min DESPUÉS del cierre anterior
+                shiftMap.set(s.id, s);
+              } else if (existing.closedAt && !s.closedAt) {
+                shiftMap.set(s.id, { ...s, ...existing });
+              } else if (!existing.closedAt && s.closedAt) {
+                shiftMap.set(s.id, { ...existing, ...s });
+              } else {
+                shiftMap.set(s.id, { ...existing, ...s });
+              }
             }
           }
         }

@@ -907,10 +907,14 @@ export function AdminVehicleInventoryTab() {
                 useInventoryStore.setState({ posShifts: updatedShifts });
                 setSupabaseShifts(updatedShifts);
 
-                // 2. Persistir directamente en Supabase (ambas llaves para sincronización inmediata)
+                // 2. Persistir directamente en Supabase (todas las llaves para sincronización inmediata)
                 try {
-                  await supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts }, { onConflict: 'key' });
-                  await supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts }, { onConflict: 'key' });
+                  const nowIso = new Date().toISOString();
+                  await Promise.allSettled([
+                    supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+                    supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+                    supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+                  ]);
                 } catch (e) {
                   console.warn('[ForzarCierre] Error sincronizando posShifts en Supabase:', e);
                 }
