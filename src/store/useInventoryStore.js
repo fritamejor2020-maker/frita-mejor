@@ -535,7 +535,14 @@ export const useInventoryStore = create(
                   let finalVal = [...val, ...userCreatedOffline];
                   // Aplicar tombstones
                   if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
-                  if (key === 'inventory') finalVal = finalVal.filter(i => !deletedInv.includes(i.id));
+                  if (key === 'inventory') {
+                    // 🛡️ Filtro de seguridad: preserte productos activos de triciclos frente a tombstones viejos
+                    finalVal = finalVal.filter(i => {
+                      if (!i?.id) return false;
+                      if (i.inTricycles === true || String(i.inTricycles) === 'true' || i.showInTricicloPos === true) return true;
+                      return !deletedInv.includes(i.id);
+                    });
+                  }
                   if (key === 'posRegisters') finalVal = finalVal.filter(r => !deletedRegs.has(r.id));
                   updates[key] = finalVal;
                 } else {
@@ -677,7 +684,11 @@ export const useInventoryStore = create(
           const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
           if (updates.inventory && Array.isArray(updates.inventory)) {
             const deletedInvIds = get().deletedInventoryIds || [];
-            updates.inventory = updates.inventory.filter(i => i?.id && !deletedInvIds.includes(i.id) && !DEMO_PRD_SET.has(i.id));
+            updates.inventory = updates.inventory.filter(i => {
+              if (!i?.id || DEMO_PRD_SET.has(i.id)) return false;
+              if (i.inTricycles === true || String(i.inTricycles) === 'true' || i.showInTricicloPos === true) return true;
+              return !deletedInvIds.includes(i.id);
+            });
           } else if (get().inventory && get().inventory.length > 0) {
             const localInv = get().inventory.filter(i => i?.id && !DEMO_PRD_SET.has(i.id));
             updates.inventory = localInv;
