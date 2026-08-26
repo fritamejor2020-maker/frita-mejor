@@ -633,17 +633,17 @@ export function AdminVehicleInventoryTab() {
       if (!existing) {
         shiftIdMap.set(s.id, s);
       } else {
-        // Mismo ID: si uno está abierto (!closedAt) y el otro cerrado, el ABIERTO gana si fue abierto hoy
+        // Mismo ID: si uno está abierto (!closedAt) y el otro cerrado, la versión ABIERTA prevalece
         if (!s.closedAt && existing.closedAt) {
           shiftIdMap.set(s.id, s);
         } else if (!existing.closedAt && s.closedAt) {
-          // Mantener abierto a menos que el cerrado tenga hora posterior
-          const sClose = new Date(s.closedAt).getTime();
+          // Mantener ABIERTO a menos que la versión cerrada fuera abierta con fecha posterior
+          const sOpen = new Date(s.openedAt || 0).getTime();
           const exOpen = new Date(existing.openedAt || 0).getTime();
-          if (sClose < exOpen) {
-            shiftIdMap.set(s.id, existing);
-          } else {
+          if (sOpen > exOpen) {
             shiftIdMap.set(s.id, s);
+          } else {
+            shiftIdMap.set(s.id, existing);
           }
         } else if (s.closedAt && existing.closedAt) {
           if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {

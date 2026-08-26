@@ -616,7 +616,12 @@ export const useInventoryStore = create(
                         const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
                         const matchingClosedAt = closedTimesByPointDate.get(`${cP}_${cD}`);
                         if (matchingClosedAt) {
-                          return { ...s, closedAt: matchingClosedAt };
+                          const sOpenTime = new Date(s.openedAt || 0).getTime();
+                          const closedTime = new Date(matchingClosedAt).getTime();
+                          // Solo auto-cerrar si la apertura fue ANTES del cierre registrado (borrador viejo)
+                          if (sOpenTime < closedTime) {
+                            return { ...s, closedAt: matchingClosedAt };
+                          }
                         }
                       }
                       const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
@@ -633,8 +638,16 @@ export const useInventoryStore = create(
                     const existing = shiftMap.get(shiftKey);
                     if (!existing) {
                       shiftMap.set(shiftKey, s);
-                    } else if (!existing.closedAt && s.closedAt) {
+                    } else if (!s.closedAt && existing.closedAt) {
+                      // La versión ABIERTA prevalece sobre la cerrada
                       shiftMap.set(shiftKey, s);
+                    } else if (!existing.closedAt && s.closedAt) {
+                      // Mantener la versión ABIERTA si la versión cerrada no fue abierta después
+                      const sOpen = new Date(s.openedAt || 0).getTime();
+                      const exOpen = new Date(existing.openedAt || 0).getTime();
+                      if (sOpen > exOpen) {
+                        shiftMap.set(shiftKey, s);
+                      }
                     } else if (existing.closedAt && s.closedAt) {
                       if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
                         shiftMap.set(shiftKey, s);
