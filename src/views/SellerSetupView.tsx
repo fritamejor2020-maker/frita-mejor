@@ -440,19 +440,19 @@ export const SellerSetupView = () => {
         <p className="text-amber-900/60 font-black mt-1 sm:mt-2 text-xs sm:text-sm tracking-widest uppercase">CONFIGURA TU TURNO</p>
       </div>
 
-      {/* ── Banner de Turno Activo Existente (Reanudar rápido) ── */}
-      {activeOpenShifts.length > 0 && (
+      {/* ── Banner de Turno Activo Existente (Reanudar mi turno) ── */}
+      {myUserOpenShifts.length > 0 && (
         <div className="bg-emerald-600 text-white rounded-[32px] p-6 shadow-xl w-full max-w-lg mb-6 border border-emerald-400 animate-fade-in-up">
           <div className="flex items-center gap-3 mb-3">
             <span className="text-2xl animate-bounce">⚡</span>
             <div>
-              <h2 className="font-black text-lg leading-tight">Turno Activo en Curso</h2>
-              <p className="text-emerald-100 text-xs font-bold">Existe un turno abierto en el sistema. Puedes reanudarlo para continuar en este dispositivo:</p>
+              <h2 className="font-black text-lg leading-tight">Tienes un Turno Activo en Curso</h2>
+              <p className="text-emerald-100 text-xs font-bold">Iniciaste un turno previamente. Puedes reanudarlo para continuar en este dispositivo:</p>
             </div>
           </div>
 
           <div className="space-y-2.5">
-            {activeOpenShifts.map((activeS: any) => {
+            {myUserOpenShifts.map((activeS: any) => {
               const timeStr = activeS.openedAt
                 ? new Date(activeS.openedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true })
                 : '';
