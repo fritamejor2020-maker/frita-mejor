@@ -195,12 +195,21 @@ export function useChatSoundNotifier(currentUserId) {
       return;
     }
 
-    const myId = String(currentUserId || '').toLowerCase();
-    const callerId = String(activeCall.callerId || '').toLowerCase();
-    const receiverId = String(activeCall.receiverId || '').toLowerCase();
+    const myId = String(currentUserId || '').toLowerCase().trim();
+    const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
 
-    const isCaller = callerId === myId || (myId === 'dejador' && (callerId === 'dejador' || callerId === 'logistica'));
-    const isReceiver = receiverId === myId || (myId === 'dejador' && (receiverId === 'dejador' || receiverId === 'logistica')) || receiverId === 'all';
+    const callerId = String(activeCall.callerId || '').toLowerCase().trim();
+    const cleanCallerId = callerId.replace(/[^a-z0-9]/g, '');
+
+    const receiverId = String(activeCall.receiverId || '').toLowerCase().trim();
+    const cleanReceiverId = receiverId.replace(/[^a-z0-9]/g, '');
+
+    const isDejadorUser = cleanMyId === 'dejador' || cleanMyId.includes('dejador') || cleanMyId.includes('logistica');
+    const isCallerDejador = cleanCallerId === 'dejador' || cleanCallerId.includes('dejador') || cleanCallerId.includes('logistica');
+    const isReceiverDejador = cleanReceiverId === 'dejador' || cleanReceiverId.includes('dejador') || cleanReceiverId.includes('logistica');
+
+    const isCaller = cleanMyId === cleanCallerId || (isDejadorUser && isCallerDejador);
+    const isReceiver = receiverId === 'all' || cleanMyId === cleanReceiverId || (isDejadorUser && isReceiverDejador);
 
     if (isReceiver && !isCaller) {
       // 🔔 RECEPTOR: Timbre de llamada entrante fuerte y continuo

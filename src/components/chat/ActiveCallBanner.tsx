@@ -74,7 +74,25 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
 
   if (!activeCall) return null;
 
-  const isCaller = activeCall.callerId === currentUserId;
+  const myId = String(currentUserId || '').toLowerCase().trim();
+  const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
+
+  const callerId = String(activeCall.callerId || '').toLowerCase().trim();
+  const cleanCallerId = callerId.replace(/[^a-z0-9]/g, '');
+
+  const receiverId = String(activeCall.receiverId || '').toLowerCase().trim();
+  const cleanReceiverId = receiverId.replace(/[^a-z0-9]/g, '');
+
+  const isDejadorUser = cleanMyId === 'dejador' || cleanMyId.includes('dejador') || cleanMyId.includes('logistica');
+  const isCallerDejador = cleanCallerId === 'dejador' || cleanCallerId.includes('dejador') || cleanCallerId.includes('logistica');
+  const isReceiverDejador = cleanReceiverId === 'dejador' || cleanReceiverId.includes('dejador') || cleanReceiverId.includes('logistica');
+
+  const isCaller = cleanMyId === cleanCallerId || (isDejadorUser && isCallerDejador);
+  const isReceiver = receiverId === 'all' || cleanMyId === cleanReceiverId || (isDejadorUser && isReceiverDejador);
+
+  // 🚫 Si este usuario NO es el llamador NI el destinatario de la llamada, NO MOSTRAR EL BANNER!
+  if (!isCaller && !isReceiver) return null;
+
   const isIncoming = !isCaller && activeCall.status === 'ringing';
 
   const formatCallTime = (s: number) => {
