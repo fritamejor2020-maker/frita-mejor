@@ -607,7 +607,7 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    // ── Deduplicar por ID único de turno (permite AM y PM del mismo vehículo el mismo día) ──
+    // ── Deduplicar por ID único de turno o vehículo (favoreciendo turnos ABIERTOS en curso) ──
     const shiftIdMap = new Map<string, any>();
     raw.forEach((s: any) => {
       if (!s?.id) return;
@@ -615,11 +615,19 @@ export function AdminVehicleInventoryTab() {
       if (!existing) {
         shiftIdMap.set(s.id, s);
       } else {
-        // Mismo ID: preferir la versión con cierre (más completa)
-        if (!existing.closedAt && s.closedAt) {
+        // Mismo ID: si uno está abierto (!closedAt) y el otro cerrado, el ABIERTO gana si fue abierto hoy
+        if (!s.closedAt && existing.closedAt) {
           shiftIdMap.set(s.id, s);
-        } else if (existing.closedAt && s.closedAt) {
-          // Ambos cerrados: preferir el más reciente
+        } else if (!existing.closedAt && s.closedAt) {
+          // Mantener abierto a menos que el cerrado tenga hora posterior
+          const sClose = new Date(s.closedAt).getTime();
+          const exOpen = new Date(existing.openedAt || 0).getTime();
+          if (sClose < exOpen) {
+            shiftIdMap.set(s.id, existing);
+          } else {
+            shiftIdMap.set(s.id, s);
+          }
+        } else if (s.closedAt && existing.closedAt) {
           if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
             shiftIdMap.set(s.id, s);
           }
@@ -642,10 +650,9 @@ export function AdminVehicleInventoryTab() {
       const pId = sellerSession.pointId;
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      const hasClosedShift = matchingStored.some((s: any) => s.closedAt);
       
-      // Si NO hay ningún turno abierto NI cerrado registrado, agregar sesión local en vivo
-      if (!hasOpenShift && !hasClosedShift) {
+      // Si NO hay ningún turno abierto registrado para este vehículo hoy, agregar sesión local en vivo
+      if (!hasOpenShift) {
         lives.push({
           id: `LIVE-${pId}`,
           pointId: pId,
@@ -675,23 +682,22 @@ export function AdminVehicleInventoryTab() {
 
       const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
       const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      const hasClosedShift = matchingStored.some((s: any) => s.closedAt);
 
-      // Si ya hay un turno abierto O un turno cerrado hoy para este vehículo, NO generar fake live
-      if (hasOpenShift || hasClosedShift) return;
-
-      const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
-      if (!alreadyInLives) {
-        lives.push({
-          id: `LIVE-GPS-${pId}`,
-          pointId: pId,
-          shift: loc.shift || 'AM',
-          responsibleName: loc.name || 'Vendedor en Ruta',
-          openedAt: loc.openedAt || loc.updatedAt || loc.timestamp || new Date().toISOString(),
-          closedAt: null,
-          type: 'VENDEDOR',
-          _isLive: true,
-        });
+      // Si NO hay ningún turno abierto registrado para este vehículo, agregar fake live por GPS activo
+      if (!hasOpenShift) {
+        const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
+        if (!alreadyInLives) {
+          lives.push({
+            id: `LIVE-GPS-${pId}`,
+            pointId: pId,
+            shift: loc.shift || 'AM',
+            responsibleName: loc.name || 'Vendedor en Ruta',
+            openedAt: loc.openedAt || loc.updatedAt || loc.timestamp || new Date().toISOString(),
+            closedAt: null,
+            type: 'VENDEDOR',
+            _isLive: true,
+          });
+        }
       }
     });
 
