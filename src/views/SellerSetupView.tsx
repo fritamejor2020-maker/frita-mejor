@@ -25,26 +25,40 @@ export const SellerSetupView = () => {
 
     const fetchAndVerify = async () => {
       try {
-        // Fetch directo a Supabase con timeout de 1.8s anti-congelamiento
+        // Fetch directo a Supabase con timeout de 6s para evitar fallbacks falsos en 3G/4G
         const fetchPromise = supabase
           .from('app_state')
           .select('value')
           .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history']);
 
-        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: null }), 1800));
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve({ data: null }), 6000));
         const res: any = await Promise.race([fetchPromise, timeoutPromise]);
         const data = res?.data;
 
         if (cancelled) return;
 
         if (data && Array.isArray(data) && data.length > 0) {
-          // Merge con "versión cerrada siempre gana"
+          // Merge dando prioridad a turnos abiertos recientes sobre registros cerrados viejos
           const shiftMap = new Map<string, any>();
           data.forEach((r: any) => {
             (r.value || []).forEach((s: any) => {
               if (!s?.id) return;
               const ex = shiftMap.get(s.id);
-              if (!ex || (!ex.closedAt && s.closedAt)) shiftMap.set(s.id, s);
+              if (!ex) {
+                shiftMap.set(s.id, s);
+              } else {
+                const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
+                const exTime = new Date(ex.openedAt || ex.closedAt || 0).getTime();
+                if (!s.closedAt && ex.closedAt && sTime >= exTime) {
+                  shiftMap.set(s.id, s);
+                } else if (s.closedAt && !ex.closedAt && sTime < exTime) {
+                  // Mantener el abierto reciente
+                } else if (!ex.closedAt && s.closedAt && sTime > exTime) {
+                  shiftMap.set(s.id, s);
+                } else if (s.closedAt && ex.closedAt && new Date(s.closedAt).getTime() > new Date(ex.closedAt).getTime()) {
+                  shiftMap.set(s.id, s);
+                }
+              }
             });
           });
 

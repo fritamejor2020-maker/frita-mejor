@@ -501,8 +501,18 @@ export function AdminVehicleInventoryTab() {
             map[key].forEach((s: any) => {
               if (!s?.id) return;
               const existing = shiftMap.get(s.id);
-              if (!existing || (!existing.closedAt && s.closedAt)) {
+              if (!existing) {
                 shiftMap.set(s.id, s);
+              } else {
+                const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
+                const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
+                if (!s.closedAt && existing.closedAt && sTime >= exTime) {
+                  shiftMap.set(s.id, s);
+                } else if (!existing.closedAt && s.closedAt && sTime > exTime + 60000) {
+                  shiftMap.set(s.id, s);
+                } else if (s.closedAt && existing.closedAt && new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+                  shiftMap.set(s.id, s);
+                }
               }
             });
           }
@@ -513,7 +523,9 @@ export function AdminVehicleInventoryTab() {
         storeShifts.forEach((s: any) => {
           if (!s?.id) return;
           const existing = shiftMap.get(s.id);
-          if (!existing || (!existing.closedAt && s.closedAt)) {
+          if (!existing) {
+            shiftMap.set(s.id, s);
+          } else if (!s.closedAt && existing.closedAt) {
             shiftMap.set(s.id, s);
           }
         });
