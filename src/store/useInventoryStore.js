@@ -712,7 +712,7 @@ export const useInventoryStore = create(
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir) y Pedir Surtido del Vendedor.
        * Incluye los productos agregados en Admin ➔ Productos Triciclos (inTricycles === true)
-       * MÁS los insumos etiquetados como 'No POS' (showInPos === false, ej: Vasos 10 OZ, Vasos 7 Onzas, Cambio).
+       * Y GARANTIZA la inclusión de insumos 'No POS' de la flota (Vasos 10 OZ, Vasos 7 Onzas, Cambio).
        * Excluye únicamente ítems 'Solo POS' (showInTricicloPos === true, ej: Café, Limonada) y materias primas de bodega.
        */
       getDeliveryItems: () => {
@@ -728,10 +728,17 @@ export const useInventoryStore = create(
           if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
           if (i.active === false || String(i.active) === 'false') return false;
 
+          const nameClean = String(i.name || '').toLowerCase().trim();
+
+          // 🥤 Vasos y 💵 Cambio SIEMPRE deben estar disponibles para Pedir Surtido y Surtir
+          if (nameClean.includes('vaso') || nameClean.includes('cambio')) {
+            return true;
+          }
+
           // Excluir de Surtir/Pedir los productos etiquetados 'Solo POS' ("Exclusivo POS / Dejador no surte")
           if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
 
-          // Incluir productos de flota (inTricycles === true) O insumos de flota No POS (showInPos === false: Vasos 10 OZ, Vasos 7 Onzas, Cambio)
+          // Incluir productos de flota (inTricycles === true) O insumos de flota No POS (showInPos === false)
           const isTricycleItem =
             i.inTricycles === true ||
             String(i.inTricycles) === 'true' ||
