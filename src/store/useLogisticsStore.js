@@ -1,12 +1,53 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
-import { push } from '../lib/syncManager';
+import { push, getBranchKey } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useAuthStore } from './useAuthStore';
 import { useVehicleStore } from './useVehicleStore';
 import { safeJSONStorage } from '../utils/safeStorage';
+
+// Helper: append atómico que lee el array remoto, agrega/actualiza el item, y escribe de vuelta
+// Evita el problema de sobrescribir todo el array cuando 2 dispositivos escriben al mismo tiempo
+async function atomicAppend(key, branchId, newItem, removeIds = []) {
+  const supabaseKey = getBranchKey(key, branchId);
+  try {
+    const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+    const existing = Array.isArray(data?.value) ? data.value : [];
+    // Filtrar items a remover y el propio item (para no duplicar)
+    const filtered = existing.filter(r => r?.id && !removeIds.includes(r.id) && r.id !== newItem?.id);
+    const merged = newItem ? [newItem, ...filtered] : filtered;
+    await supabase.from('app_state').upsert(
+      { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+  } catch (e) {
+    console.warn(`[LogisticsStore] atomicAppend failed for ${supabaseKey}:`, e?.message);
+  }
+}
+
+async function atomicRemoveAndAppend(removeKey, appendKey, branchId, itemId, completedItem) {
+  try {
+    // 1. Remove from source key
+    const srcKey = getBranchKey(removeKey, branchId);
+    const { data: srcData } = await supabase.from('app_state').select('value').eq('key', srcKey).maybeSingle();
+    const srcList = Array.isArray(srcData?.value) ? srcData.value.filter(r => r?.id !== itemId) : [];
+    const nowIso = new Date().toISOString();
+    await supabase.from('app_state').upsert({ key: srcKey, value: srcList, updated_at: nowIso }, { onConflict: 'key' });
+    
+    // 2. Append to destination key  
+    if (completedItem) {
+      const dstKey = getBranchKey(appendKey, branchId);
+      const { data: dstData } = await supabase.from('app_state').select('value').eq('key', dstKey).maybeSingle();
+      const dstList = Array.isArray(dstData?.value) ? dstData.value : [];
+      const merged = [completedItem, ...dstList.filter(r => r?.id !== completedItem.id)];
+      await supabase.from('app_state').upsert({ key: dstKey, value: merged, updated_at: nowIso }, { onConflict: 'key' });
+    }
+  } catch (e) {
+    console.warn(`[LogisticsStore] atomicRemoveAndAppend failed:`, e?.message);
+  }
+}
 
 // Acceso lazy a useInventoryStore para evitar import circular
 // (logistics ←→ inventory). Se resuelve en runtime cuando ya están todos cargados.
@@ -210,6 +251,10 @@ export const useLogisticsStore = create(
       push('pendingRequests', branchSlice, senderBranchId),
     ]).catch(() => {});
 
+    // Backup atómico para evitar pérdida por race condition
+    atomicAppend('pendingRequests', null, newRequest);
+    atomicAppend('pendingRequests', senderBranchId, newRequest);
+
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
     try {
       const itemsSummary = newRequest.items_payload
@@ -340,6 +385,10 @@ export const useLogisticsStore = create(
     }, ...completedRequests];
     set({ pendingRequests: newPending, completedRequests: newCompleted });
     syncLogisticsPartition(affectedBranchId, newPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
+
+    // Backup atómico para mover de pending a completed sin sobreescribir arrays
+    atomicRemoveAndAppend('pendingRequests', 'completedRequests', null, requestId, newCompleted[0]);
+    atomicRemoveAndAppend('pendingRequests', 'completedRequests', affectedBranchId, requestId, newCompleted[0]);
   },
 
   /**
@@ -556,6 +605,10 @@ export const useLogisticsStore = create(
       push('loadHistory', loadSlice, affectedBranchId),
       push('loadHistory', loadSlice, null)
     ]).catch(() => {});
+
+    // Backup atómico para evitar pérdida por race condition
+    atomicAppend('loadHistory', affectedBranchId, entry);
+    atomicAppend('loadHistory', null, entry);
     return true;
   },
 
@@ -609,6 +662,10 @@ export const useLogisticsStore = create(
       push('loadHistory', loadSlice, affectedBranchId),
       push('loadHistory', loadSlice, null)
     ]).catch(() => {});
+
+    // Backup atómico para evitar pérdida por race condition
+    atomicAppend('loadHistory', affectedBranchId, entry);
+    atomicAppend('loadHistory', null, entry);
     return true;
   },
 

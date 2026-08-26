@@ -607,38 +607,27 @@ export function AdminVehicleInventoryTab() {
 
     const raw = combined.filter(isVehicleShift);
 
-    // ── Deduplicar por vehículo y fecha preservando la sesión más RECIENTE en tiempo ──
-    const vehicleDateMap = new Map<string, any>();
+    // ── Deduplicar por ID único de turno (permite AM y PM del mismo vehículo el mismo día) ──
+    const shiftIdMap = new Map<string, any>();
     raw.forEach((s: any) => {
       if (!s?.id) return;
-      const rawP = s.pointId || s.vehicle || 'PUNTO';
-      const cleanP = String(rawP).toUpperCase().replace(/[^A-Z0-9]/g, '');
-      const numMatch = cleanP.match(/\d+/);
-      const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanP;
-      const sDate = s.fecha || s.date || dateOf(s.openedAt || s.closedAt || '');
-
-      const key = `${vehicleCode}_${sDate || 'TODAY'}`;
-      const existing = vehicleDateMap.get(key);
-
+      const existing = shiftIdMap.get(s.id);
       if (!existing) {
-        vehicleDateMap.set(key, s);
+        shiftIdMap.set(s.id, s);
       } else {
-        const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
-        const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
-
-        // 1. El turno con fecha de apertura más reciente gana siempre (permite reabrir un vehículo tras cerrar)
-        if (sTime > exTime + 30000) {
-          vehicleDateMap.set(key, s);
-        } else if (Math.abs(sTime - exTime) <= 30000) {
-          // Si pertenecen a la misma sesión exacta, preferir la versión que tenga cierre o más datos
-          if (!existing.closedAt && s.closedAt) {
-            vehicleDateMap.set(key, s);
+        // Mismo ID: preferir la versión con cierre (más completa)
+        if (!existing.closedAt && s.closedAt) {
+          shiftIdMap.set(s.id, s);
+        } else if (existing.closedAt && s.closedAt) {
+          // Ambos cerrados: preferir el más reciente
+          if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+            shiftIdMap.set(s.id, s);
           }
         }
       }
     });
 
-    return Array.from(vehicleDateMap.values());
+    return Array.from(shiftIdMap.values());
   }, [posShifts, supabaseShifts]);
 
   // Fecha de hoy local

@@ -348,6 +348,10 @@ export const SellerSetupView = () => {
       closedAt: null,
     };
 
+    const currentShiftsList = useInventoryStore.getState().posShifts || [];
+    const allShifts = [...currentShiftsList.filter((s: any) => s.id !== uniqueShiftId), newShiftRecord];
+    useInventoryStore.setState({ posShifts: allShifts });
+
     // 5. Iniciar sesión localmente e ingresar de inmediato (0ms latencia)
     startShift({
       id: uniqueShiftId,

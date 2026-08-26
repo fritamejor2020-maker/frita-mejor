@@ -14,6 +14,17 @@ const QUEUE_KEY = 'frita-sync-queue';
 const MAX_RETRIES = 3;
 const SYNC_LISTENERS = new Set();
 
+// Mutex por key para serializar escrituras y evitar race conditions
+const _writeLocks = new Map();
+async function withWriteLock(key, fn) {
+  while (_writeLocks.has(key)) {
+    try { await _writeLocks.get(key); } catch (_) {}
+  }
+  const promise = fn();
+  _writeLocks.set(key, promise);
+  try { return await promise; } finally { _writeLocks.delete(key); }
+}
+
 // ─── Clasificación de llaves ───────────────────────────────────────────────────
 
 /**
@@ -126,7 +137,7 @@ export function enqueue(key, value) {
 
 // ─── Escritura en Supabase con Protección Anti-Truncamiento ───────────────────
 
-async function writeToSupabase(key, value) {
+async function _writeToSupabaseImpl(key, value) {
   // Para arrays críticos de historial (posShifts, loadHistory, completedRequests): NUNCA truncar datos remotos
   if ((key === 'posShifts' || key.startsWith('posShifts_')) && Array.isArray(value)) {
     try {
@@ -206,10 +217,12 @@ async function writeToSupabase(key, value) {
         );
       if (error) throw error;
 
-      // Respaldo simultáneo en posShifts, posShifts_BRANCH-001 y posShifts_master_history
-      supabase.from('app_state').upsert({ key: 'posShifts', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
-      supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
-      supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }).catch(() => {});
+      // Escribir a todas las keys atómicamente con await
+      await Promise.allSettled([
+        supabase.from('app_state').upsert({ key: 'posShifts', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: mergedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+      ]);
       return;
     } catch (e) {
       console.warn('[SyncManager] Error merging shifts before write:', e);
@@ -237,6 +250,10 @@ async function writeToSupabase(key, value) {
       { onConflict: 'key' }
     );
   if (error) throw error;
+}
+
+async function writeToSupabase(key, value) {
+  return withWriteLock(key, () => _writeToSupabaseImpl(key, value));
 }
 
 // ─── Vaciado de cola ──────────────────────────────────────────────────────────

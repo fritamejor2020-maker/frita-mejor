@@ -725,13 +725,11 @@ export const VendedorDashboard = () => {
       // 2. Detener GPS inmediatamente
       try { gpsStop().catch(() => {}); } catch (_) {}
 
-      // 3. Notificar y cerrar sesión de inmediato en la interfaz (0ms)
+      // 3. Notificar al usuario de inmediato
       toast.success('Jornada cerrada');
-      endShift();
-      signOut();
 
-      // 4. Sincronización remota con Supabase ejecutada en segundo plano sin congelar la pantalla
-      (async () => {
+      // 4. Sincronización remota con Supabase (esperar máximo 2s antes de cerrar sesión)
+      const syncPromise = (async () => {
         try {
           const { data: remoteData } = await supabase
             .from('app_state')
@@ -798,6 +796,11 @@ export const VendedorDashboard = () => {
           console.warn('[VendedorClose Remote Background Sync]:', eSync);
         }
       })();
+
+      // 5. Esperar sync máximo 2s y LUEGO cerrar sesión para que el browser no mate la Promise
+      await Promise.race([syncPromise, new Promise(r => setTimeout(r, 2000))]);
+      endShift();
+      signOut();
     } catch (err: any) {
       console.warn('[VendedorClose Error]:', err?.message);
       endShift();

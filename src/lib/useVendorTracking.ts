@@ -12,7 +12,6 @@ import { supabase } from './supabase';
 import { useInventoryStore } from '../store/useInventoryStore';
 
 const CHANNEL  = 'vendor-tracking';
-const INTERVAL = 30_000; // 30 segundos
 
 export type TrackingStatus = 'idle' | 'requesting' | 'active' | 'denied' | 'error';
 
@@ -25,7 +24,7 @@ export function useVendorTracking(
   const [status, setStatus]     = useState<TrackingStatus>('idle');
   const [lastSent, setLastSent] = useState<Date | null>(null);
   const channelRef  = useRef<ReturnType<typeof supabase.channel> | null>(null);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const watchIdRef  = useRef<number | null>(null);
 
   // ── Guardar en Presence (tiempo real) + Store (persistente vía app_state) ──
   const sendLocation = async (lat: number, lng: number) => {
@@ -68,14 +67,12 @@ export function useVendorTracking(
             await sendLocation(pos.coords.latitude, pos.coords.longitude);
             setStatus('active');
 
-            // Actualizar cada 30s
-            intervalRef.current = setInterval(() => {
-              navigator.geolocation.getCurrentPosition(
-                (p) => sendLocation(p.coords.latitude, p.coords.longitude),
-                () => {/* silencioso */},
-                { enableHighAccuracy: false, timeout: 10_000 }
-              );
-            }, INTERVAL);
+            // Usar watchPosition en vez de setInterval — no se pausa en background en móviles
+            watchIdRef.current = navigator.geolocation.watchPosition(
+              (p) => sendLocation(p.coords.latitude, p.coords.longitude),
+              () => {/* silencioso */},
+              { enableHighAccuracy: true, maximumAge: 30_000 }
+            );
           }
         });
       },
@@ -87,14 +84,26 @@ export function useVendorTracking(
   };
 
   const stopTracking = async () => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    // Detener watchPosition
+    if (watchIdRef.current !== null) {
+      navigator.geolocation.clearWatch(watchIdRef.current);
+      watchIdRef.current = null;
+    }
     if (channelRef.current) {
       await channelRef.current.untrack().catch(() => {});
       await supabase.removeChannel(channelRef.current);
       channelRef.current = null;
     }
-    // NO limpiamos la ubicación del store — queremos que persista en el mapa
-    // mientras el turno esté activo.
+    // Marcar la ubicación como inactiva en el store
+    const locMap = useInventoryStore.getState().vendorLocations || {};
+    if (locMap[vendorId]) {
+      useInventoryStore.getState().updateVendorLocation(vendorId, locMap[vendorId].lat, locMap[vendorId].lng, vendorName, pointId);
+      const updated = { ...useInventoryStore.getState().vendorLocations };
+      if (updated[vendorId]) {
+        updated[vendorId] = { ...updated[vendorId], isActive: false, updatedAt: new Date().toISOString() };
+        useInventoryStore.setState({ vendorLocations: updated });
+      }
+    }
     setStatus('idle');
   };
 
