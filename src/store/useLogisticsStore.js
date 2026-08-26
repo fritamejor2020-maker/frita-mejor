@@ -41,7 +41,7 @@ async function atomicRemoveAndAppend(removeKey, appendKey, branchId, itemId, com
       const dstKey = getBranchKey(appendKey, branchId);
       const { data: dstData } = await supabase.from('app_state').select('value').eq('key', dstKey).maybeSingle();
       const dstList = Array.isArray(dstData?.value) ? dstData.value : [];
-      const merged = [completedItem, ...dstList.filter(r => r?.id !== completedItem.id)];
+      const merged = [completedItem, ...dstList.filter(r => r?.id && r.id !== completedItem?.id)];
       await supabase.from('app_state').upsert({ key: dstKey, value: merged, updated_at: nowIso }, { onConflict: 'key' });
     }
   } catch (e) {

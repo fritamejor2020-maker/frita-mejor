@@ -51,7 +51,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     if (Array.isArray(v)) {
       const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
       const deletedInvIds = new Set(useInventoryStore.getState().deletedInventoryIds || []);
-      const filtered = v.filter(i => i?.id && !deletedInvIds.has(i.id) && !DEMO_PRD_SET.has(i.id));
+      const filtered = v.filter(i => {
+        if (!i?.id || DEMO_PRD_SET.has(i.id)) return false;
+        if (i.inTricycles === true || String(i.inTricycles) === 'true' || i.showInTricicloPos === true) return true;
+        return !deletedInvIds.has(i.id);
+      });
       useInventoryStore.setState({ inventory: filtered });
     }
   };

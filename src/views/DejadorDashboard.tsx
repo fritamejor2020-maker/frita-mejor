@@ -361,9 +361,8 @@ export const DejadorDashboard = () => {
   // Mostrar todos los pedidos pendientes no procesados de la sede (o sin sede asignada)
   const truePendingRequests = (pendingRequests || []).filter((r: any) => {
     if (!r || !r.id || processedIds.has(r.id)) return false;
-    if (!userBranchId) return true; // Admin / Dejador sin sede ve todo
-    if (!r.branchId || r.branchId === userBranchId) return true;
-    if (userBranchId === 'BRANCH-001' || r.branchId === 'BRANCH-001') return true;
+    if (!userBranchId || userBranchId === 'BRANCH-001') return true; // HQ / Admin ve todas las sedes
+    if (!r.branchId || r.branchId === userBranchId) return true; // Dejador de sede específica ve sus pedidos
     return false;
   });
 

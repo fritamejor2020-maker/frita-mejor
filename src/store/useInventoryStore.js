@@ -1335,7 +1335,7 @@ export const useInventoryStore = create(
                 else if (wasPaid && isPaid && data.items) {
                   // 1. Devolver items viejos
                   let tempInv = newInventory.map(invItem => {
-                    const oldSoldItem = sale.items.find(i => String(i.productId || i.id) === String(invItem.id));
+                    const oldSoldItem = (sale.items || []).find(i => String(i.productId || i.id) === String(invItem.id));
                     if (oldSoldItem) {
                       return { ...invItem, qty: +(invItem.qty + (oldSoldItem.qty || 0)).toFixed(3) };
                     }
