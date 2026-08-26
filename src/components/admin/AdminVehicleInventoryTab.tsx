@@ -611,9 +611,15 @@ export function AdminVehicleInventoryTab() {
 
     const isVehicleShift = (s: any) => {
       if (!s || !s.id) return false;
-      // Mostrar cualquier turno de VENDEDOR, POS, vehículo o punto de venta registrado
-      if (s.type === 'VENDEDOR' || s.type === 'POS' || s.type === 'VEHICULO') return true;
-      if (s.pointId || s.vehicle || s.responsibleName || s.userName || s.sellerName) return true;
+      const typeStr = String(s.type || '').toUpperCase();
+
+      // 🚫 EXCLUIR ESTRICTAMENTE TURNOS DE CAJERO / PUNTO DE VENTA (van en el módulo Punto de Venta)
+      if (typeStr === 'POS' || typeStr === 'CAJERO' || typeStr === 'PUNTO_DE_VENTA' || typeStr === 'CAJA') return false;
+      if (s.registerId || s.cajaId || s.isCashier) return false;
+
+      // Incluir únicamente turnos de VENDEDOR, DEJADOR o VEHÍCULO DE FLOTA
+      if (typeStr === 'VENDEDOR' || typeStr === 'DEJADOR' || typeStr === 'VEHICULO' || typeStr === 'TRICICLO') return true;
+      if (s.vehicle || s.pointId) return true;
       return false;
     };
 
