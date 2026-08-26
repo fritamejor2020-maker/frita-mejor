@@ -711,9 +711,8 @@ export const useInventoryStore = create(
 
       /**
        * Productos del flujo logístico del Dejador (Surtir + Recibir) y Pedir Surtido del Vendedor.
-       * Incluye los productos de la lista Admin ➔ Productos Triciclos, excluyendo únicamente los ítems etiquetados
-       * como 'Solo POS' (showInTricicloPos: true - Exclusivo POS / Dejador no surte, ej: Café, Limonada).
-       * Incluye siempre productos de flujo normal (Empanada, Bofe...) e insumos 'No POS' (Vasos 10 OZ, Vasos 7 OZ, Cambio).
+       * Exige ESTRICTAMENTE que el producto esté agregado en Admin ➔ Triciclos & Flota ➔ Productos Triciclos (inTricycles === true),
+       * excluyendo únicamente los ítems etiquetados como 'Solo POS' (showInTricicloPos: true - Exclusivo POS / Dejador no surte, ej: Café, Limonada).
        */
       getDeliveryItems: () => {
         let inv = get().inventory || [];
@@ -731,8 +730,8 @@ export const useInventoryStore = create(
           // Excluir de Surtir/Pedir los productos etiquetados 'Solo POS' ("Exclusivo POS / Dejador no surte")
           if (i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true') return false;
 
-          // Debe estar configurado en Productos Triciclos (inTricycles === true o inTricycles !== false)
-          const isTricycleItem = i.inTricycles === true || String(i.inTricycles) === 'true' || i.inTricycles !== false;
+          // Debe estar explícitamente configurado en Admin ➔ Productos Triciclos (inTricycles === true)
+          const isTricycleItem = i.inTricycles === true || String(i.inTricycles) === 'true';
           return isTricycleItem;
         };
 
