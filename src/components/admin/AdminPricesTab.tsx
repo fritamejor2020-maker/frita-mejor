@@ -43,9 +43,9 @@ export const AdminPricesTab = () => {
   const [customPresets, setCustomPresets] = useState<string[]>(['5', '10', '15', '20']);
   const [presetInput, setPresetInput] = useState('');
 
-  // Products SHOWN in the Precios Maestros list = any item that is marked inTricycles === true
+  // Products SHOWN in the Precios Maestros list = any item marked for tricycles or tricycle POS
   const products = inventory.filter(
-    (i: any) => i.inTricycles === true
+    (i: any) => i.inTricycles === true || String(i.inTricycles) === 'true' || i.showInTricicloPos === true || String(i.showInTricicloPos) === 'true'
   );
 
   // ALL inventory items NOT already in the priced list (any type)
