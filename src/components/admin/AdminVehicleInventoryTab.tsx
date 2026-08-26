@@ -179,31 +179,39 @@ function buildShiftLogistics(
     return t >= windowStart && t <= windowEnd;
   };
 
+  const shiftRespName = String(shift.responsibleName || shift.userName || '').trim().toLowerCase();
+
+  const isMovementMatch = (e: any, isCargaOrSobrante: boolean = true) => {
+    if (!e) return false;
+    // 1. Si coincide el shiftId exacto
+    if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
+
+    // 2. Si coincide el vehículo (vehicleId / pointId)
+    const eVehicle = e.vehicleId || e.pointId || e.requester_point_id;
+    const isVehicleMatch = matchVehicleId(eVehicle, vehicleId);
+
+    // 3. Si coincide el vendedor responsable en la misma fecha
+    const eResp = String(e.responsibleName || e.vendorName || e.requester_name || '').trim().toLowerCase();
+    const isRespMatch = eResp && shiftRespName && (eResp === shiftRespName || eResp.includes(shiftRespName) || shiftRespName.includes(eResp));
+
+    const eDate = (e.timestamp || e.completed_at || e.created_at || '').slice(0, 10);
+    const isSameDate = !shiftDate || !eDate || eDate === shiftDate;
+
+    if (isVehicleMatch || (isRespMatch && isSameDate)) {
+      if (inWindow(e.timestamp || e.completed_at || e.created_at)) return true;
+      if (isSameDate && (!closedAt || sameDayVehicleShifts.length <= 1)) return true;
+    }
+    return false;
+  };
+
   // Cargas
   const cargaMap: Record<string, { name: string; qty: number }> = {};
   const seenCargas = new Set<string>();
   loadHistory
     .filter((e: any) => {
       if (e.type !== 'carga') return false;
-      if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenCargas.has(e.id)) return false;
-
-      // 1. Si coincide el shiftId exacto
-      if (e.shiftId && e.shiftId === shift.id) {
-        seenCargas.add(e.id);
-        return true;
-      }
-      if (e.shiftId && e.shiftId !== shift.id && sameDayVehicleShifts.some(s => s.id === e.shiftId)) {
-        return false;
-      }
-
-      // 2. Si tiene jornada explícita, debe coincidir exactamente
-      const eJornada = (e.jornada || e.shift || '').toUpperCase();
-      if (eJornada && shiftJornada && eJornada !== shiftJornada) return false;
-
-      // 3. Debe caer dentro de la ventana de tiempo del turno
-      if (!inWindow(e.timestamp)) return false;
-
+      if (!isMovementMatch(e, true)) return false;
       seenCargas.add(e.id);
       return true;
     })
@@ -219,12 +227,8 @@ function buildShiftLogistics(
   const seenSurtidos = new Set<string>();
   completedRequests
     .filter((r: any) => {
-      if (!matchVehicleId(r.requester_point_id, vehicleId)) return false;
       if (seenSurtidos.has(r.id)) return false;
-
-      const rTime = r.completed_at || r.created_at;
-      if (!inWindow(rTime)) return false;
-
+      if (!isMovementMatch(r, false)) return false;
       seenSurtidos.add(r.id);
       return true;
     })
@@ -241,28 +245,8 @@ function buildShiftLogistics(
   loadHistory
     .filter((e: any) => {
       if (e.type !== 'recepcion') return false;
-      if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
       if (seenRecepciones.has(e.id)) return false;
-
-      // Un turno que aún está abierto y en curso NO tiene sobrantes de turnos anteriores
-      if (!closedAt && !inWindow(e.timestamp)) return false;
-
-      // 1. Si coincide el shiftId exacto
-      if (e.shiftId && e.shiftId === shift.id) {
-        seenRecepciones.add(e.id);
-        return true;
-      }
-      if (e.shiftId && e.shiftId !== shift.id && sameDayVehicleShifts.some(s => s.id === e.shiftId)) {
-        return false;
-      }
-
-      // 2. Si tiene jornada explícita, debe coincidir exactamente
-      const eJornada = (e.jornada || e.shift || '').toUpperCase();
-      if (eJornada && shiftJornada && eJornada !== shiftJornada) return false;
-
-      // 3. Debe caer dentro de la ventana de tiempo
-      if (!inWindow(e.timestamp)) return false;
-
+      if (!isMovementMatch(e, true)) return false;
       seenRecepciones.add(e.id);
       return true;
     })
