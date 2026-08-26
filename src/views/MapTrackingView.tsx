@@ -183,7 +183,8 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
     loadState();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
-    const interval = setInterval(loadState, 5000);
+    // Intervalo de respaldo de 15s (el canal Realtime y Presence actualizan en vivo)
+    const interval = setInterval(loadState, 15000);
     return () => clearInterval(interval);
   }, []);
 

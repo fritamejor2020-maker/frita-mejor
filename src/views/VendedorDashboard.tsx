@@ -290,7 +290,8 @@ export const VendedorDashboard = () => {
     };
 
     syncCustomerOrders();
-    const interval = setInterval(syncCustomerOrders, 1500);
+    // Intervalo de respaldo de 15s (el canal Realtime ya notifica los pedidos al instante)
+    const interval = setInterval(syncCustomerOrders, 15000);
 
     const channel = supabase.channel(`vendor-delivery-direct-sync-${Date.now()}`)
       .on('postgres_changes', {

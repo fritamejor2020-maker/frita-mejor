@@ -305,11 +305,12 @@ export function ClientePedirView() {
     fetchVendors();
     fetchCatalog();
 
+    // Intervalo de respaldo de 15s (el canal Realtime ya notifica los cambios al instante)
     const interval = setInterval(() => {
       useInventoryStore.getState().loadFromRemote().catch(() => {});
       fetchVendors();
       fetchCatalog();
-    }, 4000);
+    }, 15000);
 
     const channel = supabase
       .channel('client-vendors-sync')
