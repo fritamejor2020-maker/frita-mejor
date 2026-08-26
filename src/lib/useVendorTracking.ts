@@ -49,38 +49,56 @@ export function useVendorTracking(
   };
 
   const startTracking = () => {
-    setStatus('requesting');
-
     if (!navigator.geolocation) {
       setStatus('error');
       return;
     }
 
+    setStatus('requesting');
+
+    // 1. Iniciar canal de Realtime en segundo plano de inmediato
+    if (!channelRef.current && vendorId) {
+      const ch = supabase.channel(CHANNEL, { config: { presence: { key: vendorId } } });
+      channelRef.current = ch;
+      ch.subscribe();
+    }
+
+    const handleSuccess = (pos: GeolocationPosition) => {
+      const { latitude, longitude } = pos.coords;
+      sendLocation(latitude, longitude);
+      setStatus('active');
+    };
+
+    const handleError = (err: GeolocationPositionError) => {
+      console.warn('[GPS Tracking] Error al obtener ubicación:', err.message);
+      setStatus(err.code === 1 ? 'denied' : 'error');
+    };
+
+    // 2. Intentar obtener posición rápida (5s timeout con alta precisión, fallback a normal)
     navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        // Crear canal de Supabase Presence
-        const ch = supabase.channel(CHANNEL, { config: { presence: { key: vendorId } } });
-        channelRef.current = ch;
-
-        ch.subscribe(async (s) => {
-          if (s === 'SUBSCRIBED') {
-            await sendLocation(pos.coords.latitude, pos.coords.longitude);
-            setStatus('active');
-
-            // Usar watchPosition en vez de setInterval — no se pausa en background en móviles
-            watchIdRef.current = navigator.geolocation.watchPosition(
-              (p) => sendLocation(p.coords.latitude, p.coords.longitude),
-              () => {/* silencioso */},
-              { enableHighAccuracy: true, maximumAge: 30_000 }
-            );
-          }
-        });
+      handleSuccess,
+      () => {
+        // Fallback rápido si GPS satelital tarda en interiores
+        navigator.geolocation.getCurrentPosition(
+          handleSuccess,
+          handleError,
+          { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
+        );
       },
-      (err) => {
-        setStatus(err.code === 1 ? 'denied' : 'error');
-      },
-      { enableHighAccuracy: true, timeout: 15_000, maximumAge: 60_000 }
+      { enableHighAccuracy: true, timeout: 5_000, maximumAge: 60_000 }
     );
+
+    // 3. Activar escucha continua por cambios de posición sin bloquear la activación
+    if (watchIdRef.current === null) {
+      watchIdRef.current = navigator.geolocation.watchPosition(
+        (pos) => {
+          sendLocation(pos.coords.latitude, pos.coords.longitude);
+          setStatus('active');
+        },
+        () => {/* silencioso en cambios no críticos */},
+        { enableHighAccuracy: false, maximumAge: 30_000 }
+      );
+    }
   };
 
   const stopTracking = async () => {

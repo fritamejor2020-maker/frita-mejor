@@ -185,15 +185,23 @@ async function _writeToSupabaseImpl(key, value) {
           const existing = shiftMap.get(s.id);
           if (!existing) {
             shiftMap.set(s.id, s);
-          } else if (existing.closedAt && !s.closedAt) {
-            // Remoto cerrado + local abierto -> mantener cerrado
-            shiftMap.set(s.id, { ...s, ...existing });
-          } else if (!existing.closedAt && s.closedAt) {
-            // Remoto abierto + local cerrado -> local cerrado gana
-            shiftMap.set(s.id, { ...existing, ...s });
           } else {
-            // Ambos abiertos o ambos cerrados -> s (local) actualiza los datos
-            shiftMap.set(s.id, { ...existing, ...s });
+            const sTime = new Date(s.openedAt || s.closedAt || 0).getTime();
+            const exTime = new Date(existing.openedAt || existing.closedAt || 0).getTime();
+
+            // Si el objeto local 's' es de una sesión abierta recién iniciada (o más reciente), se respeta la reapertura
+            if (!s.closedAt && existing.closedAt && sTime >= exTime) {
+              shiftMap.set(s.id, s);
+            } else if (existing.closedAt && !s.closedAt && sTime < exTime) {
+              // Remoto cerrado más reciente -> mantener cerrado
+              shiftMap.set(s.id, { ...s, ...existing });
+            } else if (!existing.closedAt && s.closedAt) {
+              // Local cerrado gana sobre remoto abierto
+              shiftMap.set(s.id, { ...existing, ...s });
+            } else {
+              // Ambos abiertos o ambos cerrados -> s (local) actualiza los datos
+              shiftMap.set(s.id, { ...existing, ...s });
+            }
           }
         }
       });
