@@ -82,14 +82,22 @@ export const VendedorDashboard = () => {
     }
   }, [user, isSetupComplete, responsibleName]);
 
-  // ── 2. Auto-asegurar que el turno de vendedor esté registrado en posShifts y Supabase ──
+  // ── 2. Auto-asegurar que el turno de vendedor esté registrado en posShifts si NO ha sido cerrado ──
   useEffect(() => {
     if (!isSetupComplete || !pointId) return;
     const currentShiftId = (useSellerSessionStore.getState() as any).shiftId;
     if (!currentShiftId) return;
 
     const currentShifts = useInventoryStore.getState().posShifts || [];
-    const exists = currentShifts.some((s: any) => s.id === currentShiftId);
+    const existingShift = currentShifts.find((s: any) => s.id === currentShiftId);
+
+    // Si el turno ya fue CERRADO, no volver a crearlo ni reabrirlo jamás
+    if (existingShift?.closedAt) {
+      console.log('[VendedorDashboard] El turno registrado ya fue cerrado. Finalizando sesión local...');
+      gpsStop();
+      endShift();
+      return;
+    }
 
     const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
     const cleanResp = String(responsibleName || (user as any)?.name || 'Vendedor').trim();
@@ -106,14 +114,13 @@ export const VendedorDashboard = () => {
       closedAt: null,
     };
 
-    if (!exists) {
+    if (!existingShift) {
       console.log('[VendedorDashboard] Asegurando turno activo en posShifts:', currentShiftId);
       addPosShift(activeShiftRecord);
+      const allShifts = useInventoryStore.getState().posShifts || [activeShiftRecord];
+      push('posShifts', allShifts, activeBranchId).catch(() => {});
+      push('posShifts', allShifts, null).catch(() => {});
     }
-
-    const allShifts = useInventoryStore.getState().posShifts || [activeShiftRecord];
-    push('posShifts', allShifts, activeBranchId).catch(() => {});
-    push('posShifts', allShifts, null).catch(() => {});
   }, [isSetupComplete, pointId, shift, responsibleName, openedAt]);
 
   // ── 3. Monitoreo reactivo en tiempo real: si ESTE turno específico es cerrado por Admin, salir ──
