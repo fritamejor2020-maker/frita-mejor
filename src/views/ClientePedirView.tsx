@@ -461,27 +461,36 @@ export function ClientePedirView() {
       const defaultLat = Number(activeBranch?.settings?.lat || 1.8485);
       const defaultLng = Number(activeBranch?.settings?.lng || -76.0522);
 
-      // A) Añadir por Turnos Abiertos
+      // A) Añadir ÚNICAMENTE vendedores con Turno Abierto activo hoy (filtra pings huérfanos de usuarios sin turno)
       activeShifts.forEach((s: any) => {
         const rawPoint = s.pointId || s.vehicle || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
         const cleanLowerP = cleanPoint.toLowerCase().replace(/[^a-z0-9]/g, '');
-        const rawName = s.responsibleName || s.userName || s.sellerName || s.vendedor || rawPoint;
-        const cleanName = String(rawName).trim().toUpperCase();
-        const cleanLowerN = cleanName.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        let rawName = (s.responsibleName || s.userName || s.sellerName || s.vendedor || '').trim();
         const userId = String(s.userId || s.createdBy || '').trim();
 
+        // Resolver nombre humano si el registrado es genérico
+        if (!rawName || rawName.toLowerCase().includes('vendedor') || rawName.toLowerCase().includes('punto')) {
+          if (userId) {
+            const usersList = useAuthStore.getState().users || [];
+            const foundUser = usersList.find((u: any) => u.id === userId || u.username === userId);
+            if (foundUser?.name && !foundUser.name.toLowerCase().includes('vendedor')) {
+              rawName = foundUser.name;
+            }
+          }
+        }
+        if (!rawName) rawName = rawPoint;
+
         const numMatch = cleanPoint.match(/\d+/);
-        const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
-        const uniqueKey = vehicleCode || cleanName || cleanPoint;
+        const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : rawPoint);
+        const uniqueKey = vehicleCode || cleanPoint;
 
         const locEntry = Object.entries(allLocs).find(([key, loc]: [string, any]) => {
           if (!loc || typeof loc !== 'object') return false;
           const lP = String(loc.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
           const lK = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const lN = String(loc.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return (cleanLowerP && (lP === cleanLowerP || lK === cleanLowerP)) ||
-                 (cleanLowerN && lN === cleanLowerN);
+          return cleanLowerP && (lP === cleanLowerP || lK === cleanLowerP);
         });
 
         const loc = locEntry ? locEntry[1] : null;
@@ -490,54 +499,14 @@ export function ClientePedirView() {
 
         finalVendorsMap.set(uniqueKey, {
           id: uniqueKey,
-          vendorId: loc?.vendorId || userId || uniqueKey,
+          vendorId: userId || uniqueKey,
           pointId: rawPoint,
           name: rawName,
+          responsibleName: rawName,
           lat,
           lng,
           updatedAt: loc?.updatedAt || s.openedAt || new Date().toISOString(),
         });
-      });
-
-      // B) Añadir ubicaciones activas de vendorLocations (respaldo por si el turno no fue capturado)
-      Object.entries(allLocs).forEach(([key, loc]: [string, any]) => {
-        if (!loc || typeof loc !== 'object' || !loc.lat || !loc.lng) return;
-        if (loc.isActive === false) return;
-
-        // Descartar pings GPS viejos (más de 30 minutos sin actualizar)
-        const locTime = loc.updatedAt || loc.timestamp;
-        if (locTime) {
-          const ageMs = Date.now() - new Date(locTime).getTime();
-          if (ageMs > 30 * 60 * 1000) return;
-        }
-
-        const rawPoint = loc.pointId || key || 'Punto';
-        const cleanPoint = String(rawPoint).trim().toUpperCase();
-        const pIdStr = cleanPoint.toLowerCase();
-        const nameStr = String(loc.name || '').toLowerCase();
-
-        // 🚫 EXCLUSIÓN DE CAJEROS / POS EN FALLBACK DE VENDORLOCATIONS
-        const isCashierOrPos = 
-          pIdStr.includes('caja') || pIdStr.includes('pos') || pIdStr.includes('cajero') || pIdStr.includes('despacho') || pIdStr.includes('branch') || pIdStr.includes('sucursal') ||
-          nameStr.includes('cajero') || nameStr.includes('caja') || nameStr.includes('despacho') || nameStr.includes('sede');
-
-        if (isCashierOrPos) return;
-
-        const numMatch = cleanPoint.match(/\d+/);
-        const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanPoint;
-        const uniqueKey = vehicleCode || cleanPoint;
-
-        if (!finalVendorsMap.has(uniqueKey)) {
-          finalVendorsMap.set(uniqueKey, {
-            id: uniqueKey,
-            vendorId: loc.vendorId || uniqueKey,
-            pointId: rawPoint,
-            name: loc.name || rawPoint,
-            lat: Number(loc.lat),
-            lng: Number(loc.lng),
-            updatedAt: loc.updatedAt || new Date().toISOString(),
-          });
-        }
       });
 
       const freshVendors = Array.from(finalVendorsMap.values());
