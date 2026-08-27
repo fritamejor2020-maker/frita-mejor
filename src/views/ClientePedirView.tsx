@@ -434,8 +434,10 @@ export function ClientePedirView() {
         const cleanName = String(rawName).trim().toUpperCase();
 
         const numMatch = cleanPoint.match(/\d+/);
-        const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : cleanName);
-        const uniqueShiftKey = vehicleCode || cleanName || cleanPoint;
+        if (!numMatch && !cleanPoint.startsWith('T') && !cleanPoint.startsWith('C')) return;
+
+        const vehicleCode = numMatch ? `T${numMatch[0]}` : cleanPoint;
+        const uniqueShiftKey = vehicleCode;
 
         if (uniqueShiftKey) {
           const existing = openShiftsMap.get(uniqueShiftKey);
