@@ -189,7 +189,7 @@ async function runBiometricSync() {
     try {
       const bioUsersRes = await fetchBiometricUsersFromDevice();
       if (bioUsersRes && bioUsersRes.ok && Array.isArray(bioUsersRes.users) && bioUsersRes.users.length > 0) {
-        const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+        const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').maybeSingle();
         let currentContracts = contractState?.value || [];
         if (Array.isArray(currentContracts)) {
           const contractMap = new Map();
@@ -267,7 +267,7 @@ async function runBiometricSync() {
       console.warn('[Electron Sync Daemon User Sync Warning]:', uErr.message);
     }
 
-    const { data: existingState } = await supabase.from('app_state').select('value').eq('key', 'attendance_logs').single();
+    const { data: existingState } = await supabase.from('app_state').select('value').eq('key', 'attendance_logs').maybeSingle();
     let currentLogs = existingState?.value || [];
     if (!Array.isArray(currentLogs)) currentLogs = [];
 
@@ -303,7 +303,7 @@ async function runBiometricSync() {
 
     // Notificar a la ventana principal de Electron con los datos frescos del biométrico local y la lista de contratos con sus nombres reales
     try {
-      const { data: cState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+      const { data: cState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').maybeSingle();
       const currentContracts = cState?.value || [];
 
       if (mainWindow && !mainWindow.isDestroyed()) {
