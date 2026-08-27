@@ -8,6 +8,7 @@ import { isPointInPolygon, getHaversineDistance, formatDistance } from '../utils
 import { useBranchStore } from '../store/useBranchStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
+import { initCustomerOrdersRealtime, broadcastCustomerOrders } from '../lib/customerOrdersBroadcast';
 import { toast } from 'react-hot-toast';
 import { 
   ShoppingBag, MapPin, Phone, User, Check, X, ShieldAlert, Sparkles, Navigation, 
@@ -209,6 +210,11 @@ export function ClientePedirView() {
   const [activeOrderToken, setActiveOrderToken] = useState<string | null>(() => localStorage.getItem('fm_active_order_token'));
   const [activeOrder, setActiveOrder] = useState<any>(null);
   const customerDeliveryRequests = useLogisticsStore((s: any) => s.customerDeliveryRequests || []);
+
+  // Canal Realtime exclusivo para difusión instantánea de pedidos (<30ms)
+  useEffect(() => {
+    initCustomerOrdersRealtime();
+  }, []);
 
   // Reacción instantánea vía Store (0ms / WebSocket Realtime) para actualizar el estado del pedido del cliente
   useEffect(() => {
@@ -859,6 +865,7 @@ export function ClientePedirView() {
         const existingOrders: any[] = stateData?.value || [];
         const updatedOrders = [newOrder, ...existingOrders.filter((o: any) => o?.id !== orderId)].slice(0, 50);
 
+        broadcastCustomerOrders(updatedOrders);
         await push('customer_delivery_requests', updatedOrders);
       })();
 

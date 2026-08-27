@@ -19,6 +19,7 @@ import { useChatStore } from '../store/useChatStore';
 import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 import { push } from '../lib/syncManager';
+import { initCustomerOrdersRealtime, broadcastCustomerOrders } from '../lib/customerOrdersBroadcast';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
@@ -161,6 +162,11 @@ export const VendedorDashboard = () => {
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
+
+  // Canal Realtime exclusivo para difusión instantánea de pedidos (<30ms)
+  useEffect(() => {
+    initCustomerOrdersRealtime();
+  }, []);
 
   // 1. Efecto Reactivo Principal vía Store + WebSocket
   useEffect(() => {
@@ -365,8 +371,8 @@ export const VendedorDashboard = () => {
         const updatedOrders = [...currentOrders];
         updatedOrders[idx] = acceptedOrder;
 
-        // 1. Estado local e instantáneo en 0ms
-        useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
+        // 1. Estado local e instantáneo en 0ms + WebSocket Broadcast (<30ms)
+        broadcastCustomerOrders(updatedOrders);
         setActiveDelivery(acceptedOrder);
         setPendingDelivery(null);
         toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
@@ -454,8 +460,8 @@ export const VendedorDashboard = () => {
       const updatedOrders = [...currentOrders];
       updatedOrders[idx] = updatedOrder;
 
-      // 1. Estado local e instantáneo en 0ms
-      useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
+      // 1. Estado local e instantáneo en 0ms + WebSocket Broadcast (<30ms)
+      broadcastCustomerOrders(updatedOrders);
 
       // 2. Persistir en Supabase en segundo plano
       push('customer_delivery_requests', updatedOrders).catch(() => {});
@@ -469,30 +475,29 @@ export const VendedorDashboard = () => {
 
   const handleCompleteDelivery = async (orderId: string) => {
     try {
-      const { data } = await supabase
-        .from('app_state')
-        .select('value')
-        .eq('key', 'customer_delivery_requests')
-        .maybeSingle();
-
-      const orders: any[] = data?.value || [];
-      const idx = orders.findIndex((o: any) => o.id === orderId);
+      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
       if (idx !== -1) {
-        orders[idx] = {
-          ...orders[idx],
+        const completedOrder = {
+          ...currentOrders[idx],
           status: 'completed',
           completed_at: new Date().toISOString()
         };
-        await push('customer_delivery_requests', orders);
+        const updatedOrders = [...currentOrders];
+        updatedOrders[idx] = completedOrder;
+
+        broadcastCustomerOrders(updatedOrders);
+        setActiveDelivery(null);
+        toast.success('¡Pedido entregado con éxito! 🎉');
+
+        push('customer_delivery_requests', updatedOrders).catch(() => {});
+      } else {
+        setActiveDelivery(null);
       }
-    } catch (e) {}
-
-    Promise.resolve(supabase.from('delivery_requests')
-      .update({ status: 'completed', completed_at: new Date().toISOString() })
-      .eq('id', orderId)).catch(() => {});
-
-    setActiveDelivery(null);
-    toast.success('¡Pedido entregado con éxito! 🎉 Stock descontado.');
+    } catch (e) {
+      console.error(e);
+      setActiveDelivery(null);
+    }
   };
 
   // For products with string presets (e.g. CAM with MON/20k/50k), track selected value separately
