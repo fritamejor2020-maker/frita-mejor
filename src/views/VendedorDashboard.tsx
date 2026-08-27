@@ -161,6 +161,7 @@ export const VendedorDashboard = () => {
     }
   });
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const lastSoundOrderIdRef = useRef<string | null>(null);
   const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
 
   // Canal Realtime exclusivo para difusión instantánea de pedidos (<30ms)
@@ -219,16 +220,18 @@ export const VendedorDashboard = () => {
 
     if (myPending) {
       setPendingDelivery(myPending);
-      if (!audioRef.current) {
-        audioRef.current = new Audio('/sounds/mixkit_bell.wav');
-        audioRef.current.loop = true;
+      // Sonar exactamente UNA sola vez por nuevo pedido (sin bucle repetido)
+      if (lastSoundOrderIdRef.current !== myPending.id) {
+        lastSoundOrderIdRef.current = myPending.id;
+        try {
+          const alertSound = new Audio('/sounds/mixkit_bell.wav');
+          alertSound.loop = false;
+          alertSound.play().catch(() => {});
+        } catch (e) {}
       }
-      audioRef.current.play().catch(() => {});
     } else {
       setPendingDelivery(null);
-      if (audioRef.current) {
-        audioRef.current.pause();
-      }
+      lastSoundOrderIdRef.current = null;
     }
 
     if (myActive) {

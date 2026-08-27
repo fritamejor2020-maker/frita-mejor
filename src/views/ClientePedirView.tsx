@@ -658,7 +658,8 @@ export function ClientePedirView() {
         const remoteOrders: any[] = data?.value || [];
         const remoteMatch = remoteOrders.find((o: any) => o.id === activeOrderId);
 
-        const match = (storeMatch && storeMatch.status !== 'pending') ? storeMatch : (remoteMatch || storeMatch);
+        // Preferir siempre la versión reactiva del store sobre lecturas remotas obsoletas
+        const match = storeMatch || remoteMatch;
 
         if (match) {
           setActiveOrder({ ...match });
@@ -827,8 +828,12 @@ export function ClientePedirView() {
     }
 
     const targetVendor = activeVendorsAround[0];
-    const assignedVendorCode = targetVendor?.pointId || targetVendor?.vendor_id || targetVendor?.id || 'T1';
-    const assignedVendorName = targetVendor?.name || targetVendor?.responsibleName || 'Vendedor Móvil';
+    const assignedVendorCode = targetVendor?.pointId || targetVendor?.vendorId || targetVendor?.id || 'T1';
+    const rawVName = targetVendor?.name || targetVendor?.responsibleName || targetVendor?.userName || '';
+    let assignedVendorName = rawVName || assignedVendorCode || 'Triciclo Cercano';
+    if (rawVName && assignedVendorCode && !rawVName.includes(assignedVendorCode)) {
+      assignedVendorName = `${rawVName} (${assignedVendorCode})`;
+    }
 
     setIsSubmitting(true);
     const token = (typeof crypto !== 'undefined' && crypto.randomUUID)
