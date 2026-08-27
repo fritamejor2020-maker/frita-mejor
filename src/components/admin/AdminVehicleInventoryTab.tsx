@@ -876,7 +876,7 @@ export function AdminVehicleInventoryTab() {
 
                 let shiftModified = false;
                 shiftMap.forEach((s: any, id: string) => {
-                  const matchPoint = matchVehicleId(s.pointId, targetPointId);
+                  const matchPoint = matchVehicleId(s.pointId || s.vehicle || s.point_id, targetPointId);
                   const matchId = s.id === shift.id;
                   if ((matchPoint || matchId) && !s.closedAt) {
                     shiftModified = true;
@@ -1178,7 +1178,50 @@ export function VehicleShiftCard({
         allShifts={combinedShifts}
         isExpanded={isExpanded}
         onToggle={() => setIsExpanded(e => !e)}
-        onForceClose={undefined}
+        onForceClose={!shift.closedAt ? async () => {
+          const vendedorName = shift.responsibleName || 'desconocido';
+          const targetPointId = shift.pointId || vehicleId;
+          const confirm = window.confirm(
+            `¿Confirmas el CIERRE FORZADO del turno ${targetPointId} de "${vendedorName}"?\n\nEsta acción cerrará la sesión activa del Vendedor desde el panel Admin.`
+          );
+          if (!confirm) return;
+
+          const closedAt = new Date().toISOString();
+          const allKnownShifts = useInventoryStore.getState().posShifts || [];
+          const shiftMap = new Map<string, any>();
+          allKnownShifts.forEach((s: any) => {
+            if (s && s.id) shiftMap.set(s.id, s);
+          });
+
+          let shiftModified = false;
+          shiftMap.forEach((s: any, id: string) => {
+            const matchPoint = matchVehicleId(s.pointId || s.vehicle || s.point_id, targetPointId);
+            const matchId = s.id === shift.id;
+            if ((matchPoint || matchId) && !s.closedAt) {
+              shiftModified = true;
+              shiftMap.set(id, { ...s, closedAt, forcedByAdmin: true });
+            }
+          });
+
+          if (!shiftModified) {
+            const fallbackId = shift.id && !shift.id.startsWith('LIVE-') ? shift.id : `SHIFT-FORCED-${Date.now()}`;
+            shiftMap.set(fallbackId, { ...shift, id: fallbackId, closedAt, forcedByAdmin: true, type: 'VENDEDOR' });
+          }
+
+          const updatedShifts = Array.from(shiftMap.values());
+          useInventoryStore.setState({ posShifts: updatedShifts });
+          useInventoryStore.getState().clearVendorLocation(targetPointId);
+
+          const nowIso = new Date().toISOString();
+          await Promise.allSettled([
+            supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'vendorLocations', value: {}, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'vendorLocations_BRANCH-001', value: {}, updated_at: nowIso }, { onConflict: 'key' }),
+          ]);
+          toast.success(`Turno ${targetPointId} cerrado forzosamente`);
+        } : undefined}
       />
     </div>
   );
