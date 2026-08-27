@@ -201,7 +201,7 @@ function buildShiftLogistics(
     // 5. Si hay MÚLTIPLES turnos del mismo vehículo en el mismo día, filtrar por jornada
     if (sameDayVehicleShifts.length > 1) {
       const eShift = String(e.shift || e.jornada || '').toUpperCase().trim();
-      const targetShift = String(jornada || shift.shift || '').toUpperCase().trim();
+      const targetShift = String(shiftJornada || shift.shift || '').toUpperCase().trim();
       if (eShift && targetShift && eShift !== targetShift) return false;
     }
 
