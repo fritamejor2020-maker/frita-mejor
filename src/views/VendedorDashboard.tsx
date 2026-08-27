@@ -334,13 +334,17 @@ export const VendedorDashboard = () => {
         const cleanMyUser = String((user as any)?.id || (user as any)?.username || '').trim();
         const myIdentifier = cleanMyPoint || cleanMyUser || 'T1';
 
+        const sellerPhone = (user as any)?.phone || (user as any)?.celular || (user as any)?.mobile || '';
+
         const acceptedOrder = {
           ...currentOrders[idx],
           status: 'accepted',
           accepted_at: new Date().toISOString(),
           assigned_vendor_id: myIdentifier,
           assigned_vendor_name: responsibleName || pointId || 'Vendedor',
-          accepted_vendor_name: responsibleName || pointId || 'Vendedor'
+          accepted_vendor_name: responsibleName || pointId || 'Vendedor',
+          vendor_name: responsibleName || pointId || 'Vendedor',
+          vendor_phone: sellerPhone
         };
         const updatedOrders = [...currentOrders];
         updatedOrders[idx] = acceptedOrder;

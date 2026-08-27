@@ -922,8 +922,17 @@ export function ClientePedirView() {
     const isRejected = activeOrder.status === 'rejected';
     const isPickup = activeOrder.delivery_mode === 'pickup';
 
-    const distanceKm = (isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng)
-      ? getHaversineDistance(activeOrder.client_lat, activeOrder.client_lng, activeOrder.vendor_lat, activeOrder.vendor_lng)
+    const assignedVendorObj = vendors.find(v =>
+      String(v.pointId || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase() ||
+      String(v.vendorId || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase() ||
+      String(v.id || '').toLowerCase() === String(activeOrder.assigned_vendor_id || '').toLowerCase()
+    );
+
+    const liveVendorLat = activeOrder.vendor_lat || assignedVendorObj?.lat;
+    const liveVendorLng = activeOrder.vendor_lng || assignedVendorObj?.lng;
+
+    const distanceKm = (isAccepted && liveVendorLat && liveVendorLng)
+      ? getHaversineDistance(activeOrder.client_lat, activeOrder.client_lng, liveVendorLat, liveVendorLng)
       : null;
 
     const etaMinutes = distanceKm ? Math.max(2, Math.round((distanceKm / 15) * 60 + 3)) : 5;
@@ -983,10 +992,10 @@ export function ClientePedirView() {
                     );
                   })}
 
-                  {isAccepted && activeOrder.vendor_lat && activeOrder.vendor_lng && (
+                  {isAccepted && liveVendorLat && liveVendorLng && (
                     <Polyline
                       positions={[
-                        [activeOrder.vendor_lat, activeOrder.vendor_lng],
+                        [liveVendorLat, liveVendorLng],
                         [activeOrder.client_lat, activeOrder.client_lng]
                       ]}
                       pathOptions={{
