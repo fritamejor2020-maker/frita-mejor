@@ -212,14 +212,20 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       const existing = shiftByIdMap.get(s.id);
       if (!existing) {
         shiftByIdMap.set(s.id, s);
-      } else if (!existing.closedAt && s.closedAt) {
+      } else if (!s.closedAt && existing.closedAt) {
+        // La versión ABIERTA prevalece si fue abierta hoy
         shiftByIdMap.set(s.id, s);
+      } else if (!existing.closedAt && s.closedAt) {
+        // Mantener ABIERTO a menos que el cerrado tenga apertura posterior
+        const sOpen = new Date(s.openedAt || 0).getTime();
+        const exOpen = new Date(existing.openedAt || 0).getTime();
+        if (sOpen > exOpen) {
+          shiftByIdMap.set(s.id, s);
+        } else {
+          shiftByIdMap.set(s.id, existing);
+        }
       } else if (existing.closedAt && s.closedAt) {
         if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
-          shiftByIdMap.set(s.id, s);
-        }
-      } else if (!existing.closedAt && !s.closedAt) {
-        if (new Date(s.openedAt || 0).getTime() > new Date(existing.openedAt || 0).getTime()) {
           shiftByIdMap.set(s.id, s);
         }
       }
@@ -401,7 +407,13 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       const numMatch = (cleanP || cleanName).match(/\d+/);
       const pNumKey = numMatch ? `t${numMatch[0]}` : '';
 
-      const hasActiveShift = activeKeys.size === 0 ||
+      // Excluir ubicaciones obsoletas mayores a 12h (ej: "Hace 21h" de días o turnos anteriores)
+      if (loc.updatedAt) {
+        const ageHours = (Date.now() - new Date(loc.updatedAt).getTime()) / (1000 * 60 * 60);
+        if (ageHours > 12) return;
+      }
+
+      const hasActiveShift =
         (cleanP && activeKeys.has(cleanP)) ||
         (cleanUid && activeKeys.has(cleanUid)) ||
         (cleanName && activeKeys.has(cleanName)) ||
