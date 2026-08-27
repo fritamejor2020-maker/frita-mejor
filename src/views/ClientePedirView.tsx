@@ -461,11 +461,32 @@ export function ClientePedirView() {
       const defaultLat = Number(activeBranch?.settings?.lat || 1.8485);
       const defaultLng = Number(activeBranch?.settings?.lng || -76.0522);
 
-      // A) Añadir ÚNICAMENTE vendedores con Turno Abierto activo hoy (filtra pings huérfanos de usuarios sin turno)
+      // A) Añadir ÚNICAMENTE vendedores con Turno Abierto activo hoy Y con señal GPS en vivo reciente (< 15 min)
       activeShifts.forEach((s: any) => {
         const rawPoint = s.pointId || s.vehicle || 'Punto';
         const cleanPoint = String(rawPoint).trim().toUpperCase();
         const cleanLowerP = cleanPoint.toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const locEntry = Object.entries(allLocs).find(([key, loc]: [string, any]) => {
+          if (!loc || typeof loc !== 'object') return false;
+          const lP = String(loc.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          const lK = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanLowerP && (lP === cleanLowerP || lK === cleanLowerP);
+        });
+
+        const loc = locEntry ? locEntry[1] : null;
+
+        // 🚫 EXCLUIR VENDEDORES INACTIVOS (Sin señal de GPS en los últimos 15 minutos o marcados inactivos)
+        if (loc?.isActive === false) return;
+        
+        const locTime = loc?.updatedAt || loc?.timestamp;
+        if (locTime) {
+          const ageMinutes = (Date.now() - new Date(locTime).getTime()) / (1000 * 60);
+          if (ageMinutes > 15) return; // Vendedor fuera de línea / app cerrada
+        } else {
+          const shiftAgeMinutes = (Date.now() - new Date(s.openedAt || 0).getTime()) / (1000 * 60);
+          if (shiftAgeMinutes > 20) return;
+        }
 
         let rawName = (s.responsibleName || s.userName || s.sellerName || s.vendedor || '').trim();
         const userId = String(s.userId || s.createdBy || '').trim();
@@ -486,14 +507,6 @@ export function ClientePedirView() {
         const vehicleCode = numMatch ? `T${numMatch[0]}` : (cleanPoint.startsWith('T') || cleanPoint.startsWith('C') ? cleanPoint : rawPoint);
         const uniqueKey = vehicleCode || cleanPoint;
 
-        const locEntry = Object.entries(allLocs).find(([key, loc]: [string, any]) => {
-          if (!loc || typeof loc !== 'object') return false;
-          const lP = String(loc.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          const lK = String(key || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return cleanLowerP && (lP === cleanLowerP || lK === cleanLowerP);
-        });
-
-        const loc = locEntry ? locEntry[1] : null;
         const lat = (loc?.lat && !isNaN(Number(loc.lat))) ? Number(loc.lat) : defaultLat;
         const lng = (loc?.lng && !isNaN(Number(loc.lng))) ? Number(loc.lng) : defaultLng;
 
