@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image, MessageSquare, Minus } from 'lucide-react';
+import { Calculator, Package, DollarSign, X, Zap, LogOut, Check, Pencil, Save, Clock, CheckCircle, XCircle, ChevronDown, ChevronUp, AlertCircle, Camera, Send, Trash2, Share2, ArrowRightLeft, Image, MessageSquare, Minus, Navigation } from 'lucide-react';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
 import { usePosStore } from '../store/usePosStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
@@ -1179,19 +1179,26 @@ export const VendedorDashboard = () => {
                     <Check size={18} strokeWidth={3} /> ¡Aceptar Pedido! 🛵
                   </button>
 
-                  <div className="grid grid-cols-2 gap-2 pt-1">
+                  <div className="grid grid-cols-3 gap-1.5 pt-1">
                     <button
                       onClick={() => handleRejectDelivery(pendingDelivery.id, 'out_of_stock')}
-                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold py-2.5 px-3 rounded-xl border border-amber-200 transition-all active:scale-95 text-xs flex items-center justify-center gap-1"
-                      title="Rechazar y reasignar por falta de stock"
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold py-2.5 px-2 rounded-xl border border-amber-200 transition-all active:scale-95 text-[11px] flex items-center justify-center gap-1"
+                      title="Rechazar por falta de stock"
                     >
-                      <Package size={14} /> Sin Stock / Agotado
+                      <Package size={13} /> Sin Stock
+                    </button>
+                    <button
+                      onClick={() => handleRejectDelivery(pendingDelivery.id, 'too_far')}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-800 font-bold py-2.5 px-2 rounded-xl border border-blue-200 transition-all active:scale-95 text-[11px] flex items-center justify-center gap-1"
+                      title="Rechazar por estar fuera de rango de distancia"
+                    >
+                      <Navigation size={13} /> Muy Lejos
                     </button>
                     <button
                       onClick={() => handleRejectDelivery(pendingDelivery.id, 'busy')}
-                      className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-bold py-2.5 px-3 rounded-xl border border-red-100 transition-all active:scale-95 text-xs flex items-center justify-center gap-1"
+                      className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-bold py-2.5 px-2 rounded-xl border border-red-100 transition-all active:scale-95 text-[11px] flex items-center justify-center gap-1"
                     >
-                      <X size={14} strokeWidth={3} /> Ocupado / Lejos
+                      <X size={13} strokeWidth={3} /> Ocupado
                     </button>
                   </div>
                 </div>

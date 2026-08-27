@@ -865,6 +865,8 @@ export function ClientePedirView() {
 
     const orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).substring(2, 7);
 
+    const eligibleVendorIds = activeVendorsAround.map(v => v.pointId || v.vendorId || v.id).filter(Boolean);
+
     const newOrder = {
       id: orderId,
       client_name: name.trim(),
@@ -877,6 +879,7 @@ export function ClientePedirView() {
       status: 'pending',
       assigned_vendor_id: assignedVendorCode,
       assigned_vendor_name: assignedVendorName,
+      eligible_vendor_ids: eligibleVendorIds,
       client_token: token,
       created_at: new Date().toISOString(),
       rejected_vendor_ids: [],
@@ -1203,20 +1206,27 @@ export function ClientePedirView() {
               )}
 
               {isRejected && (() => {
-                const isOutOfStock = activeOrder.rejection_reason === 'out_of_stock' || activeOrder.last_rejection_reason === 'out_of_stock';
+                const reason = activeOrder.rejection_reason || activeOrder.last_rejection_reason;
+                const isOutOfStock = reason === 'out_of_stock';
+                const isTooFar = reason === 'too_far';
+
+                const icon = isOutOfStock ? '📦' : (isTooFar ? '📍' : '😢');
+                const title = isOutOfStock 
+                  ? 'Productos Agotados en Carritos' 
+                  : (isTooFar ? 'Fuera de Cobertura de Carritos' : 'Sin Carritos Disponibles');
+                const message = isOutOfStock
+                  ? 'Uno o varios productos de tu pedido se agotaron en los carritos activos en este momento. Por favor modifica tu pedido o intenta más tarde.'
+                  : (isTooFar
+                      ? 'Los carritos activos se encuentran a más de 3 km de tu ubicación. Por favor acércate a uno de los puntos en el mapa o solicita recoger en puesto.'
+                      : 'Ningún carrito cercano pudo tomar la orden en este momento. Por favor intenta en unos minutos.');
+
                 return (
                   <div className="space-y-3 py-4">
                     <div className="w-16 h-16 rounded-full bg-red-100 text-red-600 flex items-center justify-center text-3xl mx-auto shadow-sm">
-                      {isOutOfStock ? '📦' : '😢'}
+                      {icon}
                     </div>
-                    <h2 className="text-lg font-black text-red-600">
-                      {isOutOfStock ? 'Productos Agotados en Carritos' : 'Sin Carritos Disponibles'}
-                    </h2>
-                    <p className="text-xs font-bold text-gray-500 leading-snug">
-                      {isOutOfStock
-                        ? 'Uno o varios productos de tu pedido se agotaron en los carritos activos en este momento. Por favor modifica tu pedido o intenta más tarde.'
-                        : 'Ningún carrito en este municipio pudo tomar la orden en este momento. Por favor intenta en unos minutos.'}
-                    </p>
+                    <h2 className="text-lg font-black text-red-600">{title}</h2>
+                    <p className="text-xs font-bold text-gray-500 leading-snug">{message}</p>
                     <button
                       onClick={handleResetOrder}
                       className="bg-gray-900 hover:bg-black text-white font-black py-3.5 px-8 rounded-2xl shadow-md active:scale-95 transition-all text-xs w-full mt-2"
