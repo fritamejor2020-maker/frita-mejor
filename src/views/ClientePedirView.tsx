@@ -8,6 +8,7 @@ import { isPointInPolygon, getHaversineDistance, formatDistance } from '../utils
 import { useBranchStore } from '../store/useBranchStore';
 import { useInventoryStore } from '../store/useInventoryStore';
 import { useLogisticsStore } from '../store/useLogisticsStore';
+import { useAuthStore } from '../store/useAuthStore';
 import { initCustomerOrdersRealtime, broadcastCustomerOrders } from '../lib/customerOrdersBroadcast';
 import { toast } from 'react-hot-toast';
 import { 
@@ -829,10 +830,22 @@ export function ClientePedirView() {
 
     const targetVendor = activeVendorsAround[0];
     const assignedVendorCode = targetVendor?.pointId || targetVendor?.vendorId || targetVendor?.id || 'T1';
-    const rawVName = targetVendor?.name || targetVendor?.responsibleName || targetVendor?.userName || '';
-    let assignedVendorName = rawVName || assignedVendorCode || 'Triciclo Cercano';
-    if (rawVName && assignedVendorCode && !rawVName.includes(assignedVendorCode)) {
-      assignedVendorName = `${rawVName} (${assignedVendorCode})`;
+
+    let humanName = (targetVendor?.name || targetVendor?.responsibleName || targetVendor?.userName || '').trim();
+    if (!humanName || humanName.toLowerCase().includes('vendedor') || humanName.toLowerCase().includes('punto')) {
+      const uId = targetVendor?.vendorId || targetVendor?.userId;
+      if (uId) {
+        const usersList = useAuthStore.getState().users || [];
+        const foundUser = usersList.find((u: any) => u.id === uId || u.username === uId);
+        if (foundUser?.name && !foundUser.name.toLowerCase().includes('vendedor')) {
+          humanName = foundUser.name;
+        }
+      }
+    }
+
+    let assignedVendorName = `Triciclo ${assignedVendorCode}`;
+    if (humanName && !humanName.toLowerCase().includes('vendedor')) {
+      assignedVendorName = `${humanName} (${assignedVendorCode})`;
     }
 
     setIsSubmitting(true);

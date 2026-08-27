@@ -461,17 +461,33 @@ export const VendedorDashboard = () => {
       let updatedOrder: any;
       if (nextSellerShift) {
         const nextCode = nextSellerShift.pointId || nextSellerShift.vehicle || 'T2';
-        const nextName = nextSellerShift.responsibleName || nextSellerShift.userName || nextCode;
+        let rawNextName = (nextSellerShift.responsibleName || nextSellerShift.userName || nextSellerShift.sellerName || '').trim();
+
+        if (!rawNextName || rawNextName.toLowerCase().includes('vendedor') || rawNextName.toLowerCase().includes('punto')) {
+          const uId = nextSellerShift.userId || nextSellerShift.createdBy;
+          if (uId) {
+            const usersList = useAuthStore.getState().users || [];
+            const foundUser = usersList.find((u: any) => u.id === uId || u.username === uId);
+            if (foundUser?.name && !foundUser.name.toLowerCase().includes('vendedor')) {
+              rawNextName = foundUser.name;
+            }
+          }
+        }
+
+        const formattedNextName = (!rawNextName || rawNextName.toLowerCase().includes('vendedor'))
+          ? `Triciclo ${nextCode}`
+          : `${rawNextName} (${nextCode})`;
+
         updatedOrder = {
           ...order,
           assigned_vendor_id: nextCode,
-          assigned_vendor_name: nextName,
+          assigned_vendor_name: formattedNextName,
           assigned_at: new Date().toISOString(),
           rejected_vendor_ids: rejectedList,
           last_rejection_reason: reason,
           status: 'pending'
         };
-        toast.info(reason === 'out_of_stock' ? `Reasignando a ${nextName} por falta de stock 📦` : `Reasignado al siguiente carrito (${nextCode}) 🛵`);
+        toast.info(reason === 'out_of_stock' ? `Reasignando a ${formattedNextName} por falta de stock 📦` : `Reasignado a ${formattedNextName} 🛵`);
       } else {
         updatedOrder = {
           ...order,
