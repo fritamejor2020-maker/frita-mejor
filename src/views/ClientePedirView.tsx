@@ -1105,16 +1105,43 @@ export function ClientePedirView() {
                   <h2 className="text-lg font-black text-green-600">
                     {isPickup ? '¡Pedido Listo en Puesto!' : '¡Carrito Aceptó Tu Pedido!'}
                   </h2>
-                  <p className="text-xs font-bold text-gray-500 leading-snug">
-                    <span className="text-gray-900 font-black">{activeOrder.vendor_name}</span> {isPickup ? 'ya empacó tu pedido y te espera en el puesto.' : 'se encuentra en camino hacia tu dirección.'}
-                  </p>
 
-                  {isPickup && activeOrder.vendor_lat && (
+                  {/* Card Destacado del Triciclo Asignado */}
+                  <div className="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 space-y-2 text-left my-2 shadow-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">🚲 Triciclo Asignado</span>
+                      {distanceKm !== null && (
+                        <span className="text-xs font-black bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full">
+                          a {formatDistance(distanceKm)}
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-base font-black text-gray-900">
+                      {activeOrder.assigned_vendor_name || activeOrder.vendor_name || activeOrder.assigned_vendor_id || 'Triciclo Cercano'}
+                    </div>
+                    <p className="text-xs font-bold text-gray-600 leading-snug">
+                      {isPickup ? 'Tu pedido ya fue preparado y te espera en el puesto para recoger.' : 'El vendedor se encuentra en camino hacia tu dirección con tu pedido caliente.'}
+                    </p>
+                    {activeOrder.vendor_phone && (
+                      <div className="pt-2 border-t border-emerald-200/60 flex items-center justify-between">
+                        <span className="text-xs font-bold text-gray-600">Teléfono Vendedor:</span>
+                        <a
+                          href={`tel:${activeOrder.vendor_phone}`}
+                          className="bg-green-600 hover:bg-green-700 text-white font-black text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 shadow-sm transition-all active:scale-95"
+                        >
+                          <Phone size={14} /> {activeOrder.vendor_phone}
+                        </a>
+                      </div>
+                    )}
+                  </div>
+
+                  {liveVendorLat && liveVendorLng && (
                     <button
-                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${activeOrder.vendor_lat},${activeOrder.vendor_lng}`, '_blank')}
+                      type="button"
+                      onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${liveVendorLat},${liveVendorLng}`, '_blank')}
                       className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-3.5 px-4 rounded-2xl shadow-md text-xs flex items-center justify-center gap-2 active:scale-95 transition-all mt-2"
                     >
-                      <Navigation size={15} /> Abrir Ruta en Google Maps
+                      <Navigation size={16} /> Ver Ruta y Cómo Llegar al Carrito en Google Maps
                     </button>
                   )}
                 </div>
