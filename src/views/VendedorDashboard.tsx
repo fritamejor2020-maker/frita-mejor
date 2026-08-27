@@ -160,13 +160,39 @@ export const VendedorDashboard = () => {
       return [];
     }
   });
-  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const alertAudioRef = useRef<HTMLAudioElement | null>(null);
   const lastSoundOrderIdRef = useRef<string | null>(null);
   const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
 
   // Canal Realtime exclusivo para difusión instantánea de pedidos (<30ms)
   useEffect(() => {
     initCustomerOrdersRealtime();
+  }, []);
+
+  // Desbloqueo automático de audio para iPadOS / iOS Safari en el primer toque de pantalla
+  useEffect(() => {
+    const audio = new Audio('/sounds/mixkit_bell.wav');
+    audio.load();
+    alertAudioRef.current = audio;
+
+    const unlockAudio = () => {
+      if (alertAudioRef.current) {
+        alertAudioRef.current.play().then(() => {
+          alertAudioRef.current?.pause();
+          if (alertAudioRef.current) alertAudioRef.current.currentTime = 0;
+        }).catch(() => {});
+      }
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('click', unlockAudio);
+    };
+
+    window.addEventListener('touchstart', unlockAudio, { once: true });
+    window.addEventListener('click', unlockAudio, { once: true });
+
+    return () => {
+      window.removeEventListener('touchstart', unlockAudio);
+      window.removeEventListener('click', unlockAudio);
+    };
   }, []);
 
   // 1. Efecto Reactivo Principal vía Store + WebSocket
@@ -220,13 +246,23 @@ export const VendedorDashboard = () => {
 
     if (myPending) {
       setPendingDelivery(myPending);
-      // Sonar exactamente UNA sola vez por nuevo pedido (sin bucle repetido)
+      // Sonar exactamente UNA sola vez por nuevo pedido (compatible con iPadOS/iOS/Android/Safari)
       if (lastSoundOrderIdRef.current !== myPending.id) {
         lastSoundOrderIdRef.current = myPending.id;
         try {
-          const alertSound = new Audio('/sounds/mixkit_bell.wav');
-          alertSound.loop = false;
-          alertSound.play().catch(() => {});
+          if (alertAudioRef.current) {
+            alertAudioRef.current.currentTime = 0;
+            alertAudioRef.current.play().catch(() => {
+              // Si el navegador bloqueó el autoplay, re-intentar con una nueva instancia
+              const sound = new Audio('/sounds/mixkit_bell.wav');
+              sound.play().catch(() => {
+                toast('🔔 ¡Nuevo Pedido Recibido! (Toca la pantalla para activar el audio)', { icon: '🔔' });
+              });
+            });
+          } else {
+            const sound = new Audio('/sounds/mixkit_bell.wav');
+            sound.play().catch(() => {});
+          }
         } catch (e) {}
       }
     } else {
