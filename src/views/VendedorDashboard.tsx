@@ -390,7 +390,7 @@ export const VendedorDashboard = () => {
     }
   };
 
-  const handleRejectDelivery = async (orderId: string) => {
+  const handleRejectDelivery = async (orderId: string, reason: string = 'busy') => {
     if (audioRef.current) {
       audioRef.current.pause();
       audioRef.current.currentTime = 0;
@@ -422,16 +422,36 @@ export const VendedorDashboard = () => {
         trackingId
       ].filter(Boolean)));
 
-      // Buscar otros vendedores con turno ABIERTO de HOY
+      // Recopilar todos los vendedores activos online (por turnos abiertos O ubicaciones activas)
       const currentShifts = useInventoryStore.getState().posShifts || [];
-      const activeVendorShifts = currentShifts.filter((s: any) => !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR');
+      const vendorLocs = useInventoryStore.getState().vendorLocations || {};
+      const activeSellersMap = new Map<string, any>();
+
+      currentShifts.forEach((s: any) => {
+        if (s && !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR') {
+          const pId = s.pointId || s.vehicle || s.userName || 'T';
+          activeSellersMap.set(String(pId).toUpperCase(), s);
+        }
+      });
+
+      Object.entries(vendorLocs).forEach(([k, loc]: [string, any]) => {
+        if (loc && loc.isActive !== false) {
+          const pId = loc.pointId || loc.name || k;
+          const cleanP = String(pId).toUpperCase();
+          if (!activeSellersMap.has(cleanP)) {
+            activeSellersMap.set(cleanP, { pointId: pId, responsibleName: loc.name || pId });
+          }
+        }
+      });
+
+      const activeVendorShifts = Array.from(activeSellersMap.values());
 
       const nextSellerShift = activeVendorShifts.find((s: any) => {
         const vPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const vUser  = String(s.userId || s.createdBy || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+        const vUser  = String(s.userId || s.userName || s.responsibleName || '').toLowerCase().replace(/[^a-z0-9]/g, '');
         return !rejectedList.some((r: any) => {
           const cleanR = String(r).toLowerCase().replace(/[^a-z0-9]/g, '');
-          return cleanR === vPoint || cleanR === vUser;
+          return (cleanR && (cleanR === vPoint || cleanR === vUser)) || (vPoint && cleanR.includes(vPoint));
         });
       });
 
@@ -445,16 +465,19 @@ export const VendedorDashboard = () => {
           assigned_vendor_name: nextName,
           assigned_at: new Date().toISOString(),
           rejected_vendor_ids: rejectedList,
+          last_rejection_reason: reason,
           status: 'pending'
         };
-        toast.info(`Pedido reasignado al siguiente carrito (${nextCode}) 🛵`);
+        toast.info(reason === 'out_of_stock' ? `Reasignando a ${nextName} por falta de stock 📦` : `Reasignado al siguiente carrito (${nextCode}) 🛵`);
       } else {
         updatedOrder = {
           ...order,
           rejected_vendor_ids: rejectedList,
+          last_rejection_reason: reason,
+          rejection_reason: reason === 'out_of_stock' ? 'out_of_stock' : 'no_vendors_available',
           status: 'rejected'
         };
-        toast.info('Pedido rechazado localmente.');
+        toast.info(reason === 'out_of_stock' ? 'Rechazado por falta de stock.' : 'Pedido rechazado localmente.');
       }
 
       const updatedOrders = [...currentOrders];
@@ -863,8 +886,23 @@ export const VendedorDashboard = () => {
 
   const pendingOrdersCount = (customerDeliveryRequests || []).filter((o: any) => {
     if (o?.status !== 'pending') return false;
+    if (localRejectedOrderIds.includes(o.id)) return false;
     const rejected = (o?.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
-    return !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack) && (!cleanResp || !rejected.includes(cleanResp));
+    const isRejected = rejected.includes(cleanPoint) || rejected.includes(cleanUser) || rejected.includes(cleanTrack) || (cleanResp && rejected.includes(cleanResp));
+    if (isRejected) return false;
+
+    const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    if (assigned) {
+      const matchesPoint = !!cleanPoint && assigned === cleanPoint;
+      const matchesUser  = !!cleanUser && assigned === cleanUser;
+      const matchesTrack = !!cleanTrack && assigned === cleanTrack;
+      const numMatchAssigned = assigned.match(/\d+/);
+      const numMatchPoint = cleanPoint.match(/\d+/);
+      const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
+
+      return matchesPoint || matchesUser || matchesTrack || isSameVehicleNum;
+    }
+    return true;
   }).length;
 
   const activeOrdersCount = Math.max(pendingOrdersCount, pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
@@ -1078,19 +1116,29 @@ export const VendedorDashboard = () => {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    onClick={() => handleRejectDelivery(pendingDelivery.id)}
-                    className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-black py-3 px-4 rounded-xl border border-red-100 transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
-                  >
-                    <X size={16} strokeWidth={3} /> Rechazar
-                  </button>
+                <div className="flex flex-col gap-2">
                   <button
                     onClick={() => handleAcceptDelivery(pendingDelivery.id)}
-                    className="bg-green-500 hover:bg-green-600 text-white font-black py-3 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
+                    className="w-full bg-green-500 hover:bg-green-600 text-white font-black py-3.5 px-4 rounded-xl shadow-md transition-all active:scale-95 text-sm flex items-center justify-center gap-1.5"
                   >
-                    <Check size={16} strokeWidth={3} /> Aceptar
+                    <Check size={18} strokeWidth={3} /> ¡Aceptar Pedido! 🛵
                   </button>
+
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <button
+                      onClick={() => handleRejectDelivery(pendingDelivery.id, 'out_of_stock')}
+                      className="bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold py-2.5 px-3 rounded-xl border border-amber-200 transition-all active:scale-95 text-xs flex items-center justify-center gap-1"
+                      title="Rechazar y reasignar por falta de stock"
+                    >
+                      <Package size={14} /> Sin Stock / Agotado
+                    </button>
+                    <button
+                      onClick={() => handleRejectDelivery(pendingDelivery.id, 'busy')}
+                      className="bg-red-50 hover:bg-red-100 text-[#FF4040] font-bold py-2.5 px-3 rounded-xl border border-red-100 transition-all active:scale-95 text-xs flex items-center justify-center gap-1"
+                    >
+                      <X size={14} strokeWidth={3} /> Ocupado / Lejos
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
