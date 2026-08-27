@@ -682,7 +682,7 @@ export const useInventoryStore = create(
 
           // Carga estricta de inventario desde Supabase: filtrar siempre los productos demo de la plantilla inicial
           const DEMO_PRD_SET = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-          if (updates.inventory && Array.isArray(updates.inventory)) {
+          if (updates.inventory && Array.isArray(updates.inventory) && updates.inventory.length > 0) {
             const deletedInvIds = get().deletedInventoryIds || [];
             updates.inventory = updates.inventory.filter(i => {
               if (!i?.id || DEMO_PRD_SET.has(i.id)) return false;
@@ -692,6 +692,9 @@ export const useInventoryStore = create(
           } else if (get().inventory && get().inventory.length > 0) {
             const localInv = get().inventory.filter(i => i?.id && !DEMO_PRD_SET.has(i.id));
             updates.inventory = localInv;
+          } else {
+            // Respaldar catálogo con el archivo semilla oficial
+            updates.inventory = inventoryBackupSeed || [];
           }
 
           if (Object.keys(updates).length > 0) {
@@ -1768,8 +1771,7 @@ export const useInventoryStore = create(
         }
         const deletedInv = state.deletedInventoryIds || [];
         if (!state.inventory || state.inventory.length === 0) {
-          // NO usar inventoryBackupSeed aquí — esperar a que loadFromRemote traiga los datos reales
-          state.inventory = [];
+          state.inventory = inventoryBackupSeed || [];
         } else {
           let inv = state.inventory;
           if (deletedInv.length > 0) {
