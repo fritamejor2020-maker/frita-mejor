@@ -640,16 +640,28 @@ export function ClientePedirView() {
 
     const checkStateOrder = async () => {
       try {
+        const storeOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+        const storeMatch = storeOrders.find((o: any) => o.id === activeOrderId);
+
+        // Si el store local por WebSocket ya confirmó un estado final (completed / rejected), respetarlo de inmediato en 0ms
+        if (storeMatch && (storeMatch.status === 'completed' || storeMatch.status === 'rejected')) {
+          setActiveOrder({ ...storeMatch });
+          return true;
+        }
+
         const { data } = await supabase
           .from('app_state')
           .select('value')
           .eq('key', 'customer_delivery_requests')
           .maybeSingle();
 
-        const orders: any[] = data?.value || [];
-        const match = orders.find((o: any) => o.id === activeOrderId);
+        const remoteOrders: any[] = data?.value || [];
+        const remoteMatch = remoteOrders.find((o: any) => o.id === activeOrderId);
+
+        const match = (storeMatch && storeMatch.status !== 'pending') ? storeMatch : (remoteMatch || storeMatch);
+
         if (match) {
-          setActiveOrder(match);
+          setActiveOrder({ ...match });
           if (match.status === 'completed' || match.status === 'rejected') {
             return true;
           }
