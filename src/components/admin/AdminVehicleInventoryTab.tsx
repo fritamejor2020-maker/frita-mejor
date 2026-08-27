@@ -195,15 +195,17 @@ function buildShiftLogistics(
     const eDate = dateOf(e.timestamp || e.completed_at || e.created_at || e.fecha || '');
     if (shiftDate && eDate && eDate !== shiftDate) return false;
 
-    // 4. Coincidencia por Jornada (AM/PM) si el movimiento especifica jornada
-    const eShift = String(e.shift || e.jornada || '').toUpperCase().trim();
-    const targetShift = String(jornada || shift.shift || '').toUpperCase().trim();
-    if (eShift && targetShift && eShift !== targetShift) return false;
-
-    // 5. Coincidencia por ventana de tiempo del turno (openedAt -> closedAt)
+    // 4. Coincidencia por ventana de tiempo del turno (openedAt -> closedAt)
     if (inWindow(e.timestamp || e.completed_at || e.created_at)) return true;
 
-    // Fallback: si es la misma fecha y el mismo vehículo y no hay conflicto de ventanas
+    // 5. Si hay MÚLTIPLES turnos del mismo vehículo en el mismo día, filtrar por jornada
+    if (sameDayVehicleShifts.length > 1) {
+      const eShift = String(e.shift || e.jornada || '').toUpperCase().trim();
+      const targetShift = String(jornada || shift.shift || '').toUpperCase().trim();
+      if (eShift && targetShift && eShift !== targetShift) return false;
+    }
+
+    // Fallback: si es la misma fecha y el mismo vehículo
     return (!closedAt || sameDayVehicleShifts.length <= 1);
   };
 
