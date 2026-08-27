@@ -151,6 +151,14 @@ export const VendedorDashboard = () => {
   // --- Estados de Pedidos Móviles (Uber / Rappi-style) ---
   const [pendingDelivery, setPendingDelivery] = useState<any>(null);
   const [activeDelivery, setActiveDelivery] = useState<any>(null);
+  const [localRejectedOrderIds, setLocalRejectedOrderIds] = useState<string[]>(() => {
+    try {
+      const cached = localStorage.getItem('fm_local_rejected_delivery_ids');
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
 
@@ -164,6 +172,7 @@ export const VendedorDashboard = () => {
 
     const myPending = orders.find((o: any) => {
       if (o.status !== 'pending') return false;
+      if (localRejectedOrderIds.includes(o.id)) return false; // Bloqueo local instantáneo e inmune
       const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
       return !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack) && (!cleanResp || !rejected.includes(cleanResp));
     });
@@ -171,18 +180,19 @@ export const VendedorDashboard = () => {
     const myActive = orders.find((o: any) => {
       if (o.status !== 'accepted') return false;
       const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      const assignedName = String(o.assigned_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const assignedName = String(o.assigned_vendor_name || o.accepted_vendor_name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+      if (!cleanPoint && !cleanUser && !cleanTrack && !cleanResp) return false;
+
+      const matchesPoint = !!cleanPoint && assigned === cleanPoint;
+      const matchesUser  = !!cleanUser && assigned === cleanUser;
+      const matchesTrack = !!cleanTrack && assigned === cleanTrack;
+
       const numMatchAssigned = assigned.match(/\d+/);
       const numMatchPoint = cleanPoint.match(/\d+/);
       const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
 
-      return (
-        (cleanPoint && assigned === cleanPoint) ||
-        (cleanUser && assigned === cleanUser) ||
-        (cleanTrack && assigned === cleanTrack) ||
-        (cleanResp && assignedName.includes(cleanResp)) ||
-        isSameVehicleNum
-      );
+      return matchesPoint || matchesUser || matchesTrack || (isSameVehicleNum && assigned === cleanPoint);
     });
 
     if (myPending) {
@@ -204,7 +214,7 @@ export const VendedorDashboard = () => {
     } else {
       setActiveDelivery(null);
     }
-  }, [customerDeliveryRequests, pointId, trackingId, user, responsibleName]);
+  }, [customerDeliveryRequests, pointId, trackingId, user, responsibleName, localRejectedOrderIds]);
 
   // 2. Respaldo de Polling Directo ultra-rápido (1.5s) a Supabase app_state + Auto-rotación de 60s
   useEffect(() => {
@@ -320,10 +330,16 @@ export const VendedorDashboard = () => {
       const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
       const idx = currentOrders.findIndex((o: any) => o.id === orderId);
       if (idx !== -1) {
+        const cleanMyPoint = String(pointId || '').trim();
+        const cleanMyUser = String((user as any)?.id || (user as any)?.username || '').trim();
+        const myIdentifier = cleanMyPoint || cleanMyUser || 'T1';
+
         const acceptedOrder = {
           ...currentOrders[idx],
           status: 'accepted',
           accepted_at: new Date().toISOString(),
+          assigned_vendor_id: myIdentifier,
+          assigned_vendor_name: responsibleName || pointId || 'Vendedor',
           accepted_vendor_name: responsibleName || pointId || 'Vendedor'
         };
         const updatedOrders = [...currentOrders];
@@ -354,13 +370,20 @@ export const VendedorDashboard = () => {
       audioRef.current.currentTime = 0;
     }
 
+    // 0. Bloqueo local inmune de 0ms
+    setLocalRejectedOrderIds(prev => {
+      const updated = Array.from(new Set([...prev, orderId]));
+      try {
+        localStorage.setItem('fm_local_rejected_delivery_ids', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
+    setPendingDelivery(null);
+
     try {
       const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
       const idx = currentOrders.findIndex((o: any) => o.id === orderId);
-      if (idx === -1) {
-        setPendingDelivery(null);
-        return;
-      }
+      if (idx === -1) return;
 
       const order = currentOrders[idx];
       const cleanCurrentPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -405,7 +428,7 @@ export const VendedorDashboard = () => {
           rejected_vendor_ids: rejectedList,
           status: 'rejected'
         };
-        toast.info('No hay más carritos disponibles.');
+        toast.info('Pedido rechazado localmente.');
       }
 
       const updatedOrders = [...currentOrders];
@@ -413,7 +436,6 @@ export const VendedorDashboard = () => {
 
       // 1. Estado local e instantáneo en 0ms
       useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
-      setPendingDelivery(null);
 
       // 2. Persistir en Supabase en segundo plano
       push('customer_delivery_requests', updatedOrders).catch(() => {});
