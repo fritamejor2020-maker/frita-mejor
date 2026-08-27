@@ -183,25 +183,28 @@ function buildShiftLogistics(
 
   const isMovementMatch = (e: any, isCargaOrSobrante: boolean = true) => {
     if (!e) return false;
-    // 1. Si coincide el shiftId exacto
+    // 1. Coincidencia por shiftId exacto
     if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
 
-    // 2. Si coincide el vehículo (vehicleId / pointId)
-    const eVehicle = e.vehicleId || e.pointId || e.requester_point_id;
+    // 2. OBLIGATORIO: Coincidencia estricta de Vehículo / Triciclo (T1, T2...)
+    const eVehicle = e.vehicleId || e.pointId || e.requester_point_id || e.vehicle;
     const isVehicleMatch = matchVehicleId(eVehicle, vehicleId);
+    if (!isVehicleMatch) return false; // 🚫 Si no es el mismo triciclo, descartar de inmediato
 
-    // 3. Si coincide el vendedor responsable en la misma fecha
-    const eResp = String(e.responsibleName || e.vendorName || e.requester_name || '').trim().toLowerCase();
-    const isRespMatch = eResp && shiftRespName && (eResp === shiftRespName || eResp.includes(shiftRespName) || shiftRespName.includes(eResp));
+    // 3. Coincidencia por Fecha
+    const eDate = dateOf(e.timestamp || e.completed_at || e.created_at || e.fecha || '');
+    if (shiftDate && eDate && eDate !== shiftDate) return false;
 
-    const eDate = (e.timestamp || e.completed_at || e.created_at || '').slice(0, 10);
-    const isSameDate = !shiftDate || !eDate || eDate === shiftDate;
+    // 4. Coincidencia por Jornada (AM/PM) si el movimiento especifica jornada
+    const eShift = String(e.shift || e.jornada || '').toUpperCase().trim();
+    const targetShift = String(jornada || shift.shift || '').toUpperCase().trim();
+    if (eShift && targetShift && eShift !== targetShift) return false;
 
-    if (isVehicleMatch || (isRespMatch && isSameDate)) {
-      if (inWindow(e.timestamp || e.completed_at || e.created_at)) return true;
-      if (isSameDate && (!closedAt || sameDayVehicleShifts.length <= 1)) return true;
-    }
-    return false;
+    // 5. Coincidencia por ventana de tiempo del turno (openedAt -> closedAt)
+    if (inWindow(e.timestamp || e.completed_at || e.created_at)) return true;
+
+    // Fallback: si es la misma fecha y el mismo vehículo y no hay conflicto de ventanas
+    return (!closedAt || sameDayVehicleShifts.length <= 1);
   };
 
   // Cargas
