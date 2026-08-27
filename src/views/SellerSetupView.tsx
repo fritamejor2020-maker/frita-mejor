@@ -245,8 +245,36 @@ export const SellerSetupView = () => {
       return;
     }
 
+    setIsLoading(true);
+
+    // 0. CONSULTA OBLIGATORIA NETWORK-FIRST A LA NUBE (SUPABASE) ANTES DE CONTINUAR
+    let cloudShifts: any[] = [];
+    try {
+      const { data } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .or('key.ilike.posShifts%');
+      if (data) {
+        data.forEach((row: any) => {
+          if (Array.isArray(row.value)) {
+            cloudShifts.push(...row.value);
+          }
+        });
+      }
+    } catch (eCloud) {
+      console.warn('[SellerSetupView] Error al consultar turnos remotos en Supabase:', eCloud);
+    } finally {
+      setIsLoading(false);
+    }
+
     const { posShifts, addPosShift } = useInventoryStore.getState();
-    const shiftsList = remoteShifts || posShifts || [];
+    const localShifts = posShifts || [];
+    const shiftsList = cloudShifts.length > 0 ? cloudShifts : (remoteShifts || localShifts);
+    
+    // Sincronizar el store de Zustand inmediatamente con la verdad de la nube
+    if (cloudShifts.length > 0) {
+      useInventoryStore.setState({ posShifts: shiftsList });
+    }
     const today = new Date().toISOString().slice(0, 10);
     const effectiveBranchId = userBranchId || 'BRANCH-001';
     const cleanBranch = String(effectiveBranchId).toLowerCase().replace(/[^a-z0-9]/g, '');
