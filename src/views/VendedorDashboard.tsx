@@ -174,7 +174,23 @@ export const VendedorDashboard = () => {
       if (o.status !== 'pending') return false;
       if (localRejectedOrderIds.includes(o.id)) return false; // Bloqueo local instantáneo e inmune
       const rejected = (o.rejected_vendor_ids || []).map((r: any) => String(r).toLowerCase().replace(/[^a-z0-9]/g, ''));
-      return !rejected.includes(cleanPoint) && !rejected.includes(cleanUser) && !rejected.includes(cleanTrack) && (!cleanResp || !rejected.includes(cleanResp));
+      const isRejected = rejected.includes(cleanPoint) || rejected.includes(cleanUser) || rejected.includes(cleanTrack) || (cleanResp && rejected.includes(cleanResp));
+      if (isRejected) return false;
+
+      // Asignación exclusiva (estilo Uber/Rappi): Solo el carrito asignado recibe la alerta
+      const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (assigned) {
+        const matchesPoint = !!cleanPoint && assigned === cleanPoint;
+        const matchesUser  = !!cleanUser && assigned === cleanUser;
+        const matchesTrack = !!cleanTrack && assigned === cleanTrack;
+        const numMatchAssigned = assigned.match(/\d+/);
+        const numMatchPoint = cleanPoint.match(/\d+/);
+        const isSameVehicleNum = !!(numMatchAssigned && numMatchPoint && numMatchAssigned[0] === numMatchPoint[0]);
+
+        return matchesPoint || matchesUser || matchesTrack || isSameVehicleNum;
+      }
+
+      return true;
     });
 
     const myActive = orders.find((o: any) => {
