@@ -7,6 +7,7 @@ import { push } from '../lib/syncManager';
 import { isPointInPolygon, getHaversineDistance, formatDistance } from '../utils/geoUtils';
 import { useBranchStore } from '../store/useBranchStore';
 import { useInventoryStore } from '../store/useInventoryStore';
+import { useLogisticsStore } from '../store/useLogisticsStore';
 import { toast } from 'react-hot-toast';
 import { 
   ShoppingBag, MapPin, Phone, User, Check, X, ShieldAlert, Sparkles, Navigation, 
