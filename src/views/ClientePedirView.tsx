@@ -374,8 +374,10 @@ export function ClientePedirView() {
   }, [clientPos, geofences]);
 
   const fetchGeofences = async () => {
-    const { data } = await supabase.from('geofences').select('*').eq('is_active', true);
-    setGeofences(data || []);
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'geofences').maybeSingle();
+      setGeofences(Array.isArray(data?.value) ? data.value.filter((g: any) => g.is_active !== false) : []);
+    } catch { setGeofences([]); }
   };
 
   const fetchVendors = async () => {
@@ -405,6 +407,7 @@ export function ClientePedirView() {
       allShifts.push(...(useInventoryStore.getState().posShifts || []));
 
       const today = new Date().toISOString().slice(0, 10);
+      const openShiftsMap = new Map<string, any>();
 
       allShifts.forEach((s: any) => {
         if (!s || s.closedAt || !s.id || deletedIds.has(s.id)) return;
@@ -697,14 +700,14 @@ export function ClientePedirView() {
                 };
                 setActiveOrder(updatedMatch);
 
-                const updatedOrders = orders.map((o: any) => o.id === activeOrderId ? updatedMatch : o);
+                const updatedOrders = remoteOrders.map((o: any) => o.id === activeOrderId ? updatedMatch : o);
                 push('customer_delivery_requests', updatedOrders).catch(() => {});
               } else {
                 toast.error('😢 Ningún carrito disponible pudo responder en este momento.');
                 const rejectedMatch = { ...match, status: 'rejected', rejected_vendor_ids: prevRejected };
                 setActiveOrder(rejectedMatch);
 
-                const updatedOrders = orders.map((o: any) => o.id === activeOrderId ? rejectedMatch : o);
+                const updatedOrders = remoteOrders.map((o: any) => o.id === activeOrderId ? rejectedMatch : o);
                 push('customer_delivery_requests', updatedOrders).catch(() => {});
                 return true;
               }
@@ -900,21 +903,6 @@ export function ClientePedirView() {
 
       const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2500));
       await Promise.race([pushPromise, timeoutPromise]);
-
-      // Intento secundario no bloqueante en la tabla SQL delivery_requests (si existe)
-      Promise.resolve(supabase.from('delivery_requests').insert({
-        id: orderId,
-        client_name: newOrder.client_name,
-        client_phone: newOrder.client_phone,
-        client_address: newOrder.client_address,
-        client_lat: newOrder.client_lat,
-        client_lng: newOrder.client_lng,
-        items: newOrder.items,
-        total_amount: newOrder.total_amount,
-        status: newOrder.status,
-        assigned_vendor_id: newOrder.assigned_vendor_id,
-        client_token: newOrder.client_token,
-      })).catch(() => {});
 
       toast.success(deliveryMode === 'delivery' ? '¡Buscando carrito cercano! 🛵💨' : '¡Reserva enviada al puesto! 📍');
       localStorage.setItem('fm_active_order_id', orderId);

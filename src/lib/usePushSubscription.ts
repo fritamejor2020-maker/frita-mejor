@@ -145,11 +145,15 @@ export function usePushSubscription() {
    * Llama esto al CERRAR el turno.
    */
   const unsubscribe = useCallback(async (shiftOpenedAt: string): Promise<void> => {
-    // Eliminar de Supabase
-    await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('shift_opened_at', shiftOpenedAt);
+    // Eliminar de app_state
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'push_subscriptions').maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const filtered = existing.filter((s: any) => s.shift_opened_at !== shiftOpenedAt);
+      await supabase.from('app_state').upsert({ key: 'push_subscriptions', value: filtered, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    } catch (e) {
+      console.warn('[Push] Error eliminando suscripción de app_state:', e);
+    }
 
     // Cancelar la suscripción en el navegador
     try {

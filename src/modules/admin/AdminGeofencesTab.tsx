@@ -149,22 +149,19 @@ export function AdminGeofencesTab() {
     }
 
     try {
-      const { error } = await supabase.from('geofences').insert({
+      const newGeofence = {
+        id: `GEO-${Date.now()}`,
         name: `${selectedBranch?.name || 'Sede'}: ${newGeofenceName.trim()}`,
         coordinates: drawPoints,
         is_active: true,
         branch_id: selectedBranchId,
-      });
+        created_at: new Date().toISOString(),
+      };
 
-      if (error) {
-        // Fallback si la columna branch_id no existe en Supabase
-        const { error: fallbackErr } = await supabase.from('geofences').insert({
-          name: `${selectedBranch?.name || 'Sede'}: ${newGeofenceName.trim()}`,
-          coordinates: drawPoints,
-          is_active: true
-        });
-        if (fallbackErr) throw new Error(fallbackErr.message);
-      }
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'geofences').maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const updated = [...existing, newGeofence];
+      await supabase.from('app_state').upsert({ key: 'geofences', value: updated, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
       toast.success(`¡Geocerca guardada para ${selectedBranch?.name || 'la sede'}! 🛡️`);
       setIsDrawing(false);
@@ -180,12 +177,10 @@ export function AdminGeofencesTab() {
     if (!window.confirm('¿Estás seguro de que deseas eliminar esta zona de cobertura?')) return;
     
     try {
-      const { error } = await supabase
-        .from('geofences')
-        .update({ is_active: false })
-        .eq('id', id);
-
-      if (error) throw new Error(error.message);
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'geofences').maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const updated = existing.map((g: any) => g.id === id ? { ...g, is_active: false } : g);
+      await supabase.from('app_state').upsert({ key: 'geofences', value: updated, updated_at: new Date().toISOString() }, { onConflict: 'key' });
 
       toast.success('Geocerca eliminada.');
       fetchGeofences();

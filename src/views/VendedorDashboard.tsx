@@ -942,10 +942,6 @@ export const VendedorDashboard = () => {
             supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
             push('posShifts', updatedShifts, activeBranchId),
             push('posShifts', updatedShifts, null),
-            supabase
-              .from('vendor_locations')
-              .update({ is_active: false })
-              .or(`point_id.ilike.%${pointId}%,assigned_vendor_id.ilike.%${pointId}%`)
           ]);
         } catch (eSync) {
           console.warn('[VendedorClose Remote Background Sync]:', eSync);
