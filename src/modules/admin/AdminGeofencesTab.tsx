@@ -105,23 +105,26 @@ export function AdminGeofencesTab() {
   }, [selectedBranchId]);
 
   const fetchGeofences = async () => {
-    const { data } = await supabase.from('geofences').select('*').eq('is_active', true);
-    setGeofences(data || []);
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'geofences').maybeSingle();
+      setGeofences(Array.isArray(data?.value) ? data.value.filter((g: any) => g.is_active !== false) : []);
+    } catch { setGeofences([]); }
   };
 
   const fetchActiveDeliveries = async () => {
-    const { data } = await supabase
-      .from('delivery_requests')
-      .select('*')
-      .in('status', ['pending', 'accepted'])
-      .order('created_at', { ascending: false });
-    
-    setActiveDeliveries(data || []);
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'customer_delivery_requests').maybeSingle();
+      const list = Array.isArray(data?.value) ? data.value : [];
+      setActiveDeliveries(list.filter((d: any) => d.status === 'pending' || d.status === 'accepted'));
+    } catch { setActiveDeliveries([]); }
   };
 
   const fetchVendorLocations = async () => {
-    const { data } = await supabase.from('vendor_locations').select('*').eq('is_active', true);
-    setVendorLocations(data || []);
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'vendorLocations').maybeSingle();
+      const locsObj = (data?.value && typeof data.value === 'object') ? data.value : {};
+      setVendorLocations(Object.values(locsObj).filter((l: any) => l && l.isActive !== false));
+    } catch { setVendorLocations([]); }
   };
 
   // Filtrar geocercas correspondientes a la sede seleccionada (o sin sede asignada)

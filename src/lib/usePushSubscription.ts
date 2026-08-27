@@ -74,23 +74,22 @@ export function usePushSubscription() {
     const subJson = sub;
     if (!subJson.endpoint || !subJson.keys?.p256dh || !subJson.keys?.auth) return;
 
-    // Eliminar suscripciones anteriores del mismo endpoint para evitar duplicados
-    await supabase
-      .from('push_subscriptions')
-      .delete()
-      .eq('endpoint', subJson.endpoint);
-
-    const { error } = await supabase.from('push_subscriptions').insert({
-      shift_opened_at: shiftOpenedAt,
-      endpoint:        subJson.endpoint,
-      p256dh:          subJson.keys.p256dh,
-      auth:            subJson.keys.auth,
-    });
-
-    if (error) {
-      console.error('[Push] Error guardando suscripción:', error.message);
-    } else {
-      console.log('[Push] Suscripción guardada ✅');
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', 'push_subscriptions').maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const filtered = existing.filter((s: any) => s.endpoint !== subJson.endpoint);
+      const newSub = {
+        shift_opened_at: shiftOpenedAt,
+        endpoint:        subJson.endpoint,
+        p256dh:          subJson.keys.p256dh,
+        auth:            subJson.keys.auth,
+        updated_at:      new Date().toISOString(),
+      };
+      const merged = [newSub, ...filtered];
+      await supabase.from('app_state').upsert({ key: 'push_subscriptions', value: merged, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+      console.log('[Push] Suscripción guardada en app_state ✅');
+    } catch (err: any) {
+      console.warn('[Push] Error guardando suscripción:', err?.message);
     }
   };
 

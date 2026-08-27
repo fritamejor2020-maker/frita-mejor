@@ -945,13 +945,8 @@ export function AdminVehicleInventoryTab() {
                   };
                   await clearFromAppState('vendorLocations');
                   await clearFromAppState('vendorLocations_BRANCH-001');
-
-                  await supabase
-                    .from('vendor_locations')
-                    .delete()
-                    .or(`point_id.ilike.%${targetPointId}%,assigned_vendor_id.ilike.%${targetPointId}%,name.ilike.%${targetPointId}%`);
                 } catch (e) {
-                  console.warn('[ForzarCierre] Warning al desactivar vendor_locations:', e);
+                  console.warn('[ForzarCierre] Warning al desactivar vendorLocations:', e);
                 }
 
                 // 4. Si la sesión activa del browser coincide con este punto, cerrarla
