@@ -488,10 +488,22 @@ export function ClientePedirView() {
           if (shiftAgeMinutes > 20) return;
         }
 
-        let rawName = (s.responsibleName || s.userName || s.sellerName || s.vendedor || '').trim();
+        // Dar prioridad absoluta al nombre del rastreo GPS en vivo (loc.name) enviado por el celular activo
+        const locName = (loc?.name || '').trim();
+        const shiftName = (s.responsibleName || s.userName || s.sellerName || s.vendedor || '').trim();
+        
+        let rawName = '';
+        if (locName && !locName.toLowerCase().includes('vendedor') && !locName.toLowerCase().includes('punto')) {
+          rawName = locName;
+        } else if (shiftName && !shiftName.toLowerCase().includes('vendedor') && !shiftName.toLowerCase().includes('punto')) {
+          rawName = shiftName;
+        } else {
+          rawName = shiftName || locName;
+        }
+
         const userId = String(s.userId || s.createdBy || '').trim();
 
-        // Resolver nombre humano si el registrado es genérico
+        // Resolver nombre humano si el registrado sigue siendo genérico
         if (!rawName || rawName.toLowerCase().includes('vendedor') || rawName.toLowerCase().includes('punto')) {
           if (userId) {
             const usersList = useAuthStore.getState().users || [];
