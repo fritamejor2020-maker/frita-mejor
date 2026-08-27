@@ -313,15 +313,27 @@ export const SellerSetupView = () => {
     });
 
     if (openShift) {
-      // Reanudar el turno abierto existente para este vehículo en cualquier dispositivo de inmediato (0ms)
+      const activeRespName = finalResponsibleName || openShift.responsibleName || 'Vendedor';
+      const updatedOpenShift = {
+        ...openShift,
+        responsibleName: activeRespName,
+        userId: (user as any)?.id || (user as any)?.username || openShift.userId,
+      };
+
+      const currentShiftsList = useInventoryStore.getState().posShifts || [];
+      const updatedShifts = currentShiftsList.map((s: any) => s.id === openShift.id ? updatedOpenShift : s);
+      useInventoryStore.setState({ posShifts: updatedShifts });
+      push('posShifts', updatedShifts, effectiveBranchId).catch(() => {});
+
+      // Reanudar el turno abierto existente actualizando el responsable activo (0ms)
       startShift({
         id: openShift.id,
         pointId: openShift.pointId || pointId,
         shift: openShift.shift || shift,
         pointType: openShift.pointType || pointType,
-        responsibleName: openShift.responsibleName || finalResponsibleName,
+        responsibleName: activeRespName,
         openedAt: openShift.openedAt,
-        userId: user?.id || user?.username,
+        userId: (user as any)?.id || (user as any)?.username,
         branchId: openShift.branchId || effectiveBranchId,
       });
       navigate('/vendedor');

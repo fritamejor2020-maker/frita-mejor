@@ -144,6 +144,27 @@ export const VendedorDashboard = () => {
     isSetupComplete          // Solo activo cuando el turno está abierto
   );
 
+  // Sincronizar de inmediato el responsable activo del turno en posShifts para que no permanezcan nombres obsoletos
+  useEffect(() => {
+    if (!isSetupComplete || !pointId || !trackingName) return;
+    const cleanPoint = String(pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+    const currentShifts = useInventoryStore.getState().posShifts || [];
+    let updated = false;
+    const nextShifts = currentShifts.map((s: any) => {
+      if (!s.closedAt && String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint) {
+        if (s.responsibleName !== trackingName) {
+          updated = true;
+          return { ...s, responsibleName: trackingName, userId: (user as any)?.id || (user as any)?.username || s.userId };
+        }
+      }
+      return s;
+    });
+    if (updated) {
+      useInventoryStore.setState({ posShifts: nextShifts });
+      push('posShifts', nextShifts, effectiveBranchId).catch(() => {});
+    }
+  }, [isSetupComplete, pointId, trackingName, user]);
+
   const [activeTab, setActiveTab] = useState('pos');
 
   // 🔊 Sonido global de radio — funciona en TODAS las pestañas, no solo en Chat
