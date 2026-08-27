@@ -560,6 +560,7 @@ export const VendedorDashboard = () => {
       updatedOrders[idx] = updatedOrder;
 
       // 1. Estado local e instantáneo en 0ms + WebSocket Broadcast (<30ms)
+      useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
       broadcastCustomerOrders(updatedOrders);
 
       // 2. Persistir en Supabase en segundo plano
