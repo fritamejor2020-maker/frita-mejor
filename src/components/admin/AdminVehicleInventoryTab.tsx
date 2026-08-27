@@ -179,8 +179,6 @@ function buildShiftLogistics(
     return t >= windowStart && t <= windowEnd;
   };
 
-  const shiftRespName = String(shift.responsibleName || shift.userName || '').trim().toLowerCase();
-
   const isMovementMatch = (e: any, isCargaOrSobrante: boolean = true) => {
     if (!e) return false;
     // 1. Coincidencia por shiftId exacto
@@ -191,22 +189,15 @@ function buildShiftLogistics(
     const isVehicleMatch = matchVehicleId(eVehicle, vehicleId);
     if (!isVehicleMatch) return false; // 🚫 Si no es el mismo triciclo, descartar de inmediato
 
-    // 3. Coincidencia por Fecha
+    // 3. OBLIGATORIO: Coincidencia por Fecha (AAAA-MM-DD)
     const eDate = dateOf(e.timestamp || e.completed_at || e.created_at || e.fecha || '');
     if (shiftDate && eDate && eDate !== shiftDate) return false;
 
-    // 4. Si hay MÚLTIPLES turnos del mismo vehículo en el mismo día, filtrar estrictamente por jornada (AM vs PM)
-    if (sameDayVehicleShifts.length > 1) {
-      const eShift = String(e.shift || e.jornada || '').toUpperCase().trim();
-      const targetShift = String(shiftJornada || shift.shift || '').toUpperCase().trim();
-      if (eShift && targetShift && eShift !== targetShift) return false;
-    }
+    // 4. Si sólo hay 1 turno para este vehículo hoy, todas las cargas y surtidos de hoy le pertenecen
+    if (sameDayVehicleShifts.length <= 1) return true;
 
-    // 5. Coincidencia por ventana de tiempo del turno (openedAt -> closedAt)
-    if (inWindow(e.timestamp || e.completed_at || e.created_at)) return true;
-
-    // Fallback: si es la misma fecha y el mismo vehículo
-    return (!closedAt || sameDayVehicleShifts.length <= 1);
+    // 5. Si hay múltiples turnos del mismo vehículo hoy, delimitar por ventana de tiempo (openedAt -> closedAt)
+    return inWindow(e.timestamp || e.completed_at || e.created_at);
   };
 
   // Cargas
@@ -638,22 +629,18 @@ export function AdminVehicleInventoryTab() {
       if (!existing) {
         shiftIdMap.set(s.id, s);
       } else {
-        // Mismo ID: si uno está abierto (!closedAt) y el otro cerrado, la versión ABIERTA prevalece
-        if (!s.closedAt && existing.closedAt) {
+        // Mismo ID: si una versión tiene fecha de cierre (closedAt), esa versión prevalece para mantener el cierre firme
+        if (s.closedAt && !existing.closedAt) {
           shiftIdMap.set(s.id, s);
-        } else if (!existing.closedAt && s.closedAt) {
-          // Mantener ABIERTO a menos que la versión cerrada fuera abierta con fecha posterior
-          const sOpen = new Date(s.openedAt || 0).getTime();
-          const exOpen = new Date(existing.openedAt || 0).getTime();
-          if (sOpen > exOpen) {
-            shiftIdMap.set(s.id, s);
-          } else {
-            shiftIdMap.set(s.id, existing);
-          }
+        } else if (!s.closedAt && existing.closedAt) {
+          shiftIdMap.set(s.id, existing);
         } else if (s.closedAt && existing.closedAt) {
-          if (new Date(s.closedAt).getTime() > new Date(existing.closedAt).getTime()) {
+          if (new Date(s.closedAt).getTime() >= new Date(existing.closedAt).getTime()) {
             shiftIdMap.set(s.id, s);
           }
+        } else {
+          // Ambos abiertos: preferir la versión del store (más reciente)
+          shiftIdMap.set(s.id, s);
         }
       }
     });
