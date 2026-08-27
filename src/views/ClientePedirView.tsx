@@ -207,6 +207,16 @@ export function ClientePedirView() {
   const [activeOrderId, setActiveOrderId] = useState<string | null>(() => localStorage.getItem('fm_active_order_id'));
   const [activeOrderToken, setActiveOrderToken] = useState<string | null>(() => localStorage.getItem('fm_active_order_token'));
   const [activeOrder, setActiveOrder] = useState<any>(null);
+  const customerDeliveryRequests = useLogisticsStore((s: any) => s.customerDeliveryRequests || []);
+
+  // Reacción instantánea vía Store (0ms / WebSocket Realtime) para actualizar el estado del pedido del cliente
+  useEffect(() => {
+    if (!activeOrderId) return;
+    const match = (customerDeliveryRequests || []).find((o: any) => o.id === activeOrderId);
+    if (match) {
+      setActiveOrder(match);
+    }
+  }, [customerDeliveryRequests, activeOrderId]);
 
   // Refs para prevenir clausuras obsoletas en callbacks asíncronos y eventos de Leaflet
   const branchesRef = useRef(branches);
