@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
-import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady, atomicUpdateItem, atomicAppendItem, atomicRemoveItem } from '../lib/syncManager';
+import { push, pullAll, getBranchKey, BRANCH_KEYS, GLOBAL_KEYS, markAppReady, atomicUpdateItem, atomicAppendItem, atomicRemoveItem, getQueuedOfflineItemIds } from '../lib/syncManager';
 import { markLocalWrite, applyRemoteSnapshot } from '../lib/useRealtimeSync';
 import { safeJSONStorage } from '../utils/safeStorage';
 import inventoryBackupSeed from '../data/inventoryBackupSeed.json';

@@ -197,6 +197,19 @@ function saveQueue(queue) {
   }
 }
 
+export function getQueuedOfflineItemIds(key) {
+  try {
+    const queue = getQueue();
+    const item = queue.find(q => q.key === key || q.key.startsWith(`${key}_`));
+    if (item && Array.isArray(item.value)) {
+      return new Set(item.value.map(i => i?.id).filter(Boolean));
+    }
+    return new Set();
+  } catch {
+    return new Set();
+  }
+}
+
 export function enqueue(key, value) {
   const queue = getQueue();
   const existingIdx = queue.findIndex(item => item.key === key);
