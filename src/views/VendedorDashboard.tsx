@@ -20,6 +20,7 @@ import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier } from '../hooks/useChatSoundNotifier';
 import { push } from '../lib/syncManager';
 import { initCustomerOrdersRealtime, broadcastCustomerOrders } from '../lib/customerOrdersBroadcast';
+import { initLogisticsRealtime } from '../lib/logisticsBroadcast';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
@@ -192,9 +193,10 @@ export const VendedorDashboard = () => {
   const lastSoundOrderIdRef = useRef<string | null>(null);
   const customerDeliveryRequests = useLogisticsStore(state => state.customerDeliveryRequests);
 
-  // Canal Realtime exclusivo para difusión instantánea de pedidos (<30ms)
+  // Canal Realtime exclusivo para difusión instantánea de pedidos y surtidos (<30ms)
   useEffect(() => {
     initCustomerOrdersRealtime();
+    initLogisticsRealtime();
   }, []);
 
   // Desbloqueo automático de audio para iPadOS / iOS Safari en el primer toque de pantalla

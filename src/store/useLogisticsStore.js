@@ -8,6 +8,7 @@ import { useSellerSessionStore } from './useSellerSessionStore';
 import { useAuthStore } from './useAuthStore';
 import { useVehicleStore } from './useVehicleStore';
 import { safeJSONStorage } from '../utils/safeStorage';
+import { broadcastLogisticsUpdate } from '../lib/logisticsBroadcast';
 
 // Helper: append atómico que lee el array remoto, agrega/actualiza el item, y escribe de vuelta
 // Evita el problema de sobrescribir todo el array cuando 2 dispositivos escriben al mismo tiempo
@@ -249,6 +250,7 @@ export const useLogisticsStore = create(
     const updated = [...pendingRequests, newRequest];
     set({ pendingRequests: updated });
     get().clearRestockCart();
+    broadcastLogisticsUpdate({ pendingRequests: updated });
 
     const branchSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === (senderBranchId || 'BRANCH-001'));
     markLocalWrite('pendingRequests', senderBranchId);
@@ -435,6 +437,7 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...completedRequests];
     set({ pendingRequests: newPending, completedRequests: newCompleted });
+    broadcastLogisticsUpdate({ pendingRequests: newPending, completedRequests: newCompleted });
     syncLogisticsPartition(affectedBranchId, newPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
 
     // Backup atómico para mover de pending a completed sin sobreescribir arrays
@@ -501,6 +504,7 @@ export const useLogisticsStore = create(
     }
 
     set({ pendingRequests: finalPending, completedRequests: newCompleted });
+    broadcastLogisticsUpdate({ pendingRequests: finalPending, completedRequests: newCompleted });
     syncLogisticsPartition(affectedBranchId, finalPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
   },
 
@@ -520,6 +524,7 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...rejectedRequests];
     set({ pendingRequests: newPending, rejectedRequests: newRejected });
+    broadcastLogisticsUpdate({ pendingRequests: newPending, rejectedRequests: newRejected });
     syncLogisticsPartition(affectedBranchId, newPending, get().completedRequests, newRejected, { syncRejected: true });
   },
 
@@ -653,6 +658,7 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
+    broadcastLogisticsUpdate({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     markLocalWrite('loadHistory', affectedBranchId);
     markLocalWrite('loadHistory', null);
@@ -710,6 +716,7 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
+    broadcastLogisticsUpdate({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     markLocalWrite('loadHistory', affectedBranchId);
     markLocalWrite('loadHistory', null);

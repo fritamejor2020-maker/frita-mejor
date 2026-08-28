@@ -16,6 +16,7 @@ import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier, getAudioCtx, resumeAudioContext } from '../hooks/useChatSoundNotifier';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
+import { initLogisticsRealtime } from '../lib/logisticsBroadcast';
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -257,6 +258,7 @@ export const DejadorDashboard = () => {
   };
 
   useEffect(() => {
+    initLogisticsRealtime();
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().loadFromRemote().catch(() => {});

@@ -17,6 +17,7 @@ import { trackError, installGlobalErrorHandlers } from './lib/errorTracker';
 import SyncStatusIndicator from './components/ui/SyncStatusIndicator';
 import VersionBadge from './components/ui/VersionBadge';
 import { useOrientation } from './hooks/useOrientation';
+import { initLogisticsRealtime } from './lib/logisticsBroadcast';
 
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -236,6 +237,8 @@ function App() {
       }
     };
     document.addEventListener('click', handleGlobalInputFocus, true);
+
+    initLogisticsRealtime();
 
     // 1. Estrategia Nube-Primero: al abrir la app o reconectarse, priorizar siempre los datos de Supabase si hay internet
     const syncAllRemoteStores = async () => {
