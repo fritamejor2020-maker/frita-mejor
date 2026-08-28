@@ -969,7 +969,16 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
       loadFromRemote: async () => {
         try {
-          const { data } = await supabase.from('app_state').select('*').like('key', '%attendance%');
+          const { data } = await supabase
+            .from('app_state')
+            .select('key, value')
+            .in('key', [
+              'attendance_shifts', 'attendance_shifts_BRANCH-001',
+              'attendance_groups', 'attendance_groups_BRANCH-001',
+              'attendance_contracts', 'attendance_contracts_BRANCH-001',
+              'attendance_logs', 'attendance_logs_BRANCH-001',
+              'attendance_overrides', 'attendance_overrides_BRANCH-001'
+            ]);
           if (data && Array.isArray(data)) {
             const sortedRows = [...data].sort((a, b) => (a.key.includes('BRANCH') ? 1 : -1));
             sortedRows.forEach((row: any) => {

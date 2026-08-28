@@ -446,8 +446,6 @@ export const AdminFinancesTab = ({
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().fetchPendingRequests().catch(() => {});
 
-    const interval = setInterval(loadShiftsFromSupabase, 5000);
-
     const channel = supabase
       .channel('admin-finances-shifts-sync')
       .on('postgres_changes', {
@@ -461,7 +459,6 @@ export const AdminFinancesTab = ({
       .subscribe();
 
     return () => {
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, []);

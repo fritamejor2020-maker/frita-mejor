@@ -569,27 +569,21 @@ export function AdminVehicleInventoryTab() {
     // Forzar término de carga en máximo 1.5s para no bloquear la pantalla
     const safetyTimeout = setTimeout(() => setSupabaseLoaded(true), 1500);
 
-    // Intervalo de respaldo cada 10 segundos
-    const interval = setInterval(loadShiftsFromSupabase, 10000);
-
     // Canal Realtime para cambios instantáneos
     const channel = supabase
-      .channel(`admin-shifts-live-sync-${Date.now()}`)
+      .channel('admin-vehicle-shifts-sync')
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
-        table: 'app_state'
-      }, (payload) => {
-        const key = payload.new?.key || '';
-        if (key.includes('posShifts') || key.includes('vendorLocations')) {
-          loadShiftsFromSupabase();
-        }
+        table: 'app_state',
+        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
+      }, () => {
+        loadShiftsFromSupabase();
       })
       .subscribe();
 
     return () => {
       clearTimeout(safetyTimeout);
-      clearInterval(interval);
       supabase.removeChannel(channel);
     };
   }, []);

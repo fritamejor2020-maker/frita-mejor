@@ -262,32 +262,6 @@ export const DejadorDashboard = () => {
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().loadFromRemote().catch(() => {});
-
-    // Intervalo de respaldo de 15s (el canal Realtime ya notifica los cambios al instante)
-    const interval = setInterval(() => {
-      loadRemoteShifts();
-      useLogisticsStore.getState().loadFromRemote().catch(() => {});
-    }, 15000);
-
-    const channel = supabase
-      .channel('dejador-logistics-realtime-sync')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'app_state' },
-        (payload: any) => {
-          const k = payload?.new?.key || '';
-          if (k.includes('posShifts') || k.includes('pendingRequests') || k.includes('completedRequests') || k.includes('loadHistory') || k.includes('inventory')) {
-            loadRemoteShifts();
-            useLogisticsStore.getState().loadFromRemote().catch(() => {});
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      clearInterval(interval);
-      supabase.removeChannel(channel);
-    };
   }, [userBranchId]);
 
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
