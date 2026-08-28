@@ -17,3 +17,8 @@ This file documents critical behavioral rules and coding guidelines for the Frit
 
 ## 3. 🧪 Production Builds before Push
 * Before pushing any changes to GitHub, always run `npm run build` locally in the workspace directory to ensure there are no TypeScript, compilation, or packaging errors that would break the Vercel deployment pipeline.
+
+## 4. 🔒 Inmunización Total del Catálogo e Inventario Multisede
+* **Propagación Maestra:** Cualquier modificación a productos de inventario (`variablePrice`, `referencePrice`, `price`, `imageUrl`, `posCategoryId`, `inTricycles`) y a la configuración de diseño de POS (`posSettings`) debe propagarse a todas las particiones de sede (`inventory_<branchId>`, `posSettings_<branchId>`) y a las claves globales (`inventory`, `posSettings`).
+* **Protección Anti-Desconfiguración:** `inventoryBackupSeed.json` e `INITIAL_POS_SETTINGS` en `useInventoryStore.js` deben contener siempre los valores maestros (precios variables, favoritos de la pantalla principal, fotos) para que la app jamás revierta a plantillas vacías ni pierda configuraciones previas al cambiar de sede o de equipo.
+

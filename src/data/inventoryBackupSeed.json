@@ -1,7 +1,7 @@
 [
   {
     "id": "PRD-1784642642030-1",
-    "qty": 0,
+    "qty": 11,
     "name": "Empanada",
     "tipo": "PRODUCTO",
     "type": "FRITO",
@@ -11,13 +11,13 @@
     "estado": "FRITO",
     "barcode": "1",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783605852931-pnsxa2.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 2000,
     "sortOrder": 1,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "fryKitchenIds": [],
+    "posCategoryId": "CAT-001",
+    "variablePrice": false,
+    "productionPointIds": []
   },
   {
     "id": "PRD-1784642642030-2",
@@ -30,14 +30,12 @@
     "price": 4000,
     "estado": "FRITO",
     "barcode": "2",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613910695-mkxby0.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 4000,
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1787927191103-vypk2a.png",
     "sortOrder": 2,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-3",
@@ -51,17 +49,15 @@
     "estado": "FRITO",
     "barcode": "3",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783605881381-r20um9.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 4000,
     "sortOrder": 3,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-4",
-    "qty": 0,
+    "qty": 166,
     "name": "Chorizo",
     "tipo": "PRODUCTO",
     "type": "FRITO",
@@ -70,14 +66,12 @@
     "price": 7000,
     "estado": "FRITO",
     "barcode": "4",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614049545-rbdcd0.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 7000,
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1787927205928-zhg2p1.png",
     "sortOrder": 4,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-5",
@@ -91,13 +85,12 @@
     "estado": "FRITO",
     "barcode": "5",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613980892-eleqpq.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 7000,
     "sortOrder": 5,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "abbreviation": "HP",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-6",
@@ -111,13 +104,12 @@
     "estado": "FRITO",
     "barcode": "6",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613973328-k5o09a.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 6000,
     "sortOrder": 6,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "abbreviation": "HA",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-7",
@@ -131,13 +123,12 @@
     "estado": "FRITO",
     "barcode": "7",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613990051-mpbroz.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 3000,
     "sortOrder": 7,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "abbreviation": "HS",
+    "posCategoryId": "CAT-001",
+    "variablePrice": false
   },
   {
     "id": "PRD-1784642642030-8",
@@ -147,17 +138,18 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 7000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "8",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613924639-gmtkaa.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 7000,
+    "showInPos": true,
     "sortOrder": 8,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 7000,
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-1784642642030-9",
@@ -167,17 +159,17 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 4000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "9",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614020229-7xvg8v.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 4000,
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1787927221788-wm9hga.png",
     "sortOrder": 9,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 4000,
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-1784642642030-10",
@@ -187,17 +179,17 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 5000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "10",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613935593-jjckmm.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 5000,
     "sortOrder": 10,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 5000,
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-1784642642030-11",
@@ -207,17 +199,17 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 11000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "11",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614009335-xj4t0f.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 11000,
     "sortOrder": 11,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 11000,
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-1784642642030-66",
@@ -230,14 +222,13 @@
     "price": 4000,
     "estado": "FRITO",
     "barcode": "66",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614026408-8g2e12.png",
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1787927179962-yr15nn.png",
+    "sortOrder": 12,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-001",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 12,
-    "inTricycles": false,
-    "showInPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-58",
@@ -247,17 +238,16 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 8000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "58",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613959085-4lkmjk.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 8000,
     "sortOrder": 13,
     "inTricycles": false,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 8000
   },
   {
     "id": "PRD-1784642642030-71",
@@ -271,13 +261,12 @@
     "estado": "FRITO",
     "barcode": "71",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614039656-5r8aol.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 30000,
     "sortOrder": 14,
     "inTricycles": false,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 30000
   },
   {
     "id": "PRD-1784642642030-67",
@@ -290,14 +279,13 @@
     "price": 5500,
     "estado": "FRITO",
     "barcode": "67",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783613990051-mpbroz.png",
+    "imageUrl": "",
+    "sortOrder": 15,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-001",
     "variablePrice": false,
-    "referencePrice": 5500,
-    "sortOrder": 15,
-    "inTricycles": false,
-    "showInPos": true
+    "referencePrice": 5500
   },
   {
     "id": "PRD-1784642642030-57",
@@ -307,142 +295,137 @@
     "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
-    "price": 3000,
+    "price": 0,
     "estado": "FRITO",
     "barcode": "57",
     "imageUrl": "",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 3000,
     "sortOrder": 16,
     "inTricycles": true,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-001",
+    "variablePrice": true,
+    "referencePrice": 3000,
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-1784642642030-63",
     "qty": 0,
     "name": "Café",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 700,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "63",
     "imageUrl": "",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 700,
     "sortOrder": 17,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": true,
+    "referencePrice": 700,
     "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-64",
     "qty": 0,
     "name": "Café con Leche",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 1000,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "64",
     "imageUrl": "",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 1000,
     "sortOrder": 18,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": true,
+    "referencePrice": 1000,
     "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-12",
     "qty": 0,
     "name": "Limonada",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 2500,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "12",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614144828-gmvlny.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 2500,
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1787927380900-4q89cc.png",
     "sortOrder": 19,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": false,
+    "referencePrice": 2500,
     "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-14",
     "qty": 0,
     "name": "Avena 10 Oz",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 2500,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "14",
     "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614155069-dsuidt.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 2500,
+    "showInPos": true,
     "sortOrder": 20,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": false,
+    "referencePrice": 2500,
     "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-15",
     "qty": 0,
     "name": "Masato 10 Oz",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 2500,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "15",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614155069-dsuidt.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 2500,
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1784906393748-5rkzip.png",
     "sortOrder": 21,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": false,
+    "referencePrice": 2500,
     "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-13",
     "qty": 0,
     "name": "Bebida 7 Oz",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 2000,
-    "estado": "FRITO",
+    "estado": "N/A",
     "barcode": "13",
     "imageUrl": "",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 2000,
     "sortOrder": 22,
     "inTricycles": true,
-    "showInPos": true,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-1784812767023",
+    "variablePrice": false,
+    "referencePrice": 2000,
     "showInTricicloPos": true
   },
   {
@@ -457,12 +440,12 @@
     "estado": "N/A",
     "barcode": "16",
     "imageUrl": "",
+    "sortOrder": 122,
+    "inTricycles": true,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-1784042382916",
     "variablePrice": true,
-    "referencePrice": 0,
-    "sortOrder": 122,
-    "showInTricicloPos": true
+    "referencePrice": 0
   },
   {
     "id": "PRD-1784642642030-17",
@@ -476,12 +459,12 @@
     "estado": "N/A",
     "barcode": "7702535024447",
     "imageUrl": "",
+    "sortOrder": 123,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 12000,
-    "sortOrder": 123,
-    "showInTricicloPos": true
+    "referencePrice": 12000
   },
   {
     "id": "PRD-1784642642030-18",
@@ -495,12 +478,12 @@
     "estado": "N/A",
     "barcode": "7702535024423",
     "imageUrl": "",
+    "sortOrder": 124,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 124,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-19",
@@ -514,12 +497,12 @@
     "estado": "N/A",
     "barcode": "7702535011089|7702535011119",
     "imageUrl": "",
+    "sortOrder": 125,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 125,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-20",
@@ -533,12 +516,12 @@
     "estado": "N/A",
     "barcode": "77035684",
     "imageUrl": "",
+    "sortOrder": 126,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3000,
-    "sortOrder": 126,
-    "showInTricicloPos": true
+    "referencePrice": 3000
   },
   {
     "id": "PRD-1784642642030-21",
@@ -552,12 +535,12 @@
     "estado": "N/A",
     "barcode": "7702535011706",
     "imageUrl": "",
+    "sortOrder": 127,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 127,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-22",
@@ -571,12 +554,12 @@
     "estado": "N/A",
     "barcode": "7702535012079",
     "imageUrl": "",
+    "sortOrder": 128,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 128,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-23",
@@ -590,12 +573,12 @@
     "estado": "N/A",
     "barcode": "7702090029581",
     "imageUrl": "",
+    "sortOrder": 129,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 129,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-24",
@@ -609,12 +592,12 @@
     "estado": "N/A",
     "barcode": "7702090042818",
     "imageUrl": "",
+    "sortOrder": 130,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 130,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-25",
@@ -628,12 +611,12 @@
     "estado": "N/A",
     "barcode": "7702090022728",
     "imageUrl": "",
+    "sortOrder": 131,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 9500,
-    "sortOrder": 131,
-    "showInTricicloPos": true
+    "referencePrice": 9500
   },
   {
     "id": "PRD-1784642642030-26",
@@ -647,12 +630,12 @@
     "estado": "N/A",
     "barcode": "7702090029512",
     "imageUrl": "",
+    "sortOrder": 132,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 132,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-27",
@@ -666,12 +649,12 @@
     "estado": "N/A",
     "barcode": "7702090031928",
     "imageUrl": "",
+    "sortOrder": 133,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 133,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-28",
@@ -685,12 +668,12 @@
     "estado": "N/A",
     "barcode": "7702090022766",
     "imageUrl": "",
+    "sortOrder": 134,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 9500,
-    "sortOrder": 134,
-    "showInTricicloPos": true
+    "referencePrice": 9500
   },
   {
     "id": "PRD-1784642642030-29",
@@ -704,12 +687,12 @@
     "estado": "N/A",
     "barcode": "7702090029505",
     "imageUrl": "",
+    "sortOrder": 135,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 135,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-30",
@@ -723,12 +706,12 @@
     "estado": "N/A",
     "barcode": "7702090032017",
     "imageUrl": "",
+    "sortOrder": 136,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 136,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-31",
@@ -742,12 +725,12 @@
     "estado": "N/A",
     "barcode": "7702535013212",
     "imageUrl": "",
+    "sortOrder": 137,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 137,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-32",
@@ -761,12 +744,12 @@
     "estado": "N/A",
     "barcode": "7702535012857",
     "imageUrl": "",
+    "sortOrder": 138,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 138,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-33",
@@ -780,12 +763,12 @@
     "estado": "N/A",
     "barcode": "7702090038088",
     "imageUrl": "",
+    "sortOrder": 139,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 139,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-34",
@@ -799,12 +782,12 @@
     "estado": "N/A",
     "barcode": "7702090029871|7707133044033",
     "imageUrl": "",
+    "sortOrder": 140,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 140,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-35",
@@ -818,12 +801,12 @@
     "estado": "N/A",
     "barcode": "7702090013047|7707133075655",
     "imageUrl": "",
+    "sortOrder": 141,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2000,
-    "sortOrder": 141,
-    "showInTricicloPos": true
+    "referencePrice": 2000
   },
   {
     "id": "PRD-1784642642030-36",
@@ -837,12 +820,12 @@
     "estado": "N/A",
     "barcode": "7702090038071|7707133033730",
     "imageUrl": "",
+    "sortOrder": 142,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 142,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-37",
@@ -856,12 +839,12 @@
     "estado": "N/A",
     "barcode": "7702090029864|7707133062471",
     "imageUrl": "",
+    "sortOrder": 143,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 143,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-38",
@@ -875,12 +858,12 @@
     "estado": "N/A",
     "barcode": "7702090013061|7702090013016|7707133098029|7707133042039",
     "imageUrl": "",
+    "sortOrder": 144,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2000,
-    "sortOrder": 144,
-    "showInTricicloPos": true
+    "referencePrice": 2000
   },
   {
     "id": "PRD-1784642642030-39",
@@ -894,12 +877,12 @@
     "estado": "N/A",
     "barcode": "7702090038095|7707133065090|7707133055053",
     "imageUrl": "",
+    "sortOrder": 145,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 145,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-40",
@@ -913,12 +896,12 @@
     "estado": "N/A",
     "barcode": "7702090029888|7707133052670",
     "imageUrl": "",
+    "sortOrder": 146,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 146,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-41",
@@ -932,12 +915,12 @@
     "estado": "N/A",
     "barcode": "7702090016369|7707133025919",
     "imageUrl": "",
+    "sortOrder": 147,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2000,
-    "sortOrder": 147,
-    "showInTricicloPos": true
+    "referencePrice": 2000
   },
   {
     "id": "PRD-1784642642030-42",
@@ -951,12 +934,12 @@
     "estado": "N/A",
     "barcode": "7702090038064|7707133095097",
     "imageUrl": "",
+    "sortOrder": 148,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 148,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-43",
@@ -970,12 +953,12 @@
     "estado": "N/A",
     "barcode": "7702090029857|7707133083216",
     "imageUrl": "",
+    "sortOrder": 149,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 149,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-44",
@@ -989,12 +972,12 @@
     "estado": "N/A",
     "barcode": "7702090065855",
     "imageUrl": "",
+    "sortOrder": 150,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 150,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-45",
@@ -1008,12 +991,12 @@
     "estado": "N/A",
     "barcode": "7702090047011",
     "imageUrl": "",
+    "sortOrder": 151,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 151,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-46",
@@ -1027,12 +1010,12 @@
     "estado": "N/A",
     "barcode": "7702090070637|7707133049663",
     "imageUrl": "",
+    "sortOrder": 152,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 152,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-47",
@@ -1046,12 +1029,12 @@
     "estado": "N/A",
     "barcode": "7702004013514",
     "imageUrl": "",
+    "sortOrder": 153,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 153,
-    "showInTricicloPos": true
+    "referencePrice": 6500
   },
   {
     "id": "PRD-1784642642030-48",
@@ -1065,12 +1048,12 @@
     "estado": "N/A",
     "barcode": "7702004013484",
     "imageUrl": "",
+    "sortOrder": 154,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 154,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-49",
@@ -1084,12 +1067,12 @@
     "estado": "N/A",
     "barcode": "7702004013668",
     "imageUrl": "",
+    "sortOrder": 155,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2500,
-    "sortOrder": 155,
-    "showInTricicloPos": true
+    "referencePrice": 2500
   },
   {
     "id": "PRD-1784642642030-50",
@@ -1103,12 +1086,12 @@
     "estado": "N/A",
     "barcode": "7702090044577",
     "imageUrl": "",
+    "sortOrder": 156,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 156,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-51",
@@ -1122,12 +1105,12 @@
     "estado": "N/A",
     "barcode": "7702090027884",
     "imageUrl": "",
+    "sortOrder": 157,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 157,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-52",
@@ -1141,12 +1124,12 @@
     "estado": "N/A",
     "barcode": "7702090023008",
     "imageUrl": "",
+    "sortOrder": 158,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2500,
-    "sortOrder": 158,
-    "showInTricicloPos": true
+    "referencePrice": 2500
   },
   {
     "id": "PRD-1784642642030-53",
@@ -1160,32 +1143,31 @@
     "estado": "N/A",
     "barcode": "7702090022711|7702535010327",
     "imageUrl": "",
+    "sortOrder": 159,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2000,
-    "sortOrder": 159,
-    "showInTricicloPos": true
+    "referencePrice": 2000
   },
   {
     "id": "PRD-1784642642030-54",
     "qty": 0,
     "name": "Gatorade 500 ml",
-    "tipo": "PRODUCTO",
-    "type": "FRITO",
+    "tipo": "BEBIDA",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 4000,
     "estado": "N/A",
     "barcode": "7702192422051|7702192736455",
     "imageUrl": "",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-001",
-    "variablePrice": false,
-    "referencePrice": 4000,
     "sortOrder": 160,
     "inTricycles": false,
-    "showInPos": true
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-002",
+    "variablePrice": false,
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-55",
@@ -1199,12 +1181,12 @@
     "estado": "N/A",
     "barcode": "7702090039214",
     "imageUrl": "",
+    "sortOrder": 161,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 2500,
-    "sortOrder": 161,
-    "showInTricicloPos": true
+    "referencePrice": 2500
   },
   {
     "id": "PRD-1784642642030-56",
@@ -1218,12 +1200,12 @@
     "estado": "N/A",
     "barcode": "7702535022054",
     "imageUrl": "",
+    "sortOrder": 162,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 162,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-59",
@@ -1237,12 +1219,12 @@
     "estado": "N/A",
     "barcode": "77082381",
     "imageUrl": "",
+    "sortOrder": 165,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3000,
-    "sortOrder": 165,
-    "showInTricicloPos": true
+    "referencePrice": 3000
   },
   {
     "id": "PRD-1784642642030-60",
@@ -1256,12 +1238,12 @@
     "estado": "N/A",
     "barcode": "7708352415017|7707234030614",
     "imageUrl": "",
+    "sortOrder": 166,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 500,
-    "sortOrder": 166,
-    "showInTricicloPos": true
+    "referencePrice": 500
   },
   {
     "id": "PRD-1784642642030-61",
@@ -1275,11 +1257,12 @@
     "estado": "FRITO",
     "barcode": "61",
     "imageUrl": "",
+    "sortOrder": 167,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-1784042382916",
     "variablePrice": false,
-    "referencePrice": 500,
-    "sortOrder": 167
+    "referencePrice": 500
   },
   {
     "id": "PRD-1784642642030-62",
@@ -1293,11 +1276,12 @@
     "estado": "FRITO",
     "barcode": "62",
     "imageUrl": "",
+    "sortOrder": 168,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-1784042382916",
-    "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 168
+    "variablePrice": true,
+    "referencePrice": 5000
   },
   {
     "id": "PRD-1784642642030-65",
@@ -1311,11 +1295,12 @@
     "estado": "N/A",
     "barcode": "65",
     "imageUrl": "",
+    "sortOrder": 171,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-1784042382916",
     "variablePrice": true,
-    "referencePrice": 0,
-    "sortOrder": 171
+    "referencePrice": 0
   },
   {
     "id": "PRD-1784642642030-68",
@@ -1329,12 +1314,12 @@
     "estado": "N/A",
     "barcode": "7702535027066",
     "imageUrl": "",
+    "sortOrder": 174,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 174,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-69",
@@ -1348,12 +1333,12 @@
     "estado": "N/A",
     "barcode": "7702090073065",
     "imageUrl": "",
+    "sortOrder": 175,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 1000,
-    "sortOrder": 175,
-    "showInTricicloPos": true
+    "referencePrice": 1000
   },
   {
     "id": "PRD-1784642642030-70",
@@ -1367,12 +1352,12 @@
     "estado": "N/A",
     "barcode": "7702090037784",
     "imageUrl": "",
+    "sortOrder": 176,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 1500,
-    "sortOrder": 176,
-    "showInTricicloPos": true
+    "referencePrice": 1500
   },
   {
     "id": "PRD-1784642642030-72",
@@ -1386,12 +1371,12 @@
     "estado": "N/A",
     "barcode": "7702535001783",
     "imageUrl": "",
+    "sortOrder": 178,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 8000,
-    "sortOrder": 178,
-    "showInTricicloPos": true
+    "referencePrice": 8000
   },
   {
     "id": "PRD-1784642642030-73",
@@ -1405,12 +1390,12 @@
     "estado": "N/A",
     "barcode": "7702535033593|7702535032688",
     "imageUrl": "",
+    "sortOrder": 179,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4500,
-    "sortOrder": 179,
-    "showInTricicloPos": true
+    "referencePrice": 4500
   },
   {
     "id": "PRD-1784642642030-74",
@@ -1424,12 +1409,12 @@
     "estado": "N/A",
     "barcode": "7702090000122",
     "imageUrl": "",
+    "sortOrder": 180,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4500,
-    "sortOrder": 180,
-    "showInTricicloPos": true
+    "referencePrice": 4500
   },
   {
     "id": "PRD-1784642642030-75",
@@ -1443,12 +1428,12 @@
     "estado": "N/A",
     "barcode": "7707151700119",
     "imageUrl": "",
+    "sortOrder": 181,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4500,
-    "sortOrder": 181,
-    "showInTricicloPos": true
+    "referencePrice": 4500
   },
   {
     "id": "PRD-1784642642030-76",
@@ -1462,12 +1447,12 @@
     "estado": "N/A",
     "barcode": "7702192631507",
     "imageUrl": "",
+    "sortOrder": 182,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 182,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-77",
@@ -1481,12 +1466,12 @@
     "estado": "N/A",
     "barcode": "7702090020847",
     "imageUrl": "",
+    "sortOrder": 183,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3000,
-    "sortOrder": 183,
-    "showInTricicloPos": true
+    "referencePrice": 3000
   },
   {
     "id": "PRD-1784642642030-78",
@@ -1500,12 +1485,12 @@
     "estado": "N/A",
     "barcode": "7702535012086",
     "imageUrl": "",
+    "sortOrder": 184,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 4000,
-    "sortOrder": 184,
-    "showInTricicloPos": true
+    "referencePrice": 4000
   },
   {
     "id": "PRD-1784642642030-79",
@@ -1519,12 +1504,12 @@
     "estado": "N/A",
     "barcode": "7702090042054",
     "imageUrl": "",
+    "sortOrder": 185,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3000,
-    "sortOrder": 185,
-    "showInTricicloPos": true
+    "referencePrice": 3000
   },
   {
     "id": "PRD-1784642642030-80",
@@ -1538,12 +1523,12 @@
     "estado": "N/A",
     "barcode": "7702090071849|7702090001211",
     "imageUrl": "",
+    "sortOrder": 186,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 3500,
-    "sortOrder": 186,
-    "showInTricicloPos": true
+    "referencePrice": 3500
   },
   {
     "id": "PRD-1784642642030-81",
@@ -1553,33 +1538,16 @@
     "type": "CRUDO",
     "unit": "unidades",
     "alert": 5,
-    "price": 27000,
+    "price": 28000,
     "estado": "CRUDO",
     "barcode": "81",
     "imageUrl": "",
+    "sortOrder": 187,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-003",
     "variablePrice": false,
-    "referencePrice": 27000,
-    "sortOrder": 187
-  },
-  {
-    "id": "PRD-1784642642030-82",
-    "qty": 0,
-    "name": "Chorizo Crudo",
-    "tipo": "PRODUCTO",
-    "type": "CRUDO",
-    "unit": "unidades",
-    "alert": 5,
-    "price": 6500,
-    "estado": "CRUDO",
-    "barcode": "82",
-    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614049545-rbdcd0.png",
-    "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-003",
-    "variablePrice": false,
-    "referencePrice": 6500,
-    "sortOrder": 188
+    "referencePrice": 27000
   },
   {
     "id": "PRD-1784642642030-83",
@@ -1593,32 +1561,32 @@
     "estado": "N/A",
     "barcode": "7702090002881|7707151700768",
     "imageUrl": "",
+    "sortOrder": 189,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 12000,
-    "sortOrder": 189,
-    "showInTricicloPos": true
+    "referencePrice": 12000
   },
   {
     "id": "PRD-1784642642030-84",
     "qty": 0,
     "name": "Arepamix",
     "tipo": "PRODUCTO",
-    "type": "CRUDO",
+    "type": "FRITO",
     "unit": "unidades",
     "alert": 5,
     "price": 7000,
     "estado": "FRITO",
     "barcode": "84",
     "imageUrl": "",
+    "sortOrder": 190,
+    "inTricycles": true,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-003",
     "variablePrice": false,
     "referencePrice": 7000,
-    "sortOrder": 190,
-    "inTricycles": true,
-    "showInPos": true
+    "showInTricicloPos": true
   },
   {
     "id": "PRD-1784642642030-85",
@@ -1632,48 +1600,50 @@
     "estado": "N/A",
     "barcode": "7702004013842",
     "imageUrl": "",
+    "sortOrder": 191,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 5000,
-    "sortOrder": 191,
-    "showInTricicloPos": true
+    "referencePrice": 5000
   },
   {
     "id": "PRD-1784642642030-86",
     "qty": 0,
     "name": "Tarro Grande",
     "tipo": "PRODUCTO",
-    "type": "CRUDO",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 18000,
     "estado": "FRITO",
     "barcode": "86",
     "imageUrl": "",
+    "sortOrder": 192,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-003",
+    "posCategoryId": "CAT-1784812767023",
     "variablePrice": false,
-    "referencePrice": 18000,
-    "sortOrder": 192
+    "referencePrice": 18000
   },
   {
     "id": "PRD-1784642642030-87",
     "qty": 0,
     "name": "Tarro Pequeño",
     "tipo": "PRODUCTO",
-    "type": "CRUDO",
+    "type": "BEBIDA",
     "unit": "unidades",
     "alert": 5,
     "price": 8000,
     "estado": "FRITO",
     "barcode": "87",
     "imageUrl": "",
+    "sortOrder": 193,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-003",
+    "posCategoryId": "CAT-1784812767023",
     "variablePrice": false,
-    "referencePrice": 8000,
-    "sortOrder": 193
+    "referencePrice": 8000
   },
   {
     "id": "PRD-1784642642030-88",
@@ -1687,12 +1657,103 @@
     "estado": "FRITO",
     "barcode": "7702535025482",
     "imageUrl": "",
+    "sortOrder": 194,
+    "inTricycles": false,
     "warehouseId": "BOD-001",
     "posCategoryId": "CAT-002",
     "variablePrice": false,
-    "referencePrice": 7500,
-    "sortOrder": 194,
-    "showInTricicloPos": true
+    "referencePrice": 7500
+  },
+  {
+    "id": "FR-1783518383552-846673-81",
+    "qty": 0,
+    "name": "Chorizo Crudo",
+    "tipo": "PRODUCTO",
+    "type": "CRUDO",
+    "unit": "unidades",
+    "alert": 5,
+    "price": 6500,
+    "estado": "CRUDO",
+    "barcode": "82",
+    "imageUrl": "",
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-003",
+    "variablePrice": false,
+    "referencePrice": 0
+  },
+  {
+    "id": "PRD-1786480612103-869105",
+    "qty": 0,
+    "name": "Vasos 10 OZ",
+    "type": "PRODUCTO",
+    "unit": "ud",
+    "alert": 0,
+    "price": 2500,
+    "showInPos": false,
+    "inTricycles": true,
+    "warehouseId": "BOD-003",
+    "abbreviation": "V10",
+    "variablePrice": false,
+    "inventoryPresets": [
+      50,
+      100
+    ]
+  },
+  {
+    "id": "PRD-1786480773958-586428",
+    "qty": 0,
+    "name": "Vasos 7 Onzas",
+    "type": "PRODUCTO",
+    "unit": "ud",
+    "alert": 0,
+    "price": 2000,
+    "showInPos": false,
+    "inTricycles": true,
+    "warehouseId": "BOD-003",
+    "abbreviation": "V7",
+    "variablePrice": false,
+    "inventoryPresets": [
+      50,
+      100
+    ]
+  },
+  {
+    "id": "PRD-1786639737563-924324",
+    "qty": 0,
+    "name": "Cambio",
+    "type": "PRODUCTO",
+    "unit": "ud",
+    "alert": 0,
+    "price": 0,
+    "showInPos": false,
+    "inTricycles": true,
+    "warehouseId": "BOD-003",
+    "variablePrice": false,
+    "inventoryPresets": [
+      "MON",
+      "2k",
+      "50k"
+    ],
+    "showInTricicloPos": false
+  },
+  {
+    "id": "PRD-1784642642030-82",
+    "qty": 0,
+    "name": "Chorizo Crudo",
+    "tipo": "PRODUCTO",
+    "type": "CRUDO",
+    "unit": "unidades",
+    "alert": 5,
+    "price": 7000,
+    "estado": "CRUDO",
+    "barcode": "4",
+    "imageUrl": "https://uevcotmnffftoelscjua.supabase.co/storage/v1/object/public/product-images/1783614049545-rbdcd0.png",
+    "sortOrder": 188,
+    "inTricycles": false,
+    "warehouseId": "BOD-001",
+    "posCategoryId": "CAT-003",
+    "variablePrice": false,
+    "referencePrice": 6500
   },
   {
     "id": "INS-001",
@@ -1702,8 +1763,8 @@
     "unit": "kg",
     "alert": 20,
     "barcode": "7701234000001",
-    "warehouseId": "BOD-001",
     "imageUrl": "",
+    "warehouseId": "BOD-001",
     "posCategoryId": ""
   },
   {
@@ -1714,20 +1775,8 @@
     "unit": "kg",
     "alert": 10,
     "barcode": "7701234000002",
-    "warehouseId": "BOD-001",
     "imageUrl": "",
-    "posCategoryId": ""
-  },
-  {
-    "id": "INS-003",
-    "qty": 8,
-    "name": "Especias Chorizo",
-    "type": "INSUMO",
-    "unit": "kg",
-    "alert": 2,
-    "barcode": "7701234000003",
     "warehouseId": "BOD-001",
-    "imageUrl": "",
     "posCategoryId": ""
   },
   {
@@ -1738,8 +1787,8 @@
     "unit": "kg",
     "alert": 1,
     "barcode": "7701234000004",
-    "warehouseId": "BOD-001",
     "imageUrl": "",
+    "warehouseId": "BOD-001",
     "posCategoryId": ""
   },
   {
@@ -1750,8 +1799,8 @@
     "unit": "m",
     "alert": 10,
     "barcode": "7701234000005",
-    "warehouseId": "BOD-001",
     "imageUrl": "",
+    "warehouseId": "BOD-001",
     "posCategoryId": ""
   },
   {
@@ -1762,8 +1811,8 @@
     "unit": "kg",
     "alert": 15,
     "barcode": "7701234000006",
-    "warehouseId": "BOD-002",
     "imageUrl": "",
+    "warehouseId": "BOD-002",
     "posCategoryId": ""
   },
   {
@@ -1774,8 +1823,8 @@
     "unit": "kg",
     "alert": 0.5,
     "barcode": "7701234000007",
-    "warehouseId": "BOD-002",
     "imageUrl": "",
+    "warehouseId": "BOD-002",
     "posCategoryId": ""
   },
   {
@@ -1786,11 +1835,14 @@
     "unit": "unidades",
     "alert": 0,
     "price": 2500,
-    "inTricycles": true,
     "showInPos": false,
-    "showInTricicloPos": false,
+    "inTricycles": true,
     "abbreviation": "V10",
-    "inventoryPresets": [50, 100]
+    "inventoryPresets": [
+      50,
+      100
+    ],
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-VASOS-7OZ",
@@ -1800,11 +1852,14 @@
     "unit": "unidades",
     "alert": 0,
     "price": 2000,
-    "inTricycles": true,
     "showInPos": false,
-    "showInTricicloPos": false,
+    "inTricycles": true,
     "abbreviation": "V7",
-    "inventoryPresets": [50, 100]
+    "inventoryPresets": [
+      50,
+      100
+    ],
+    "showInTricicloPos": false
   },
   {
     "id": "PRD-CAMBIO",
@@ -1814,10 +1869,14 @@
     "unit": "unidades",
     "alert": 0,
     "price": 0,
-    "inTricycles": true,
     "showInPos": false,
-    "showInTricicloPos": false,
+    "inTricycles": true,
     "abbreviation": "CAM",
-    "inventoryPresets": ["MON", "2k", "50k"]
+    "inventoryPresets": [
+      "MON",
+      "2k",
+      "50k"
+    ],
+    "showInTricicloPos": false
   }
 ]

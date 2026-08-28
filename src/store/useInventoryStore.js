@@ -38,13 +38,16 @@ function syncKey(key, value) {
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 
-  if (key === 'inventory' || key === 'products') {
+  if (key === 'inventory' || key === 'products' || key === 'posSettings') {
     markLocalWrite(key, null);
     markLocalWrite(key, 'BRANCH-001');
-    Promise.allSettled([
-      push(key, value, null),
-      push(key, value, 'BRANCH-001'),
-    ]).catch(() => {});
+    const branches = useBranchStore.getState().branches || [];
+    const allBranchIds = new Set(['BRANCH-001', ...branches.map(b => b.id)]);
+    const pushes = [push(key, value, null)];
+    allBranchIds.forEach(bId => {
+      pushes.push(push(key, value, bId));
+    });
+    Promise.allSettled(pushes).catch(() => {});
   }
 
   // Para BRANCH_KEYS: también actualizar la llave legacy sin sufijo para mantener ambas en 100% sincronía
@@ -166,7 +169,7 @@ const INITIAL_FRY_KITCHENS = [
   { id: 'FK-002', name: 'Cocina Apoyo',     location: 'Zona Sur',   active: true },
 ];
 
-const INITIAL_INVENTORY = [];
+const INITIAL_INVENTORY = inventoryBackupSeed || [];
 
 const INITIAL_PRODUCTS = [];
 const INITIAL_FRITADO_RECIPES = [];
@@ -195,10 +198,10 @@ const INITIAL_CUSTOMER_TYPES = [];
 
 const INITIAL_POS_SETTINGS = {
   printerName: 'POS-58',
-  cashDrawerCode: '27,112,48,55,121',
+  cashDrawerCode: '\\x1B\\x70\\x00\\x19\\xFA',
   supervisorPin: '1234',
   paymentMethods: [
-    { id: 'PM-001', name: 'EFECTIVO', openDrawer: true, printReceipt: true },
+    { id: 'PM-001', name: 'EFECTIVO', openDrawer: true, printReceipt: false },
     { id: 'PM-002', name: 'TARJETA', openDrawer: false, printReceipt: true },
     { id: 'PM-003', name: 'NEQUI', openDrawer: false, printReceipt: true },
     { id: 'PM-004', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: true },
@@ -206,27 +209,43 @@ const INITIAL_POS_SETTINGS = {
   restockPresets: [5, 10, 15, 20],
   ticketConfig: {
     businessName: 'Frita Mejor',
-    nit: '900.000.000-1',
-    phone: '300 123 4567',
-    address: 'Cali, Colombia',
+    nit: '12233346-7',
+    phone: '314379377',
+    address: 'Pitalito, Huila',
     showLogo: true,
     showBarcode: true,
     showCashier: true,
     saleFooterMsg: '¡GRACIAS POR SU COMPRA!',
-    saleSubFooterMsg: 'Conserve este tiquete para reclamos.',
-    saleBottomLine: 'Sistema POS • fritamejor.com',
+    saleBottomLine: 'Dios los bendiga',
+    saleSubFooterMsg: 'Si desea factura electrónica escriba al 3138015176',
     zReportFooterMsg: 'FIN DE INFORME Z',
   },
   inventoryControl: {
-    linkProduction: false,       // Ligado de Crudos a Fritos en Producción y Fritado
-    linkSalesToInventory: false, // Ligado de Caja POS/Ventas a Inventario (descuento automático)
-    strictTricycleStock: false,  // Ligado de stock físico estricto en Triciclos
+    linkProduction: false,
+    linkSalesToInventory: false,
+    strictTricycleStock: false,
   },
   layout: {
     gridColumns: 6,
-    gridRows: 4,
-    showOnlySelected: false,
-    selectedProductIds: [],
+    gridRows: 5,
+    showOnlySelected: true,
+    selectedProductIds: [
+      'PRD-1784642642030-1',
+      'PRD-1784642642030-2',
+      'PRD-1784642642030-3',
+      'PRD-1784642642030-4',
+      'PRD-1784642642030-5',
+      'PRD-1784642642030-6',
+      'PRD-1784642642030-7',
+      'PRD-1784642642030-8',
+      'PRD-1784642642030-9',
+      'PRD-1784642642030-10',
+      'PRD-1784642642030-11',
+      'PRD-1784642642030-66',
+      'PRD-1784642642030-58',
+      'PRD-1784642642030-71',
+      'PRD-1784642642030-67'
+    ],
   },
 };
 
