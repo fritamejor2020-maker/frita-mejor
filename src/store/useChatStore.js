@@ -172,6 +172,7 @@ export const useChatStore = create(
          */
         markAsRead: (myUserId, targetUserId = null, targetDate = null, targetJornada = null) => {
           const myId = String(myUserId || '').toLowerCase();
+          const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
           const target = targetUserId ? String(targetUserId).toLowerCase() : null;
           const isDejador = myId === 'dejador';
           const todayDate = targetDate || getCurrentDate();
@@ -179,7 +180,9 @@ export const useChatStore = create(
           let changed = false;
 
           const updated = (get().messages || []).map(m => {
-            if (m.read) return m;
+            // Si ya fue marcado como leído por este usuario
+            const readByList = Array.isArray(m.readBy) ? m.readBy : [];
+            if (m.read && (!isDejador || readByList.includes(cleanMyId))) return m;
 
             // 🛡️ Solo marcar leídos los de la jornada activa
             const msgDate = m.date || getMessageDate(m.createdAt);
@@ -191,14 +194,20 @@ export const useChatStore = create(
             const sender = String(m.senderId || '').toLowerCase();
             const point = String(m.pointId || '').toLowerCase();
             const receiver = String(m.receiverId || '').toLowerCase();
+            const cleanSender = sender.replace(/[^a-z0-9]/g, '');
+            const cleanPoint = point.replace(/[^a-z0-9]/g, '');
+            const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
 
             // Ignorar mensajes propios
-            if (sender === myId || point === myId) return m;
+            if (sender === myId || point === myId || cleanSender === cleanMyId || cleanPoint === cleanMyId) return m;
 
             // Verificar si el mensaje era para mí o mi rol
             const isForMe =
               receiver === 'all' ||
               receiver === myId ||
+              (cleanMyId && cleanReceiver === cleanMyId) ||
+              (cleanMyId && cleanReceiver.includes(cleanMyId)) ||
+              (cleanReceiver && cleanMyId.includes(cleanReceiver)) ||
               (isDejador && (receiver === 'dejador' || receiver === 'logistica'));
 
             if (!isForMe) return m;
@@ -206,9 +215,6 @@ export const useChatStore = create(
             // Si se está viendo un canal/vehículo específico (ej: 't1', 't2')
             if (target && target !== 'all') {
               const cleanTarget = target.replace(/[^a-z0-9]/g, '');
-              const cleanSender = sender.replace(/[^a-z0-9]/g, '');
-              const cleanPoint = point.replace(/[^a-z0-9]/g, '');
-              const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
 
               const matchesTarget = cleanSender === cleanTarget || 
                                     cleanPoint === cleanTarget || 
@@ -218,14 +224,20 @@ export const useChatStore = create(
 
               if (matchesTarget) {
                 changed = true;
-                return { ...m, read: true };
+                const newReadBy = [...new Set([...readByList, cleanMyId, myId])];
+                return { ...m, read: true, readBy: newReadBy };
               }
             } else if (target === 'all') {
               // Viendo Canal General ('ALL'): SOLO marcar como leídos los mensajes dirigidos a Canal General ('ALL')
               if (receiver === 'all') {
                 changed = true;
-                return { ...m, read: true };
+                const newReadBy = [...new Set([...readByList, cleanMyId, myId])];
+                return { ...m, read: true, readBy: newReadBy };
               }
+            } else {
+              changed = true;
+              const newReadBy = [...new Set([...readByList, cleanMyId, myId])];
+              return { ...m, read: true, readBy: newReadBy };
             }
 
             return m;
@@ -244,12 +256,14 @@ export const useChatStore = create(
         getUnreadCount: (myUserId, fromUserId = null, activeShiftId = null, targetDate = null, targetJornada = null) => {
           const msgs = get().messages || [];
           const myId = String(myUserId || '').toLowerCase();
-          const isDejador = myId === 'dejador';
+          const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
+          const isDejador = myId === 'dejador' || cleanMyId === 'dejador';
           const todayDate = targetDate || getCurrentDate();
           const currentJornada = targetJornada || getCurrentJornada();
 
           return msgs.filter(m => {
-            if (m.read) return false;
+            const readByList = Array.isArray(m.readBy) ? m.readBy : [];
+            if (cleanMyId && readByList.includes(cleanMyId)) return false;
 
             // 🛡️ REGLA ESTRICTA: Ignorar mensajes de días o jornadas anteriores
             const msgDate = m.date || getMessageDate(m.createdAt);
@@ -266,14 +280,20 @@ export const useChatStore = create(
             const sender = String(m.senderId || '').toLowerCase();
             const point = String(m.pointId || '').toLowerCase();
             const receiver = String(m.receiverId || '').toLowerCase();
+            const cleanSender = sender.replace(/[^a-z0-9]/g, '');
+            const cleanPoint = point.replace(/[^a-z0-9]/g, '');
+            const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
 
             // Descartar mensajes propios
-            if (sender === myId || point === myId) return false;
+            if (sender === myId || point === myId || (cleanMyId && cleanSender === cleanMyId) || (cleanMyId && cleanPoint === cleanMyId)) return false;
 
             // Verificar si el destinatario es para mí o mi rol
             const isForMe =
               receiver === 'all' ||
               receiver === myId ||
+              (cleanMyId && cleanReceiver === cleanMyId) ||
+              (cleanMyId && cleanReceiver.includes(cleanMyId)) ||
+              (cleanReceiver && cleanMyId.includes(cleanReceiver)) ||
               (isDejador && (receiver === 'dejador' || receiver === 'logistica'));
 
             if (!isForMe) return false;
@@ -287,9 +307,6 @@ export const useChatStore = create(
             if (fromUserId) {
               const target = String(fromUserId).toLowerCase();
               const cleanTarget = target.replace(/[^a-z0-9]/g, '');
-              const cleanSender = sender.replace(/[^a-z0-9]/g, '');
-              const cleanPoint = point.replace(/[^a-z0-9]/g, '');
-              const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
 
               const matchesVehicle = cleanSender === cleanTarget || 
                                      cleanPoint === cleanTarget || 

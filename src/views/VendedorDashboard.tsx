@@ -410,14 +410,27 @@ export const VendedorDashboard = () => {
   }, []);
 
   const handleAcceptDelivery = async (orderId: string) => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    if (alertAudioRef.current) {
+      alertAudioRef.current.pause();
+      alertAudioRef.current.currentTime = 0;
     }
 
     try {
-      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
-      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
+      let currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      let idx = currentOrders.findIndex((o: any) => o.id === orderId);
+
+      if (idx === -1) {
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
+        if (data?.value && Array.isArray(data.value)) {
+          currentOrders = data.value;
+          idx = currentOrders.findIndex((o: any) => o.id === orderId);
+        }
+      }
+
       if (idx !== -1) {
         const cleanMyPoint = String(pointId || '').trim();
         const cleanMyUser = String((user as any)?.id || (user as any)?.username || '').trim();
@@ -439,6 +452,7 @@ export const VendedorDashboard = () => {
         updatedOrders[idx] = acceptedOrder;
 
         // 1. Estado local e instantáneo en 0ms + WebSocket Broadcast (<30ms)
+        useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
         broadcastCustomerOrders(updatedOrders);
         setActiveDelivery(acceptedOrder);
         setPendingDelivery(null);
@@ -454,13 +468,14 @@ export const VendedorDashboard = () => {
       }
     } catch (e) {
       console.error(e);
+      setPendingDelivery(null);
     }
   };
 
   const handleRejectDelivery = async (orderId: string, reason: string = 'busy') => {
-    if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+    if (alertAudioRef.current) {
+      alertAudioRef.current.pause();
+      alertAudioRef.current.currentTime = 0;
     }
 
     // 0. Bloqueo local inmune de 0ms
@@ -474,8 +489,21 @@ export const VendedorDashboard = () => {
     setPendingDelivery(null);
 
     try {
-      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
-      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
+      let currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      let idx = currentOrders.findIndex((o: any) => o.id === orderId);
+
+      if (idx === -1) {
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
+        if (data?.value && Array.isArray(data.value)) {
+          currentOrders = data.value;
+          idx = currentOrders.findIndex((o: any) => o.id === orderId);
+        }
+      }
+
       if (idx === -1) return;
 
       const order = currentOrders[idx];
@@ -988,7 +1016,7 @@ export const VendedorDashboard = () => {
   const activeOrdersCount = Math.max(pendingOrdersCount, pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
   const chatMessages = useChatStore(state => state.messages);
   const getUnreadCount = useChatStore(state => state.getUnreadCount);
-  const chatUnreadCount = getUnreadCount(pointId || trackingId);
+  const chatUnreadCount = getUnreadCount(pointId || trackingId || (user as any)?.username || (user as any)?.id || 'T1');
 
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },
