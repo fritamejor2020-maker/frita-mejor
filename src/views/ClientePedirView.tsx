@@ -379,7 +379,11 @@ export function ClientePedirView() {
       const { data } = await supabase
         .from('app_state')
         .select('key, value')
-        .or('key.ilike.posShifts%,key.ilike.vendorLocations%,key.ilike.deletedShiftIds%');
+        .in('key', [
+          `posShifts_${selectedBranchId}`, 'posShifts_BRANCH-001', 'posShifts',
+          `vendorLocations_${selectedBranchId}`, 'vendorLocations_BRANCH-001', 'vendorLocations',
+          `deletedShiftIds_${selectedBranchId}`, 'deletedShiftIds_BRANCH-001', 'deletedShiftIds'
+        ]);
 
       if (!data) return;
 
@@ -609,7 +613,11 @@ export function ClientePedirView() {
         const { data: routeData } = await supabase
           .from('app_state')
           .select('key, value')
-          .or('key.ilike.loadHistory%,key.ilike.completedRequests%,key.ilike.posSales%,key.ilike.posShifts%');
+          .in('key', [
+            `posShifts_${selectedBranchId}`, 'posShifts_BRANCH-001', 'posShifts',
+            `loadHistory_${selectedBranchId}`, 'loadHistory_BRANCH-001', 'loadHistory',
+            `completedRequests_${selectedBranchId}`, 'completedRequests_BRANCH-001', 'completedRequests'
+          ]);
 
         const routeMap: Record<string, any> = {};
         (routeData || []).forEach((r: any) => { routeMap[r.key] = r.value; });

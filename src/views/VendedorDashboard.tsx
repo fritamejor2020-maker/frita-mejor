@@ -979,7 +979,15 @@ export const VendedorDashboard = () => {
           const { data: remoteData } = await supabase
             .from('app_state')
             .select('key, value')
-            .or('key.ilike.posShifts%,key.ilike.vendorLocations%');
+            .in('key', [
+              `posShifts_${activeBranchId || 'BRANCH-001'}`,
+              'posShifts_BRANCH-001',
+              'posShifts',
+              'posShifts_master_history',
+              `vendorLocations_${activeBranchId || 'BRANCH-001'}`,
+              'vendorLocations_BRANCH-001',
+              'vendorLocations'
+            ]);
 
           const upsertPromises = (remoteData || []).map(row => {
             const k = row.key || '';

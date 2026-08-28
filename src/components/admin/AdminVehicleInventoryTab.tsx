@@ -491,7 +491,10 @@ export function AdminVehicleInventoryTab() {
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .or('key.ilike.posShifts%,key.ilike.deletedShiftIds%');
+        .in('key', [
+          'posShifts_BRANCH-001', 'posShifts', 'posShifts_master_history',
+          'deletedShiftIds_BRANCH-001', 'deletedShiftIds'
+        ]);
 
       if (!error && data) {
         const map: Record<string, any> = {};

@@ -254,7 +254,12 @@ export const SellerSetupView = () => {
       const { data } = await supabase
         .from('app_state')
         .select('key, value')
-        .or('key.ilike.posShifts%');
+        .in('key', [
+          `posShifts_${(user as any)?.branchId || 'BRANCH-001'}`,
+          'posShifts_BRANCH-001',
+          'posShifts',
+          'posShifts_master_history'
+        ]);
       if (data) {
         data.forEach((row: any) => {
           if (Array.isArray(row.value)) {
