@@ -618,16 +618,16 @@ export function AdminVehicleInventoryTab() {
       const typeStr = String(s.type || '').toUpperCase();
       const hasVehicle = !!(s.pointId || s.vehicle || /^[tc]\d+/i.test(String(s.pointId || s.vehicle || '')));
 
-      // 🚫 EXCLUIR ESTRICTAMENTE TURNOS DE CAJERO / PUNTO DE VENTA (van en el módulo Punto de Venta)
-      if (typeStr === 'POS' || typeStr === 'CAJERO' || typeStr === 'PUNTO_DE_VENTA' || typeStr === 'CAJA' || s.isCashier) {
+      // 🚫 EXCLUIR ESTRICTAMENTE TURNOS DE CAJERO / PUNTO DE VENTA Y DEJADOR
+      if (typeStr === 'POS' || typeStr === 'CAJERO' || typeStr === 'PUNTO_DE_VENTA' || typeStr === 'CAJA' || typeStr === 'DEJADOR' || s.isCashier) {
         return false;
       }
-      if (!hasVehicle && (s.registerId || s.cajaId) && typeStr !== 'VENDEDOR' && typeStr !== 'DEJADOR' && typeStr !== 'TRICICLO') {
+      if (!hasVehicle && (s.registerId || s.cajaId) && typeStr !== 'VENDEDOR' && typeStr !== 'TRICICLO') {
         return false;
       }
 
-      // Incluir turnos de VENDEDOR, DEJADOR o VEHÍCULO DE FLOTA
-      if (typeStr === 'VENDEDOR' || typeStr === 'DEJADOR' || typeStr === 'VEHICULO' || typeStr === 'TRICICLO') return true;
+      // Incluir turnos de VENDEDOR o VEHÍCULO DE FLOTA EN RUTA (T1, T2...)
+      if (typeStr === 'VENDEDOR' || typeStr === 'VEHICULO' || typeStr === 'TRICICLO') return true;
       if (hasVehicle) return true;
       return false;
     };
