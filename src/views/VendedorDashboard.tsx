@@ -456,7 +456,8 @@ export const VendedorDashboard = () => {
         broadcastCustomerOrders(updatedOrders);
         setActiveDelivery(acceptedOrder);
         setPendingDelivery(null);
-        toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.');
+        toast.dismiss();
+        toast.success('¡Pedido aceptado! 🛵 Dirígete al cliente.', { duration: 2500 });
 
         // 2. Persistir en Supabase en segundo plano
         push('customer_delivery_requests', updatedOrders).catch(() => {});
@@ -517,24 +518,19 @@ export const VendedorDashboard = () => {
         trackingId
       ].filter(Boolean)));
 
-      // Recopilar todos los vendedores activos online (por turnos abiertos O ubicaciones activas)
+      // Recopilar únicamente los vendedores con TURNO ABIERTO HOY
       const currentShifts = useInventoryStore.getState().posShifts || [];
-      const vendorLocs = useInventoryStore.getState().vendorLocations || {};
+      const todayStr = new Date().toISOString().slice(0, 10);
       const activeSellersMap = new Map<string, any>();
 
       currentShifts.forEach((s: any) => {
-        if (s && !s.closedAt && String(s.type || '').toUpperCase() === 'VENDEDOR') {
-          const pId = s.pointId || s.vehicle || s.userName || 'T';
-          activeSellersMap.set(String(pId).toUpperCase(), s);
-        }
-      });
-
-      Object.entries(vendorLocs).forEach(([k, loc]: [string, any]) => {
-        if (loc && loc.isActive !== false) {
-          const pId = loc.pointId || loc.name || k;
-          const cleanP = String(pId).toUpperCase();
-          if (!activeSellersMap.has(cleanP)) {
-            activeSellersMap.set(cleanP, { pointId: pId, responsibleName: loc.name || pId });
+        if (s && !s.closedAt) {
+          const typeStr = String(s.type || '').toUpperCase();
+          const sDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+          if (sDate && sDate < todayStr) return; // Descartar turnos de días pasados
+          if (typeStr === 'VENDEDOR' || /^[tc]\d+/i.test(String(s.pointId || s.vehicle || ''))) {
+            const pId = s.pointId || s.vehicle || s.userName || 'T';
+            activeSellersMap.set(String(pId).toUpperCase(), s);
           }
         }
       });
@@ -579,7 +575,8 @@ export const VendedorDashboard = () => {
           last_rejection_reason: reason,
           status: 'pending'
         };
-        toast(reason === 'out_of_stock' ? `Reasignando a ${formattedNextName} por falta de stock 📦` : `Reasignado a ${formattedNextName} 🛵`, { icon: '🔄' });
+        toast.dismiss();
+        toast(reason === 'out_of_stock' ? `Reasignando a ${formattedNextName} por falta de stock 📦` : `Reasignado a ${formattedNextName} 🛵`, { icon: '🔄', duration: 2500 });
       } else {
         updatedOrder = {
           ...order,
@@ -588,7 +585,8 @@ export const VendedorDashboard = () => {
           rejection_reason: reason === 'out_of_stock' ? 'out_of_stock' : 'no_vendors_available',
           status: 'rejected'
         };
-        toast(reason === 'out_of_stock' ? 'Rechazado por falta de stock 📦' : 'Pedido rechazado localmente ❌', { icon: '⚠️' });
+        toast.dismiss();
+        toast(reason === 'out_of_stock' ? 'Rechazado por falta de stock 📦' : 'Pedido rechazado localmente ❌', { icon: '⚠️', duration: 2500 });
       }
 
       const updatedOrders = [...currentOrders];
@@ -638,7 +636,8 @@ export const VendedorDashboard = () => {
         useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
         broadcastCustomerOrders(updatedOrders);
         setActiveDelivery(null);
-        toast.success('¡Pedido entregado con éxito! 🎉');
+        toast.dismiss();
+        toast.success('¡Pedido entregado con éxito! 🎉', { duration: 2500 });
 
         push('customer_delivery_requests', updatedOrders).catch(() => {});
         try {
