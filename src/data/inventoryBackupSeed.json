@@ -443,7 +443,7 @@
     "sortOrder": 122,
     "inTricycles": true,
     "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-1784042382916",
+    "posCategoryId": "CAT-1787929202721",
     "variablePrice": true,
     "referencePrice": 0
   },
@@ -1298,7 +1298,7 @@
     "sortOrder": 171,
     "inTricycles": false,
     "warehouseId": "BOD-001",
-    "posCategoryId": "CAT-1784042382916",
+    "posCategoryId": "CAT-1787929202721",
     "variablePrice": true,
     "referencePrice": 0
   },

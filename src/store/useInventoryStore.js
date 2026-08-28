@@ -38,7 +38,7 @@ function syncKey(key, value) {
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 
-  if (key === 'inventory' || key === 'products' || key === 'posSettings') {
+  if (key === 'inventory' || key === 'products' || key === 'posSettings' || key === 'posCategories') {
     markLocalWrite(key, null);
     markLocalWrite(key, 'BRANCH-001');
     const branches = useBranchStore.getState().branches || [];
