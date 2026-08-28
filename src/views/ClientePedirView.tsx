@@ -601,23 +601,143 @@ export function ClientePedirView() {
         setPosSettings(settingsData.value);
       }
 
-      const NON_PHYSICAL_SERVICES = new Set(['Domicilio Transferencia', 'Producto No Registrado']);
+      // 5. Calcular inventario en ruta en vivo de los triciclos activos (cargas + surtidos - ventas)
+      let routeStockByProd: Record<string, number> = {};
+      let totalRouteUnits = 0;
 
-      const saleItems = (items || []).filter((i: any) => {
-        if (!i || !i.id || i.type === 'INSUMO' || i.showInPos === false) return false;
-        if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
-        return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
+      try {
+        const { data: routeData } = await supabase
+          .from('app_state')
+          .select('key, value')
+          .or('key.ilike.loadHistory%,key.ilike.completedRequests%,key.ilike.posSales%,key.ilike.posShifts%');
+
+        const routeMap: Record<string, any> = {};
+        (routeData || []).forEach((r: any) => { routeMap[r.key] = r.value; });
+
+        const allShifts: any[] = [];
+        Object.keys(routeMap).forEach(key => {
+          if (key.startsWith('posShifts') && Array.isArray(routeMap[key])) {
+            allShifts.push(...routeMap[key]);
+          }
+        });
+        allShifts.push(...(useInventoryStore.getState().posShifts || []));
+
+        const today = new Date().toISOString().slice(0, 10);
+        const activeVendorShifts = allShifts.filter((s: any) => {
+          if (!s || s.closedAt || !s.id) return false;
+          const sDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+          if (sDate && sDate < today) return false;
+          const typeStr = String(s.type || '').toUpperCase();
+          return typeStr === 'VENDEDOR' || /^[tc]\d+/i.test(String(s.pointId || s.vehicle || ''));
+        });
+
+        const activeVehicles = new Set(
+          activeVendorShifts.map((s: any) => String(s.pointId || s.vehicle || '').trim().toUpperCase()).filter(Boolean)
+        );
+
+        const loads: any[] = [];
+        Object.keys(routeMap).forEach(key => {
+          if (key.startsWith('loadHistory') && Array.isArray(routeMap[key])) loads.push(...routeMap[key]);
+        });
+
+        const surtidos: any[] = [];
+        Object.keys(routeMap).forEach(key => {
+          if (key.startsWith('completedRequests') && Array.isArray(routeMap[key])) surtidos.push(...routeMap[key]);
+        });
+
+        const sales: any[] = [];
+        Object.keys(routeMap).forEach(key => {
+          if (key.startsWith('posSales') && Array.isArray(routeMap[key])) sales.push(...routeMap[key]);
+        });
+
+        const isForActiveTricycle = (item: any) => {
+          const vId = String(item.vehicleId || item.pointId || item.requester_point_id || '').trim().toUpperCase();
+          const numMatch = vId.match(/\d+/);
+          const vKey = numMatch ? `T${numMatch[0]}` : vId;
+          return activeVehicles.has(vId) || activeVehicles.has(vKey);
+        };
+
+        loads.forEach((l: any) => {
+          const lDate = (l.timestamp || l.createdAt || '').slice(0, 10);
+          if (lDate && lDate !== today) return;
+          if (!isForActiveTricycle(l)) return;
+
+          if (l.type === 'carga') {
+            (l.items || []).forEach((it: any) => {
+              const pId = it.productId || it.id;
+              const pName = it.name;
+              const q = Number(it.qty) || 0;
+              if (pId) routeStockByProd[pId] = (routeStockByProd[pId] || 0) + q;
+              if (pName) routeStockByProd[pName] = (routeStockByProd[pName] || 0) + q;
+              totalRouteUnits += q;
+            });
+          } else if (l.type === 'recepcion') {
+            (l.items || []).forEach((it: any) => {
+              const pId = it.productId || it.id;
+              const pName = it.name;
+              const q = Number(it.qty) || 0;
+              if (pId) routeStockByProd[pId] = Math.max(0, (routeStockByProd[pId] || 0) - q);
+              if (pName) routeStockByProd[pName] = Math.max(0, (routeStockByProd[pName] || 0) - q);
+              totalRouteUnits = Math.max(0, totalRouteUnits - q);
+            });
+          }
+        });
+
+        surtidos.forEach((s: any) => {
+          const sDate = (s.completed_at || s.created_at || '').slice(0, 10);
+          if (sDate && sDate !== today) return;
+          if (!isForActiveTricycle(s)) return;
+
+          (s.items_payload || s.items || []).forEach((it: any) => {
+            const pId = it.productId || it.id;
+            const pName = it.name;
+            const q = Number(it.qty) || 0;
+            if (pId) routeStockByProd[pId] = (routeStockByProd[pId] || 0) + q;
+            if (pName) routeStockByProd[pName] = (routeStockByProd[pName] || 0) + q;
+            totalRouteUnits += q;
+          });
+        });
+
+        sales.forEach((sale: any) => {
+          if (sale.status === 'REJECTED' || sale.status === 'CANCELLED') return;
+          const saleDate = (sale.date || sale.timestamp || sale.openedAt || '').slice(0, 10);
+          if (saleDate && saleDate !== today) return;
+          const vId = String(sale.pointId || sale.registerId || sale.vehicle || '').trim().toUpperCase();
+          if (!activeVehicles.has(vId) && !activeVehicles.has(`T${vId.match(/\d+/)?.[0]}`)) return;
+
+          (sale.items || []).forEach((it: any) => {
+            const pId = it.productId || it.id;
+            const pName = it.name;
+            const q = Number(it.qty || it.quantity) || 0;
+            if (pId) routeStockByProd[pId] = Math.max(0, (routeStockByProd[pId] || 0) - q);
+            if (pName) routeStockByProd[pName] = Math.max(0, (routeStockByProd[pName] || 0) - q);
+          });
+        });
+      } catch (errRoute) {
+        console.warn('[ClientePedirView] Error calculating route stock:', errRoute);
+      }
+
+      const mappedProducts = saleItems.map((item: any) => {
+        const liveInRouteStock = (routeStockByProd[item.id] !== undefined)
+          ? routeStockByProd[item.id]
+          : (item.name && routeStockByProd[item.name] !== undefined)
+          ? routeStockByProd[item.name]
+          : null;
+
+        const effectiveStock = (liveInRouteStock !== null && totalRouteUnits > 0)
+          ? liveInRouteStock
+          : (item.qty !== undefined && item.qty !== null ? item.qty : 10);
+
+        return {
+          id: item.id,
+          name: item.name,
+          price: (item.price && Number(item.price) > 0) ? Number(item.price) : (Number(item.referencePrice) || 0),
+          category: item.posCategoryId || 'Fritos',
+          description: item.description || 'Recién preparado',
+          image_url: item.imageUrl || null,
+          stock: effectiveStock
+        };
       });
-
-      const mappedProducts = saleItems.map((item: any) => ({
-        id: item.id,
-        name: item.name,
-        price: (item.price && Number(item.price) > 0) ? Number(item.price) : (Number(item.referencePrice) || 0),
-        category: item.posCategoryId || 'Fritos',
-        description: item.description || 'Recién preparado',
-        image_url: item.imageUrl || null,
-        stock: item.qty || 10
-      }));
 
       if (mappedProducts.length > 0) {
         setProducts(mappedProducts);
