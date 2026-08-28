@@ -719,7 +719,21 @@ export const useInventoryStore = create(
           filtered = (inventoryBackupSeed || []).filter(isDeliveryItem);
         }
 
-        return filtered || [];
+        // Deduplicar estrictamente por nombre normalizado para evitar tarjetas duplicadas en pantalla
+        const seenNames = new Map();
+        (filtered || []).forEach(item => {
+          const norm = String(item.name || '').trim().toLowerCase();
+          if (!seenNames.has(norm)) {
+            seenNames.set(norm, item);
+          } else {
+            const existing = seenNames.get(norm);
+            if (!existing.inTricycles && item.inTricycles) {
+              seenNames.set(norm, item);
+            }
+          }
+        });
+
+        return Array.from(seenNames.values());
       },
 
       /**
@@ -744,7 +758,16 @@ export const useInventoryStore = create(
           });
         }
 
-        return filtered || [];
+        // Deduplicar estrictamente por nombre normalizado
+        const seenNames = new Map();
+        (filtered || []).forEach(item => {
+          const norm = String(item.name || '').trim().toLowerCase();
+          if (!seenNames.has(norm)) {
+            seenNames.set(norm, item);
+          }
+        });
+
+        return Array.from(seenNames.values());
       },
 
 
