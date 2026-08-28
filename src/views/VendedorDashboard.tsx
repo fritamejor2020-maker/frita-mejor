@@ -26,7 +26,7 @@ import { useRemoteShiftClose } from '../lib/useRemoteShiftClose';
 import { push } from '../lib/syncManager';
 
 export const VendedorDashboard = () => {
-  const { isSetupComplete, pointId, shift, responsibleName, endShift, openedAt } = useSellerSessionStore();
+  const { isSetupComplete, pointId, shift, shiftId, responsibleName, endShift, openedAt } = useSellerSessionStore();
 
   // Detectar cierre remoto del turno (cuando el Admin lo cierra desde el PC)
   useRemoteShiftClose();
@@ -652,7 +652,7 @@ export const VendedorDashboard = () => {
   // Auto-calculated from logistics: (carga + surtidos) - sobrantes
   const getLogisticsCalc = () => {
     if (!pointId) return { soldItems: {}, theoretical: 0 };
-    return calcSoldByVehicle(pointId, productPriceMap, openedAt || undefined);
+    return calcSoldByVehicle(pointId, productPriceMap, openedAt || undefined, undefined, shiftId || undefined, shift || undefined);
   };
 
   // Modal edición de presets por producto

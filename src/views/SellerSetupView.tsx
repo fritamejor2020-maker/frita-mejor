@@ -19,6 +19,7 @@ export const SellerSetupView = () => {
   // Usamos fetch DIRECTO a Supabase en lugar del store para evitar que el localStorage
   // desactualizado del iPad muestre turnos ya cerrados como "en curso".
   const [remoteShifts, setRemoteShifts] = useState<any[] | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -614,9 +615,17 @@ export const SellerSetupView = () => {
         {/* Botón Iniciar */}
         <button 
           onClick={handleStartShift}
-          className="w-full bg-[#FF4040] text-white font-black text-lg sm:text-xl py-4 sm:py-6 rounded-[28px] sm:rounded-[32px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95"
+          disabled={isLoading}
+          className="w-full bg-[#FF4040] disabled:bg-gray-400 text-white font-black text-lg sm:text-xl py-4 sm:py-6 rounded-[28px] sm:rounded-[32px] shadow-[0_15px_30px_-10px_rgba(255,64,64,0.5)] transition-all active:scale-95 flex items-center justify-center gap-2"
         >
-          INICIAR TURNO
+          {isLoading ? (
+            <>
+              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              <span>VERIFICANDO EN NUBE...</span>
+            </>
+          ) : (
+            'INICIAR TURNO'
+          )}
         </button>
       </div>
     </div>

@@ -181,22 +181,30 @@ function buildShiftLogistics(
 
   const isMovementMatch = (e: any, isCargaOrSobrante: boolean = true) => {
     if (!e) return false;
-    // 1. Coincidencia por shiftId exacto
-    if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
 
-    // 2. OBLIGATORIO: Coincidencia estricta de Vehículo / Triciclo (T1, T2...)
+    // 1. OBLIGATORIO: Coincidencia estricta de Vehículo / Triciclo (T1, T2...)
     const eVehicle = e.vehicleId || e.pointId || e.requester_point_id || e.vehicle;
     const isVehicleMatch = matchVehicleId(eVehicle, vehicleId);
     if (!isVehicleMatch) return false; // 🚫 Si no es el mismo triciclo, descartar de inmediato
+
+    // 2. Coincidencia por shiftId exacto (máxima prioridad)
+    if (e.shiftId && shift.id) {
+      if (e.shiftId === shift.id) return true;
+      // Si el movimiento tiene un shiftId explícito y no coincide con este turno, DESCARTAR
+      return false;
+    }
 
     // 3. OBLIGATORIO: Coincidencia por Fecha (AAAA-MM-DD)
     const eDate = dateOf(e.timestamp || e.completed_at || e.created_at || e.fecha || '');
     if (shiftDate && eDate && eDate !== shiftDate) return false;
 
-    // 4. Si sólo hay 1 turno para este vehículo hoy, todas las cargas y surtidos de hoy le pertenecen
-    if (sameDayVehicleShifts.length <= 1) return true;
+    // 4. Si el movimiento tiene jornada explícita (AM vs PM) y difiere de la del turno, descartar
+    const eJornada = (e.jornada || e.shift || '').toUpperCase();
+    if (eJornada && shiftJornada && eJornada !== 'COMPLETA' && shiftJornada !== 'COMPLETA' && eJornada !== shiftJornada) {
+      return false;
+    }
 
-    // 5. Si hay múltiples turnos del mismo vehículo hoy, delimitar por ventana de tiempo (openedAt -> closedAt)
+    // 5. Delimitar estrictamente por ventana de tiempo (openedAt -> closedAt)
     return inWindow(e.timestamp || e.completed_at || e.created_at);
   };
 

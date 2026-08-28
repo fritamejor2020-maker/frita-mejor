@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import { push, getBranchKey } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
+import { useSellerSessionStore } from './useSellerSessionStore';
 import { useAuthStore } from './useAuthStore';
 import { useVehicleStore } from './useVehicleStore';
 import { safeJSONStorage } from '../utils/safeStorage';
@@ -226,10 +227,17 @@ export const useLogisticsStore = create(
       }
     } catch (_) {}
 
+    // Capturar sesión activa del vendedor para vincular el surtido a su turno único
+    const sellerSession = useSellerSessionStore.getState();
+    const activeShiftId = sellerSession.isSetupComplete ? (sellerSession.shiftId || null) : null;
+    const activeShiftJornada = sellerSession.isSetupComplete ? (sellerSession.shift || null) : null;
+
     const newRequest = {
       id: `REQ-${Date.now()}`,
       requester_point_id: pointId,
       requester_name: requesterName || 'Desconocido',
+      shiftId: activeShiftId,
+      jornada: activeShiftJornada || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM'),
       items_payload: restockCart.filter(item => item.qty > 0),
       observacion: observacion?.trim() || null,
       location,
@@ -408,17 +416,19 @@ export const useLogisticsStore = create(
     const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
     const posShifts = getPosShifts();
     const cleanRequester = String(req.requester_point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const activeShift = posShifts.find(s => {
-      if (!s || s.closedAt) return false;
-      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
-    });
+    const activeShift = req.shiftId 
+      ? posShifts.find(s => s && s.id === req.shiftId) 
+      : posShifts.find(s => {
+          if (!s || s.closedAt) return false;
+          const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
+        });
 
     const newPending = pendingRequests.filter(req => req.id !== requestId);
     const newCompleted = [{
       ...req,
-      shiftId: activeShift?.id || null,
-      jornada: activeShift?.shift || dejadorShift || 'AM',
+      shiftId: req.shiftId || activeShift?.id || null,
+      jornada: req.jornada || activeShift?.shift || dejadorShift || 'AM',
       status: 'completed',
       completed_at: new Date().toISOString(),
       anotadorName: anotadorName || null,
@@ -446,11 +456,13 @@ export const useLogisticsStore = create(
     const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
     const posShifts = getPosShifts();
     const cleanRequester = String(req.requester_point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-    const activeShift = posShifts.find(s => {
-      if (!s || s.closedAt) return false;
-      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-      return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
-    });
+    const activeShift = req.shiftId 
+      ? posShifts.find(s => s && s.id === req.shiftId) 
+      : posShifts.find(s => {
+          if (!s || s.closedAt) return false;
+          const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+          return cleanPoint && cleanRequester && (cleanPoint === cleanRequester || cleanPoint.includes(cleanRequester) || cleanRequester.includes(cleanPoint));
+        });
 
     // Quitar el request original de pendientes
     const newPending = pendingRequests.filter(r => r.id !== requestId);
@@ -458,8 +470,8 @@ export const useLogisticsStore = create(
     // Marcar como completado solo los ítems disponibles
     const newCompleted = [{
       ...req,
-      shiftId: activeShift?.id || null,
-      jornada: activeShift?.shift || dejadorShift || 'AM',
+      shiftId: req.shiftId || activeShift?.id || null,
+      jornada: req.jornada || activeShift?.shift || dejadorShift || 'AM',
       items_payload: availableItems,
       status: 'completed',
       completed_at: new Date().toISOString(),
@@ -474,6 +486,8 @@ export const useLogisticsStore = create(
         id: `REQ-POST-${Date.now()}`,
         requester_point_id: req.requester_point_id,
         requester_name: req.requester_name,
+        shiftId: req.shiftId || activeShift?.id || null,
+        jornada: req.jornada || activeShift?.shift || dejadorShift || 'AM',
         items_payload: postponedItems,
         location: req.location || null,
         observacion: req.observacion || null,
@@ -719,33 +733,68 @@ export const useLogisticsStore = create(
    * @param {string} [sinceTimestamp] - Filtrar solo desde esta fecha (ISO)
    * @returns {{ soldItems: Record<string, {qty, name, price}>, theoretical: number }}
    */
-  calcSoldByVehicle: (vehicleId, productPrices, sinceTimestamp = null) => {
+  /**
+   * Calcula las unidades vendidas por vehículo usando el modelo de inventario:
+   * Vendido = (Carga Inicial + Surtidos Entregados) - Sobrantes al Cierre
+   *
+   * @param {string} vehicleId - ej. 'T2'
+   * @param {object} productPrices - { [productId]: price } mapa de precios
+   * @param {string} [sinceTimestamp] - Filtrar solo desde esta fecha/hora (ISO)
+   * @param {string} [untilTimestamp] - Filtrar hasta esta fecha/hora (ISO)
+   * @param {string} [targetShiftId] - ID exacto del turno a calcular
+   * @param {string} [targetJornada] - Jornada 'AM' | 'PM' | 'MD'
+   * @returns {{ soldItems: Record<string, {qty, name, price}>, theoretical: number }}
+   */
+  calcSoldByVehicle: (vehicleId, productPrices, sinceTimestamp = null, untilTimestamp = null, targetShiftId = null, targetJornada = null) => {
     const { loadHistory, completedRequests } = get();
-    
-    // Filter by START OF DAY so loads made before the vendor opens their session
-    // (which is the normal workflow) are still counted.
-    let since = null;
-    if (sinceTimestamp) {
-      const d = new Date(sinceTimestamp);
-      since = new Date(d.getFullYear(), d.getMonth(), d.getDate()); // midnight local
-    }
-    const inRange = ts => !since || new Date(ts) >= since;
+    const cleanVeh = String(vehicleId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+
+    // Delimitar ventana de tiempo estricta del turno (hasta 30 min antes de apertura para capturar la carga de bodega)
+    const startTime = sinceTimestamp ? new Date(sinceTimestamp).getTime() - 30 * 60 * 1000 : 0;
+    const endTime = untilTimestamp ? new Date(untilTimestamp).getTime() + 15 * 60 * 1000 : Infinity;
+
+    const isMatch = (item, isCargaOrRecv = true) => {
+      if (!item) return false;
+      const itemVeh = String(item.vehicleId || item.pointId || item.requester_point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (itemVeh && cleanVeh && !(itemVeh === cleanVeh || itemVeh.includes(cleanVeh) || cleanVeh.includes(itemVeh))) {
+        return false;
+      }
+
+      // 1. Si ambos tienen shiftId definido: regla estricta 1 a 1
+      if (item.shiftId && targetShiftId) {
+        return item.shiftId === targetShiftId;
+      }
+
+      // 2. Si el item tiene un shiftId asignado pero este cálculo pertenece a otro shiftId explícito: descartar
+      if (item.shiftId && targetShiftId && item.shiftId !== targetShiftId) {
+        return false;
+      }
+
+      // 3. Si se especifica jornada (AM vs PM) y el item tiene jornada incompatible: descartar
+      if (targetJornada && item.jornada && targetJornada !== 'COMPLETA' && item.jornada !== 'COMPLETA' && targetJornada !== item.jornada) {
+        return false;
+      }
+
+      // 4. Ventana de tiempo estricta
+      const ts = new Date(item.timestamp || item.completed_at || item.created_at || 0).getTime();
+      return ts >= startTime && ts <= endTime;
+    };
 
     // Acumula cantidades { [productId]: qty }
     const totals = {};
 
     // 1. Carga inicial
     loadHistory
-      .filter(e => e.type === 'carga' && e.vehicleId === vehicleId && inRange(e.timestamp))
+      .filter(e => e.type === 'carga' && isMatch(e, true))
       .forEach(e => {
         e.items.forEach(({ productId, qty }) => {
           totals[productId] = (totals[productId] || 0) + qty;
         });
       });
 
-    // 2. Surtidos entregados durante el día
+    // 2. Surtidos entregados durante el turno
     completedRequests
-      .filter(r => r.requester_point_id === vehicleId && inRange(r.completed_at || r.created_at))
+      .filter(r => isMatch(r, false))
       .forEach(r => {
         (r.items_payload || []).forEach(({ productId, qty }) => {
           totals[productId] = (totals[productId] || 0) + qty;
@@ -754,7 +803,7 @@ export const useLogisticsStore = create(
 
     // 3. Restar sobrantes (recepciones del dejador al cierre)
     loadHistory
-      .filter(e => e.type === 'recepcion' && e.vehicleId === vehicleId && inRange(e.timestamp))
+      .filter(e => e.type === 'recepcion' && isMatch(e, true))
       .forEach(e => {
         e.items.forEach(({ productId, qty }) => {
           totals[productId] = (totals[productId] || 0) - qty;
