@@ -96,6 +96,12 @@ function MapController({
       onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
       toast.success('📍 Ubicación ajustada en el mapa');
     },
+    locationfound(e) {
+      onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
+    },
+    locationerror() {
+      toast.error('No se pudo acceder a tu GPS. Puedes tocar en el mapa para ubicarte.');
+    },
   });
 
   useEffect(() => {
@@ -110,15 +116,6 @@ function MapController({
       map.setView(centerPos, DEFAULT_ZOOM);
     }
   }, [centerPos]);
-
-  useMapEvents({
-    locationfound(e) {
-      onLocationChangeRef.current(e.latlng.lat, e.latlng.lng);
-    },
-    locationerror() {
-      toast.error('No se pudo acceder a tu GPS. Puedes tocar en el mapa para ubicarte.');
-    },
-  });
 
   return null;
 }
@@ -315,8 +312,9 @@ export function ClientePedirView() {
     }
   }, []);
 
-  // Cargar datos al cambiar de sede y mantener sincronización periódica
+  // Cargar datos al cambiar de sede y mantener sincronización periódica eficiente
   useEffect(() => {
+    let isMounted = true;
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     fetchGeofences();
     fetchVendors();
@@ -324,33 +322,30 @@ export function ClientePedirView() {
 
     // Intervalo de respaldo de 15s (el canal Realtime ya notifica los cambios al instante)
     const interval = setInterval(() => {
-      useInventoryStore.getState().loadFromRemote().catch(() => {});
+      if (!isMounted) return;
       fetchVendors();
       fetchCatalog();
     }, 15000);
 
     const channel = supabase
-      .channel('client-vendors-sync')
+      .channel(`client-vendors-sync-${selectedBranchId}`)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'app_state' },
         () => {
-          useInventoryStore.getState().loadFromRemote().catch(() => {});
+          if (!isMounted) return;
           fetchVendors();
           fetchCatalog();
         }
       )
       .subscribe();
 
-    if (activeOrderId && activeOrderToken) {
-      monitorOrder();
-    }
-
     return () => {
+      isMounted = false;
       clearInterval(interval);
       supabase.removeChannel(channel);
     };
-  }, [selectedBranchId, inventoryFromStore]);
+  }, [selectedBranchId]);
 
   // Recalcular cobertura de Geocercas
   useEffect(() => {
@@ -633,10 +628,36 @@ export function ClientePedirView() {
     }
   };
 
-  const monitorOrder = async () => {
-    if (!activeOrderId) return;
+  // Carritos activos ordenados por cercanía GPS (memorizados para evitar re-cálculos en cada micro-render)
+  const activeVendorsAround = useMemo(() => {
+    return vendors.map(v => {
+      const distance = getHaversineDistance(clientPos[0], clientPos[1], v.lat, v.lng);
+      return { ...v, distance: isNaN(distance) ? 0 : distance };
+    }).sort((a, b) => a.distance - b.distance);
+  }, [vendors, clientPos]);
+
+  // Stock disponible consolidado de los carritos del municipio
+  const availableProducts = useMemo(() => {
+    const strictStock = posSettings?.inventoryControl?.strictTricycleStock ?? false;
+    return products.map(prod => {
+      const totalStock = prod.stock || 0;
+      return {
+        ...prod,
+        stock: strictStock ? totalStock : (totalStock > 0 ? totalStock : 10)
+      };
+    });
+  }, [products, posSettings]);
+
+  // Monitoreo en tiempo real del pedido activo (con limpieza estricta para evitar fugas de memoria)
+  useEffect(() => {
+    if (!activeOrderId || !activeOrderToken) return;
+
+    let isSubscribed = true;
+    let intervalId: any = null;
+    let channel: any = null;
 
     const checkStateOrder = async () => {
+      if (!isSubscribed) return true;
       try {
         const storeOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
         const storeMatch = storeOrders.find((o: any) => o.id === activeOrderId);
@@ -655,11 +676,9 @@ export function ClientePedirView() {
 
         const remoteOrders: any[] = data?.value || [];
         const remoteMatch = remoteOrders.find((o: any) => o.id === activeOrderId);
-
-        // Preferir siempre la versión reactiva del store sobre lecturas remotas obsoletas
         const match = storeMatch || remoteMatch;
 
-        if (match) {
+        if (match && isSubscribed) {
           setActiveOrder({ ...match });
           if (match.status === 'completed' || match.status === 'rejected') {
             return true;
@@ -716,49 +735,39 @@ export function ClientePedirView() {
       return false;
     };
 
-    const isFinished = await checkStateOrder();
-    if (isFinished) return;
+    checkStateOrder().then(isFinished => {
+      if (isFinished || !isSubscribed) return;
 
-    const channel = supabase.channel(`order-track-${activeOrderId}-${Date.now()}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'app_state',
-        filter: 'key=eq.customer_delivery_requests'
-      }, async () => {
-        await checkStateOrder();
-      })
-      .subscribe();
+      channel = supabase.channel(`order-track-${activeOrderId}`)
+        .on('postgres_changes', {
+          event: '*',
+          schema: 'public',
+          table: 'app_state',
+          filter: 'key=eq.customer_delivery_requests'
+        }, async () => {
+          await checkStateOrder();
+        })
+        .subscribe();
 
-    const interval = setInterval(async () => {
-      const done = await checkStateOrder();
-      if (done) {
-        clearInterval(interval);
-        supabase.removeChannel(channel);
-      }
-    }, 2500);
+      intervalId = setInterval(async () => {
+        const done = await checkStateOrder();
+        if (done && intervalId) {
+          clearInterval(intervalId);
+          intervalId = null;
+          if (channel) {
+            supabase.removeChannel(channel);
+            channel = null;
+          }
+        }
+      }, 4000);
+    });
 
     return () => {
-      clearInterval(interval);
-      supabase.removeChannel(channel);
+      isSubscribed = false;
+      if (intervalId) clearInterval(intervalId);
+      if (channel) supabase.removeChannel(channel);
     };
-  };
-
-  // Carritos activos ordenados por cercanía GPS (incluye exactamente todos los vendedores detectados en rastreo en vivo)
-  const activeVendorsAround = vendors.map(v => {
-    const distance = getHaversineDistance(clientPos[0], clientPos[1], v.lat, v.lng);
-    return { ...v, distance: isNaN(distance) ? 0 : distance };
-  }).sort((a, b) => a.distance - b.distance);
-
-  // Stock disponible consolidado de los carritos del municipio
-  const availableProducts = products.map(prod => {
-    const strictStock = posSettings?.inventoryControl?.strictTricycleStock ?? false;
-    const totalStock = prod.stock || 0;
-    return {
-      ...prod,
-      stock: strictStock ? totalStock : (totalStock > 0 ? totalStock : 10)
-    };
-  });
+  }, [activeOrderId, activeOrderToken, activeVendorsAround]);
 
   // Categorías dinámicas adaptadas exactamente a los productos de los triciclos
   const dynamicCategories = useMemo(() => {
