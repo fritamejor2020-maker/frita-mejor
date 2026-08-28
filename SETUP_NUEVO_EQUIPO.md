@@ -74,9 +74,13 @@ git config credential.helper wincred
 3. **Radio de Cobertura y Reasignación:**
    Mantiene filtro de 3km de cobertura. Los pedidos no contestados a los 60s se auto-rotan al siguiente carrito más cercano.
 
-### E. Aplicación de Escritorio Electron (`electron/main.cjs`)
-- Electron ejecuta la app de React en su `BrowserWindow` e incluye un daemon de sincronización biométrica en segundo plano.
+### E. Aplicación de Escritorio Electron (`C:\Users\GIGABYTE\Documents\Cajero-FritaMejor`)
+- **Ubicación de la App Nativa:** `C:\Users\GIGABYTE\Documents\Cajero-FritaMejor` (Ejecutable: `Cajero-FritaMejor.exe`, Backend: `resources/app/main.js`).
+- Electron ejecuta la app de POS cargando la versión de producción (`https://frita-mejor.vercel.app/login`) en su `BrowserWindow` e incluye:
+  - Servidor de impresión térmica ESC/POS nativo y apertura de cajón monedero en puerto 9099 (`RawPrinterHelper.exe`).
+  - Daemon de sincronización biométrica Hikvision en segundo plano cada 30s.
 - Las consultas a `app_state` en Electron usan `.maybeSingle()` para evitar excepciones `PGRST116`.
+
 
 ---
 
