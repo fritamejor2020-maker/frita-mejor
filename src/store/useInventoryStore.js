@@ -375,24 +375,31 @@ export const useInventoryStore = create(
               let val = rawBranchVal !== undefined && rawBranchVal !== null ? rawBranchVal : remote[key];
               if (Array.isArray(rawBranchVal) || Array.isArray(remote[key])) {
                 const combinedMap = new Map();
-                if (Array.isArray(remote[key])) {
-                  remote[key].forEach(item => { if (item?.id) combinedMap.set(item.id, item); });
-                }
+                // 1. PRIMERO: Los datos específicos de la sede tienen máxima prioridad (datos reales y actualizados)
                 if (Array.isArray(rawBranchVal)) {
-                  rawBranchVal.forEach(item => {
+                  rawBranchVal.forEach(item => { if (item?.id) combinedMap.set(item.id, item); });
+                }
+                // 2. LUEGO: Llave legacy solo como fallback para items que no existan en la sede
+                if (Array.isArray(remote[key])) {
+                  remote[key].forEach(item => {
                     if (item?.id) {
                       const existing = combinedMap.get(item.id);
-                      if (!existing || (!existing.closedAt && item.closedAt)) {
+                      if (!existing) {
+                        combinedMap.set(item.id, item);
+                      } else if (key === 'posShifts' && !existing.closedAt && item.closedAt) {
                         combinedMap.set(item.id, item);
                       }
                     }
                   });
                 }
+                // 3. Para posShifts: historial maestro de respaldo
                 if (key === 'posShifts' && Array.isArray(remote['posShifts_master_history'])) {
                   remote['posShifts_master_history'].forEach(item => {
                     if (item?.id) {
                       const existing = combinedMap.get(item.id);
-                      if (!existing || (!existing.closedAt && item.closedAt)) {
+                      if (!existing) {
+                        combinedMap.set(item.id, item);
+                      } else if (!existing.closedAt && item.closedAt) {
                         combinedMap.set(item.id, item);
                       }
                     }
