@@ -105,9 +105,41 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const d = (item.completed_at || item.created_at || item.timestamp || item.fecha || item.date || '').slice(0, 10);
       return !d || d >= today;
     };
+    const nowMs = Date.now();
     const map = new Map();
-    (currentList || []).filter(isToday).forEach(item => { if (item?.id) map.set(item.id, item); });
-    incomingList.filter(isToday).forEach(item => { if (item?.id) map.set(item.id, item); });
+
+    // 1. Añadir elementos locales primero
+    (currentList || []).filter(isToday).forEach(item => {
+      if (item?.id) map.set(item.id, item);
+    });
+
+    // 2. Fusionar elementos entrantes preservando escrituras locales recientes
+    incomingList.filter(isToday).forEach(item => {
+      if (!item?.id) return;
+      const local = map.get(item.id);
+      if (!local) {
+        map.set(item.id, item);
+      } else {
+        const localTime = new Date(local.created_at || local.completed_at || local.timestamp || 0).getTime();
+        const incomingTime = new Date(item.created_at || item.completed_at || item.timestamp || 0).getTime();
+        if (nowMs - localTime < 15000 && incomingTime < localTime) {
+          map.set(item.id, local);
+        } else {
+          map.set(item.id, { ...local, ...item });
+        }
+      }
+    });
+
+    // 3. Garantizar que ningún pedido pendiente local creado recientemente se pierda por desfase de red
+    (currentList || []).forEach(localItem => {
+      if (localItem?.id && !map.has(localItem.id)) {
+        const localTime = new Date(localItem.created_at || localItem.timestamp || 0).getTime();
+        if (nowMs - localTime < 60000) {
+          map.set(localItem.id, localItem);
+        }
+      }
+    });
+
     return Array.from(map.values());
   };
 
@@ -265,29 +297,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     };
 
     // ── Logística (Dejador / Vendedor) ──
-    // MERGE por sede: al recibir datos de una sede, conservar pedidos de otras sedes
-    // y reemplazar solo los de la sede que se actualizó. Esto evita que un update
-    // de BRANCH-001 borre los pedidos de BRANCH-002 en el estado local del Dejador.
-    applicators[`pendingRequests_${bid}`]   = (v) => {
-      const current = useLogisticsStore.getState().pendingRequests || [];
-      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
-      useLogisticsStore.setState({ pendingRequests: [...otherBranch, ...(v || [])] });
-    };
-    applicators[`completedRequests_${bid}`] = (v) => {
-      const current = useLogisticsStore.getState().completedRequests || [];
-      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
-      useLogisticsStore.setState({ completedRequests: [...otherBranch, ...(v || [])] });
-    };
-    applicators[`rejectedRequests_${bid}`]  = (v) => {
-      const current = useLogisticsStore.getState().rejectedRequests || [];
-      const otherBranch = current.filter(r => (r.branchId || 'BRANCH-001') !== bid);
-      useLogisticsStore.setState({ rejectedRequests: [...otherBranch, ...(v || [])] });
-    };
-    applicators[`loadHistory_${bid}`]       = (v) => {
-      const current = useLogisticsStore.getState().loadHistory || [];
-      const otherBranch = current.filter(e => (e.branchId || 'BRANCH-001') !== bid);
-      useLogisticsStore.setState({ loadHistory: [...otherBranch, ...(v || [])] });
-    };
+    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
+    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
+    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
+    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
 
     // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
     applicators[`loadTemplates_${bid}`]     = (v) => {
