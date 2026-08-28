@@ -357,9 +357,25 @@ export const DejadorDashboard = () => {
     ...(rejectedRequests  || []).map((r: any) => r.id),
   ]);
 
+  const activeShiftsList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
+
   // Mostrar todos los pedidos pendientes no procesados de la sede (o sin sede asignada)
+  // Ignora solicitudes de turnos ya cerrados o con más de 24 horas de antigüedad
   const truePendingRequests = (pendingRequests || []).filter((r: any) => {
     if (!r || !r.id || processedIds.has(r.id)) return false;
+    
+    // Si la solicitud pertenece a un turno ya cerrado, no es un pedido activo
+    if (r.shiftId) {
+      const shift = activeShiftsList.find((s: any) => s?.id === r.shiftId);
+      if (shift?.closedAt) return false;
+    }
+
+    // Si tiene más de 24h y no tiene turno abierto asociado, descartar
+    const reqTime = r.created_at || r.timestamp;
+    if (reqTime && (Date.now() - new Date(reqTime).getTime() > 24 * 60 * 60 * 1000)) {
+      return false;
+    }
+
     if (!userBranchId || userBranchId === 'BRANCH-001') return true; // HQ / Admin ve todas las sedes
     if (!r.branchId || r.branchId === userBranchId) return true; // Dejador de sede específica ve sus pedidos
     return false;
