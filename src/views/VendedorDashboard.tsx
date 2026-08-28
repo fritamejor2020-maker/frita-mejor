@@ -610,22 +610,85 @@ export const VendedorDashboard = () => {
 
   const handleCompleteDelivery = async (orderId: string) => {
     try {
-      const currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
-      const idx = currentOrders.findIndex((o: any) => o.id === orderId);
+      let currentOrders = useLogisticsStore.getState().customerDeliveryRequests || [];
+      let idx = currentOrders.findIndex((o: any) => o.id === orderId);
+
+      if (idx === -1) {
+        const { data } = await supabase
+          .from('app_state')
+          .select('value')
+          .eq('key', 'customer_delivery_requests')
+          .maybeSingle();
+        if (data?.value && Array.isArray(data.value)) {
+          currentOrders = data.value;
+          idx = currentOrders.findIndex((o: any) => o.id === orderId);
+        }
+      }
+
       if (idx !== -1) {
+        const order = currentOrders[idx];
         const completedOrder = {
-          ...currentOrders[idx],
+          ...order,
           status: 'completed',
           completed_at: new Date().toISOString()
         };
         const updatedOrders = [...currentOrders];
         updatedOrders[idx] = completedOrder;
 
+        useLogisticsStore.setState({ customerDeliveryRequests: updatedOrders });
         broadcastCustomerOrders(updatedOrders);
         setActiveDelivery(null);
         toast.success('¡Pedido entregado con éxito! 🎉');
 
         push('customer_delivery_requests', updatedOrders).catch(() => {});
+        try {
+          localStorage.setItem('fm_customer_delivery_requests', JSON.stringify(updatedOrders));
+        } catch (e) {}
+
+        // ── REGISTRAR VENTA EN EL HISTORIAL Y TURNO DEL VENDEDOR ──
+        const activeBranchId = (user as any)?.branchId || 'BRANCH-001';
+        const saleId = `SALE-DELIVERY-${completedOrder.id || Date.now()}`;
+        const today = new Date().toISOString().slice(0, 10);
+        const shiftKey = openedAt || shiftId || `SHIFT-${pointId}-${today}`;
+
+        const saleData = {
+          id: saleId,
+          orderId: completedOrder.id,
+          publicId: completedOrder.id,
+          shiftId: shiftKey,
+          branchId: activeBranchId,
+          registerId: pointId || 'T1',
+          pointId: pointId || 'T1',
+          vehicle: pointId || 'T1',
+          responsibleName: responsibleName || (user as any)?.name || pointId || 'Vendedor Móvil',
+          userName: (user as any)?.name || responsibleName || 'Vendedor Móvil',
+          userId: (user as any)?.id || null,
+          date: today,
+          createdAt: new Date().toISOString(),
+          timestamp: new Date().toISOString(),
+          total: Number(completedOrder.total_amount) || 0,
+          totalAmount: Number(completedOrder.total_amount) || 0,
+          paymentMethod: 'EFECTIVO',
+          paymentMethods: [{ method: 'EFECTIVO', amount: Number(completedOrder.total_amount) || 0 }],
+          status: 'PAID',
+          type: 'PEDIDO_CLIENTE',
+          orderType: 'CLIENT_DELIVERY',
+          clientName: completedOrder.client_name || 'Cliente Domicilio',
+          clientPhone: completedOrder.client_phone || '',
+          clientAddress: completedOrder.client_address || '',
+          deliveryMode: completedOrder.delivery_mode || 'delivery',
+          items: (completedOrder.items || []).map((item: any) => ({
+            productId: item.productId || item.id,
+            id: item.productId || item.id,
+            name: item.name,
+            qty: Number(item.qty) || 1,
+            quantity: Number(item.qty) || 1,
+            price: Number(item.price) || 0,
+            total: (Number(item.qty) || 1) * (Number(item.price) || 0)
+          }))
+        };
+
+        useInventoryStore.getState().addPosSale(saleData);
       } else {
         setActiveDelivery(null);
       }
@@ -1320,31 +1383,50 @@ export const VendedorDashboard = () => {
               </h4>
               <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
                 {(() => {
-                  const isThisShift = (req: any) => req.openedAt === openedAt || (req.pointId === pointId && req.shift === shift);
-                  const myCompleted = (completedRequests || []).filter(isThisShift);
-                  const myRejected = (rejectedRequests || []).filter(isThisShift);
-                  
-                  const allHistory = [
-                    ...myCompleted.map(c => ({ ...c, _status: 'completed' })),
-                    ...myRejected.map(r => ({ ...r, _status: 'rejected' }))
-                  ].sort((a, b) => new Date(b.completed_at || b.created_at).getTime() - new Date(a.completed_at || a.created_at).getTime());
+                  const cleanPoint = String(pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const cleanUser = String((user as any)?.id || (user as any)?.username || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                  const today = new Date().toISOString().slice(0, 10);
+
+                  const myDeliveries = (customerDeliveryRequests || []).filter((o: any) => {
+                    const assigned = String(o.assigned_vendor_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const oDate = (o.created_at || o.assigned_at || o.completed_at || '').slice(0, 10);
+                    if (oDate && oDate < today) return false;
+                    const isMyVeh = (cleanPoint && (assigned === cleanPoint || assigned.includes(cleanPoint))) ||
+                                    (cleanUser && (assigned === cleanUser || assigned.includes(cleanUser)));
+                    return isMyVeh && (o.status === 'completed' || o.status === 'rejected');
+                  });
+
+                  const allHistory = [...myDeliveries].sort((a, b) => 
+                    new Date(b.completed_at || b.rejected_at || b.created_at || 0).getTime() - 
+                    new Date(a.completed_at || a.rejected_at || a.created_at || 0).getTime()
+                  );
 
                   if (allHistory.length === 0) {
                     return <p className="text-xs text-gray-400 font-bold text-center py-4">Aún no has procesado pedidos hoy.</p>;
                   }
 
                   return allHistory.map((req: any, i: number) => {
-                    const isCompleted = req._status === 'completed';
+                    const isCompleted = req.status === 'completed';
+                    const itemsSummary = (req.items || []).map((it: any) => `${it.name} × ${it.qty}`).join(', ');
                     return (
-                      <div key={i} className="flex justify-between items-center text-xs p-2.5 bg-gray-50 rounded-xl border border-gray-100">
-                        <div>
-                          <p className="font-black text-gray-800">{req.clientName || req.client_name || 'Cliente'}</p>
+                      <div key={i} className="flex justify-between items-center text-xs p-3 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                        <div className="flex-1 pr-2">
+                          <p className="font-black text-gray-800 flex items-center gap-1.5">
+                            <span>{isCompleted ? '✅' : '❌'}</span>
+                            <span>{req.client_name || req.clientName || 'Cliente'}</span>
+                            {req.delivery_mode === 'delivery' && <span className="text-[10px] bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full font-bold">A Domicilio</span>}
+                          </p>
+                          {itemsSummary && (
+                            <p className="text-[11px] text-gray-600 font-semibold mt-0.5 truncate">
+                              {itemsSummary}
+                            </p>
+                          )}
                           <p className="text-[10px] text-gray-400 font-bold mt-0.5">
-                            {isCompleted ? '✅ Entregado' : '❌ Rechazado'} · {formatMoney(req.total_amount || req.total || 0)}
+                            {isCompleted ? 'Entregado' : 'Rechazado'} · <span className="text-green-600 font-black">{formatMoney(req.total_amount || req.total || 0)}</span>
                           </p>
                         </div>
-                        <span className="text-[10px] text-gray-400 font-bold">
-                          {new Date(req.completed_at || req.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+                        <span className="text-[10px] text-gray-400 font-bold shrink-0">
+                          {new Date(req.completed_at || req.rejected_at || req.created_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                       </div>
                     );
