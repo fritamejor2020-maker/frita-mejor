@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useChatStore } from '../store/useChatStore';
+import { useChatStore, getMessageDate, getMessageJornada, getCurrentDate, getCurrentJornada } from '../store/useChatStore';
 
 /**
  * Hook Global de Notificaciones de Audio y Llamadas de Chat
@@ -137,6 +137,21 @@ export function useChatSoundNotifier(currentUserId) {
     if (prevMsgCountRef.current > 0 && messages.length > prevMsgCountRef.current) {
       const latestMsg = messages[0];
       if (latestMsg) {
+        // 🛡️ REGLA ESTRICTA: Ignorar mensajes de jornadas o días anteriores
+        const msgDate = latestMsg.date || getMessageDate(latestMsg.createdAt);
+        const msgJornada = latestMsg.jornada || getMessageJornada(latestMsg.createdAt);
+        if (msgDate !== getCurrentDate() || msgJornada !== getCurrentJornada()) {
+          prevMsgCountRef.current = messages.length;
+          return;
+        }
+
+        // Solo sonar si el mensaje fue enviado en tiempo real (< 2 minutos)
+        const msgAgeMs = Date.now() - new Date(latestMsg.createdAt || 0).getTime();
+        if (msgAgeMs > 2 * 60 * 1000) {
+          prevMsgCountRef.current = messages.length;
+          return;
+        }
+
         const myId = String(currentUserId || '').toLowerCase();
         const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
 

@@ -83,6 +83,32 @@ function setupChatRealtime(set, get) {
   }
 }
 
+// ─── Helpers de Jornada y Fecha para Aislamiento de Chat ──────────────────────
+export function getMessageJornada(isoString) {
+  if (!isoString) return 'AM';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return 'AM';
+  const totalMinutes = d.getHours() * 60 + d.getMinutes();
+  return totalMinutes < 750 ? 'AM' : 'PM'; // Corte 12:30 PM (750 min)
+}
+
+export function getMessageDate(isoString) {
+  if (!isoString) return '';
+  const d = new Date(isoString);
+  if (isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+export function getCurrentJornada() {
+  const now = new Date();
+  return (now.getHours() * 60 + now.getMinutes()) < 750 ? 'AM' : 'PM';
+}
+
+export function getCurrentDate() {
+  const now = new Date();
+  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+}
+
 export const useChatStore = create(
   persist(
     (set, get) => {
@@ -94,15 +120,20 @@ export const useChatStore = create(
         activeCall: null,
 
         /**
-         * Envía un nuevo mensaje o nota de voz
+         * Envía un nuevo mensaje o nota de voz asociado a la fecha y jornada activa
          */
-        sendMessage: ({ shiftId, branchId, senderId, senderName, senderRole, receiverId, receiverName, pointId, type, text, mediaUrl, durationSeconds }) => {
+        sendMessage: ({ shiftId, branchId, senderId, senderName, senderRole, receiverId, receiverName, pointId, type, text, mediaUrl, durationSeconds, date, jornada }) => {
           const user = useAuthStore.getState().user;
           const effectiveBranch = branchId || user?.branchId || 'BRANCH-001';
-          
+          const now = new Date();
+          const effectiveDate = date || getCurrentDate();
+          const effectiveJornada = jornada || getCurrentJornada();
+
           const newMessage = {
             id: `MSG-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
             shiftId: shiftId || 'shift-active',
+            date: effectiveDate,
+            jornada: effectiveJornada,
             branchId: effectiveBranch,
             senderId: senderId || user?.id || 'unknown',
             senderName: senderName || user?.name || 'Usuario',
@@ -115,7 +146,7 @@ export const useChatStore = create(
             mediaUrl: mediaUrl || null,
             durationSeconds: durationSeconds || 0,
             read: false,
-            createdAt: new Date().toISOString(),
+            createdAt: now.toISOString(),
           };
 
           const updated = [newMessage, ...get().messages];
@@ -139,14 +170,23 @@ export const useChatStore = create(
         /**
          * Marca mensajes como leídos para un usuario al abrir un chat
          */
-        markAsRead: (myUserId, targetUserId = null) => {
+        markAsRead: (myUserId, targetUserId = null, targetDate = null, targetJornada = null) => {
           const myId = String(myUserId || '').toLowerCase();
           const target = targetUserId ? String(targetUserId).toLowerCase() : null;
           const isDejador = myId === 'dejador';
+          const todayDate = targetDate || getCurrentDate();
+          const currentJornada = targetJornada || getCurrentJornada();
           let changed = false;
 
           const updated = (get().messages || []).map(m => {
             if (m.read) return m;
+
+            // 🛡️ Solo marcar leídos los de la jornada activa
+            const msgDate = m.date || getMessageDate(m.createdAt);
+            const msgJornada = m.jornada || getMessageJornada(m.createdAt);
+            if (msgDate !== todayDate || msgJornada !== currentJornada) {
+              return m;
+            }
 
             const sender = String(m.senderId || '').toLowerCase();
             const point = String(m.pointId || '').toLowerCase();
@@ -199,15 +239,29 @@ export const useChatStore = create(
         },
 
         /**
-         * Retorna la cantidad de mensajes no leídos para un usuario
+         * Retorna la cantidad de mensajes no leídos estrictamente para la jornada activa
          */
-        getUnreadCount: (myUserId, fromUserId = null) => {
+        getUnreadCount: (myUserId, fromUserId = null, activeShiftId = null, targetDate = null, targetJornada = null) => {
           const msgs = get().messages || [];
           const myId = String(myUserId || '').toLowerCase();
           const isDejador = myId === 'dejador';
+          const todayDate = targetDate || getCurrentDate();
+          const currentJornada = targetJornada || getCurrentJornada();
 
           return msgs.filter(m => {
             if (m.read) return false;
+
+            // 🛡️ REGLA ESTRICTA: Ignorar mensajes de días o jornadas anteriores
+            const msgDate = m.date || getMessageDate(m.createdAt);
+            if (msgDate !== todayDate) return false;
+
+            const msgJornada = m.jornada || getMessageJornada(m.createdAt);
+            if (msgJornada !== currentJornada) return false;
+
+            // Si hay un shiftId activo estricto
+            if (activeShiftId && activeShiftId !== 'shift-active' && m.shiftId && m.shiftId !== 'shift-active') {
+              if (m.shiftId !== activeShiftId) return false;
+            }
 
             const sender = String(m.senderId || '').toLowerCase();
             const point = String(m.pointId || '').toLowerCase();
@@ -251,31 +305,39 @@ export const useChatStore = create(
         },
 
         /**
-         * Retorna los mensajes de una conversación entre dos usuarios para el turno activo
+         * Retorna los mensajes de una conversación exclusivamente para la jornada y turno activo
          */
-        getConversation: (userAId, userBId, activeShiftId = null) => {
+        getConversation: (userAId, userBId, activeShiftId = null, targetDate = null, targetJornada = null) => {
           const currentMessages = get().messages || [];
-          const now = Date.now();
-          const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+          const todayDate = targetDate || getCurrentDate();
+          const currentJornada = targetJornada || getCurrentJornada();
 
           return currentMessages.filter(m => {
-            // Filtro de turno: si hay un turno activo específico, priorizar mensajes del turno
-            if (activeShiftId && activeShiftId !== 'shift-active' && m.shiftId && m.shiftId !== 'shift-active') {
-              if (m.shiftId !== activeShiftId) return false;
-            } else {
-              // Si no hay shiftId específico, descartar mensajes de jornadas pasadas (>24 horas)
-              const msgTime = new Date(m.createdAt).getTime();
-              if (now - msgTime > TWENTY_FOUR_HOURS) return false;
-            }
-
             // Descartar señales internas de señalización de la vista del chat
             if (m.type === 'call_signal_ringing' || m.type === 'call_signal_connected') {
               return false;
             }
 
+            // 🛡️ REGLA ESTRICTA: El mensaje DEBE ser de la FECHA ACTIVA
+            const msgDate = m.date || getMessageDate(m.createdAt);
+            if (msgDate !== todayDate) {
+              return false;
+            }
+
+            // 🛡️ REGLA ESTRICTA: El mensaje DEBE ser de la JORNADA ACTIVA (AM vs PM)
+            const msgJornada = m.jornada || getMessageJornada(m.createdAt);
+            if (msgJornada !== currentJornada) {
+              return false;
+            }
+
+            // Filtro de turno: si hay un turno activo específico, priorizar mensajes del turno
+            if (activeShiftId && activeShiftId !== 'shift-active' && m.shiftId && m.shiftId !== 'shift-active') {
+              if (m.shiftId !== activeShiftId) return false;
+            }
+
             // Si la conversación seleccionada es 'ALL' (Canal General)
             if (!userBId || userBId === 'ALL') {
-              return true; // Muestra todo el canal de radio del turno activo
+              return true; // Muestra todo el canal de radio de la jornada activa
             }
 
             // Para canal individual (ej: T1, T2, etc.)
