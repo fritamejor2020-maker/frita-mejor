@@ -252,17 +252,22 @@ export function PosView() {
     const cust = (customers || []).find(c => c.id === s.customerId);
     return {
       id: s.id,
-      customerName: s.customerName || cust?.name || (s.customerId ? 'Cliente' : 'Venta Pausada'),
+      customerName: s.customerName || cust?.name || (s.isLuckyWinner ? 'Cliente Ganador Raspa y Gana' : (s.customerId ? 'Cliente' : 'Venta Pausada')),
       customerId: s.customerId || '',
       customerPhone: s.customerPhone || cust?.phone || '',
       deliveryAddress: s.deliveryAddress || cust?.address || '',
       serviceType: s.serviceType || 'DELIVERY',
       items: s.items || [],
       subtotal: s.subtotal || 0,
+      discountPercent: s.discountPercent || 0,
+      discountAmount: s.discountAmount || 0,
       total: s.total || 0,
       heldAt: s.heldAt || s.timestamp || new Date().toISOString(),
       isOlaClick: !!s.isOlaClick,
-      publicId: s.publicId || (s.id ? s.id.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').slice(-6) : 'N/A')
+      isLuckyWinner: !!s.isLuckyWinner,
+      prizeType: s.prizeType || 'RASPA_Y_GANA',
+      discountPercentage: s.discountPercentage || 10,
+      publicId: s.publicId || (s.id ? s.id.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').replace('HELD-LUCKY-', '').slice(-6) : 'N/A')
     };
   }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
 
@@ -880,55 +885,96 @@ export function PosView() {
       } : {}),
     };
     
+    // ── EVALUAR CAMPANA DE LA SUERTE & PREMIACIÓN ALEATORIA (SOLO PARA VENTAS NUEVAS) ──
+    let isLuckyWinner = false;
+    let rewardConfig = null;
+
+    if (!activeSuspendedId) {
+      try {
+        const userBranch = user?.branchId || 'GLOBAL';
+        const branchRewardsConfig = posSettings?.luckyRewardsConfig?.[userBranch] || posSettings?.luckyRewardsConfig?.['GLOBAL'] || {};
+        rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
+
+        if (rewardConfig && rewardConfig.enabled) {
+          const minAmount = rewardConfig.minPurchaseAmount || 0;
+          if (total >= minAmount) {
+            const now = new Date();
+            const hour = now.getHours();
+            let currentSlot = '16-19';
+            if (hour >= 6 && hour < 10) currentSlot = '06-10';
+            else if (hour >= 10 && hour < 12) currentSlot = '10-12';
+            else if (hour >= 12 && hour < 14) currentSlot = '12-14';
+            else if (hour >= 14 && hour < 16) currentSlot = '14-16';
+            else if (hour >= 16 && hour < 19) currentSlot = '16-19';
+            else if (hour >= 19 && hour < 21) currentSlot = '19-21';
+
+            const slotPercent = rewardConfig.hourlyDistribution?.[currentSlot] ?? 20;
+            const dailyTotal = rewardConfig.dailyPrizes || 100;
+            const slotQuota = Math.max(1, Math.round((dailyTotal * slotPercent) / 100));
+
+            // Probabilidad de ganar ponderada por cuota del horario
+            const probability = Math.min(0.85, Math.max(0.1, slotQuota / 35));
+            isLuckyWinner = Math.random() < probability;
+          }
+        }
+      } catch (luckyErr) {
+        console.error('[LuckyRewards] Error al evaluar premio:', luckyErr);
+      }
+    }
+
+    // ── SI ES GANADOR: PAUSAR VENTA EN ESPERA PARA QUE EL CLIENTE RASPE ANTES DE COBRAR ──
+    if (isLuckyWinner) {
+      playVictoryChime();
+
+      const suspendedWinnerSale = {
+        id: `HELD-LUCKY-${Date.now()}`,
+        customerId: selectedCustomer || null,
+        customerName: saleCustomer?.name || (selectedCustomer ? 'Cliente' : 'Cliente Ganador Raspa y Gana'),
+        customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
+        deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
+        serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+        isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+        publicId: pendingDeliveryInfo?.publicId || null,
+        items: [...ticketItems],
+        subtotal,
+        discountPercent,
+        discountAmount,
+        total,
+        status: 'SUSPENDED',
+        isLuckyWinner: true,
+        prizeType: rewardConfig?.prizeType || 'RASPA_Y_GANA',
+        discountPercentage: rewardConfig?.discountPercentage || 10,
+        timestamp: new Date().toISOString(),
+        heldAt: new Date().toISOString(),
+        shiftId: activeShift?.id,
+        registerId: selectedRegisterId,
+        userName: activeShift?.userName || user?.name || 'PRINCIPAL'
+      };
+
+      addPosSale(suspendedWinnerSale);
+
+      setWinnerInfo({
+        prizeType: rewardConfig?.prizeType || 'RASPA_Y_GANA',
+        discountPercentage: rewardConfig?.discountPercentage || 10,
+        customerName: saleCustomer?.name || 'Cliente',
+        amount: total
+      });
+      setShowLuckyWinnerModal(true);
+
+      // Limpiar ticket para seguir atendiendo la fila mientras el cliente raspa
+      setTicketItems([]);
+      setActiveSuspendedId(null);
+      setSelectedCustomer('');
+      setPendingDeliveryInfo(null);
+      return;
+    }
+
     if (activeSuspendedId) {
       try { deleteHeldSale(activeSuspendedId); } catch(e) {}
       try { deletePosSale(activeSuspendedId); } catch(e) {}
       addPosSale(saleData);
     } else {
       addPosSale(saleData);
-    }
-
-    // ── EVALUAR CAMPANA DE LA SUERTE & PREMIACIÓN ALEATORIA ──
-    try {
-      const userBranch = user?.branchId || 'GLOBAL';
-      const branchRewardsConfig = posSettings?.luckyRewardsConfig?.[userBranch] || posSettings?.luckyRewardsConfig?.['GLOBAL'] || {};
-      const rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
-
-      if (rewardConfig && rewardConfig.enabled) {
-        const minAmount = rewardConfig.minPurchaseAmount || 0;
-        if (total >= minAmount) {
-          const now = new Date();
-          const hour = now.getHours();
-          let currentSlot = '16-19';
-          if (hour >= 6 && hour < 10) currentSlot = '06-10';
-          else if (hour >= 10 && hour < 12) currentSlot = '10-12';
-          else if (hour >= 12 && hour < 14) currentSlot = '12-14';
-          else if (hour >= 14 && hour < 16) currentSlot = '14-16';
-          else if (hour >= 16 && hour < 19) currentSlot = '16-19';
-          else if (hour >= 19 && hour < 21) currentSlot = '19-21';
-
-          const slotPercent = rewardConfig.hourlyDistribution?.[currentSlot] ?? 20;
-          const dailyTotal = rewardConfig.dailyPrizes || 100;
-          const slotQuota = Math.max(1, Math.round((dailyTotal * slotPercent) / 100));
-
-          // Probabilidad de ganar ponderada por cuota del horario
-          const probability = Math.min(0.85, Math.max(0.1, slotQuota / 35));
-          const isLuckyWinner = Math.random() < probability;
-
-          if (isLuckyWinner) {
-            playVictoryChime();
-            setWinnerInfo({
-              prizeType: rewardConfig.prizeType || 'RASPA_Y_GANA',
-              discountPercentage: rewardConfig.discountPercentage || 10,
-              customerName: saleCustomer?.name || 'Cliente',
-              amount: total
-            });
-            setShowLuckyWinnerModal(true);
-          }
-        }
-      }
-    } catch (luckyErr) {
-      console.error('[LuckyRewards] Error al evaluar premio:', luckyErr);
     }
     
     // Clear ticket
@@ -2027,19 +2073,30 @@ export function PosView() {
                   {allHeldAndSuspended.map((sale) => (
                     <div 
                       key={sale.id}
-                      className="bg-[#181a24] border border-gray-800 rounded-2xl p-4 flex flex-col justify-between hover:border-gray-700 transition-all shadow-md"
+                      className={`rounded-2xl p-4 flex flex-col justify-between transition-all shadow-md ${
+                        sale.isLuckyWinner
+                          ? 'bg-gradient-to-br from-amber-500/10 via-[#181a24] to-[#12131a] border-2 border-amber-500/70 shadow-[0_0_20px_rgba(245,158,11,0.15)]'
+                          : 'bg-[#181a24] border border-gray-800 hover:border-gray-700'
+                      }`}
                     >
                       <div>
                         <div className="flex items-start justify-between gap-2 pb-2 border-b border-gray-800">
                           <div>
-                            <span className="font-black text-sm text-white flex items-center gap-1.5">
-                              {sale.customerName}
+                            <div className="flex items-center flex-wrap gap-1.5 mb-1">
+                              <span className="font-black text-sm text-white">
+                                {sale.customerName}
+                              </span>
+                              {sale.isLuckyWinner && (
+                                <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 animate-pulse">
+                                  🎟️ GANADOR RASPA Y GANA
+                                </span>
+                              )}
                               {sale.isOlaClick && (
                                 <span className="bg-yellow-500/10 text-yellow-400 text-[10px] px-2 py-0.5 rounded-full font-bold">
                                   📱 OlaClick
                                 </span>
                               )}
-                            </span>
+                            </div>
                             <span className="text-[11px] text-gray-400 font-semibold block mt-0.5">
                               {sale.publicId ? `#${sale.publicId}` : sale.id} • {new Date(sale.heldAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
                             </span>
@@ -2073,18 +2130,23 @@ export function PosView() {
                           onClick={() => {
                             handleLoadSuspended(sale);
                           }}
-                          className="flex-1 bg-green-600 hover:bg-green-500 text-white font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                          className={`flex-1 font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 ${
+                            sale.isLuckyWinner
+                              ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 shadow-amber-500/20'
+                              : 'bg-green-600 hover:bg-green-500 text-white'
+                          }`}
                         >
-                          ▶️ Retomar Pedido
+                          {sale.isLuckyWinner ? '🎯 Recuperar y Ajustar Premio' : '▶️ Retomar Pedido'}
                         </button>
                         <button
                           onClick={() => {
-                            deleteHeldSale(sale.id);
-                            deletePosSale(sale.id);
-                            toast.error('Venta en espera eliminada');
+                            if (confirm('¿Eliminar esta venta en espera?')) {
+                              deleteHeldSale(sale.id);
+                              deletePosSale(sale.id);
+                            }
                           }}
-                          className="bg-red-500/10 hover:bg-red-500/20 text-red-400 font-bold text-xs p-2.5 rounded-xl border border-red-500/20 active:scale-95 transition-all"
-                          title="Eliminar de ventas en espera"
+                          className="w-10 h-10 rounded-xl bg-red-950/40 border border-red-900/30 text-red-400 hover:bg-red-900/60 hover:text-red-300 flex items-center justify-center text-xs active:scale-95 transition-all"
+                          title="Eliminar de espera"
                         >
                           🗑️
                         </button>
@@ -3444,24 +3506,30 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
           ) : (
             sales.map(s => {
               const cust = (customers || []).find(c => c.id === s.customerId);
-              const custName = cust?.name || 'Cliente General';
+              const custName = cust?.name || (s.isLuckyWinner ? 'Cliente Ganador Raspa y Gana' : 'Cliente General');
               const isContrata = cust?.typeId;
+              const isWinner = !!s.isLuckyWinner;
               return (
-                <div key={s.id} className="bg-[#16171d] border border-gray-800 rounded-[24px] p-5 hover:border-gray-600 transition-all hover:shadow-lg group">
+                <div key={s.id} className={`rounded-[24px] p-5 transition-all hover:shadow-lg group ${isWinner ? 'bg-gradient-to-r from-amber-500/10 to-[#16171d] border-2 border-amber-500/70 shadow-[0_0_20px_rgba(245,158,11,0.2)]' : 'bg-[#16171d] border border-gray-800 hover:border-gray-600'}`}>
                   <div className="flex justify-between items-center">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center flex-wrap gap-2 mb-1">
                         <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${isContrata ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
                           {isContrata ? '🤝' : '👤'} {custName}
                         </span>
+                        {isWinner && (
+                          <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black px-2.5 py-0.5 rounded-lg animate-pulse">
+                            🎟️ GANADOR RASPA Y GANA
+                          </span>
+                        )}
                       </div>
                       <h3 className="font-black text-white text-lg">Total: <span className="text-chunky-main">{formatMoney(s.total)}</span></h3>
                       <p className="text-xs text-gray-400 font-bold">Fecha: {new Date(s.timestamp).toLocaleString('es-CO')}</p>
-                      <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items.length} ítem(s) guardados.</p>
+                      <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items?.length || 0} ítem(s) guardados.</p>
                     </div>
                     <div className="flex flex-col gap-2 shrink-0 ml-3">
-                      <Button className="rounded-[16px] bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 py-2.5 shadow-[0_4px_14px_0_rgba(37,99,235,0.39)] active:scale-95 transition-all text-sm" onClick={() => onLoad(s)}>
-                        Recuperar
+                      <Button className={`rounded-[16px] font-black px-5 py-2.5 active:scale-95 transition-all text-sm ${isWinner ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)]' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_4px_14px_0_rgba(37,99,235,0.39)]'}`} onClick={() => onLoad(s)}>
+                        {isWinner ? '🎯 Recuperar Premio' : 'Recuperar'}
                       </Button>
                       <button className="rounded-[16px] bg-red-950/40 hover:bg-red-900/60 text-red-400 font-bold px-5 py-2 active:scale-95 transition-all text-xs border border-red-900/30" onClick={() => { if (confirm('¿Eliminar esta venta en espera?')) onDelete(s.id); }}>
                         🗑️ Eliminar
@@ -4151,14 +4219,22 @@ function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
         </p>
 
         {winnerInfo.prizeType === 'RASPA_Y_GANA' ? (
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 mb-6 text-center space-y-2">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-2xl p-5 mb-6 text-center space-y-3">
             <span className="text-4xl block">🎟️</span>
             <h3 className="text-base font-black text-amber-300 uppercase tracking-wide">
               ¡Entregar Tarjeta Raspa y Gana!
             </h3>
-            <p className="text-xs text-gray-400 font-semibold">
-              Entrega una tarjeta física de regalo al cliente por su compra de {formatMoney(winnerInfo.amount)}.
-            </p>
+            <div className="text-xs text-gray-300 font-semibold space-y-1.5 text-left bg-black/30 p-3.5 rounded-xl border border-amber-500/20">
+              <p className="flex items-center gap-1.5">
+                <span className="text-amber-400 font-black">1.</span> Entrega una tarjeta de Raspa y Gana al cliente.
+              </p>
+              <p className="flex items-center gap-1.5">
+                <span className="text-amber-400 font-black">2.</span> La venta se guardó en <strong className="text-amber-300">Ventas en Espera</strong>.
+              </p>
+              <p className="flex items-center gap-1.5">
+                <span className="text-amber-400 font-black">3.</span> Cuando raspe, ve a <strong className="text-amber-300">En Espera</strong>, presiona <strong className="text-blue-400">Recuperar</strong> y ajusta el pedido (descuento, producto en $0 o regalo) antes de cobrar.
+              </p>
+            </div>
           </div>
         ) : (
           <div className="bg-purple-500/10 border border-purple-500/30 rounded-2xl p-5 mb-6 text-center space-y-2">
@@ -4176,7 +4252,7 @@ function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
           onClick={onClose}
           className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 font-black text-base py-4 rounded-2xl shadow-xl active:scale-95 transition-all"
         >
-          ¡Entendido y Continuar!
+          ¡Entendido, Continuar con la Fila!
         </button>
 
       </div>
