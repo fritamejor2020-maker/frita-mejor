@@ -198,6 +198,8 @@ export function PosView() {
   const [ticketItems, setTicketItems]     = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [activeSuspendedId, setActiveSuspendedId] = useState(null);
+  const [manualDiscountPercent, setManualDiscountPercent] = useState(0);
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
 
   // Modal & Print states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -386,7 +388,7 @@ export function PosView() {
 
   // -- CALCULATIONS --
   const customer = customers?.find(c => c.id === selectedCustomer);
-  const discountPercent = customer?.discountPercent || 0;
+  const discountPercent = manualDiscountPercent > 0 ? manualDiscountPercent : (customer?.discountPercent || 0);
   
   // Helper to resolve effective special price for any product based on selected customer & type
   const getEffectivePrice = (item, custObj = customer, cTypes = customerTypes) => {
@@ -821,6 +823,7 @@ export function PosView() {
     setTicketItems(sale.items || []);
     setSelectedCustomer(sale.customerId || '');
     setActiveSuspendedId(sale.id);
+    setManualDiscountPercent(sale.discountPercent || (sale.isLuckyWinner && sale.prizeType === 'DISCOUNT' ? (sale.discountPercentage || 0) : 0));
     setPendingDeliveryInfo({
       customerName: sale.customerName || '',
       customerPhone: sale.customerPhone || '',
@@ -1444,6 +1447,19 @@ export function PosView() {
           })()}
         </div>
 
+        {/* Banner si la venta viene de Raspa y Gana */}
+        {activeSuspendedId && String(activeSuspendedId).includes('LUCKY') && (
+          <div className="mx-3 mt-2 p-3 bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-transparent border border-amber-500/50 rounded-2xl text-xs space-y-1.5 shadow-lg shadow-amber-500/5 animate-pulse">
+            <div className="flex items-center gap-2 font-black text-amber-300">
+              <span className="text-base">🎟️</span>
+              <span className="uppercase tracking-wider">Venta Ganadora de Raspa y Gana</span>
+            </div>
+            <p className="text-[11px] text-gray-200 font-medium leading-relaxed">
+              Usa el botón <strong className="text-green-400">🎁 $0</strong> en un producto para dejarlo gratis, o usa <strong className="text-amber-300">🏷️ Descuento %</strong> para aplicar descuento antes de cobrar.
+            </p>
+          </div>
+        )}
+
         {/* Ticket Items List */}
         <div className="flex-1 overflow-y-auto p-2 scrollbar-thin">
           {ticketItems.length === 0 ? (
@@ -1452,22 +1468,59 @@ export function PosView() {
               <p className="mt-4 font-bold text-sm uppercase tracking-wider">Añade productos</p>
             </div>
           ) : (
-            <div className="space-y-1">
+            <div className="space-y-1.5">
               {ticketItems.map(item => (
-                <div key={item.id} className="flex items-center gap-2 p-2 bg-[#1e1f26] rounded-xl border border-transparent hover:border-gray-700 transition-all">
+                <div key={item.id} className={`flex items-center gap-2 p-2.5 rounded-xl border transition-all ${item.price === 0 ? 'bg-green-500/10 border-green-500/40 shadow-sm' : 'bg-[#1e1f26] border-transparent hover:border-gray-700'}`}>
                   {/* Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex justify-between items-center">
                       <span className="font-bold text-sm truncate">{item.name}</span>
-                      <span className="font-black text-sm text-chunky-secondary shrink-0 ml-2">{formatMoney(item.price * item.qty)}</span>
+                      <span className={`font-black text-sm shrink-0 ml-2 ${item.price === 0 ? 'text-green-400' : 'text-chunky-secondary'}`}>{formatMoney(item.price * item.qty)}</span>
                     </div>
-                    <div className="flex items-center justify-between mt-1">
-                      <span className={`text-[10px] font-bold ${item.isCustomPrice ? 'text-amber-500' : 'text-gray-500'}`}>
-                        {formatMoney(item.price)} c/u
-                        {item.isCustomPrice && <span className="ml-1 bg-amber-500/20 text-amber-500 px-1 rounded">VIP</span>}
-                      </span>
+                    <div className="flex items-center justify-between mt-1.5 gap-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTicketItems(prev => prev.map(i => {
+                              if (i.id === item.id) {
+                                const isCurrentlyZero = i.price === 0;
+                                return {
+                                  ...i,
+                                  price: isCurrentlyZero ? (i.originalPrice || item.price || 0) : 0,
+                                  isCustomPrice: !isCurrentlyZero
+                                };
+                              }
+                              return i;
+                            }));
+                          }}
+                          className={`text-[9px] font-black px-2 py-0.5 rounded-md transition-all active:scale-95 flex items-center gap-1 ${
+                            item.price === 0
+                              ? 'bg-green-500 text-gray-950 font-black shadow-sm'
+                              : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
+                          }`}
+                          title={item.price === 0 ? 'Restaurar precio original' : 'Poner este producto en $0 (Regalo de Raspa y Gana)'}
+                        >
+                          {item.price === 0 ? '🎁 GRATIS ($0)' : '🎁 Poner $0'}
+                        </button>
+                        <span 
+                          className={`text-[10px] font-bold cursor-pointer hover:underline select-none ${item.price === 0 ? 'text-green-400 font-black' : item.isCustomPrice ? 'text-amber-500' : 'text-gray-400'}`}
+                          onClick={() => {
+                            const customPriceStr = prompt(`Ingresa nuevo precio unitario para ${item.name}:`, String(item.price));
+                            if (customPriceStr !== null) {
+                              const p = parseFloat(customPriceStr);
+                              if (!isNaN(p) && p >= 0) {
+                                setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p, isCustomPrice: true } : i));
+                              }
+                            }
+                          }}
+                          title="Clic para cambiar precio manualmente"
+                        >
+                          {formatMoney(item.price)} c/u
+                        </span>
+                      </div>
                       {/* Qty controls */}
-                      <div className="flex items-center bg-[#0c0d11] rounded-lg border border-gray-800">
+                      <div className="flex items-center bg-[#0c0d11] rounded-lg border border-gray-800 shrink-0">
                         <button className="w-8 h-8 flex items-center justify-center text-gray-400 active:text-white active:bg-gray-700 rounded-l-lg transition-colors" onClick={() => handleQtyChange(item.id, -1)}>
                           <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
                         </button>
@@ -1500,19 +1553,30 @@ export function PosView() {
             <span>Subtotal</span>
             <span>{formatMoney(subtotal)}</span>
           </div>
-          {discountPercent > 0 && (
-            <div className="flex justify-between items-center text-sm font-bold text-orange-400">
-              <span>Descuento ({discountPercent}%)</span>
-              <span>-{formatMoney(discountAmount)}</span>
-            </div>
-          )}
+
+          <div className="flex justify-between items-center text-sm font-bold">
+            <button 
+              type="button"
+              onClick={() => setShowDiscountModal(true)}
+              className="text-xs font-black text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all"
+              title="Aplicar o cambiar descuento % a toda la venta"
+            >
+              🏷️ {discountPercent > 0 ? `Descuento: ${discountPercent}% (Cambiar)` : 'Aplicar Descuento %'}
+            </button>
+            {discountPercent > 0 ? (
+              <span className="text-orange-400 font-bold">-{formatMoney(discountAmount)}</span>
+            ) : (
+              <span className="text-gray-600 text-xs">$0</span>
+            )}
+          </div>
+
           <div className="flex justify-between items-end mt-2 pt-2 border-t border-gray-800">
             <span className="text-xl font-black uppercase tracking-wider text-gray-300">Total</span>
             <span className="text-4xl font-black text-white">{formatMoney(total)}</span>
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); setSelectedCustomer(''); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); setSelectedCustomer(''); setManualDiscountPercent(0); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
               <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
@@ -1851,6 +1915,14 @@ export function PosView() {
           winnerInfo={winnerInfo}
           formatMoney={formatMoney}
           onClose={() => setShowLuckyWinnerModal(false)}
+        />
+      )}
+
+      {showDiscountModal && (
+        <DiscountModal
+          currentDiscount={discountPercent}
+          onApply={(pct) => setManualDiscountPercent(pct)}
+          onClose={() => setShowDiscountModal(false)}
         />
       )}
 
@@ -4255,6 +4327,91 @@ function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
           ¡Entendido, Continuar con la Fila!
         </button>
 
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Rápido de Descuentos (%) para Caja & Premios ───
+function DiscountModal({ currentDiscount, onApply, onClose }) {
+  const [customVal, setCustomVal] = useState(currentDiscount ? String(currentDiscount) : '');
+  const presets = [5, 10, 15, 20, 25, 50, 100];
+
+  return (
+    <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-[#1a1b24] border border-amber-500/40 rounded-[28px] max-w-sm w-full p-6 shadow-2xl space-y-5 animate-bounce-in">
+        <div className="flex justify-between items-center pb-3 border-b border-gray-800">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">🏷️</span>
+            <h3 className="font-black text-lg text-white">Aplicar Descuento</h3>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-white font-bold text-lg">✕</button>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-400 font-semibold mb-2">Porcentajes rápidos:</p>
+          <div className="grid grid-cols-4 gap-2">
+            {presets.map(p => (
+              <button
+                key={p}
+                onClick={() => { onApply(p); onClose(); }}
+                className={`py-2.5 rounded-xl font-black text-xs transition-all active:scale-95 ${
+                  currentDiscount === p
+                    ? 'bg-amber-500 text-gray-950 shadow-md'
+                    : 'bg-[#252836] text-gray-200 hover:bg-amber-500/20 hover:text-amber-300 border border-gray-700'
+                }`}
+              >
+                {p}%
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="text-xs text-gray-400 font-semibold mb-2">O escribe un porcentaje personalizado (%):</p>
+          <div className="flex gap-2">
+            <input
+              type="number"
+              min="0"
+              max="100"
+              placeholder="Ej. 35"
+              value={customVal}
+              onChange={(e) => setCustomVal(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const num = parseFloat(customVal);
+                  if (!isNaN(num) && num >= 0 && num <= 100) {
+                    onApply(num);
+                    onClose();
+                  }
+                }
+              }}
+              className="flex-1 bg-[#121318] border border-gray-700 rounded-xl px-4 py-2 text-white font-black text-base outline-none focus:border-amber-500"
+              autoFocus
+            />
+            <button
+              onClick={() => {
+                const num = parseFloat(customVal);
+                if (!isNaN(num) && num >= 0 && num <= 100) {
+                  onApply(num);
+                  onClose();
+                }
+              }}
+              className="bg-amber-500 hover:bg-amber-400 text-gray-950 font-black px-4 py-2 rounded-xl text-xs active:scale-95 transition-all"
+            >
+              Aplicar
+            </button>
+          </div>
+        </div>
+
+        {currentDiscount > 0 && (
+          <button
+            onClick={() => { onApply(0); onClose(); }}
+            className="w-full py-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 text-red-400 border border-red-900/30 font-bold text-xs active:scale-95 transition-all"
+          >
+            Quitar Descuento (0%)
+          </button>
+        )}
       </div>
     </div>
   );
