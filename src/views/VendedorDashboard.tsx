@@ -551,7 +551,7 @@ export const VendedorDashboard = () => {
           last_rejection_reason: reason,
           status: 'pending'
         };
-        toast.info(reason === 'out_of_stock' ? `Reasignando a ${formattedNextName} por falta de stock 📦` : `Reasignado a ${formattedNextName} 🛵`);
+        toast(reason === 'out_of_stock' ? `Reasignando a ${formattedNextName} por falta de stock 📦` : `Reasignado a ${formattedNextName} 🛵`, { icon: '🔄' });
       } else {
         updatedOrder = {
           ...order,
@@ -560,7 +560,7 @@ export const VendedorDashboard = () => {
           rejection_reason: reason === 'out_of_stock' ? 'out_of_stock' : 'no_vendors_available',
           status: 'rejected'
         };
-        toast.info(reason === 'out_of_stock' ? 'Rechazado por falta de stock.' : 'Pedido rechazado localmente.');
+        toast(reason === 'out_of_stock' ? 'Rechazado por falta de stock 📦' : 'Pedido rechazado localmente ❌', { icon: '⚠️' });
       }
 
       const updatedOrders = [...currentOrders];

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import * as XLSX from 'xlsx';
 import { Button } from '../../components/ui/Button';
+import { toast } from 'react-hot-toast';
 import { useAuthStore, ROLE_ACCESS } from '../../store/useAuthStore';
 import { uploadProductImage } from '../../lib/storageUtils';
 import { useInventoryStore, INITIAL_ITEM_TYPES } from '../../store/useInventoryStore';
@@ -1340,7 +1341,20 @@ export function InventoryPanel({ branchId, onOpenItemTypes }) {
                     inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined
                   });
                 }}
-                onSave={() => { updateInventoryItem(item.id, { ...form, qty: parseFloat(form.qty) || 0, alert: parseFloat(form.alert) || 0, price: parseFloat(form.price) || 0, type: form.type || 'PRODUCTO', variablePrice: form.variablePrice === 'true' || form.variablePrice === true, referencePrice: parseFloat(form.referencePrice) || 0, inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined }); setEditingId(null); }}
+                onSave={() => {
+                  updateInventoryItem(item.id, {
+                    ...form,
+                    qty: parseFloat(form.qty) || 0,
+                    alert: parseFloat(form.alert) || 0,
+                    price: parseFloat(form.price) || 0,
+                    type: form.type || 'PRODUCTO',
+                    variablePrice: form.variablePrice === 'true' || form.variablePrice === true,
+                    referencePrice: parseFloat(form.referencePrice) || 0,
+                    inTricycles: form.inTricycles === 'true' || form.inTricycles === true || form.inTricycles === undefined
+                  });
+                  toast.success('💾 Cambios guardados y sincronizados');
+                  setEditingId(null);
+                }}
                 onCancel={() => setEditingId(null)} />
             </div>
           ) : (
