@@ -539,7 +539,7 @@ ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, passwo
 
     // Sincronizar actualización de contrato inmediatamente en Supabase
     try {
-      const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').single();
+      const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').maybeSingle();
       let currentContracts = contractState?.value || [];
       if (Array.isArray(currentContracts)) {
         let found = false;
@@ -666,8 +666,8 @@ async function fetchBiometricUsersFromDevice() {
 
     // Sincronizar automáticamente contratos en Supabase de forma 100% autónoma por Electron
     try {
-      const { data: st1 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').single();
-      const { data: st2 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').single();
+      const { data: st1 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').maybeSingle();
+      const { data: st2 } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').maybeSingle();
       let currentContracts = (st1?.value && Array.isArray(st1.value) && st1.value.length > 0) ? st1.value : (st2?.value || []);
       if (!Array.isArray(currentContracts)) currentContracts = [];
 

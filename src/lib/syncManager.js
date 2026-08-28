@@ -451,7 +451,7 @@ export async function pull(key, branchId = null) {
     .from('app_state')
     .select('value')
     .eq('key', supabaseKey)
-    .single();
+    .maybeSingle();
   if (error || !data) return null;
   return data.value;
 }
