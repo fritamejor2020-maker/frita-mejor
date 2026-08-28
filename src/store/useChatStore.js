@@ -174,15 +174,15 @@ export const useChatStore = create(
           const myId = String(myUserId || '').toLowerCase();
           const cleanMyId = myId.replace(/[^a-z0-9]/g, '');
           const target = targetUserId ? String(targetUserId).toLowerCase() : null;
-          const isDejador = myId === 'dejador';
+          const isDejador = myId === 'dejador' || cleanMyId === 'dejador';
           const todayDate = targetDate || getCurrentDate();
           const currentJornada = targetJornada || getCurrentJornada();
           let changed = false;
 
           const updated = (get().messages || []).map(m => {
-            // Si ya fue marcado como leído por este usuario
             const readByList = Array.isArray(m.readBy) ? m.readBy : [];
-            if (m.read && (!isDejador || readByList.includes(cleanMyId))) return m;
+            // Si ya fue marcado como leído por este usuario, no procesar de nuevo
+            if (cleanMyId && (readByList.includes(cleanMyId) || readByList.includes(myId))) return m;
 
             // 🛡️ Solo marcar leídos los de la jornada activa
             const msgDate = m.date || getMessageDate(m.createdAt);
@@ -199,7 +199,7 @@ export const useChatStore = create(
             const cleanReceiver = receiver.replace(/[^a-z0-9]/g, '');
 
             // Ignorar mensajes propios
-            if (sender === myId || point === myId || cleanSender === cleanMyId || cleanPoint === cleanMyId) return m;
+            if (sender === myId || point === myId || (cleanMyId && (cleanSender === cleanMyId || cleanPoint === cleanMyId))) return m;
 
             // Verificar si el mensaje era para mí o mi rol
             const isForMe =
@@ -220,16 +220,10 @@ export const useChatStore = create(
                                     cleanPoint === cleanTarget || 
                                     cleanReceiver === cleanTarget ||
                                     (cleanTarget && cleanSender.includes(cleanTarget)) ||
-                                    (cleanTarget && cleanPoint.includes(cleanTarget));
+                                    (cleanTarget && cleanPoint.includes(cleanTarget)) ||
+                                    receiver === 'all';
 
               if (matchesTarget) {
-                changed = true;
-                const newReadBy = [...new Set([...readByList, cleanMyId, myId])];
-                return { ...m, read: true, readBy: newReadBy };
-              }
-            } else if (target === 'all') {
-              // Viendo Canal General ('ALL'): SOLO marcar como leídos los mensajes dirigidos a Canal General ('ALL')
-              if (receiver === 'all') {
                 changed = true;
                 const newReadBy = [...new Set([...readByList, cleanMyId, myId])];
                 return { ...m, read: true, readBy: newReadBy };

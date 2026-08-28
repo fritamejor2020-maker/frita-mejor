@@ -1076,10 +1076,21 @@ export const VendedorDashboard = () => {
     return true;
   }).length;
 
-  const activeOrdersCount = Math.max(pendingOrdersCount, pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
   const chatMessages = useChatStore(state => state.messages);
   const getUnreadCount = useChatStore(state => state.getUnreadCount);
+  const markAsRead = useChatStore(state => state.markAsRead);
   const chatUnreadCount = getUnreadCount(pointId || trackingId || (user as any)?.username || (user as any)?.id || 'T1');
+
+  // Limpiar contador rojo de mensajes no leídos al abrir la pestaña de Chat
+  useEffect(() => {
+    if (activeTab === 'chat') {
+      const myId = pointId || trackingId || (user as any)?.username || (user as any)?.id || 'T1';
+      markAsRead(myId, 'DEJADOR');
+      markAsRead(myId, 'ALL');
+    }
+  }, [activeTab, chatMessages.length]);
+
+  const activeOrdersCount = Math.max(pendingOrdersCount, pendingDelivery ? 1 : 0) + (activeDelivery ? 1 : 0);
 
   const tabs = [
     { id: 'pos', label: 'Venta', icon: <Calculator size={24} /> },
