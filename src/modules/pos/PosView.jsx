@@ -4296,16 +4296,19 @@ function LuckyWinnerModal({ winnerInfo, formatMoney, onClose }) {
             <h3 className="text-base font-black text-amber-300 uppercase tracking-wide">
               ¡Entregar Tarjeta Raspa y Gana!
             </h3>
-            <div className="text-xs text-gray-300 font-semibold space-y-1.5 text-left bg-black/30 p-3.5 rounded-xl border border-amber-500/20">
-              <p className="flex items-center gap-1.5">
-                <span className="text-amber-400 font-black">1.</span> Entrega una tarjeta de Raspa y Gana al cliente.
-              </p>
-              <p className="flex items-center gap-1.5">
-                <span className="text-amber-400 font-black">2.</span> La venta se guardó en <strong className="text-amber-300">Ventas en Espera</strong>.
-              </p>
-              <p className="flex items-center gap-1.5">
-                <span className="text-amber-400 font-black">3.</span> Cuando raspe, ve a <strong className="text-amber-300">En Espera</strong>, presiona <strong className="text-blue-400">Recuperar</strong> y ajusta el pedido (descuento, producto en $0 o regalo) antes de cobrar.
-              </p>
+            <div className="text-xs text-gray-200 font-semibold space-y-2.5 text-left bg-black/40 p-4 rounded-2xl border border-amber-500/30">
+              <div className="flex items-start gap-2.5">
+                <span className="bg-amber-500/20 text-amber-300 font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px] border border-amber-500/40 mt-0.5">1</span>
+                <p className="leading-snug text-gray-200">Entrega una tarjeta física de Raspa y Gana al cliente.</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="bg-amber-500/20 text-amber-300 font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px] border border-amber-500/40 mt-0.5">2</span>
+                <p className="leading-snug text-gray-200">La venta se guardó en <strong className="text-amber-300">Ventas en Espera</strong>.</p>
+              </div>
+              <div className="flex items-start gap-2.5">
+                <span className="bg-amber-500/20 text-amber-300 font-black w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[11px] border border-amber-500/40 mt-0.5">3</span>
+                <p className="leading-snug text-gray-200">Cuando raspe su premio, ve a <strong className="text-amber-300">En Espera</strong>, presiona <strong className="text-blue-400">Recuperar</strong> y ajusta el pedido (descuento, producto en $0 o regalo) antes de cobrar.</p>
+              </div>
             </div>
           </div>
         ) : (
