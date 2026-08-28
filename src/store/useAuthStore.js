@@ -180,6 +180,7 @@ export const useAuthStore = create(
       loading: false,
       error:   null,
       users:   DEFAULT_USERS, // todos los usuarios del sistema
+      deletedUserIds: [],
 
       getActiveBranchId: () => {
         const s = get();
@@ -190,34 +191,39 @@ export const useAuthStore = create(
         set({ activeBranchId: branchId });
       },
 
-      // ─── Cargar usuarios de Supabase (Fuente de Verdad + Auto-Curación) ───────────
+      // ─── Cargar usuarios de Supabase (Fuente de Verdad + Inmunidad Anti-Resurrección) ───────────
       loadFromRemote: async () => {
         try {
           const { data } = await supabase
             .from('app_state')
-            .select('value')
-            .eq('key', 'users')
-            .maybeSingle();
+            .select('key, value')
+            .in('key', ['users', 'deletedUserIds']);
 
-          const remoteUsers = (data && Array.isArray(data.value)) ? data.value : [];
-          const currentLocalUsers = get().users || [];
+          const usersRow = data?.find((d) => d.key === 'users');
+          const deletedRow = data?.find((d) => d.key === 'deletedUserIds');
 
-          const userMap = new Map();
-          DEFAULT_USERS.forEach(u => userMap.set(u.id, u));
-          currentLocalUsers.forEach(u => { if (u?.id) userMap.set(u.id, u); });
-          remoteUsers.forEach(u => { if (u?.id) userMap.set(u.id, u); });
+          const remoteUsers = (usersRow && Array.isArray(usersRow.value)) ? usersRow.value : [];
+          const remoteDeleted = (deletedRow && Array.isArray(deletedRow.value)) ? deletedRow.value : [];
 
-          const mergedUsers = Array.from(userMap.values());
-          const currentUser = get().user;
-          const updatedSelf = currentUser ? (userMap.get(currentUser.id) || currentUser) : null;
+          const localDeleted = get().deletedUserIds || [];
+          const allDeleted = new Set([...localDeleted, ...remoteDeleted]);
 
-          set({ users: mergedUsers, user: updatedSelf });
-
-          // Si la memoria local tenía usuarios adicionales que no estaban en la nube, auto-curar Supabase
-          if (mergedUsers.length > remoteUsers.length) {
-            markLocalWrite('users');
-            push('users', mergedUsers).catch(() => {});
+          let finalUsers = [];
+          if (remoteUsers.length > 0) {
+            finalUsers = remoteUsers.filter((u) => u?.id && !allDeleted.has(u.id));
+          } else {
+            const currentLocal = get().users || [];
+            if (currentLocal.length > 0) {
+              finalUsers = currentLocal.filter((u) => u?.id && !allDeleted.has(u.id));
+            } else {
+              finalUsers = DEFAULT_USERS.filter((u) => !allDeleted.has(u.id));
+            }
           }
+
+          const currentUser = get().user;
+          const updatedSelf = currentUser ? (finalUsers.find((u) => u.id === currentUser.id) || currentUser) : null;
+
+          set({ users: finalUsers, deletedUserIds: Array.from(allDeleted), user: updatedSelf });
         } catch (err) {
           console.warn('[AuthStore] Error cargando usuarios desde Supabase:', err?.message);
         }
@@ -357,11 +363,15 @@ export const useAuthStore = create(
       deleteUser: (id) => {
         const current = get().user;
         if (current?.id === id) return { ok: false, error: 'No puedes eliminar tu propio usuario.' };
-        set((state) => ({ users: state.users.filter((u) => u.id !== id) }));
+        const newDeleted = [...new Set([...(get().deletedUserIds || []), id])];
+        const updatedUsers = (get().users || []).filter((u) => u.id !== id);
+        set({ users: updatedUsers, deletedUserIds: newDeleted });
+        
         // Sincronizar con Supabase
-        const updatedUsers = get().users;
         markLocalWrite('users');
+        markLocalWrite('deletedUserIds');
         push('users', updatedUsers).catch(err => console.warn('[Sync] users', err.message));
+        push('deletedUserIds', newDeleted).catch(err => console.warn('[Sync] deletedUserIds', err.message));
         return { ok: true };
       },
 
@@ -396,11 +406,12 @@ export const useAuthStore = create(
     }),
     {
       name: 'frita-mejor-auth-v2',
-      version: 16, // v16: 'dashboard' como módulo asignable
+      version: 17, // v17: persistencia de deletedUserIds
       // Solo persistir estos campos (no todo el estado)
       partialize: (state) => ({
         user:  state.user,
         users: state.users,
+        deletedUserIds: state.deletedUserIds || [],
       }),
       // Migración: asegurar módulos nuevos en access[]
       migrate: (persisted, fromVersion) => {

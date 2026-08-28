@@ -147,7 +147,21 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['completedRequests'] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
   applicators['rejectedRequests']  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
   applicators['loadHistory']       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
-  applicators['users']             = (v) => useAuthStore.setState({ users: v });
+  applicators['deletedUserIds']    = (v) => {
+    const local = useAuthStore.getState().deletedUserIds || [];
+    const merged = [...new Set([...local, ...(v || [])])];
+    const deletedSet = new Set(merged);
+    const currentUsers = useAuthStore.getState().users || [];
+    useAuthStore.setState({
+      deletedUserIds: merged,
+      users: currentUsers.filter(u => !deletedSet.has(u.id))
+    });
+  };
+  applicators['users']             = (v) => {
+    const deletedSet = new Set(useAuthStore.getState().deletedUserIds || []);
+    const filtered = (v || []).filter(u => u?.id && !deletedSet.has(u.id));
+    useAuthStore.setState({ users: filtered });
+  };
   applicators['payrollEmployees']  = (v) => usePayrollStore.setState({ payrollEmployees: v });
   applicators['payrollRecords']    = (v) => usePayrollStore.setState({ payrollRecords: v });
   applicators['branches']          = (v) => useBranchStore.getState().loadFromRemote(v);
