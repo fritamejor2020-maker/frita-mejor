@@ -767,7 +767,6 @@ export function AdminVehicleInventoryTab() {
         <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
         <p className="text-xs font-bold text-gray-400">
           Datos en tiempo real · <span className="text-blue-500">Carga</span> + <span className="text-orange-500">Surtidos</span> − <span className="text-purple-500">Sobrantes</span>
-          {liveShifts.length > 0 && <span className="text-amber-600 ml-2">· 🔴 {liveShifts.length} {liveShifts.length === 1 ? 'sesión en vivo detectada' : 'sesiones en vivo detectadas'}</span>}
         </p>
       </div>
 
