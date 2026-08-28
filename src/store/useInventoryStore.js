@@ -168,76 +168,9 @@ const INITIAL_FRY_KITCHENS = [
 
 const INITIAL_INVENTORY = [];
 
-const INITIAL_PRODUCTS = [
-  {
-    id: 'P-001', name: 'Chorizo Tradicional', recipeId: 'R-001',
-    productionPointIds: ['PP-001'], unit: 'kg', outputInventoryId: 'PRD-001',
-    linePresets: { 'PP-001': [1, 2, 5, 10, 20] },
-  },
-  {
-    id: 'P-002', name: 'Salchicha Viena', recipeId: 'R-002',
-    productionPointIds: ['PP-002'], unit: 'kg', outputInventoryId: 'PRD-002',
-    linePresets: { 'PP-002': [1, 2, 5, 10, 20] },
-  },
-  {
-    id: 'P-003', name: 'Morcilla Negra', recipeId: 'R-003',
-    productionPointIds: ['PP-001'], unit: 'kg', outputInventoryId: 'PRD-003',
-    linePresets: { 'PP-001': [1, 2, 5, 10, 20] },
-  },
-  {
-    id: 'P-004', name: 'Jamón del Diablo', recipeId: 'R-004',
-    productionPointIds: ['PP-003'], unit: 'kg', outputInventoryId: 'PRD-004',
-    linePresets: { 'PP-003': [1, 2, 5, 10, 20] },
-  },
-];
-
-const INITIAL_FRITADO_RECIPES = [
-  { id: 'FR-001', crudoId: 'PRD-RAW-005', fritoId: 'PRD-005', presets: [10, 20, 50, 100, 200], fryKitchenIds: ['FK-001'] },
-  { id: 'FR-002', crudoId: 'PRD-RAW-006', fritoId: 'PRD-006', presets: [10, 20, 50, 100, 200], fryKitchenIds: ['FK-001'] },
-];
-
-const INITIAL_RECIPES = [
-  {
-    id: 'R-001', name: 'Chorizo Tradicional', productId: 'P-001',
-    yieldQty: 10, yieldUnit: 'kg',
-    ingredients: [
-      { inventoryId: 'INS-001', name: 'Carne de Cerdo',    qty: 6.5,  unit: 'kg' },
-      { inventoryId: 'INS-002', name: 'Grasa de Cerdo',   qty: 2.5,  unit: 'kg' },
-      { inventoryId: 'INS-003', name: 'Especias Chorizo', qty: 0.3,  unit: 'kg' },
-      { inventoryId: 'INS-004', name: 'Sal Nitral',       qty: 0.05, unit: 'kg' },
-      { inventoryId: 'INS-005', name: 'Tripa Natural',    qty: 3,    unit: 'm'  },
-    ],
-  },
-  {
-    id: 'R-002', name: 'Salchicha Viena', productId: 'P-002',
-    yieldQty: 5, yieldUnit: 'kg',
-    ingredients: [
-      { inventoryId: 'INS-001', name: 'Carne de Cerdo', qty: 2.5,  unit: 'kg' },
-      { inventoryId: 'INS-006', name: 'Carne de Res',   qty: 1.5,  unit: 'kg' },
-      { inventoryId: 'INS-004', name: 'Sal Nitral',     qty: 0.03, unit: 'kg' },
-      { inventoryId: 'INS-008', name: 'Hielo',          qty: 1.5,  unit: 'kg' },
-    ],
-  },
-  {
-    id: 'R-003', name: 'Morcilla Negra', productId: 'P-003',
-    yieldQty: 5, yieldUnit: 'kg',
-    ingredients: [
-      { inventoryId: 'INS-002', name: 'Grasa de Cerdo', qty: 3,    unit: 'kg' },
-      { inventoryId: 'INS-007', name: 'Paprika',        qty: 0.1,  unit: 'kg' },
-      { inventoryId: 'INS-004', name: 'Sal Nitral',     qty: 0.02, unit: 'kg' },
-    ],
-  },
-  {
-    id: 'R-004', name: 'Jamón del Diablo', productId: 'P-004',
-    yieldQty: 8, yieldUnit: 'kg',
-    ingredients: [
-      { inventoryId: 'INS-006', name: 'Carne de Res',   qty: 6,    unit: 'kg' },
-      { inventoryId: 'INS-001', name: 'Carne de Cerdo', qty: 1.5,  unit: 'kg' },
-      { inventoryId: 'INS-004', name: 'Sal Nitral',     qty: 0.04, unit: 'kg' },
-      { inventoryId: 'INS-003', name: 'Especias',       qty: 0.1,  unit: 'kg' },
-    ],
-  },
-];
+const INITIAL_PRODUCTS = [];
+const INITIAL_FRITADO_RECIPES = [];
+const INITIAL_RECIPES = [];
 
 // =============================================================================
 // DATOS INICIALES — POS (PUNTO DE VENTA)
@@ -257,14 +190,8 @@ export const INITIAL_ITEM_TYPES = [
   { id: 'IT-005', name: 'FRITO', description: 'Productos fritos calientes listos para venta rápida', isSystem: true, color: 'bg-yellow-50 text-yellow-600 border border-yellow-200' },
 ];
 
-const INITIAL_CUSTOMERS = [
-  { id: 'CUST-002', name: 'Mayorista VIP', document: '900123456', discountPercent: 10, active: true, typeId: 'CTYPE-001', phone: '', creditLimit: 500000, notes: '', address: '' },
-];
-
-const INITIAL_CUSTOMER_TYPES = [
-  { id: 'CTYPE-001', name: 'Mayoristas', productDiscounts: [{ productId: 'PRD-001', discountValue: 1800 }], allowCredit: true, globalDiscountPercent: 0, color: 'bg-blue-500' },
-  { id: 'CTYPE-002', name: 'Eventos Especiales', productDiscounts: [], allowCredit: false, globalDiscountPercent: 0, color: 'bg-purple-500' }
-];
+const INITIAL_CUSTOMERS = [];
+const INITIAL_CUSTOMER_TYPES = [];
 
 const INITIAL_POS_SETTINGS = {
   printerName: 'POS-58',
@@ -404,35 +331,8 @@ export const useInventoryStore = create(
           // un ID que coincida con los INITIAL_* del código fuente.
           // ════════════════════════════════════════════════════════════════════
 
-          // IDs conocidos de datos de plantilla/demo del código fuente
-          // Si un ítem local tiene uno de estos IDs, es de DEMO y debe descartarse
-          const DEMO_IDS = new Set([
-            // Bodegas demo
-            'BOD-001', 'BOD-002', 'BOD-003',
-            // Puntos de producción demo
-            'PP-001', 'PP-002', 'PP-003',
-            // Cocinas demo
-            'FK-001', 'FK-002',
-            // Inventario demo
-            'INS-001','INS-002','INS-003','INS-004','INS-005','INS-006','INS-007','INS-008',
-            'PRD-001','PRD-002','PRD-003','PRD-004','PRD-005','PRD-006','PRD-RAW-005','PRD-RAW-006',
-            // Productos demo
-            'P-001','P-002','P-003','P-004',
-            // Recetas demo
-            'R-001','R-002','R-003','R-004',
-            // Fritado demo
-            'FR-001','FR-002',
-            // Categorías POS demo
-            'CAT-001','CAT-002','CAT-003',
-            // Tipos de Ítem demo
-            'IT-001','IT-002','IT-003','IT-004','IT-005',
-            // Clientes demo
-            'CUST-002',
-            // Tipos de cliente demo
-            'CTYPE-001','CTYPE-002',
-            // Registros de caja demo
-            'REG-001',
-          ]);
+          // Lista de exclusión limpia (sin bloqueo de IDs reales)
+          const DEMO_IDS = new Set();
 
           // Procesar llaves globales — REMOTO REEMPLAZA LOCAL
           for (const key of GLOBAL_STORE_KEYS) {
@@ -732,9 +632,8 @@ export const useInventoryStore = create(
        * Filtra inventory por tipo FRITO o PRODUCTO y que tenga precio definido.
        */
       getPosItems: () => {
-        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         return get().inventory.filter(
-          (i) => i.type !== 'INSUMO' && i.inTricycles === true && !DEMO_PRD_IDS.has(i.id)
+          (i) => i && i.id && i.type !== 'INSUMO' && (i.inTricycles === true || i.inTricycles === 'true')
         );
       },
 
@@ -749,11 +648,10 @@ export const useInventoryStore = create(
         if (!inv || inv.length === 0) {
           inv = inventoryBackupSeed || [];
         }
-        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         const NON_PHYSICAL_SERVICES = new Set(['Bebida No Guardada', 'Domicilio Transferencia', 'Producto No Registrado']);
 
         const isDeliveryItem = (i) => {
-          if (!i || !i.id || DEMO_PRD_IDS.has(i.id)) return false;
+          if (!i || !i.id) return false;
           if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
           if (i.active === false || String(i.active) === 'false') return false;
 
@@ -795,16 +693,15 @@ export const useInventoryStore = create(
         if (!inv || inv.length === 0) {
           inv = inventoryBackupSeed || [];
         }
-        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
 
         let filtered = inv.filter((i) => {
-          if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+          if (!i || !i.id || i.type === 'INSUMO' || i.showInPos === false || String(i.showInPos) === 'false') return false;
           return i.inTricycles === true || i.inTricycles === 'true';
         });
 
         if (filtered.length === 0) {
           filtered = (inventoryBackupSeed || []).filter((i) => {
-            if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+            if (!i || !i.id || i.type === 'INSUMO' || i.showInPos === false || String(i.showInPos) === 'false') return false;
             return i.inTricycles === true || i.inTricycles === 'true';
           });
         }
@@ -1735,36 +1632,6 @@ export const useInventoryStore = create(
           state.posRegisters = state.posRegisters.filter(r => !deletedRegs.includes(r.id));
         }
 
-        // ── Limpiar inventory, customerTypes y customers DEMO del localStorage ──
-        const DEMO_CTYPE_IDS = new Set(['CTYPE-001', 'CTYPE-002']);
-        const DEMO_CUST_IDS = new Set(['CUST-002']);
-        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-        if (Array.isArray(state.inventory)) {
-          const hasReal = state.inventory.some(i => i?.id && !DEMO_PRD_IDS.has(i.id));
-          if (hasReal) {
-            state.inventory = state.inventory.filter(i => !i?.id || !DEMO_PRD_IDS.has(i.id));
-          }
-        }
-        if (Array.isArray(state.customerTypes)) {
-          const realTypes = state.customerTypes.filter(ct => ct?.id && !DEMO_CTYPE_IDS.has(ct.id));
-          if (realTypes.length === 0) {
-            state.customerTypes = [];
-          } else {
-            state.customerTypes = realTypes;
-          }
-        }
-        if (Array.isArray(state.customers)) {
-          // Mantener CUST-001 (Cliente General) pero eliminar demos
-          const realCustomers = state.customers.filter(c => c?.id && !DEMO_CUST_IDS.has(c.id));
-          // Si solo queda CUST-001 (sin clientes contrata reales), vaciar para que Supabase los traiga
-          const hasRealContrata = realCustomers.some(c => c.typeId && !DEMO_CTYPE_IDS.has(c.typeId));
-          if (!hasRealContrata) {
-            state.customers = [];
-          } else {
-            state.customers = realCustomers;
-          }
-        }
-
         const deletedShifts = state.deletedShiftIds || [];
         if (deletedShifts.length > 0 && state.posShifts?.length > 0) {
           state.posShifts = state.posShifts.filter(s => !deletedShifts.includes(s.id));
@@ -1778,17 +1645,14 @@ export const useInventoryStore = create(
             inv = inv.filter(i => !deletedInv.includes(i.id));
           }
           
-          // Eliminar duplicados locales (mismo ID o mismo nombre + código de barras)
+          // Eliminar duplicados locales por ID único de forma segura
           const seenIds = new Set();
-          const seenNames = new Set();
           const uniqueInventory = [];
           
           inv.forEach(item => {
             if (!item || !item.id) return;
-            const nameKey = `${item.name.toLowerCase().trim()}_${item.barcode || ''}`;
-            if (!seenIds.has(item.id) && !seenNames.has(nameKey)) {
+            if (!seenIds.has(item.id)) {
               seenIds.add(item.id);
-              seenNames.add(nameKey);
               uniqueInventory.push(item);
             }
           });

@@ -160,10 +160,9 @@ export function ClientePedirView() {
     try {
       const storeItems = useInventoryStore.getState().getVendedorPosItems();
       if (storeItems && storeItems.length > 0) {
-        const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
         const NON_PHYSICAL_SERVICES = new Set(['Domicilio Transferencia', 'Producto No Registrado']);
         return storeItems.filter((i: any) => {
-          if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+          if (!i || !i.id || i.type === 'INSUMO' || i.showInPos === false) return false;
           if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
           return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
         }).map((item: any) => ({
@@ -607,11 +606,10 @@ export function ClientePedirView() {
         setPosSettings(settingsData.value);
       }
 
-      const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
       const NON_PHYSICAL_SERVICES = new Set(['Domicilio Transferencia', 'Producto No Registrado']);
 
       const saleItems = (items || []).filter((i: any) => {
-        if (!i || DEMO_PRD_IDS.has(i.id) || i.type === 'INSUMO' || i.showInPos === false) return false;
+        if (!i || !i.id || i.type === 'INSUMO' || i.showInPos === false) return false;
         if (NON_PHYSICAL_SERVICES.has(i.name?.trim())) return false;
         return i.inTricycles === true || i.inTricycles === 'true' || i.showInTricicloPos === true;
       });

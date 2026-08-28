@@ -20,8 +20,8 @@ const MASTER_PASSWORD = 'Anamonica99';
 //   • frita-seller-session / frita-dejador-session — sesiones activas
 //   • frita-sync-queue   — cola de sincronización offline
 //
-// CONSERVA (configuración del sistema):
-//   • inventory (cantidades se resetean a 0, items se mantienen)
+// CONSERVA (configuración e inventarios físicos del sistema):
+//   • inventory (se conservan todos los ítems y cantidades físicas exactas)
 //   • warehouses, productionPoints, fryKitchens
 //   • products, recipes, fritadoRecipes
 //   • posCategories, posSettings, loadTemplates
@@ -109,7 +109,7 @@ function patchLocalStore(storeName, patchFn) {
 function clearLocalOperationalData() {
   // ── useInventoryStore ('frita-mejor-inventory') ──────────────────────────
   // Borra: movements, posShifts, posSales, posExpenses, deletedShiftIds
-  // Resetea: inventario qty a 0 (opcionales — dejamos cantidades en 0 para empezar limpio)
+  // Conserva: inventario y cantidades intactas
   patchLocalStore('frita-mejor-inventory', (state) => ({
     ...state,
     movements:       [],
@@ -117,8 +117,6 @@ function clearLocalOperationalData() {
     posSales:        [],
     posExpenses:     [],
     deletedShiftIds: [],
-    // Resetear cantidades del inventario a 0 (los ítems se conservan)
-    inventory: (state.inventory || []).map(item => ({ ...item, qty: 0 })),
   }));
 
   // ── useLogisticsStore ('frita-mejor-logistics') ──────────────────────────

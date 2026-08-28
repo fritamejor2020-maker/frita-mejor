@@ -215,15 +215,14 @@ export const DejadorDashboard = () => {
       const map: Record<string, any> = {};
       data.forEach((row: any) => { map[row.key] = row.value; });
 
-      // Actualizar inventario si viene de Supabase (filtrando siempre los 6 ítems demo de la plantilla inicial)
+      // Actualizar inventario si viene de Supabase
       const rawInv = (userBranchId && Array.isArray(map[`inventory_${userBranchId}`]))
         ? map[`inventory_${userBranchId}`]
         : (Array.isArray(map['inventory_BRANCH-001']) ? map['inventory_BRANCH-001'] : map['inventory']);
 
-      const DEMO_PRD_IDS = new Set(['PRD-001', 'PRD-002', 'PRD-003', 'PRD-004', 'PRD-005', 'PRD-006', 'PRD-RAW-005', 'PRD-RAW-006']);
-      const cleanedInv = (Array.isArray(rawInv) ? rawInv : []).filter((i: any) => i?.id && !DEMO_PRD_IDS.has(i.id));
-
-      useInventoryStore.setState({ inventory: cleanedInv });
+      if (Array.isArray(rawInv) && rawInv.length > 0) {
+        useInventoryStore.setState({ inventory: rawInv.filter((i: any) => i?.id) });
+      }
 
       const shiftMap = new Map<string, any>();
       [
