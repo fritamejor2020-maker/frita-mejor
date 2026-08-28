@@ -198,8 +198,10 @@ export function PosView() {
   const [ticketItems, setTicketItems]     = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [activeSuspendedId, setActiveSuspendedId] = useState(null);
+  const [isLuckyWinnerSession, setIsLuckyWinnerSession] = useState(false);
   const [manualDiscountPercent, setManualDiscountPercent] = useState(0);
   const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const isLuckyTicket = isLuckyWinnerSession || !!(activeSuspendedId && String(activeSuspendedId).includes('LUCKY'));
 
   // Modal & Print states
   const [showPaymentModal, setShowPaymentModal] = useState(false);
@@ -820,6 +822,8 @@ export function PosView() {
   };
 
   const handleLoadSuspended = (sale) => {
+    const isLucky = !!(sale.isLuckyWinner || (sale.id && String(sale.id).includes('LUCKY')));
+    setIsLuckyWinnerSession(isLucky);
     setTicketItems(sale.items || []);
     setSelectedCustomer(sale.customerId || '');
     setActiveSuspendedId(sale.id);
@@ -984,6 +988,8 @@ export function PosView() {
     setTicketItems([]);
     setActiveSuspendedId(null);
     setSelectedCustomer('');
+    setManualDiscountPercent(0);
+    setIsLuckyWinnerSession(false);
     
     // Print trigger logic strictly based on hardware configuration
     let autoPrint = !!methodConfig.printReceipt;
@@ -1448,7 +1454,7 @@ export function PosView() {
         </div>
 
         {/* Banner si la venta viene de Raspa y Gana */}
-        {activeSuspendedId && String(activeSuspendedId).includes('LUCKY') && (
+        {isLuckyTicket && (
           <div className="mx-3 mt-2 p-3 bg-gradient-to-r from-amber-500/20 via-yellow-500/15 to-transparent border border-amber-500/50 rounded-2xl text-xs space-y-1.5 shadow-lg shadow-amber-500/5 animate-pulse">
             <div className="flex items-center gap-2 font-black text-amber-300">
               <span className="text-base">🎟️</span>
@@ -1479,44 +1485,38 @@ export function PosView() {
                     </div>
                     <div className="flex items-center justify-between mt-1.5 gap-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setTicketItems(prev => prev.map(i => {
-                              if (i.id === item.id) {
-                                const isCurrentlyZero = i.price === 0;
-                                return {
-                                  ...i,
-                                  price: isCurrentlyZero ? (i.originalPrice || item.price || 0) : 0,
-                                  isCustomPrice: !isCurrentlyZero
-                                };
-                              }
-                              return i;
-                            }));
-                          }}
-                          className={`text-[9px] font-black px-2 py-0.5 rounded-md transition-all active:scale-95 flex items-center gap-1 ${
-                            item.price === 0
-                              ? 'bg-green-500 text-gray-950 font-black shadow-sm'
-                              : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
-                          }`}
-                          title={item.price === 0 ? 'Restaurar precio original' : 'Poner este producto en $0 (Regalo de Raspa y Gana)'}
-                        >
-                          {item.price === 0 ? '🎁 GRATIS ($0)' : '🎁 Poner $0'}
-                        </button>
+                        {/* Botón Poner $0: SOLO visible en ventas ganadoras de Raspa y Gana o si el producto ya está en $0 */}
+                        {(isLuckyTicket || item.price === 0) && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setTicketItems(prev => prev.map(i => {
+                                if (i.id === item.id) {
+                                  const isCurrentlyZero = i.price === 0;
+                                  return {
+                                    ...i,
+                                    price: isCurrentlyZero ? (i.originalPrice || item.price || 0) : 0,
+                                    isCustomPrice: !isCurrentlyZero
+                                  };
+                                }
+                                return i;
+                              }));
+                            }}
+                            className={`text-[9px] font-black px-2 py-0.5 rounded-md transition-all active:scale-95 flex items-center gap-1 ${
+                              item.price === 0
+                                ? 'bg-green-500 text-gray-950 font-black shadow-sm'
+                                : 'bg-amber-500/15 text-amber-300 hover:bg-amber-500/25 border border-amber-500/30'
+                            }`}
+                            title={item.price === 0 ? 'Restaurar precio original' : 'Poner este producto en $0 (Regalo de Raspa y Gana)'}
+                          >
+                            {item.price === 0 ? '🎁 GRATIS ($0)' : '🎁 Poner $0'}
+                          </button>
+                        )}
                         <span 
-                          className={`text-[10px] font-bold cursor-pointer hover:underline select-none ${item.price === 0 ? 'text-green-400 font-black' : item.isCustomPrice ? 'text-amber-500' : 'text-gray-400'}`}
-                          onClick={() => {
-                            const customPriceStr = prompt(`Ingresa nuevo precio unitario para ${item.name}:`, String(item.price));
-                            if (customPriceStr !== null) {
-                              const p = parseFloat(customPriceStr);
-                              if (!isNaN(p) && p >= 0) {
-                                setTicketItems(prev => prev.map(i => i.id === item.id ? { ...i, price: p, isCustomPrice: true } : i));
-                              }
-                            }
-                          }}
-                          title="Clic para cambiar precio manualmente"
+                          className={`text-[10px] font-bold select-none ${item.price === 0 ? 'text-green-400 font-black' : item.isCustomPrice ? 'text-amber-500' : 'text-gray-400'}`}
                         >
                           {formatMoney(item.price)} c/u
+                          {item.isCustomPrice && item.price !== 0 && <span className="ml-1 bg-amber-500/20 text-amber-500 px-1 rounded">VIP</span>}
                         </span>
                       </div>
                       {/* Qty controls */}
@@ -1554,21 +1554,29 @@ export function PosView() {
             <span>{formatMoney(subtotal)}</span>
           </div>
 
-          <div className="flex justify-between items-center text-sm font-bold">
-            <button 
-              type="button"
-              onClick={() => setShowDiscountModal(true)}
-              className="text-xs font-black text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all"
-              title="Aplicar o cambiar descuento % a toda la venta"
-            >
-              🏷️ {discountPercent > 0 ? `Descuento: ${discountPercent}% (Cambiar)` : 'Aplicar Descuento %'}
-            </button>
-            {discountPercent > 0 ? (
-              <span className="text-orange-400 font-bold">-{formatMoney(discountAmount)}</span>
-            ) : (
-              <span className="text-gray-600 text-xs">$0</span>
-            )}
-          </div>
+          {/* Descuento: botón interactivo si es venta premiada, o texto informativo si ya tiene descuento aplicado */}
+          {isLuckyTicket ? (
+            <div className="flex justify-between items-center text-sm font-bold">
+              <button 
+                type="button"
+                onClick={() => setShowDiscountModal(true)}
+                className="text-xs font-black text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-lg flex items-center gap-1.5 active:scale-95 transition-all"
+                title="Aplicar o cambiar descuento % a toda la venta"
+              >
+                🏷️ {discountPercent > 0 ? `Descuento: ${discountPercent}% (Cambiar)` : 'Aplicar Descuento %'}
+              </button>
+              {discountPercent > 0 ? (
+                <span className="text-orange-400 font-bold">-{formatMoney(discountAmount)}</span>
+              ) : (
+                <span className="text-gray-600 text-xs">$0</span>
+              )}
+            </div>
+          ) : discountPercent > 0 ? (
+            <div className="flex justify-between items-center text-sm font-bold text-orange-400">
+              <span>Descuento ({discountPercent}%)</span>
+              <span>-{formatMoney(discountAmount)}</span>
+            </div>
+          ) : null}
 
           <div className="flex justify-between items-end mt-2 pt-2 border-t border-gray-800">
             <span className="text-xl font-black uppercase tracking-wider text-gray-300">Total</span>
@@ -1576,7 +1584,7 @@ export function PosView() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setPendingDeliveryInfo(null); setSelectedCustomer(''); setManualDiscountPercent(0); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setIsLuckyWinnerSession(false); setPendingDeliveryInfo(null); setSelectedCustomer(''); setManualDiscountPercent(0); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
               <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
