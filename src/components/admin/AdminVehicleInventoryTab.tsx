@@ -666,77 +666,15 @@ export function AdminVehicleInventoryTab() {
 
   const vendorLocations = useInventoryStore((s: any) => s.vendorLocations) || {};
 
-  const liveShifts: any[] = useMemo(() => {
-    const lives: any[] = [];
-
-    if (sellerSession?.isSetupComplete && sellerSession?.pointId) {
-      const pId = sellerSession.pointId;
-      const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
-      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-      
-      // Si NO hay ningún turno abierto registrado para este vehículo hoy, agregar sesión local en vivo
-      if (!hasOpenShift) {
-        lives.push({
-          id: `LIVE-${pId}`,
-          pointId: pId,
-          shift: sellerSession.shift || 'AM',
-          responsibleName: sellerSession.responsibleName || 'Vendedor',
-          openedAt: sellerSession.openedAt || new Date().toISOString(),
-          closedAt: null,
-          type: 'VENDEDOR',
-          _isLive: true,
-        });
-      }
-    }
-
-    // Solo generar liveShifts por GPS cuando los turnos remotos ya hayan cargado para evitar destellos
-    if (!supabaseLoaded && supabaseShifts.length === 0) return lives;
-
-    Object.values(vendorLocations).forEach((loc: any) => {
-      const pId = loc?.pointId || loc?.name;
-      if (!pId || loc?.isActive === false) return;
-
-      // Descartar pings GPS viejos (más de 30 minutos sin actualizar)
-      const locTime = loc.updatedAt || loc.timestamp;
-      if (locTime) {
-        const ageMs = Date.now() - new Date(locTime).getTime();
-        if (ageMs > 30 * 60 * 1000) return;
-      }
-
-      const matchingStored = storedShifts.filter((s: any) => matchVehicleId(s.pointId, pId));
-      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-
-      // Si NO hay ningún turno abierto registrado para este vehículo, agregar fake live por GPS activo
-      if (!hasOpenShift) {
-        const alreadyInLives = lives.some((l: any) => matchVehicleId(l.pointId, pId));
-        if (!alreadyInLives) {
-          lives.push({
-            id: `LIVE-GPS-${pId}`,
-            pointId: pId,
-            shift: loc.shift || 'AM',
-            responsibleName: loc.name || 'Vendedor en Ruta',
-            openedAt: loc.openedAt || loc.updatedAt || loc.timestamp || new Date().toISOString(),
-            closedAt: null,
-            type: 'VENDEDOR',
-            _isLive: true,
-          });
-        }
-      }
-    });
-
-    return lives;
-  }, [sellerSession, storedShifts, vendorLocations, today]);
-
   const allShifts: any[] = useMemo(() => {
-    const combined = [...liveShifts, ...storedShifts];
-    return combined.sort((a: any, b: any) => {
+    return [...storedShifts].sort((a: any, b: any) => {
       if (!a.closedAt && b.closedAt) return -1;
       if (a.closedAt && !b.closedAt) return 1;
       const tA = new Date(a.closedAt || a.openedAt || 0).getTime();
       const tB = new Date(b.closedAt || b.openedAt || 0).getTime();
       return tB - tA;
     });
-  }, [liveShifts, storedShifts]);
+  }, [storedShifts]);
 
   const filteredShifts = useMemo(() => {
     return allShifts.filter((s: any) => {
@@ -1032,59 +970,12 @@ export function VehicleShiftCard({
   const priceMap: Record<string, { price: number; name: string }> = {};
   (products || []).forEach((p: any) => { priceMap[p.id] = { price: p.price || 0, name: p.name }; });
 
-  const liveShift = useMemo(() => {
-    if (sellerSession?.isSetupComplete && matchVehicleId(sellerSession?.pointId, vehicleId)) {
-      const matchingStored = combinedShifts.filter((s: any) => matchVehicleId(s.pointId, vehicleId));
-      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-
-      if (!hasOpenShift) {
-        return {
-          id: `LIVE-${vehicleId}`,
-          pointId: vehicleId,
-          shift: sellerSession.shift || 'AM',
-          responsibleName: sellerSession.responsibleName || 'Vendedor',
-          openedAt: sellerSession.openedAt || new Date().toISOString(),
-          closedAt: null,
-          type: 'VENDEDOR',
-          _isLive: true,
-        };
-      }
-    }
-
-    const matchedLoc: any = Object.values(vendorLocations).find((loc: any) =>
-      matchVehicleId(loc?.pointId || loc?.name, vehicleId) && loc?.isActive !== false
-    );
-    if (matchedLoc) {
-      const matchingStored = combinedShifts.filter((s: any) => matchVehicleId(s.pointId, vehicleId));
-      const hasOpenShift = matchingStored.some((s: any) => !s.closedAt);
-
-      if (!hasOpenShift) {
-        return {
-          id: `LIVE-GPS-${vehicleId}`,
-          pointId: vehicleId,
-          shift: matchedLoc.shift || 'AM',
-          responsibleName: matchedLoc.name || 'Vendedor en Ruta',
-          openedAt: matchedLoc.openedAt || matchedLoc.updatedAt || matchedLoc.timestamp || new Date().toISOString(),
-          closedAt: null,
-          type: 'VENDEDOR',
-          _isLive: true,
-        };
-      }
-    }
-
-    return null;
-  }, [sellerSession, combinedShifts, vendorLocations, vehicleId, today]);
-
   // Buscar el turno correcto con prioridad:
-  // 1. Sesión live del vendedor
-  // 2. PRIMERA PRIORIDAD: Cualquier turno abierto (!closedAt) que coincida con el vehículo
-  // 3. Turno de hoy que coincida con jornada actual (solo si !activeOnly)
-  // 4. Turno de hoy (si !activeOnly)
-  // 5. El más reciente (fallback — solo si !activeOnly)
-  // 6. Si activeOnly=true y hay cargas/surtidos hoy para este vehículo, inyectar turno activo sintético
+  // 1. PRIMERA PRIORIDAD: Cualquier turno abierto (!closedAt) que coincida con el vehículo
+  // 2. Turno de hoy que coincida con jornada actual (solo si !activeOnly)
+  // 3. Turno de hoy (si !activeOnly)
+  // 4. El más reciente (fallback — solo si !activeOnly)
   const shift = useMemo(() => {
-    if (liveShift) return liveShift;
-
     const forVehicle = combinedShifts.filter(
       (s: any) => s.type === 'VENDEDOR' && matchVehicleId(s.pointId, vehicleId)
     );
@@ -1149,7 +1040,7 @@ export function VehicleShiftCard({
     }
 
     return null;
-  }, [posShifts, vehicleId, liveShift, currentShift, activeOnly, today, loadHistory, completedRequests]);
+  }, [posShifts, vehicleId, currentShift, activeOnly, today, loadHistory, completedRequests]);
 
   if (!vehicleId) return null;
 
