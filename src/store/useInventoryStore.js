@@ -543,35 +543,14 @@ export const useInventoryStore = create(
                 if (key === 'posShifts') {
                   merged = merged.filter(s => !deleted.includes(s.id));
 
-                  // Auto-cerrar borradores abiertos si el vehículo ya fue cerrado en esa fecha
-                  const closedTimesByPointDate = new Map();
-                  merged.forEach(s => {
-                    if (s.closedAt && s.pointId) {
-                      const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                      const cD = s.closedAt.slice(0, 10);
-                      closedTimesByPointDate.set(`${cP}_${cD}`, s.closedAt);
-                    }
-                  });
-
+                  // Solo auto-cerrar turnos huérfanos de DÍAS ANTERIORES (a las 11:59:59 pm de la fecha de ese turno).
+                  // Los turnos del día de hoy NUNCA se auto-cierran automáticamente por el sistema.
                   const today = new Date().toISOString().slice(0, 10);
                   merged = merged.map(s => {
                     if (!s.closedAt) {
-                      if (s.pointId) {
-                        const cP = String(s.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const cD = s.openedAt ? s.openedAt.slice(0, 10) : (s.fecha || '');
-                        const matchingClosedAt = closedTimesByPointDate.get(`${cP}_${cD}`);
-                        if (matchingClosedAt) {
-                          const sOpenTime = new Date(s.openedAt || 0).getTime();
-                          const closedTime = new Date(matchingClosedAt).getTime();
-                          // Solo auto-cerrar si la apertura fue ANTES del cierre registrado (borrador viejo)
-                          if (sOpenTime < closedTime) {
-                            return { ...s, closedAt: matchingClosedAt };
-                          }
-                        }
-                      }
                       const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
                       if (shiftDate && shiftDate < today) {
-                        return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+                        return { ...s, closedAt: `${shiftDate}T23:59:59.999Z`, _autoClosedStale: true };
                       }
                     }
                     return s;

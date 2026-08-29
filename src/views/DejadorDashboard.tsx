@@ -244,7 +244,7 @@ export const DejadorDashboard = () => {
         if (!s.closedAt) {
           const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
           if (shiftDate && shiftDate < today) {
-            return { ...s, closedAt: s.openedAt || new Date().toISOString(), _autoClosedStale: true };
+            return { ...s, closedAt: `${shiftDate}T23:59:59.999Z`, _autoClosedStale: true };
           }
         }
         return s;
