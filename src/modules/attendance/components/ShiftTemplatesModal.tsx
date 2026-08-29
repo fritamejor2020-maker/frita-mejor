@@ -19,6 +19,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     updateScheduleGroup,
     deleteScheduleGroup,
     upsertEmployeeContract,
+    bulkUpsertEmployeeContracts,
   } = useAttendanceStore();
 
   const [activeTab, setActiveTab] = useState<'groups' | 'templates' | 'employees'>(initialTab);
@@ -248,10 +249,12 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     if (selectedEmpNos.length === 0) return;
 
     const count = selectedEmpNos.length;
+    const updatedList: EmployeeContract[] = [];
+
     selectedEmpNos.forEach((empNo) => {
       const emp = employeeContracts.find((e) => e.employeeNo === empNo);
       if (emp) {
-        upsertEmployeeContract({
+        updatedList.push({
           ...emp,
           shiftType: empShiftType,
           scheduleGroupId: empScheduleGroupId,
@@ -261,6 +264,10 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
         });
       }
     });
+
+    if (updatedList.length > 0) {
+      bulkUpsertEmployeeContracts(updatedList);
+    }
 
     setSelectedEmpNos([]);
     setBulkSuccessMsg(`✅ ¡Asignación masiva exitosa! Se actualizó el horario a los ${count} trabajador(es) seleccionado(s).`);

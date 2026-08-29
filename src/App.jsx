@@ -11,6 +11,7 @@ import { useSupplierStore } from './store/useSupplierStore';
 import { useTaskStore } from './store/useTaskStore';
 import { useIncomeConfigStore } from './store/useIncomeConfigStore';
 import { useGoalStore } from './store/useGoalStore';
+import { useAttendanceStore } from './store/useAttendanceStore';
 import { flushQueue } from './lib/syncManager';
 import { initCrossTabSync, registerStore, broadcastState, isApplyingRemoteState } from './lib/crossTabSync';
 import { trackError, installGlobalErrorHandlers } from './lib/errorTracker';
@@ -257,6 +258,7 @@ function App() {
           useTaskStore.getState().loadFromRemote(),
           useIncomeConfigStore.getState().loadFromRemote(),
           useGoalStore.getState().loadFromRemote(),
+          useAttendanceStore.getState().loadFromRemote(),
         ]);
         flushQueue();
       } catch (err) {

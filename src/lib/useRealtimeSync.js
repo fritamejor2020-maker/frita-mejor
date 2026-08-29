@@ -255,9 +255,24 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       }
     };
     applicators[`attendance_contracts_${bid}`] = (v) => {
-      if (Array.isArray(v)) {
-        useAttendanceStore.setState({ employeeContracts: v });
+      if (Array.isArray(v) && v.length > 0) {
+        const current = useAttendanceStore.getState().employeeContracts || [];
+        const map = new Map(current.map(c => [c.employeeId || c.employeeNo, c]));
+        v.forEach(c => {
+          const key = c.employeeId || c.employeeNo;
+          if (key) {
+            const ex = map.get(key);
+            map.set(key, ex ? { ...ex, ...c } : c);
+          }
+        });
+        useAttendanceStore.setState({ employeeContracts: Array.from(map.values()) });
       }
+    };
+    applicators[`attendance_shifts_${bid}`] = (v) => {
+      if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ shiftTemplates: v });
+    };
+    applicators[`attendance_groups_${bid}`] = (v) => {
+      if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ scheduleGroups: v });
     };
     applicators[`attendance_overrides_${bid}`] = (v) => {
       if (Array.isArray(v)) {
@@ -408,7 +423,20 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
         useAttendanceStore.setState({ attendanceLogs: filtered });
       }
     };
-    if (!applicators['attendance_contracts']) applicators['attendance_contracts'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ employeeContracts: v }); };
+    if (!applicators['attendance_contracts']) applicators['attendance_contracts'] = (v) => {
+      if (Array.isArray(v) && v.length > 0) {
+        const current = useAttendanceStore.getState().employeeContracts || [];
+        const map = new Map(current.map(c => [c.employeeId || c.employeeNo, c]));
+        v.forEach(c => {
+          const key = c.employeeId || c.employeeNo;
+          if (key) {
+            const ex = map.get(key);
+            map.set(key, ex ? { ...ex, ...c } : c);
+          }
+        });
+        useAttendanceStore.setState({ employeeContracts: Array.from(map.values()) });
+      }
+    };
     if (!applicators['attendance_overrides']) applicators['attendance_overrides'] = (v) => { if (Array.isArray(v)) useAttendanceStore.setState({ shiftOverrides: v }); };
     if (!applicators['attendance_shifts'])    applicators['attendance_shifts']    = (v) => { if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ shiftTemplates: v }); };
     if (!applicators['attendance_groups'])    applicators['attendance_groups']    = (v) => { if (Array.isArray(v) && v.length > 0) useAttendanceStore.setState({ scheduleGroups: v }); };

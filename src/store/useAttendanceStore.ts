@@ -3,6 +3,8 @@ import { persist } from 'zustand/middleware';
 import { push } from '../lib/syncManager';
 import { supabase } from '../lib/supabase';
 import { safeJSONStorage } from '../utils/safeStorage';
+import { useAuthStore } from './useAuthStore';
+import { useBranchStore } from './useBranchStore';
 
 export interface BiometricTerminal {
   id: string;
@@ -102,6 +104,7 @@ interface AttendanceStoreState {
 
   // Contracts
   upsertEmployeeContract: (contract: EmployeeContract) => void;
+  bulkUpsertEmployeeContracts: (contracts: EmployeeContract[]) => void;
   deleteEmployeeContract: (employeeId: string) => void;
   updateGlobalRates: (targetHours: number, baseRate: number, overtimeRate: number) => void;
 
@@ -229,20 +232,41 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
   pinPassword: u.employeeNo === '24' ? '4321' : String(1000 + Number(u.employeeNo)),
 }));
 
-function mergeBiometricContracts(existing: EmployeeContract[]): EmployeeContract[] {
+function mergeBiometricContracts(incoming: EmployeeContract[] = [], currentLocal: EmployeeContract[] = []): EmployeeContract[] {
   const map = new Map<string, EmployeeContract>();
-  
-  // 1. Agregar todos los contratos existentes pasados por parámetro (Supabase / LocalStorage / Estado)
-  (existing || []).forEach((c) => {
+
+  // 1. Agregar contratos locales actuales como base
+  (currentLocal || []).forEach((c) => {
     const empNo = String(c.employeeNo || '').trim();
-    if (empNo) map.set(empNo, c);
+    if (empNo) map.set(empNo, { ...c });
   });
 
-  // 2. Agregar cualquier usuario base inicial solo si aún no está en el mapa
+  // 2. Agregar / actualizar con los entrantes (preservando campos clave si el entrante los trae incompletos)
+  (incoming || []).forEach((c) => {
+    const empNo = String(c.employeeNo || '').trim();
+    if (!empNo) return;
+    const existing = map.get(empNo);
+    if (!existing) {
+      map.set(empNo, { ...c, scheduleGroupId: c.scheduleGroupId || 'GROUP-LOCAL' });
+    } else {
+      map.set(empNo, {
+        ...existing,
+        ...c,
+        scheduleGroupId: c.scheduleGroupId || existing.scheduleGroupId || 'GROUP-LOCAL',
+        shiftType: c.shiftType || existing.shiftType || 'VARIABLE',
+        defaultShiftId: c.defaultShiftId || existing.defaultShiftId || 'SHIFT-MANANA-COMPLETO',
+        weeklyTargetHours: c.weeklyTargetHours || existing.weeklyTargetHours || 44,
+        baseHourlyRate: c.baseHourlyRate || existing.baseHourlyRate || 6500,
+        overtimeHourlyRate: c.overtimeHourlyRate || existing.overtimeHourlyRate || 9750,
+      });
+    }
+  });
+
+  // 3. Agregar cualquier usuario base inicial solo si aún no está en el mapa
   INITIAL_CONTRACTS.forEach((c) => {
     const empNo = String(c.employeeNo || '').trim();
     if (empNo && !map.has(empNo)) {
-      map.set(empNo, c);
+      map.set(empNo, { ...c, scheduleGroupId: 'GROUP-LOCAL' });
     }
   });
 
@@ -426,6 +450,18 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
             ? s.employeeContracts.map((c) => (c.employeeId === contract.employeeId ? { ...c, ...contract } : c))
             : [...s.employeeContracts, contract];
           return { employeeContracts: updated };
+        });
+        push('attendance_contracts', get().employeeContracts);
+      },
+
+      bulkUpsertEmployeeContracts: (contracts) => {
+        set((s) => {
+          const contractMap = new Map(s.employeeContracts.map(c => [c.employeeId, c]));
+          contracts.forEach(c => {
+            const existing = contractMap.get(c.employeeId);
+            contractMap.set(c.employeeId, existing ? { ...existing, ...c } : c);
+          });
+          return { employeeContracts: Array.from(contractMap.values()) };
         });
         push('attendance_contracts', get().employeeContracts);
       },
@@ -969,31 +1005,78 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
 
       loadFromRemote: async () => {
         try {
+          const user = useAuthStore.getState().user;
+          const userBranchId = user?.branchId || 'BRANCH-001';
+          const branches = useBranchStore.getState().branches || [];
+          const branchIds = new Set(['BRANCH-001', userBranchId, ...branches.map((b: any) => b.id)]);
+
+          const keysToFetch = [
+            'attendance_shifts', 'attendance_groups', 'attendance_contracts', 'attendance_logs', 'attendance_overrides', 'attendance_terminals'
+          ];
+          branchIds.forEach(bid => {
+            if (bid) {
+              keysToFetch.push(`attendance_shifts_${bid}`);
+              keysToFetch.push(`attendance_groups_${bid}`);
+              keysToFetch.push(`attendance_contracts_${bid}`);
+              keysToFetch.push(`attendance_logs_${bid}`);
+              keysToFetch.push(`attendance_overrides_${bid}`);
+              keysToFetch.push(`attendance_terminals_${bid}`);
+            }
+          });
+
           const { data } = await supabase
             .from('app_state')
             .select('key, value')
-            .in('key', [
-              'attendance_shifts', 'attendance_shifts_BRANCH-001',
-              'attendance_groups', 'attendance_groups_BRANCH-001',
-              'attendance_contracts', 'attendance_contracts_BRANCH-001',
-              'attendance_logs', 'attendance_logs_BRANCH-001',
-              'attendance_overrides', 'attendance_overrides_BRANCH-001'
-            ]);
+            .in('key', keysToFetch);
+
           if (data && Array.isArray(data)) {
-            const sortedRows = [...data].sort((a, b) => (a.key.includes('BRANCH') ? 1 : -1));
-            sortedRows.forEach((row: any) => {
-              const val = row.value;
-              if (Array.isArray(val) && val.length > 0) {
-                if (row.key.includes('attendance_shifts')) useAttendanceStore.setState({ shiftTemplates: val });
-                if (row.key.includes('attendance_groups')) useAttendanceStore.setState({ scheduleGroups: val });
-                if (row.key.includes('attendance_contracts')) {
-                  const merged = mergeBiometricContracts(val);
-                  useAttendanceStore.setState({ employeeContracts: merged });
-                }
-                if (row.key.includes('attendance_logs')) useAttendanceStore.setState({ attendanceLogs: mergeBiometricLogs(val, []) });
-                if (row.key.includes('attendance_overrides')) useAttendanceStore.setState({ shiftOverrides: val });
+            const shiftMap = new Map();
+            const groupMap = new Map();
+            const contractMap = new Map();
+            const logMap = new Map();
+            const overrideMap = new Map();
+            const terminalMap = new Map();
+
+            data.forEach((row: any) => {
+              const k = row.key || '';
+              const val = Array.isArray(row.value) ? row.value : [];
+              if (k.startsWith('attendance_shifts')) {
+                val.forEach((s: any) => { if (s?.id) shiftMap.set(s.id, s); });
+              } else if (k.startsWith('attendance_groups')) {
+                val.forEach((g: any) => { if (g?.id) groupMap.set(g.id, g); });
+              } else if (k.startsWith('attendance_contracts')) {
+                val.forEach((c: any) => {
+                  const id = c.employeeId || c.employeeNo;
+                  if (id) {
+                    const ex = contractMap.get(id);
+                    contractMap.set(id, ex ? { ...ex, ...c } : c);
+                  }
+                });
+              } else if (k.startsWith('attendance_logs')) {
+                val.forEach((l: any) => { if (l?.id) logMap.set(l.id, l); });
+              } else if (k.startsWith('attendance_overrides')) {
+                val.forEach((o: any) => { if (o?.id) overrideMap.set(o.id, o); });
+              } else if (k.startsWith('attendance_terminals')) {
+                val.forEach((t: any) => { if (t?.id) terminalMap.set(t.id, t); });
               }
             });
+
+            if (shiftMap.size > 0) useAttendanceStore.setState({ shiftTemplates: Array.from(shiftMap.values()) });
+            if (groupMap.size > 0) useAttendanceStore.setState({ scheduleGroups: Array.from(groupMap.values()) });
+            if (contractMap.size > 0) {
+              const current = useAttendanceStore.getState().employeeContracts || [];
+              const merged = mergeBiometricContracts(Array.from(contractMap.values()), current);
+              useAttendanceStore.setState({ employeeContracts: merged });
+            }
+            if (logMap.size > 0) {
+              useAttendanceStore.setState({ attendanceLogs: mergeBiometricLogs(Array.from(logMap.values()), []) });
+            }
+            if (overrideMap.size > 0) {
+              useAttendanceStore.setState({ shiftOverrides: Array.from(overrideMap.values()) });
+            }
+            if (terminalMap.size > 0) {
+              useAttendanceStore.setState({ terminals: Array.from(terminalMap.values()) });
+            }
           }
         } catch { /* ignore */ }
       },
@@ -1010,7 +1093,7 @@ export const useAttendanceStore = create<AttendanceStoreState>()(
         scheduleGroups: (persistedState?.scheduleGroups && persistedState.scheduleGroups.length > 0)
           ? persistedState.scheduleGroups
           : INITIAL_SCHEDULE_GROUPS,
-        employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts),
+        employeeContracts: mergeBiometricContracts(persistedState?.employeeContracts, currentState?.employeeContracts),
         attendanceLogs: mergeBiometricLogs(persistedState?.attendanceLogs, []),
         deletedLogIds: [],
       }),
@@ -1025,7 +1108,9 @@ if (typeof window !== 'undefined') {
     electronBridge.onBiometricSyncData((data: any) => {
       if (data) {
         if (Array.isArray(data.contracts) && data.contracts.length > 0) {
-          useAttendanceStore.setState({ employeeContracts: data.contracts });
+          const current = useAttendanceStore.getState().employeeContracts || [];
+          const merged = mergeBiometricContracts(data.contracts, current);
+          useAttendanceStore.setState({ employeeContracts: merged });
         }
         if (Array.isArray(data.logs) && data.logs.length > 0) {
           useAttendanceStore.setState((state) => ({

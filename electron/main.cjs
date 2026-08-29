@@ -303,8 +303,14 @@ async function runBiometricSync() {
 
     // Notificar a la ventana principal de Electron con los datos frescos del biométrico local y la lista de contratos con sus nombres reales
     try {
-      const { data: cState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts').maybeSingle();
-      const currentContracts = cState?.value || [];
+      const { data: cRows } = await supabase.from('app_state').select('key, value').in('key', ['attendance_contracts', 'attendance_contracts_BRANCH-001']);
+      let currentContracts = [];
+      if (Array.isArray(cRows)) {
+        const b1 = cRows.find(r => r.key === 'attendance_contracts_BRANCH-001');
+        const g = cRows.find(r => r.key === 'attendance_contracts');
+        if (Array.isArray(b1?.value) && b1.value.length > 0) currentContracts = b1.value;
+        else if (Array.isArray(g?.value) && g.value.length > 0) currentContracts = g.value;
+      }
 
       if (mainWindow && !mainWindow.isDestroyed()) {
         mainWindow.webContents.send('biometric-sync-data', {

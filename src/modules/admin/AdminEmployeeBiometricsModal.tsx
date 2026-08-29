@@ -29,7 +29,7 @@ const TEMPLATE_EXAMPLE_ROWS = [
 ];
 
 export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeNo }: AdminEmployeeBiometricsModalProps) {
-  const { employeeContracts, shiftTemplates, scheduleGroups = [], terminals, upsertEmployeeContract, deleteEmployeeContract, pushUserToTerminal, deleteUserFromTerminal, fetchTerminalUsers } = useAttendanceStore();
+  const { employeeContracts, shiftTemplates, scheduleGroups = [], terminals, upsertEmployeeContract, bulkUpsertEmployeeContracts, deleteEmployeeContract, pushUserToTerminal, deleteUserFromTerminal, fetchTerminalUsers } = useAttendanceStore();
   const { branches = [] } = useBranchStore();
 
   const [selectedEmpId, setSelectedEmpId] = useState<string | null>(null);
@@ -152,6 +152,7 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     const contract: EmployeeContract = {
       employeeId: selectedEmpId || `EMP-${employeeNo}`,
       employeeNo, fullName, branchId, shiftType, defaultShiftId,
+      scheduleGroupId,
       weeklyTargetHours, baseHourlyRate, overtimeHourlyRate, pinPassword,
       avatarColor: selectedEmpId
         ? employeeContracts.find((c) => c.employeeId === selectedEmpId)?.avatarColor
@@ -327,14 +328,12 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     if (!importPreview || importPreview.length === 0) return;
 
     setIsProcessing(true);
-    let savedCount = 0;
+    bulkUpsertEmployeeContracts(importPreview);
+    let savedCount = importPreview.length;
     let pushedCount = 0;
     let pushErrors = 0;
 
     for (const contract of importPreview) {
-      upsertEmployeeContract(contract);
-      savedCount++;
-
       if (pushToDevice && terminals.length > 0) {
         // Push each employee to the first terminal of their branch (or first terminal)
         const branchTerminal = terminals.find((t) => t.branchId === contract.branchId) || terminals[0];

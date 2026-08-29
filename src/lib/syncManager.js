@@ -342,6 +342,32 @@ async function _writeToSupabaseImpl(key, value) {
     }
   }
 
+  // 🛡️ Asistencias y Turnos (Contratos, Plantillas, Horarios Maestro): Propagar a todas las sedes y a la clave global
+  const isAttendanceConfig = key.startsWith('attendance_contracts') || key.startsWith('attendance_shifts') || key.startsWith('attendance_groups') || key.startsWith('attendance_terminals');
+  if (isAttendanceConfig && Array.isArray(value)) {
+    try {
+      const baseKey = getBaseKey(key);
+      const nowIso = new Date().toISOString();
+      const branchIds = ['BRANCH-001'];
+      try {
+        const branches = useBranchStore?.getState?.()?.branches || [];
+        branches.forEach(b => { if (b?.id && !branchIds.includes(b.id)) branchIds.push(b.id); });
+      } catch (_) {}
+
+      const upserts = [
+        supabase.from('app_state').upsert({ key: baseKey, value, updated_at: nowIso }, { onConflict: 'key' })
+      ];
+      branchIds.forEach(bid => {
+        upserts.push(supabase.from('app_state').upsert({ key: `${baseKey}_${bid}`, value, updated_at: nowIso }, { onConflict: 'key' }));
+      });
+
+      await Promise.allSettled(upserts);
+      return;
+    } catch (e) {
+      console.warn('[SyncManager] Error saving attendance configuration:', e);
+    }
+  }
+
   const { error } = await supabase
     .from('app_state')
     .upsert(
