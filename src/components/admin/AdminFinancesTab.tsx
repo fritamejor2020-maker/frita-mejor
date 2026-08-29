@@ -29,6 +29,7 @@ const formatShiftTime = (isoString?: string) => {
 
 import { formatMoney as fmt } from '../../utils/formatUtils';
 import { getProductAbbreviation } from '../../utils/formatUtils';
+import { matchVehicleId } from '../../utils/vehicleUtils';
 
 // ─── ResumenOperativoTab ─────────────────────────────────────────────
 // Consolida por vehículo: carga inicial + surtidos + sobrantes + cierre vendedor
