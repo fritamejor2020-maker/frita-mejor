@@ -59,8 +59,7 @@ export function useOrientation() {
         }
       } catch (_) {}
 
-      // Forzar un reflow/relayout en navegadores táctiles (ej: Opera Tablet)
-      window.dispatchEvent(new Event('resize'));
+      // Orientación actualizada correctamente en DOM sin bucles de eventos
     };
 
     // Aplicar orientación inicial al montar

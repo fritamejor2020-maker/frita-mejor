@@ -1851,9 +1851,11 @@ export const VendedorDashboard = () => {
                   } finally {
                     setTransferAmount('');
                     setTransferNote('');
-                    setTransferPhoto(null);
-                    if (transferFileRef.current) {
-                      transferFileRef.current.value = '';
+                    if (cameraFileRef.current) {
+                      cameraFileRef.current.value = '';
+                    }
+                    if (galleryFileRef.current) {
+                      galleryFileRef.current.value = '';
                     }
                   }
                 }}

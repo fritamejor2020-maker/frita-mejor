@@ -108,8 +108,10 @@ export function useVendorTracking(
       watchIdRef.current = null;
     }
     if (channelRef.current) {
-      await channelRef.current.untrack().catch(() => {});
-      await supabase.removeChannel(channelRef.current);
+      try {
+        await channelRef.current.untrack().catch(() => {});
+        await supabase.removeChannel(channelRef.current);
+      } catch (_) {}
       channelRef.current = null;
     }
     // Marcar la ubicación como inactiva en el store

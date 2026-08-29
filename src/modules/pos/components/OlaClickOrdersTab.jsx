@@ -3,7 +3,7 @@ import { supabase } from '../../../lib/supabase';
 import { usePosStore } from '../../../store/usePosStore';
 import { useInventoryStore } from '../../../store/useInventoryStore';
 import { ShoppingBag, Check, X, Phone, MapPin, AlertCircle, Volume2, VolumeX } from 'lucide-react';
-import toast from 'react-hot-toast';
+import { toast } from 'react-hot-toast';
 
 // Web Audio API Synthesizer for a premium register/bell sound
 const playChime = () => {

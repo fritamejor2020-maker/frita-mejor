@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+ï»¿import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from './supabase';
 import { useSellerSessionStore } from '../store/useSellerSessionStore';
@@ -6,12 +6,12 @@ import { useSellerSessionStore } from '../store/useSellerSessionStore';
 /**
  * Hook: detecta cuando el Admin cierra remotamente el turno del Vendedor.
  *
- * Cómo funciona:
+ * CÃ³mo funciona:
  * 1. Se suscribe en tiempo real a cambios en la tabla app_state para las llaves de posShifts.
  * 2. Cuando detecta un cambio, verifica si el shiftId activo ya fue marcado como cerrado.
- * 3. Si fue cerrado, limpia la sesión local y redirige al vendedor a la pantalla de configuración.
+ * 3. Si fue cerrado, limpia la sesiÃ³n local y redirige al vendedor a la pantalla de configuraciÃ³n.
  *
- * También hace polling cada 10s como fallback en caso de que Realtime falle.
+ * TambiÃ©n hace polling cada 10s como fallback en caso de que Realtime falle.
  */
 export function useRemoteShiftClose() {
   const { shiftId, isSetupComplete, endShift } = useSellerSessionStore();
@@ -40,7 +40,7 @@ export function useRemoteShiftClose() {
           if (!cancelled) navigate('/vendedor-setup', { replace: true });
         }
       } catch (e) {
-        // Silencioso — el polling es un fallback
+        // Silencioso â€” el polling es un fallback
       }
     };
 
@@ -80,7 +80,8 @@ export function useRemoteShiftClose() {
     return () => {
       cancelled = true;
       clearInterval(interval);
-      supabase.removeChannel(channel);
+      try { if (channel) supabase.removeChannel(channel); } catch (_) {}
     };
   }, [shiftId, isSetupComplete, endShift, navigate]);
 }
+
