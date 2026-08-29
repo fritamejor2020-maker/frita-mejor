@@ -535,47 +535,56 @@ async function pushContractToBiometricDevice(employeeNo, name, password) {
 }
 
 // ── Manejo de Eventos IPC ──────────────────────────────────────────────────────
-ipcMain.handle('modify-biometric-user', async (event, { employeeNo, name, password }) => {
+ipcMain.handle('modify-biometric-user', async (event, payload) => {
   try {
-    const empNoStr = String(employeeNo).trim();
-    const nameStr = String(name).trim();
-    const pinStr = String(password).trim();
+    const empNoStr = String(payload.employeeNo || '').trim();
+    const nameStr = String(payload.fullName || payload.name || '').trim();
+    const pinStr = String(payload.pinPassword || payload.password || '').trim();
 
     const pushRes = await pushContractToBiometricDevice(empNoStr, nameStr, pinStr);
 
     // Sincronizar actualización de contrato inmediatamente en Supabase
     try {
-      const { data: contractState } = await supabase.from('app_state').select('value').eq('key', 'attendance_contracts_BRANCH-001').maybeSingle();
-      let currentContracts = contractState?.value || [];
-      if (Array.isArray(currentContracts)) {
-        let found = false;
-        currentContracts = currentContracts.map(c => {
-          if (String(c.employeeNo).trim() === empNoStr) {
-            found = true;
-            return { ...c, fullName: nameStr, pinPassword: pinStr };
-          }
-          return c;
-        });
-
-        if (!found) {
-          currentContracts.push({
-            employeeId: `EMP-${empNoStr}`,
-            employeeNo: empNoStr,
-            fullName: nameStr,
-            branchId: 'BRANCH-001',
-            shiftType: 'VARIABLE',
-            weeklyTargetHours: 44,
-            baseHourlyRate: 6500,
-            overtimeHourlyRate: 9750,
-            pinPassword: pinStr,
-            avatarColor: '#3B82F6'
-          });
-        }
-
-        await supabase.from('app_state').upsert({ key: 'attendance_contracts', value: currentContracts }, { onConflict: 'key' });
-        await supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: currentContracts }, { onConflict: 'key' });
-        console.log(`[Electron Native IPC] 🟢 Contrato del usuario #${empNoStr} guardado en Supabase.`);
+      const { data: cRows } = await supabase.from('app_state').select('key, value').in('key', ['attendance_contracts', 'attendance_contracts_BRANCH-001']);
+      let currentContracts = [];
+      if (Array.isArray(cRows)) {
+        const b1 = cRows.find(r => r.key === 'attendance_contracts_BRANCH-001');
+        const g = cRows.find(r => r.key === 'attendance_contracts');
+        if (Array.isArray(b1?.value) && b1.value.length > 0) currentContracts = b1.value;
+        else if (Array.isArray(g?.value) && g.value.length > 0) currentContracts = g.value;
       }
+
+      const contractMap = new Map();
+      currentContracts.forEach(c => {
+        const id = c.employeeId || c.employeeNo;
+        if (id) contractMap.set(String(id).trim(), c);
+      });
+
+      const existing = contractMap.get(`EMP-${empNoStr}`) || contractMap.get(empNoStr);
+      const fullContract = {
+        employeeId: existing?.employeeId || payload.employeeId || `EMP-${empNoStr}`,
+        employeeNo: empNoStr,
+        fullName: nameStr,
+        branchId: payload.branchId || existing?.branchId || 'BRANCH-001',
+        shiftType: payload.shiftType || existing?.shiftType || 'VARIABLE',
+        scheduleGroupId: payload.scheduleGroupId || existing?.scheduleGroupId || 'GROUP-LOCAL',
+        defaultShiftId: payload.defaultShiftId || existing?.defaultShiftId || 'SHIFT-MANANA-COMPLETO',
+        weeklyTargetHours: Number(payload.weeklyTargetHours || existing?.weeklyTargetHours || 44),
+        baseHourlyRate: Number(payload.baseHourlyRate || existing?.baseHourlyRate || 6500),
+        overtimeHourlyRate: Number(payload.overtimeHourlyRate || existing?.overtimeHourlyRate || 9750),
+        pinPassword: pinStr,
+        avatarColor: payload.avatarColor || existing?.avatarColor || '#3B82F6'
+      };
+
+      contractMap.set(fullContract.employeeId, fullContract);
+      const updatedContracts = Array.from(contractMap.values());
+      const nowIso = new Date().toISOString();
+
+      await Promise.allSettled([
+        supabase.from('app_state').upsert({ key: 'attendance_contracts', value: updatedContracts, updated_at: nowIso }, { onConflict: 'key' }),
+        supabase.from('app_state').upsert({ key: 'attendance_contracts_BRANCH-001', value: updatedContracts, updated_at: nowIso }, { onConflict: 'key' }),
+      ]);
+      console.log(`[Electron Native IPC] 🟢 Contrato del usuario #${empNoStr} guardado con horario ${fullContract.scheduleGroupId} en Supabase.`);
     } catch (dbErr) {
       console.warn('[Electron Native IPC Supabase update error]:', dbErr.message);
     }

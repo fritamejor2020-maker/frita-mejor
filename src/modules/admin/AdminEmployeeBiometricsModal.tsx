@@ -168,11 +168,7 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
       if (typeof electronBridge.modifyBiometricUser === 'function') {
         try {
           console.log('[AdminModal] Invocando modificación nativa vía modifyBiometricUser...');
-          const res = await electronBridge.modifyBiometricUser({
-            employeeNo: String(contract.employeeNo),
-            name: contract.fullName,
-            password: String(contract.pinPassword || '1234')
-          });
+          const res = await electronBridge.modifyBiometricUser(contract);
           showStatus(res.message, res.ok ? 'success' : 'error');
           setIsProcessing(false);
           return;
