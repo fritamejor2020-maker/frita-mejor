@@ -822,6 +822,41 @@ export function PosView() {
   };
 
   const handleLoadSuspended = (sale) => {
+    // 1. AUTO-GUARDADO: Si el carrito actual tiene productos y no es la misma venta que se está seleccionando,
+    // persistir automáticamente el carrito actual en Espera para no perderlo JAMÁS al cambiar entre ventas.
+    if (ticketItems && ticketItems.length > 0 && activeSuspendedId !== sale.id) {
+      const currentCustomerObj = customers?.find(cust => cust.id === selectedCustomer);
+      const currentSaleId = activeSuspendedId || `HELD-${Date.now()}`;
+      const autoSavedSale = {
+        id: currentSaleId,
+        customerId: selectedCustomer || null,
+        customerName: currentCustomerObj?.name || pendingDeliveryInfo?.customerName || (isLuckyWinnerSession ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Venta Pausada')),
+        customerPhone: currentCustomerObj?.phone || pendingDeliveryInfo?.customerPhone || '',
+        deliveryAddress: currentCustomerObj?.address || pendingDeliveryInfo?.deliveryAddress || '',
+        serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+        isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+        isLuckyWinner: isLuckyWinnerSession || String(currentSaleId).includes('LUCKY'),
+        prizeType: isLuckyWinnerSession ? 'RASPA_Y_GANA' : undefined,
+        publicId: pendingDeliveryInfo?.publicId || null,
+        items: [...ticketItems],
+        subtotal,
+        discountPercent,
+        discountAmount,
+        total,
+        status: 'SUSPENDED',
+        heldAt: new Date().toISOString(),
+        timestamp: new Date().toISOString()
+      };
+
+      const existsInStore = (posSales || []).some(s => s.id === currentSaleId);
+      if (existsInStore) {
+        updatePosSale(currentSaleId, autoSavedSale);
+      } else {
+        addPosSale(autoSavedSale);
+      }
+      toast.info('Venta anterior guardada en espera automáticamente', { icon: '💾' });
+    }
+
     const isLucky = !!(sale.isLuckyWinner || (sale.id && String(sale.id).includes('LUCKY')));
     setIsLuckyWinnerSession(isLucky);
     setTicketItems(sale.items || []);
@@ -836,9 +871,8 @@ export function PosView() {
       isOlaClick: !!sale.isOlaClick,
       publicId: sale.publicId || ''
     });
-    // Eliminar de la lista de pendientes para evitar duplicados en Ventas en Espera
-    deleteHeldSale(sale.id);
-    deletePosSale(sale.id);
+
+    // NO eliminamos la venta de la base de datos para que persista ante cualquier cambio entre ventas o recarga
     setShowSuspendedModal(false);
     setShowHeldSalesModal(false);
     toast.success(`Pedido de ${sale.customerName || 'Cliente'} retomado`, { icon: '▶️' });
@@ -1584,7 +1618,19 @@ export function PosView() {
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4">
-            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => { setTicketItems([]); setActiveSuspendedId(null); setIsLuckyWinnerSession(false); setPendingDeliveryInfo(null); setSelectedCustomer(''); setManualDiscountPercent(0); try { usePosStore.getState().clearCart(); } catch(_) {} }}>
+            <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => {
+              if (activeSuspendedId) {
+                try { deleteHeldSale(activeSuspendedId); } catch(_) {}
+                try { deletePosSale(activeSuspendedId); } catch(_) {}
+              }
+              setTicketItems([]);
+              setActiveSuspendedId(null);
+              setIsLuckyWinnerSession(false);
+              setPendingDeliveryInfo(null);
+              setSelectedCustomer('');
+              setManualDiscountPercent(0);
+              try { usePosStore.getState().clearCart(); } catch(_) {}
+            }}>
               <span className="text-lg">❌</span>
               <span className="text-[10px] font-black">Anular</span>
             </button>
@@ -1858,9 +1904,22 @@ export function PosView() {
         <SuspendedSalesModal
           sales={(posSales || []).filter(s => s.status === 'SUSPENDED')}
           customers={customers}
+          activeSuspendedId={activeSuspendedId}
           onClose={() => setShowSuspendedModal(false)}
           onLoad={handleLoadSuspended}
-          onDelete={deletePosSale}
+          onDelete={(id) => {
+            if (id === activeSuspendedId) {
+              setTicketItems([]);
+              setActiveSuspendedId(null);
+              setIsLuckyWinnerSession(false);
+              setPendingDeliveryInfo(null);
+              setSelectedCustomer('');
+              setManualDiscountPercent(0);
+              try { usePosStore.getState().clearCart(); } catch(_) {}
+            }
+            deleteHeldSale(id);
+            deletePosSale(id);
+          }}
         />
       )}
 
@@ -2166,6 +2225,11 @@ export function PosView() {
                               <span className="font-black text-sm text-white">
                                 {sale.customerName}
                               </span>
+                              {sale.id === activeSuspendedId && (
+                                <span className="bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1">
+                                  ⚡ EN CAJA ACTUAL
+                                </span>
+                              )}
                               {sale.isLuckyWinner && (
                                 <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-black flex items-center gap-1 animate-pulse">
                                   🎟️ GANADOR RASPA Y GANA
@@ -2211,16 +2275,27 @@ export function PosView() {
                             handleLoadSuspended(sale);
                           }}
                           className={`flex-1 font-black text-xs py-2.5 px-3 rounded-xl shadow-md active:scale-95 transition-all flex items-center justify-center gap-1.5 ${
-                            sale.isLuckyWinner
+                            sale.id === activeSuspendedId
+                              ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                              : sale.isLuckyWinner
                               ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 shadow-amber-500/20'
                               : 'bg-green-600 hover:bg-green-500 text-white'
                           }`}
                         >
-                          {sale.isLuckyWinner ? '🎯 Recuperar y Ajustar Premio' : '▶️ Retomar Pedido'}
+                          {sale.id === activeSuspendedId ? '⚡ Continuar en Caja' : (sale.isLuckyWinner ? '🎯 Recuperar y Ajustar Premio' : '▶️ Retomar Pedido')}
                         </button>
                         <button
                           onClick={() => {
                             if (confirm('¿Eliminar esta venta en espera?')) {
+                              if (sale.id === activeSuspendedId) {
+                                setTicketItems([]);
+                                setActiveSuspendedId(null);
+                                setIsLuckyWinnerSession(false);
+                                setPendingDeliveryInfo(null);
+                                setSelectedCustomer('');
+                                setManualDiscountPercent(0);
+                                try { usePosStore.getState().clearCart(); } catch(_) {}
+                              }
                               deleteHeldSale(sale.id);
                               deletePosSale(sale.id);
                             }
@@ -3567,7 +3642,7 @@ function PaymentModal({ total, paymentMethods, onClose, onConfirm }) {
 }
 
 // ─── Suspended Sales Modal Component ───
-function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
+function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete, activeSuspendedId }) {
   return (
     <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
       <div className="bg-[#1e1f26] border border-gray-700/50 rounded-[32px] w-full max-w-xl overflow-hidden shadow-2xl flex flex-col max-h-[80vh] animate-bounce-in">
@@ -3589,6 +3664,7 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
               const custName = cust?.name || (s.isLuckyWinner ? 'Cliente Ganador Raspa y Gana' : 'Cliente General');
               const isContrata = cust?.typeId;
               const isWinner = !!s.isLuckyWinner;
+              const isActive = s.id === activeSuspendedId;
               return (
                 <div key={s.id} className={`rounded-[24px] p-5 transition-all hover:shadow-lg group ${isWinner ? 'bg-gradient-to-r from-amber-500/10 to-[#16171d] border-2 border-amber-500/70 shadow-[0_0_20px_rgba(245,158,11,0.2)]' : 'bg-[#16171d] border border-gray-800 hover:border-gray-600'}`}>
                   <div className="flex justify-between items-center">
@@ -3597,6 +3673,11 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
                         <span className={`text-sm font-black px-2 py-0.5 rounded-lg ${isContrata ? 'bg-amber-500/20 text-amber-400' : 'bg-blue-500/20 text-blue-400'}`}>
                           {isContrata ? '🤝' : '👤'} {custName}
                         </span>
+                        {isActive && (
+                          <span className="bg-blue-500/20 text-blue-400 border border-blue-500/40 text-xs font-black px-2.5 py-0.5 rounded-lg">
+                            ⚡ EN CAJA ACTUAL
+                          </span>
+                        )}
                         {isWinner && (
                           <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-black px-2.5 py-0.5 rounded-lg animate-pulse">
                             🎟️ GANADOR RASPA Y GANA
@@ -3608,8 +3689,8 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete }) {
                       <p className="text-xs text-gray-500 mt-1 bg-[#21242d] inline-block px-2 py-1 rounded-md">{s.items?.length || 0} ítem(s) guardados.</p>
                     </div>
                     <div className="flex flex-col gap-2 shrink-0 ml-3">
-                      <Button className={`rounded-[16px] font-black px-5 py-2.5 active:scale-95 transition-all text-sm ${isWinner ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)]' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_4px_14px_0_rgba(37,99,235,0.39)]'}`} onClick={() => onLoad(s)}>
-                        {isWinner ? '🎯 Recuperar Premio' : 'Recuperar'}
+                      <Button className={`rounded-[16px] font-black px-5 py-2.5 active:scale-95 transition-all text-sm ${isActive ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_4px_14px_0_rgba(37,99,235,0.39)]' : isWinner ? 'bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-gray-950 shadow-[0_4px_14px_0_rgba(245,158,11,0.39)]' : 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_4px_14px_0_rgba(37,99,235,0.39)]'}`} onClick={() => onLoad(s)}>
+                        {isActive ? '⚡ Continuar en Caja' : isWinner ? '🎯 Recuperar Premio' : 'Recuperar'}
                       </Button>
                       <button className="rounded-[16px] bg-red-950/40 hover:bg-red-900/60 text-red-400 font-bold px-5 py-2 active:scale-95 transition-all text-xs border border-red-900/30" onClick={() => { if (confirm('¿Eliminar esta venta en espera?')) onDelete(s.id); }}>
                         🗑️ Eliminar
