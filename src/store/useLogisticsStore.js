@@ -6,6 +6,7 @@ import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useSellerSessionStore } from './useSellerSessionStore';
 import { useAuthStore } from './useAuthStore';
+import { useBranchStore } from './useBranchStore';
 import { useVehicleStore } from './useVehicleStore';
 import { safeJSONStorage } from '../utils/safeStorage';
 import { broadcastLogisticsUpdate } from '../lib/logisticsBroadcast';
@@ -292,16 +293,20 @@ export const useLogisticsStore = create(
     try {
       const user = useAuthStore.getState().user;
       const userBranchId = user?.branchId || 'BRANCH-001';
+      const branches = useBranchStore.getState().branches || [];
+      const branchIds = new Set(['BRANCH-001', userBranchId, ...branches.map(b => b.id)]);
+
       const keysToFetch = [
-        'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
-        'pendingRequests_BRANCH-001', 'completedRequests_BRANCH-001', 'rejectedRequests_BRANCH-001', 'loadHistory_BRANCH-001'
+        'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory'
       ];
-      if (userBranchId && userBranchId !== 'BRANCH-001') {
-        keysToFetch.push(`pendingRequests_${userBranchId}`);
-        keysToFetch.push(`completedRequests_${userBranchId}`);
-        keysToFetch.push(`rejectedRequests_${userBranchId}`);
-        keysToFetch.push(`loadHistory_${userBranchId}`);
-      }
+      branchIds.forEach(bid => {
+        if (bid) {
+          keysToFetch.push(`pendingRequests_${bid}`);
+          keysToFetch.push(`completedRequests_${bid}`);
+          keysToFetch.push(`rejectedRequests_${bid}`);
+          keysToFetch.push(`loadHistory_${bid}`);
+        }
+      });
 
       const { data } = await supabase
         .from('app_state')

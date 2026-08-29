@@ -405,7 +405,12 @@ export const AdminFinancesTab = ({
       const { data, error } = await supabase
         .from('app_state')
         .select('key, value')
-        .in('key', ['posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history', 'deletedShiftIds', 'deletedShiftIds_BRANCH-001']);
+        .in('key', [
+          'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
+          'deletedShiftIds', 'deletedShiftIds_BRANCH-001',
+          'loadHistory_BRANCH-001', 'loadHistory',
+          'completedRequests_BRANCH-001', 'completedRequests'
+        ]);
 
       if (error || !data) return;
 
@@ -435,6 +440,28 @@ export const AdminFinancesTab = ({
 
       // Sincronizar en el store global para que Inventario en Ruta y Cierres Finanzas compartan exactamente los mismos datos
       useInventoryStore.setState({ posShifts: filtered });
+
+      // Unificar loadHistory
+      const historyMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['loadHistory_BRANCH-001']) ? map['loadHistory_BRANCH-001'] : []),
+        ...(Array.isArray(map['loadHistory']) ? map['loadHistory'] : [])
+      ].forEach((h: any) => {
+        if (h?.id) historyMap.set(h.id, h);
+      });
+      const allHistory = Array.from(historyMap.values()).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      if (allHistory.length > 0) useLogisticsStore.setState({ loadHistory: allHistory });
+
+      // Unificar completedRequests
+      const completedMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['completedRequests_BRANCH-001']) ? map['completedRequests_BRANCH-001'] : []),
+        ...(Array.isArray(map['completedRequests']) ? map['completedRequests'] : [])
+      ].forEach((c: any) => {
+        if (c?.id) completedMap.set(c.id, c);
+      });
+      const allCompleted = Array.from(completedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0).getTime() - new Date(a.completed_at || a.created_at || 0).getTime());
+      if (allCompleted.length > 0) useLogisticsStore.setState({ completedRequests: allCompleted });
     } catch (e) {
       // Ignorar fallos de red sin romper la UI
     }
@@ -452,7 +479,7 @@ export const AdminFinancesTab = ({
         event: '*',
         schema: 'public',
         table: 'app_state',
-        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
+        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history,loadHistory,loadHistory_BRANCH-001,completedRequests,completedRequests_BRANCH-001)'
       }, () => {
         loadShiftsFromSupabase();
       })
@@ -510,7 +537,7 @@ export const AdminFinancesTab = ({
   };
 
   // Carga el historial logístico de un vehículo en una fecha dada
-  const buildLogisticsTimeline = (vehicleId: string, shiftDate: string) => {
+  const buildLogisticsTimeline = (vehicleId: string, shiftDate: string, shiftId?: string) => {
     const seenIds = new Set<string>();
 
     // Aceptar entradas del mismo día o hasta ±1 día para absorber desfases de huso horario
@@ -529,16 +556,28 @@ export const AdminFinancesTab = ({
 
     const logEntries = (loadHistory as any[])
       .filter(e => {
-        if (e.vehicleId !== vehicleId || !isNearDate(e.timestamp)) return false;
+        if (!matchVehicleId(e.vehicleId, vehicleId)) return false;
+        const mShiftId = e.shiftId || e.shift_id;
+        if (mShiftId && shiftId) {
+          if (mShiftId !== shiftId) return false;
+        } else if (!isNearDate(e.timestamp)) {
+          return false;
+        }
         if (seenIds.has(e.id)) return false;
         seenIds.add(e.id);
         return true;
       })
-      .map(e => ({ id: e.id, type: e.type, timestamp: e.timestamp, items: e.items.map((i: any) => ({ ...i })) }));
+      .map(e => ({ id: e.id, type: e.type, timestamp: e.timestamp, items: (e.items || []).map((i: any) => ({ ...i })) }));
 
     const surtidoEntries = (completedRequests as any[])
       .filter(r => {
-        if (r.requester_point_id !== vehicleId || !isNearDate(r.completed_at || r.created_at)) return false;
+        if (!matchVehicleId(r.requester_point_id, vehicleId)) return false;
+        const mShiftId = r.shiftId || r.shift_id;
+        if (mShiftId && shiftId) {
+          if (mShiftId !== shiftId) return false;
+        } else if (!isNearDate(r.completed_at || r.created_at)) {
+          return false;
+        }
         if (seenIds.has(r.id)) return false;
         seenIds.add(r.id);
         return true;
@@ -605,6 +644,15 @@ export const AdminFinancesTab = ({
        return dateOf(ts) === shiftDate;
      };
 
+     const isShiftLogisticsMatch = (e: any) => {
+       if (!e) return false;
+       const mShiftId = e.shiftId || e.shift_id;
+       if (mShiftId && s.id) {
+         return mShiftId === s.id;
+       }
+       return inWindow(e.timestamp || e.completed_at || e.created_at);
+     };
+
      if (s.type === 'VENDEDOR') {
          const priceMap: Record<string, { price: number, name: string }> = {};
          (useInventoryStore.getState().getPosItems() || []).forEach((p: any) => {
@@ -619,8 +667,8 @@ export const AdminFinancesTab = ({
          const seenCargaIds = new Set<string>();
          const cargaMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          loadHistory
-           .filter((e: any) => e.type === 'carga' && e.vehicleId === vehicleId
-             && inWindow(e.timestamp)   // ← solo la ventana de este turno
+           .filter((e: any) => e.type === 'carga' && matchVehicleId(e.vehicleId, vehicleId)
+             && isShiftLogisticsMatch(e)
              && !seenCargaIds.has(e.id) && (seenCargaIds.add(e.id) || true))
            .forEach((e: any) => {
              e.items.forEach(({ productId, qty, name, stringValue }: any) => {
@@ -635,8 +683,8 @@ export const AdminFinancesTab = ({
          const seenSurtidoIds = new Set<string>();
          const surtidoMap: Record<string, { name: string; qty: number; stringCounts: Record<string,number> }> = {};
          completedRequests
-           .filter((r: any) => r.requester_point_id === vehicleId
-             && inWindow(r.completed_at || r.created_at)  // ← solo la ventana de este turno
+           .filter((r: any) => matchVehicleId(r.requester_point_id, vehicleId)
+             && isShiftLogisticsMatch(r)
              && !seenSurtidoIds.has(r.id) && (seenSurtidoIds.add(r.id) || true))
            .forEach((r: any) => {
              (r.items_payload || []).forEach(({ productId, qty, name, stringValue }: any) => {
@@ -651,8 +699,8 @@ export const AdminFinancesTab = ({
          const seenRecepcionIds = new Set<string>();
          const sobranteMap: Record<string, { name: string; qty: number }> = {};
          loadHistory
-           .filter((e: any) => e.type === 'recepcion' && e.vehicleId === vehicleId
-             && inWindow(e.timestamp)  // ← solo la ventana de este turno
+           .filter((e: any) => e.type === 'recepcion' && matchVehicleId(e.vehicleId, vehicleId)
+             && isShiftLogisticsMatch(e)
              && !seenRecepcionIds.has(e.id) && (seenRecepcionIds.add(e.id) || true))
            .forEach((e: any) => {
              e.items.forEach(({ productId, qty, name }: any) => {
@@ -1163,7 +1211,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                                   if (!_hasRealLogistics) {
                                     const _vid = closing._raw?.pointId;
                                     if (_vid) {
-                                      const _tl = buildLogisticsTimeline(_vid, closing.date);
+                                      const _tl = buildLogisticsTimeline(_vid, closing.date, closing._raw?.id);
                                       const _cM: Record<string,number> = {};
                                       const _sM: Record<string,number> = {};
                                       const _rM: Record<string,number> = {};
@@ -1185,7 +1233,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                                   }
                                   setEditDetails(_initDetails);
                                   const vehicleId = closing._raw?.pointId;
-                                  setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
+                                  setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date, closing._raw?.id) : []);
                                 }}
                               >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1246,7 +1294,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
                               {/* ── Historial de Envíos (colapsable) ── */}
                               {closing._raw?.pointId && (() => {
-                                const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
+                                const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date, closing._raw?.id);
                                 const rawHistory = closing._raw?.editHistory;
                                 const buildDiffItems = (snap: any) => {
                                   const items: any[] = [];
@@ -1533,7 +1581,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                            }
                            setEditDetails(_initDetails);
                           const vehicleId = closing._raw?.pointId;
-                          setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date) : []);
+                          setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date, closing._raw?.id) : []);
                         }}
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1675,7 +1723,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
                      {/* ── Historial de Envíos (colapsable) ── */}
                      {closing._raw?.pointId && (() => {
-                       const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date);
+                       const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date, closing._raw?.id);
                        // Inyectar entrada virtual si el cierre fue editado manualmente
                        // Inyectar entradas del editHistory (una por cada edicion)
                        const rawHistory = closing._raw?.editHistory;

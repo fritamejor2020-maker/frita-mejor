@@ -188,8 +188,9 @@ function buildShiftLogistics(
     if (!isVehicleMatch) return false; // 🚫 Si no es el mismo triciclo, descartar de inmediato
 
     // 2. Coincidencia por shiftId exacto (máxima prioridad)
-    if (e.shiftId && shift.id) {
-      if (e.shiftId === shift.id) return true;
+    const mShiftId = e.shiftId || e.shift_id;
+    if (mShiftId && shift.id) {
+      if (mShiftId === shift.id) return true;
       // Si el movimiento tiene un shiftId explícito y no coincide con este turno, DESCARTAR
       return false;
     }
@@ -289,6 +290,30 @@ function buildShiftLogistics(
     totalVendidoPesos += vendido * price;
     lines.push({ pid, name, carga, surtido, sobrante, vendido, price });
   });
+
+  // Fallback robusto: si no hay registros logísticos en loadHistory pero el turno cerrado tiene soldItems guardados
+  if (lines.length === 0 && shift.soldItems && typeof shift.soldItems === 'object') {
+    Object.values(shift.soldItems).forEach((item: any) => {
+      const pid = item.id || item.productId || item.name;
+      const price = item.price || priceMap[pid]?.price || 0;
+      const qty = item.qty || 0;
+      const sent = item.sent || qty;
+      const returned = item.returned || 0;
+      totalCarga += sent;
+      totalSobrante += returned;
+      totalVendido += qty;
+      totalVendidoPesos += qty * price;
+      lines.push({
+        pid,
+        name: item.name || priceMap[pid]?.name || pid,
+        carga: sent,
+        surtido: 0,
+        sobrante: returned,
+        vendido: qty,
+        price
+      });
+    });
+  }
 
   return { lines, totalCarga, totalSurtido, totalSobrante, totalVendido, totalVendidoPesos };
 }
@@ -493,7 +518,9 @@ export function AdminVehicleInventoryTab() {
         .select('key, value')
         .in('key', [
           'posShifts_BRANCH-001', 'posShifts', 'posShifts_master_history',
-          'deletedShiftIds_BRANCH-001', 'deletedShiftIds'
+          'deletedShiftIds_BRANCH-001', 'deletedShiftIds',
+          'loadHistory_BRANCH-001', 'loadHistory',
+          'completedRequests_BRANCH-001', 'completedRequests'
         ]);
 
       if (!error && data) {
@@ -549,9 +576,29 @@ export function AdminVehicleInventoryTab() {
 
         const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
         setSupabaseShifts(filtered);
-
-        // También actualizar el store de Zustand para que quede sincronizado
         useInventoryStore.setState({ posShifts: filtered });
+
+        // Unificar loadHistory
+        const historyMap = new Map<string, any>();
+        [
+          ...(Array.isArray(map['loadHistory_BRANCH-001']) ? map['loadHistory_BRANCH-001'] : []),
+          ...(Array.isArray(map['loadHistory']) ? map['loadHistory'] : [])
+        ].forEach((h: any) => {
+          if (h?.id) historyMap.set(h.id, h);
+        });
+        const allHistory = Array.from(historyMap.values()).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+        if (allHistory.length > 0) useLogisticsStore.setState({ loadHistory: allHistory });
+
+        // Unificar completedRequests
+        const completedMap = new Map<string, any>();
+        [
+          ...(Array.isArray(map['completedRequests_BRANCH-001']) ? map['completedRequests_BRANCH-001'] : []),
+          ...(Array.isArray(map['completedRequests']) ? map['completedRequests'] : [])
+        ].forEach((c: any) => {
+          if (c?.id) completedMap.set(c.id, c);
+        });
+        const allCompleted = Array.from(completedMap.values()).sort((a, b) => new Date(b.completed_at || b.created_at || 0).getTime() - new Date(a.completed_at || a.created_at || 0).getTime());
+        if (allCompleted.length > 0) useLogisticsStore.setState({ completedRequests: allCompleted });
       }
     } catch (e) {
       // No bloquear la UI si falla Supabase
@@ -576,7 +623,7 @@ export function AdminVehicleInventoryTab() {
         event: '*',
         schema: 'public',
         table: 'app_state',
-        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history)'
+        filter: 'key=in.(posShifts,posShifts_BRANCH-001,posShifts_master_history,loadHistory,loadHistory_BRANCH-001,completedRequests,completedRequests_BRANCH-001)'
       }, () => {
         loadShiftsFromSupabase();
       })

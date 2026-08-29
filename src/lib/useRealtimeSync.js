@@ -97,24 +97,33 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['branches']          = (v) => { if (Array.isArray(v) && v.length > 0) useBranchStore.getState().loadFromRemote(v); };
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['suppliers']         = (v) => useSupplierStore.getState().loadFromRemote(v);
-  const mergeLogisticsList = (currentList, incomingList) => {
+  const mergeLogisticsList = (currentList, incomingList, isPendingOnly = false) => {
     if (!Array.isArray(incomingList)) return currentList || [];
-    const today = new Date().toISOString().slice(0, 10);
-    const isToday = (item) => {
-      if (!item) return false;
-      const d = (item.completed_at || item.created_at || item.timestamp || item.fecha || item.date || '').slice(0, 10);
-      return !d || d >= today;
-    };
     const nowMs = Date.now();
     const map = new Map();
 
+    const isKeepable = (item) => {
+      if (!item) return false;
+      if (isPendingOnly) {
+        const today = new Date().toISOString().slice(0, 10);
+        const d = (item.created_at || item.timestamp || item.fecha || item.date || '').slice(0, 10);
+        return !d || d >= today;
+      }
+      // Para completedRequests, rejectedRequests y loadHistory: conservar los últimos 60 días (historial completo)
+      const rawDate = item.completed_at || item.created_at || item.timestamp || item.fecha || item.date || '';
+      if (!rawDate) return true;
+      const itemTime = new Date(rawDate).getTime();
+      if (isNaN(itemTime)) return true;
+      return (nowMs - itemTime) <= 60 * 24 * 60 * 60 * 1000;
+    };
+
     // 1. Añadir elementos locales primero
-    (currentList || []).filter(isToday).forEach(item => {
+    (currentList || []).filter(isKeepable).forEach(item => {
       if (item?.id) map.set(item.id, item);
     });
 
     // 2. Fusionar elementos entrantes preservando escrituras locales recientes
-    incomingList.filter(isToday).forEach(item => {
+    incomingList.filter(isKeepable).forEach(item => {
       if (!item?.id) return;
       const local = map.get(item.id);
       if (!local) {
@@ -143,10 +152,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     return Array.from(map.values());
   };
 
-  applicators['pendingRequests']   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
-  applicators['completedRequests'] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
-  applicators['rejectedRequests']  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
-  applicators['loadHistory']       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
+  applicators['pendingRequests']   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v, true) }));
+  applicators['completedRequests'] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v, false) }));
+  applicators['rejectedRequests']  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v, false) }));
+  applicators['loadHistory']       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v, false) }));
   applicators['deletedUserIds']    = (v) => {
     const local = useAuthStore.getState().deletedUserIds || [];
     const merged = [...new Set([...local, ...(v || [])])];
@@ -275,10 +284,10 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(state.contrataPayments || [], v || [], 'contrataPayments');
       useInventoryStore.setState({ contrataPayments: merged });
     };
-    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
-    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
-    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
-    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
+    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v, true) }));
+    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v, false) }));
+    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v, false) }));
+    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v, false) }));
     applicators[`customerTypes_${bid}`]   = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customerTypes: v }); };
     applicators[`customers_${bid}`]       = (v) => { if (Array.isArray(v) && v.length > 0) useInventoryStore.setState({ customers: v }); };
     applicators[`posSettings_${bid}`]     = (v) => {
@@ -310,11 +319,6 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       }
     };
 
-    // ── Logística (Dejador / Vendedor) ──
-    applicators[`pendingRequests_${bid}`]   = (v) => useLogisticsStore.setState(s => ({ pendingRequests: mergeLogisticsList(s.pendingRequests, v) }));
-    applicators[`completedRequests_${bid}`] = (v) => useLogisticsStore.setState(s => ({ completedRequests: mergeLogisticsList(s.completedRequests, v) }));
-    applicators[`rejectedRequests_${bid}`]  = (v) => useLogisticsStore.setState(s => ({ rejectedRequests: mergeLogisticsList(s.rejectedRequests, v) }));
-    applicators[`loadHistory_${bid}`]       = (v) => useLogisticsStore.setState(s => ({ loadHistory: mergeLogisticsList(s.loadHistory, v) }));
 
     // ── Otros BRANCH_KEYS que syncManager escribe con sufijo ──
     applicators[`loadTemplates_${bid}`]     = (v) => {
