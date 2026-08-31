@@ -153,16 +153,30 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
     })
     .filter(Boolean);
 
-  // 4. TOTALES GENERALES DEL TURNO
+  // 4. TOTALES GENERALES Y ABSORCIÓN DE SALIDAS EN CASCADA
+  const retiros        = (expenses || []).filter(e => e.type !== 'deposito');
+  const depositos      = (expenses || []).filter(e => e.type === 'deposito');
+  const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
+  const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
+
+  // ── Lógica de Cascada (Local -> Contratas) ──
+  const localSalidasAbsorbidas = Math.min(totalExpenses, localCash);
+  const localCashNeto = localCash - localSalidasAbsorbidas;
+  const localTotalCalculado = localCashNeto + localSalidasAbsorbidas + localTotalTransfer;
+
+  const salidasRestantes = totalExpenses - localSalidasAbsorbidas;
+  const contrataSalidasAbsorbidas = Math.min(salidasRestantes, contrataCash);
+  const contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
+  const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTotalTransfer + contrataCredit;
+
+  const totalGastosCierre = totalExpenses;
+  const totalGeneralCalculado = localTotalCalculado + contrataTotalCalculado;
+
   const cashSalesTotal     = localCash + contrataCash;
   const transferSalesTotal = localTotalTransfer + contrataTotalTransfer;
   const totalSales         = localTotalSales + contrataTotalSales;
 
   const totalDiscounts = safeSales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
-  const retiros        = (expenses || []).filter(e => e.type !== 'deposito');
-  const depositos      = (expenses || []).filter(e => e.type === 'deposito');
-  const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
-  const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
 
   const expectedCash = initial + cashSalesTotal - totalExpenses + totalDeposits;
   const countedCash  = shift.realAmount || 0;
@@ -310,39 +324,49 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="border-bottom: 1px dashed black; margin: 4px 0;"></div>
       ` : ''}
 
-      <!-- 3. RESUMEN GENERAL DEL TURNO COMPACTO -->
+      <!-- 4. RESUMEN FINANCIERO DEL TURNO -->
       ${tc.zShowFinancialSummary !== false ? `
-      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Resumen Financiero del Turno</h3>
         
-        ${tc.zShowInitialBase !== false ? `<div style="display: flex; justify-content: space-between;">
-          <span>Base Inicial Caja:</span>
-          <span>${formatMoney(initial)}</span>
-        </div>` : ''}
-        
-        <div style="display: flex; justify-content: space-between;">
-          <span>Total Efectivo Caja (Local + Contratas):</span>
-          <span>${formatMoney(cashSalesTotal)}</span>
-        </div>
-        <div style="display: flex; justify-content: space-between;">
-          <span>Total Transferencias / Digital:</span>
-          <span>${formatMoney(transferSalesTotal)}</span>
+        <!-- Local -->
+        <div style="margin-bottom: 2px;">
+          <div style="font-weight: 900; margin-bottom: 1px; font-size: 11px;">Local</div>
+          <div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCashNeto)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Salidas Local:</span><span>${formatMoney(localSalidasAbsorbidas)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dashed black; margin-top: 1px; padding-top: 1px;">
+            <span>Total Local:</span><span>${formatMoney(localTotalCalculado)}</span>
+          </div>
         </div>
 
-        ${tc.zShowTotalSales !== false ? `<div style="border-top: 1px solid black; padding-top: 2px; margin-top: 2px; display: flex; justify-content: space-between; font-weight: 900; font-size: 12.5px;">
-          <span>TOTAL GENERAL VENTAS:</span>
-          <span>${formatMoney(totalSales)}</span>
-        </div>` : ''}
+        <div style="border-bottom: 1px dashed #aaa; margin: 3px 0;"></div>
 
-        ${tc.zShowExpensesLine !== false ? `<div style="display: flex; justify-content: space-between; margin-top: 4px;">
-          <span>Retiros / Gastos:</span>
-          <span>-${formatMoney(totalExpenses)}</span>
-        </div>` : ''}
+        <!-- Contratas -->
+        <div style="margin-bottom: 2px;">
+          <div style="font-weight: 900; margin-bottom: 1px; font-size: 11px;">Contratas</div>
+          <div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCashNeto)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Salidas Contratas:</span><span>${formatMoney(contrataSalidasAbsorbidas)}</span></div>
+          <div style="display: flex; justify-content: space-between;"><span>Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span></div>
+          ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900;"><span>Créditos Contratas:</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
+          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dashed black; margin-top: 1px; padding-top: 1px;">
+            <span>Total Contratas:</span><span>${formatMoney(contrataTotalCalculado)}</span>
+          </div>
+        </div>
 
-        ${totalDeposits > 0 ? `<div style="display: flex; justify-content: space-between; margin-top: 2px;">
-          <span>Depositos:</span>
-          <span>+${formatMoney(totalDeposits)}</span>
-        </div>` : ''}
+        <div style="border-bottom: 1px solid black; margin: 3px 0;"></div>
+
+        <!-- Total Gastos del cierre -->
+        <div style="display: flex; justify-content: space-between; font-weight: bold; color: #b91c1c; font-size: 10.5px; padding-top: 1px;">
+          <span>Total Gastos del cierre:</span>
+          <span>${formatMoney(totalGastosCierre)}</span>
+        </div>
+
+        <!-- Total General del cierre -->
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 11.5px; padding: 2px 0;">
+          <span>Total General del cierre:</span>
+          <span>${formatMoney(totalGeneralCalculado)}</span>
+        </div>
 
         ${discountsHtml}
       </div>
