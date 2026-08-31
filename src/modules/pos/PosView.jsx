@@ -17,6 +17,7 @@ import { supabase } from '../../lib/supabase';
 import { usePosStore } from '../../store/usePosStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { QuickTaskDrawer } from '../../components/ui/QuickTaskDrawer';
+import toast from 'react-hot-toast';
 
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
@@ -828,63 +829,72 @@ export function PosView() {
   const handleLoadSuspended = (sale) => {
     if (!sale) return;
 
-    // 1. AUTO-GUARDADO: Si el carrito actual tiene productos y no es la misma venta que se está seleccionando,
-    // persistir automáticamente el carrito actual en Espera para no perderlo JAMÁS al cambiar entre ventas.
-    if (ticketItems && ticketItems.length > 0 && activeSuspendedId !== sale.id) {
-      const currentCustomerObj = customers?.find(cust => cust.id === selectedCustomer);
-      const currentSaleId = activeSuspendedId || `HELD-${Date.now()}`;
-      const autoSavedSale = {
-        id: currentSaleId,
-        customerId: selectedCustomer || null,
-        customerName: currentCustomerObj?.name || pendingDeliveryInfo?.customerName || (isLuckyWinnerSession ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Venta Pausada')),
-        customerPhone: currentCustomerObj?.phone || pendingDeliveryInfo?.customerPhone || '',
-        deliveryAddress: currentCustomerObj?.address || pendingDeliveryInfo?.deliveryAddress || '',
-        serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
-        isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
-        isLuckyWinner: isLuckyWinnerSession || String(currentSaleId).includes('LUCKY'),
-        prizeType: isLuckyWinnerSession ? 'RASPA_Y_GANA' : undefined,
-        publicId: pendingDeliveryInfo?.publicId || null,
-        items: ticketItems.map(i => ({ ...i })),
-        subtotal,
-        discountPercent,
-        discountAmount,
-        total,
-        status: 'SUSPENDED',
-        heldAt: new Date().toISOString(),
-        timestamp: new Date().toISOString()
-      };
+    try {
+      // 1. AUTO-GUARDADO: Si el carrito actual tiene productos y no es la misma venta que se está seleccionando,
+      // persistir automáticamente el carrito actual en Espera para no perderlo JAMÁS al cambiar entre ventas.
+      if (ticketItems && ticketItems.length > 0 && activeSuspendedId !== sale.id) {
+        const currentCustomerObj = customers?.find(cust => cust.id === selectedCustomer);
+        const currentSaleId = activeSuspendedId || `HELD-${Date.now()}`;
+        const autoSavedSale = {
+          id: currentSaleId,
+          customerId: selectedCustomer || null,
+          customerName: currentCustomerObj?.name || pendingDeliveryInfo?.customerName || (isLuckyWinnerSession ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Venta Pausada')),
+          customerPhone: currentCustomerObj?.phone || pendingDeliveryInfo?.customerPhone || '',
+          deliveryAddress: currentCustomerObj?.address || pendingDeliveryInfo?.deliveryAddress || '',
+          serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+          isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+          isLuckyWinner: isLuckyWinnerSession || String(currentSaleId).includes('LUCKY'),
+          prizeType: isLuckyWinnerSession ? 'RASPA_Y_GANA' : undefined,
+          publicId: pendingDeliveryInfo?.publicId || null,
+          items: ticketItems.map(i => ({ ...i })),
+          subtotal,
+          discountPercent,
+          discountAmount,
+          total,
+          status: 'SUSPENDED',
+          heldAt: new Date().toISOString(),
+          timestamp: new Date().toISOString()
+        };
 
-      const existsInStore = (posSales || []).some(s => s.id === currentSaleId);
-      if (existsInStore) {
-        updatePosSale(currentSaleId, autoSavedSale);
-      } else {
-        addPosSale(autoSavedSale);
+        const existsInStore = (posSales || []).some(s => s.id === currentSaleId);
+        if (existsInStore) {
+          updatePosSale(currentSaleId, autoSavedSale);
+        } else {
+          addPosSale(autoSavedSale);
+        }
+        try { toast('Venta anterior guardada en espera automáticamente', { icon: '💾' }); } catch(_) {}
       }
-      toast.info('Venta anterior guardada en espera automáticamente', { icon: '💾' });
+
+      // 2. OBTENER LA VERSIÓN FRESCA DE LA VENTA A RETOMAR
+      const freshSale = (posSales || []).find(s => s.id === sale.id) || (heldSales || []).find(h => h.id === sale.id) || sale;
+      const isLucky = !!(freshSale.isLuckyWinner || (freshSale.id && String(freshSale.id).includes('LUCKY')));
+
+      setIsLuckyWinnerSession(isLucky);
+      setTicketItems((freshSale.items || []).map(i => ({ ...i })));
+      setSelectedCustomer(freshSale.customerId || '');
+      setActiveSuspendedId(freshSale.id);
+      setManualDiscountPercent(freshSale.discountPercent || (freshSale.isLuckyWinner && freshSale.prizeType === 'DISCOUNT' ? (freshSale.discountPercentage || 0) : 0));
+      setPendingDeliveryInfo({
+        customerName: freshSale.customerName || '',
+        customerPhone: freshSale.customerPhone || '',
+        deliveryAddress: freshSale.deliveryAddress || '',
+        serviceType: freshSale.serviceType || 'DELIVERY',
+        isOlaClick: !!freshSale.isOlaClick,
+        publicId: freshSale.publicId || ''
+      });
+
+      // Cerrar modales inmediatamente
+      setShowSuspendedModal(false);
+      setShowHeldSalesModal(false);
+      try { toast.success(`Pedido de ${freshSale.customerName || 'Cliente'} retomado`, { icon: '▶️' }); } catch(_) {}
+    } catch (err) {
+      console.error('[POS] Error al retomar venta en espera:', err);
+      // En caso de cualquier error imprevisto, asegurar que el modal se cierre y se carguen los ítems
+      setTicketItems((sale.items || []).map(i => ({ ...i })));
+      setActiveSuspendedId(sale.id);
+      setShowSuspendedModal(false);
+      setShowHeldSalesModal(false);
     }
-
-    // 2. OBTENER LA VERSIÓN FRESCA DE LA VENTA A RETOMAR
-    const freshSale = (posSales || []).find(s => s.id === sale.id) || (heldSales || []).find(h => h.id === sale.id) || sale;
-    const isLucky = !!(freshSale.isLuckyWinner || (freshSale.id && String(freshSale.id).includes('LUCKY')));
-
-    setIsLuckyWinnerSession(isLucky);
-    setTicketItems((freshSale.items || []).map(i => ({ ...i })));
-    setSelectedCustomer(freshSale.customerId || '');
-    setActiveSuspendedId(freshSale.id);
-    setManualDiscountPercent(freshSale.discountPercent || (freshSale.isLuckyWinner && freshSale.prizeType === 'DISCOUNT' ? (freshSale.discountPercentage || 0) : 0));
-    setPendingDeliveryInfo({
-      customerName: freshSale.customerName || '',
-      customerPhone: freshSale.customerPhone || '',
-      deliveryAddress: freshSale.deliveryAddress || '',
-      serviceType: freshSale.serviceType || 'DELIVERY',
-      isOlaClick: !!freshSale.isOlaClick,
-      publicId: freshSale.publicId || ''
-    });
-
-    // Cerrar modales inmediatamente
-    setShowSuspendedModal(false);
-    setShowHeldSalesModal(false);
-    toast.success(`Pedido de ${freshSale.customerName || 'Cliente'} retomado`, { icon: '▶️' });
   };
 
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
