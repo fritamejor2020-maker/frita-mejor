@@ -159,17 +159,45 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
 
-  // ── Lógica de Cascada (Local -> Contratas) ──
-  const localSalidasAbsorbidas = Math.min(totalExpenses, localCash);
-  const localCashNeto = localCash - localSalidasAbsorbidas;
-  const localTotalCalculado = localCashNeto + localSalidasAbsorbidas + localTotalTransfer;
+  // ── Lógica de Cálculo: Efectivo Real Contado vs Modo Teórico ──
+  const realCountedCash = Number(shift.realAmount);
+  const hasRealCount = !isNaN(realCountedCash) && realCountedCash > 0;
 
-  const salidasRestantes = totalExpenses - localSalidasAbsorbidas;
-  const contrataSalidasAbsorbidas = Math.min(salidasRestantes, contrataCash);
-  const contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
+  let localCashNeto = 0;
+  let localSalidasAbsorbidas = 0;
+  let contrataCashNeto = 0;
+  let contrataSalidasAbsorbidas = 0;
+
+  if (hasRealCount) {
+    // Modo Real Contado:
+    // El efectivo real de ventas disponible en gaveta (descontando base inicial):
+    const efVentasRealEnGaveta = Math.max(0, realCountedCash - initial);
+    
+    // Salidas pagadas:
+    localSalidasAbsorbidas = Math.min(totalExpenses, localCash);
+    contrataSalidasAbsorbidas = Math.min(totalExpenses - localSalidasAbsorbidas, contrataCash);
+
+    // Distribuimos el efectivo real que quedó en gaveta entre Local y Contratas:
+    const contrataEsperadoNeto = Math.max(0, contrataCash - contrataSalidasAbsorbidas);
+    if (efVentasRealEnGaveta >= contrataEsperadoNeto) {
+      contrataCashNeto = contrataEsperadoNeto;
+      localCashNeto = efVentasRealEnGaveta - contrataEsperadoNeto;
+    } else {
+      contrataCashNeto = efVentasRealEnGaveta;
+      localCashNeto = 0;
+    }
+  } else {
+    // Modo Sistema Teórico (sin conteo real ingresado):
+    localSalidasAbsorbidas = Math.min(totalExpenses, localCash);
+    localCashNeto = localCash - localSalidasAbsorbidas;
+    contrataSalidasAbsorbidas = Math.min(totalExpenses - localSalidasAbsorbidas, contrataCash);
+    contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
+  }
+
+  const localTotalCalculado = localCashNeto + localSalidasAbsorbidas + localTotalTransfer;
   const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTotalTransfer + contrataCredit;
 
-  const totalGastosCierre = totalExpenses;
+  const totalGastosCierre = localSalidasAbsorbidas + contrataSalidasAbsorbidas;
   const totalGeneralCalculado = localTotalCalculado + contrataTotalCalculado;
 
   const cashSalesTotal     = localCash + contrataCash;
@@ -334,8 +362,8 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         <!-- Local -->
         <div style="margin-bottom: 2px;">
           <div style="font-weight: 900; text-decoration: underline; margin-bottom: 3px; font-size: 11px;">Local</div>
-          <div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCashNeto)}</span></div>
-          <div style="display: flex; justify-content: space-between;"><span>Salidas Local:</span><span>${formatMoney(localSalidasAbsorbidas)}</span></div>
+          ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCashNeto)}</span></div>` : ''}
+          ${tc.zShowExpensesLine !== false && totalExpenses > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Salidas Local:</span><span>${formatMoney(localSalidasAbsorbidas)}</span></div>` : ''}
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span></div>
           <div style="border-top: 1px dashed black; margin: 3px 0 2px 0;"></div>
           <div style="display: flex; justify-content: space-between; font-weight: 900;">
@@ -348,8 +376,8 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         <!-- Contratas -->
         <div style="margin-bottom: 2px;">
           <div style="font-weight: 900; text-decoration: underline; margin-bottom: 3px; font-size: 11px;">Contratas</div>
-          <div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCashNeto)}</span></div>
-          <div style="display: flex; justify-content: space-between;"><span>Salidas Contratas:</span><span>${formatMoney(contrataSalidasAbsorbidas)}</span></div>
+          ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCashNeto)}</span></div>` : ''}
+          ${tc.zShowExpensesLine !== false && contrataSalidasAbsorbidas > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Salidas Contratas:</span><span>${formatMoney(contrataSalidasAbsorbidas)}</span></div>` : ''}
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span></div>
           ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900;"><span>Créditos Contratas:</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
           <div style="border-top: 1px dashed black; margin: 3px 0 2px 0;"></div>
@@ -361,16 +389,20 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         <div style="border-bottom: 1.5px solid black; margin: 5px 0;"></div>
 
         <!-- Total Gastos del cierre -->
+        ${tc.zShowExpensesLine !== false && totalExpenses > 0 ? `
         <div style="display: flex; justify-content: space-between; font-weight: 900; color: #dc2626 !important; font-size: 11px; margin-bottom: 4px;">
           <span>Total Gastos del cierre:</span>
           <span>${formatMoney(totalGastosCierre)}</span>
         </div>
+        ` : ''}
 
         <!-- Total General del cierre -->
+        ${tc.zShowTotalSales !== false ? `
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px;">
           <span>Total General del cierre:</span>
           <span>${formatMoney(totalGeneralCalculado)}</span>
         </div>
+        ` : ''}
 
         ${discountsHtml}
       </div>
@@ -414,6 +446,12 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
         <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Cuadre de Caja (Efectivo)</h3>
         
+        ${tc.zShowInitialBase !== false ? `
+        <div style="display: flex; justify-content: space-between;">
+          <span>Base Inicial:</span>
+          <span>${formatMoney(initial)}</span>
+        </div>` : ''}
+
         <div style="display: flex; justify-content: space-between;">
           <span>Efectivo Esperado en Caja:</span>
           <span>${formatMoney(expectedCash)}</span>
