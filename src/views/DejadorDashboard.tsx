@@ -478,6 +478,7 @@ export const DejadorDashboard = () => {
   const [stringSelections, setStringSelections] = useState<Record<string, string>>({});
   const [showHistory, setShowHistory] = useState(false);
   const [expandedCargaId, setExpandedCargaId] = useState<string | null>(null);
+  const [expandedRecepcionId, setExpandedRecepcionId] = useState<string | null>(null);
   const [activePreset, setActivePreset] = useState<string | null>(null);
   
   // Custom states for manual input toggles
@@ -1142,6 +1143,103 @@ export const DejadorDashboard = () => {
                                 <div key={idx} className="flex justify-between items-center border-b border-amber-100/60 pb-1 last:border-0 last:pb-0">
                                   <span className="font-bold text-gray-800">• {item.name || 'Producto'}</span>
                                   <span className="font-black text-red-600 bg-white px-2 py-0.5 rounded-lg border border-amber-200/60">{item.qty} uds.</span>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* ─── HISTORIAL DE RECEPCIONES (SOBRANTES RECIBIDOS) ─── */}
+        {activeTab === 'recibir' && (() => {
+          const recentRecepciones = [...(loadHistory as any[])]
+            .filter((e: any) => e.type === 'recepcion' || e.type === 'recibir')
+            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+            .slice(0, 30);
+          if (recentRecepciones.length === 0) return null;
+          return (
+            <div className="mt-8 mb-6 pb-20">
+              <h2 className="font-black text-gray-700 tracking-wide text-base mb-3 px-1 flex items-center gap-2">
+                <span>📥 Historial de Recepción de Sobrantes</span>
+              </h2>
+              <div className="space-y-2.5">
+                {recentRecepciones.map((entry: any) => {
+                  const totalItems = (entry.items || []).reduce((sum: number, i: any) => sum + (i.qty || 0), 0);
+                  const d = new Date(entry.timestamp);
+                  const timeStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+                  const isExpanded = expandedRecepcionId === entry.id;
+
+                  return (
+                    <div
+                      key={entry.id}
+                      className="bg-white/90 rounded-2xl p-4 shadow-sm border border-indigo-200/70 transition-all cursor-pointer hover:shadow-md"
+                      onClick={() => setExpandedRecepcionId(isExpanded ? null : entry.id)}
+                    >
+                      {/* Cabecera del ítem */}
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white font-black text-sm flex items-center justify-center flex-shrink-0 shadow-sm">
+                          {(entry.vehicleId || '?').slice(0, 2).toUpperCase()}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-black text-gray-800 text-sm flex items-center gap-2">
+                            <span>{entry.vehicleId || 'Sin triciclo'}</span>
+                            <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200/60">
+                              {isExpanded ? '▲ Cerrar detalle' : '▼ Toca para ver productos'}
+                            </span>
+                          </p>
+                          <p className="text-gray-400 font-bold text-xs">
+                            {timeStr}{entry.dejadorName ? ` · 🛵 ${entry.dejadorName}` : ''}{entry.anotadorName ? ` · 📋 ${entry.anotadorName}` : ''}
+                          </p>
+                        </div>
+                        <div className="text-right flex-shrink-0">
+                          <p className="font-black text-indigo-600 text-sm">{totalItems} uds.</p>
+                          <p className="text-gray-400 font-bold text-[10px]">{(entry.items || []).length} productos</p>
+                        </div>
+                      </div>
+
+                      {/* Desglose desplegable de productos y unidades */}
+                      {isExpanded && (
+                        <div className="mt-4 pt-3 border-t border-indigo-100/80 animate-fade-in" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-between mb-2.5">
+                            <span className="text-[11px] font-black text-gray-500 uppercase tracking-wider">
+                              📥 Detalle de Sobrantes Recibidos
+                            </span>
+                            <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-100">
+                              Total: {totalItems} unidades
+                            </span>
+                          </div>
+
+                          {/* Cápsulas de Productos (Pills) */}
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {(entry.items || []).filter((item: any) => (item.qty || 0) > 0).map((item: any, idx: number) => {
+                              const prodAbbr = item.stringValue || getProductAbbreviation(item.name || '', item.abbreviation);
+                              return (
+                                <div key={idx} className="flex rounded-xl overflow-hidden shadow-sm border border-indigo-200 bg-white">
+                                  <div className="bg-indigo-600 text-white font-black text-xs px-3 py-1.5 flex items-center justify-center min-w-[38px] whitespace-nowrap" title={item.name}>
+                                    {prodAbbr}
+                                  </div>
+                                  <div className="bg-gray-50 text-gray-900 font-black text-xs px-3 py-1.5 flex items-center justify-center min-w-[36px] border-l border-indigo-100">
+                                    {item.qty} {item.qty === 1 ? 'ud' : 'uds'}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                          </div>
+
+                          {/* Lista textual detallada con nombres completos */}
+                          {entry.items && entry.items.length > 0 && (
+                            <div className="bg-indigo-50/50 rounded-xl p-3 border border-indigo-100 text-xs font-bold text-gray-700 space-y-1">
+                              {entry.items.filter((item: any) => (item.qty || 0) > 0).map((item: any, idx: number) => (
+                                <div key={idx} className="flex justify-between items-center border-b border-indigo-100/60 pb-1 last:border-0 last:pb-0">
+                                  <span className="font-bold text-gray-800">• {item.name || 'Producto'}</span>
+                                  <span className="font-black text-indigo-600 bg-white px-2 py-0.5 rounded-lg border border-indigo-200/60">{item.qty} uds.</span>
                                 </div>
                               ))}
                             </div>
