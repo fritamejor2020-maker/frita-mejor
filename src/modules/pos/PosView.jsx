@@ -235,15 +235,41 @@ export function PosView() {
   const deletedPosSaleIds = useInventoryStore(s => s.deletedPosSaleIds || []);
   const deletedSaleSet = new Set(deletedPosSaleIds);
 
-  const heldSales = (usePosStore(s => s.heldSales || [])).filter(
-    h => !deletedSaleSet.has(h.id) && (!h.originalOlaClickId || !deletedSaleSet.has(h.originalOlaClickId))
+  // Conjunto de ventas ya PAGADAS para no mostrar jamás una venta suspendida que ya fue cobrada
+  const paidOlaClickIds = new Set(
+    (posSales || [])
+      .filter(s => s.status === 'PAID' && s.originalOlaClickId)
+      .map(s => s.originalOlaClickId)
   );
+  const paidSaleIds = new Set(
+    (posSales || [])
+      .filter(s => s.status === 'PAID' && s.id)
+      .map(s => s.id)
+  );
+
+  const heldSales = (usePosStore(s => s.heldSales || [])).filter(h => {
+    if (!h || h.status !== 'SUSPENDED') return false;
+    if (deletedSaleSet.has(h.id)) return false;
+    if (h.originalOlaClickId && deletedSaleSet.has(h.originalOlaClickId)) return false;
+    if (h.publicId && deletedSaleSet.has(h.publicId)) return false;
+    if (paidSaleIds.has(h.id)) return false;
+    if (h.originalOlaClickId && paidOlaClickIds.has(h.originalOlaClickId)) return false;
+    if (!h.items || !Array.isArray(h.items) || h.items.length === 0) return false;
+    return true;
+  });
   const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
   const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
-  const suspendedSales = (posSales || []).filter(
-    s => s.status === 'SUSPENDED' && !deletedSaleSet.has(s.id) && (!s.originalOlaClickId || !deletedSaleSet.has(s.originalOlaClickId))
-  );
+  const suspendedSales = (posSales || []).filter(s => {
+    if (!s || s.status !== 'SUSPENDED') return false;
+    if (deletedSaleSet.has(s.id)) return false;
+    if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return false;
+    if (s.publicId && deletedSaleSet.has(s.publicId)) return false;
+    if (paidSaleIds.has(s.id)) return false;
+    if (s.originalOlaClickId && paidOlaClickIds.has(s.originalOlaClickId)) return false;
+    if (!s.items || !Array.isArray(s.items) || s.items.length === 0) return false;
+    return true;
+  });
   
   // Unificar ventas en espera dando absoluta prioridad a posSales (fuente de verdad sincronizada)
   const combinedSalesMap = new Map();
@@ -1032,10 +1058,14 @@ export function PosView() {
     if (activeSuspendedId) {
       try { deleteHeldSale(activeSuspendedId); } catch(e) {}
       try { deletePosSale(activeSuspendedId); } catch(e) {}
-      addPosSale(saleData);
-    } else {
-      addPosSale(saleData);
     }
+    if (saleData.originalOlaClickId) {
+      try { deleteHeldSale(`HELD-OLA-${saleData.originalOlaClickId}`); } catch(e) {}
+      try { deletePosSale(`HELD-OLA-${saleData.originalOlaClickId}`); } catch(e) {}
+      try { deleteHeldSale(saleData.originalOlaClickId); } catch(e) {}
+      try { deletePosSale(saleData.originalOlaClickId); } catch(e) {}
+    }
+    addPosSale(saleData);
     
     // Clear ticket
     setTicketItems([]);

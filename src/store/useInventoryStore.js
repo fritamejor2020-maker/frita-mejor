@@ -75,6 +75,18 @@ export function mergeArrays(localArr, remoteArr, key) {
   const deletedRegs = new Set(useInventoryStore.getState()?.deletedPosRegisterIds || []);
   const deletedBranches = new Set(useBranchStore.getState()?.deletedBranchIds || []);
 
+  const allPaidOlaClickIds = new Set();
+  const allPaidSaleIds = new Set();
+  if (key === 'posSales') {
+    [...localArr, ...remoteArr].forEach(s => {
+      if (s && s.status === 'PAID') {
+        if (s.id) allPaidSaleIds.add(s.id);
+        if (s.originalOlaClickId) allPaidOlaClickIds.add(s.originalOlaClickId);
+        if (s.publicId) allPaidSaleIds.add(s.publicId);
+      }
+    });
+  }
+
   const merged = [];
   const addedIds = new Set();
 
@@ -92,14 +104,26 @@ export function mergeArrays(localArr, remoteArr, key) {
             merged.push({ ...localItem, ...remoteVersion });
           }
         } else if (key === 'posSales') {
-          if (deletedSales.has(localItem.id) || deletedSales.has(remoteVersion.id) || (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId))) {
+          const isDeleted = deletedSales.has(localItem.id) || deletedSales.has(remoteVersion.id) || 
+            (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
+            (remoteVersion.originalOlaClickId && deletedSales.has(remoteVersion.originalOlaClickId));
+
+          if (isDeleted) {
             // Ignorar ventas eliminadas
           } else if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
             merged.push(remoteVersion);
           } else if (localItem.status === 'PAID' || localItem.status === 'REJECTED') {
             merged.push(localItem);
           } else {
-            merged.push({ ...localItem, ...remoteVersion });
+            // Venta suspendida: comprobar si ya fue pagada con otro ID o si está vacía
+            const isAlreadyPaid = allPaidSaleIds.has(localItem.id) || allPaidSaleIds.has(remoteVersion.id) ||
+              (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId)) ||
+              (remoteVersion.originalOlaClickId && allPaidOlaClickIds.has(remoteVersion.originalOlaClickId));
+            const hasItems = (localItem.items && localItem.items.length > 0) || (remoteVersion.items && remoteVersion.items.length > 0);
+
+            if (!isAlreadyPaid && hasItems) {
+              merged.push({ ...localItem, ...remoteVersion });
+            }
           }
         } else {
           // Por defecto, remoto gana para actualizaciones (inventarios, productos, etc.)
@@ -108,10 +132,9 @@ export function mergeArrays(localArr, remoteArr, key) {
         addedIds.add(localItem.id);
       } else {
         // Solo existe localmente en el localStorage de este dispositivo.
-        // PREVENCIÓN DE RESURRECCIÓN: Si no existe en Supabase y NO fue creado offline en este dispositivo,
-        // significa que fue ELIMINADO en otro equipo y NO debe ser resucitado ni re-subido a Supabase.
         const isDeletedTombstone =
           deletedSales.has(localItem.id) ||
+          (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
           deletedShifts.has(localItem.id) ||
           deletedInvs.has(localItem.id) ||
           deletedRegs.has(localItem.id) ||
@@ -119,9 +142,18 @@ export function mergeArrays(localArr, remoteArr, key) {
 
         const isQueuedOffline = queuedIds.has(localItem.id);
 
-        if (!isDeletedTombstone && (isQueuedOffline || key === 'posSales' || key === 'posShifts' || key === 'movements')) {
-          merged.push(localItem);
-          addedIds.add(localItem.id);
+        if (!isDeletedTombstone) {
+          if (key === 'posSales' && localItem.status === 'SUSPENDED') {
+            const isAlreadyPaid = allPaidSaleIds.has(localItem.id) || (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
+            const hasItems = localItem.items && localItem.items.length > 0;
+            if (!isAlreadyPaid && hasItems) {
+              merged.push(localItem);
+              addedIds.add(localItem.id);
+            }
+          } else if (isQueuedOffline || key === 'posSales' || key === 'posShifts' || key === 'movements') {
+            merged.push(localItem);
+            addedIds.add(localItem.id);
+          }
         }
       }
     } else {
@@ -132,15 +164,24 @@ export function mergeArrays(localArr, remoteArr, key) {
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
       const isDeletedTombstone =
-        (key === 'posSales' && deletedSales.has(remoteItem.id)) ||
+        (key === 'posSales' && (deletedSales.has(remoteItem.id) || (remoteItem.originalOlaClickId && deletedSales.has(remoteItem.originalOlaClickId)))) ||
         (key === 'posShifts' && deletedShifts.has(remoteItem.id)) ||
         (key === 'inventory' && deletedInvs.has(remoteItem.id)) ||
         (key === 'posRegisters' && deletedRegs.has(remoteItem.id)) ||
         (key === 'branches' && deletedBranches.has(remoteItem.id));
 
       if (!isDeletedTombstone) {
-        merged.push(remoteItem);
-        addedIds.add(remoteItem.id);
+        if (key === 'posSales' && remoteItem.status === 'SUSPENDED') {
+          const isAlreadyPaid = allPaidSaleIds.has(remoteItem.id) || (remoteItem.originalOlaClickId && allPaidOlaClickIds.has(remoteItem.originalOlaClickId));
+          const hasItems = remoteItem.items && remoteItem.items.length > 0;
+          if (!isAlreadyPaid && hasItems) {
+            merged.push(remoteItem);
+            addedIds.add(remoteItem.id);
+          }
+        } else {
+          merged.push(remoteItem);
+          addedIds.add(remoteItem.id);
+        }
       }
     }
   });
@@ -1242,8 +1283,10 @@ export const useInventoryStore = create(
               return invItem;
             });
           }
-          // Limpiar de deletedPosSaleIds para asegurar que no quede bloqueada si era una venta en espera re-guardada
-          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => dId !== saleId && dId !== sale.originalOlaClickId && dId !== sale.publicId);
+          // Limpiar de deletedPosSaleIds únicamente si es una venta en espera que se está re-guardando
+          const newDeleted = sale.status === 'SUSPENDED'
+            ? (s.deletedPosSaleIds || []).filter(dId => dId !== saleId)
+            : (s.deletedPosSaleIds || []);
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
