@@ -22,28 +22,37 @@ import { initLogisticsRealtime } from './lib/logisticsBroadcast';
 
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
-import { ProductionView } from './modules/production/ProductionView';
-import { WarehouseView }  from './modules/warehouse/WarehouseView';
-import { AdminView }      from './modules/admin/AdminView';
-import { PosView }        from './modules/pos/PosView';
-import { FritadoView }    from './modules/fritado/FritadoView';
-import { TransfersView }  from './modules/transfers/TransfersView';
-import { TasksView }      from './modules/tasks/TasksView';
-import { PublicDamageReportView } from './modules/tasks/PublicDamageReportView';
 import { QuickTaskDrawer } from './components/ui/QuickTaskDrawer';
 
-import { SellerSetupView }     from './views/SellerSetupView';
-import { DejadorSetupView }    from './views/DejadorSetupView';
-import { VendedorDashboard }   from './views/VendedorDashboard';
-import { DejadorDashboard }    from './views/DejadorDashboard';
-import { MapTrackingView }     from './views/MapTrackingView';
-import { FinanceDashboard }    from './modules/pos/FinanceDashboard';
-import { ModuleSelectorView }  from './views/ModuleSelectorView';
-import { CierresView }         from './modules/cierres/CierresView';
-import { DashboardView }       from './modules/dashboard/DashboardView';
-import { ManagerDashboard }    from './views/ManagerDashboard';
-import { ClientePedirView }   from './views/ClientePedirView';
-import { AttendanceView }     from './modules/attendance/AttendanceView';
+// ── Code-Splitting: Carga diferida de vistas pesadas para ahorrar memoria en tablets ──
+const ProductionView = React.lazy(() => import('./modules/production/ProductionView').then(m => ({ default: m.ProductionView })));
+const WarehouseView  = React.lazy(() => import('./modules/warehouse/WarehouseView').then(m => ({ default: m.WarehouseView })));
+const AdminView      = React.lazy(() => import('./modules/admin/AdminView').then(m => ({ default: m.AdminView })));
+const PosView        = React.lazy(() => import('./modules/pos/PosView').then(m => ({ default: m.PosView })));
+const FritadoView    = React.lazy(() => import('./modules/fritado/FritadoView').then(m => ({ default: m.FritadoView })));
+const TransfersView  = React.lazy(() => import('./modules/transfers/TransfersView').then(m => ({ default: m.TransfersView })));
+const TasksView      = React.lazy(() => import('./modules/tasks/TasksView').then(m => ({ default: m.TasksView })));
+const PublicDamageReportView = React.lazy(() => import('./modules/tasks/PublicDamageReportView').then(m => ({ default: m.PublicDamageReportView })));
+
+const SellerSetupView     = React.lazy(() => import('./views/SellerSetupView').then(m => ({ default: m.SellerSetupView })));
+const DejadorSetupView    = React.lazy(() => import('./views/DejadorSetupView').then(m => ({ default: m.DejadorSetupView })));
+const VendedorDashboard   = React.lazy(() => import('./views/VendedorDashboard').then(m => ({ default: m.VendedorDashboard })));
+const DejadorDashboard    = React.lazy(() => import('./views/DejadorDashboard').then(m => ({ default: m.DejadorDashboard })));
+const MapTrackingView     = React.lazy(() => import('./views/MapTrackingView').then(m => ({ default: m.MapTrackingView })));
+const FinanceDashboard    = React.lazy(() => import('./modules/pos/FinanceDashboard').then(m => ({ default: m.FinanceDashboard })));
+const ModuleSelectorView  = React.lazy(() => import('./views/ModuleSelectorView').then(m => ({ default: m.ModuleSelectorView })));
+const CierresView         = React.lazy(() => import('./modules/cierres/CierresView').then(m => ({ default: m.CierresView })));
+const DashboardView       = React.lazy(() => import('./modules/dashboard/DashboardView').then(m => ({ default: m.DashboardView })));
+const ManagerDashboard    = React.lazy(() => import('./views/ManagerDashboard').then(m => ({ default: m.ManagerDashboard })));
+const ClientePedirView   = React.lazy(() => import('./views/ClientePedirView').then(m => ({ default: m.ClientePedirView })));
+const AttendanceView     = React.lazy(() => import('./modules/attendance/AttendanceView').then(m => ({ default: m.AttendanceView })));
+
+const LoadingFallback = () => (
+  <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFF8E7] gap-3">
+    <div className="w-10 h-10 border-4 border-amber-400 border-t-amber-600 rounded-full animate-spin"></div>
+    <span className="text-xs font-black text-amber-900 tracking-wider uppercase">Cargando...</span>
+  </div>
+);
 
 import { Link } from 'react-router-dom';
 
@@ -366,90 +375,92 @@ function App() {
       <BrowserRouter>
         <QuickTaskDrawer />
         <ErrorBoundary>
-          <Routes>
-            {/* ── Pública: rutas sin login ───────────────── */}
-            <Route path="/login" element={<LoginView />} />
-            <Route path="/pedir" element={<ClientePedirView />} />
-            <Route path="/reportar-dano" element={<PublicDamageReportView />} />
+          <React.Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              {/* ── Pública: rutas sin login ───────────────── */}
+              <Route path="/login" element={<LoginView />} />
+              <Route path="/pedir" element={<ClientePedirView />} />
+              <Route path="/reportar-dano" element={<PublicDamageReportView />} />
 
-            {/* ── Todo lo demás requiere estar autenticado ─────── */}
-            <Route element={<ProtectedRoute />}>
+              {/* ── Todo lo demás requiere estar autenticado ─────── */}
+              <Route element={<ProtectedRoute />}>
 
-              {/* Redirección raíz basada en rol */}
-              <Route path="/" element={<RoleRedirect />} />
+                {/* Redirección raíz basada en rol */}
+                <Route path="/" element={<RoleRedirect />} />
 
-              {/* Selector de módulo — requiere login, sin restricción de módulo */}
-              <Route path="/selector" element={<ModuleSelectorView />} />
+                {/* Selector de módulo — requiere login, sin restricción de módulo */}
+                <Route path="/selector" element={<ModuleSelectorView />} />
 
-              {/* Módulos por access[] del usuario */}
-              <Route element={<ProtectedRoute allowedModules={['produccion']} />}>
-                <Route path="/produccion" element={<ProductionView />} />
+                {/* Módulos por access[] del usuario */}
+                <Route element={<ProtectedRoute allowedModules={['produccion']} />}>
+                  <Route path="/produccion" element={<ProductionView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['fritado']} />}>
+                  <Route path="/fritado" element={<FritadoView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['bodega']} />}>
+                  <Route path="/bodega" element={<WarehouseView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['admin', 'dashboard']} />}>
+                  <Route path="/admin" element={<AdminView />} />
+                  <Route path="/dashboard" element={<DashboardView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['pos']} />}>
+                  <Route path="/pos" element={<PosView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina']} />}>
+                  <Route path="/finanzas" element={<FinanceDashboard />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['vendedor-setup', 'vendedor']} />}>
+                  <Route path="/vendedor-setup" element={<SellerSetupView />} />
+                  <Route path="/vendedor" element={<VendedorDashboard />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['dejador']} />}>
+                  <Route path="/dejador-setup" element={<DejadorSetupView />} />
+                  <Route path="/dejador" element={<DejadorDashboard />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
+                  <Route path="/tracking" element={<TrackingWrapper />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
+                  <Route path="/cierres" element={<CierresView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['traslados', 'admin']} />}>
+                  <Route path="/traslados" element={<TransfersView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['gerente']} />}>
+                  <Route path="/gerente" element={<ManagerDashboard />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['asistencia', 'admin', 'gerente']} />}>
+                  <Route path="/asistencia" element={<AttendanceView />} />
+                </Route>
+
+                <Route element={<ProtectedRoute allowedModules={['tareas']} />}>
+                  <Route path="/tareas" element={<TasksView />} />
+                </Route>
+
+                {/* Sin acceso al módulo */}
+                <Route path="/unauthorized" element={<UnauthorizedView />} />
+
               </Route>
+              {/* ──────────────────────────────────────────────── */}
 
-              <Route element={<ProtectedRoute allowedModules={['fritado']} />}>
-                <Route path="/fritado" element={<FritadoView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['bodega']} />}>
-                <Route path="/bodega" element={<WarehouseView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['admin', 'dashboard']} />}>
-                <Route path="/admin" element={<AdminView />} />
-                <Route path="/dashboard" element={<DashboardView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['pos']} />}>
-                <Route path="/pos" element={<PosView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['finanzas-ingresos', 'finanzas-gastos', 'finanzas-nomina']} />}>
-                <Route path="/finanzas" element={<FinanceDashboard />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['vendedor-setup', 'vendedor']} />}>
-                <Route path="/vendedor-setup" element={<SellerSetupView />} />
-                <Route path="/vendedor" element={<VendedorDashboard />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['dejador']} />}>
-                <Route path="/dejador-setup" element={<DejadorSetupView />} />
-                <Route path="/dejador" element={<DejadorDashboard />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['tracking', 'dejador', 'admin']} />}>
-                <Route path="/tracking" element={<TrackingWrapper />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['cierres', 'admin']} />}>
-                <Route path="/cierres" element={<CierresView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['traslados', 'admin']} />}>
-                <Route path="/traslados" element={<TransfersView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['gerente']} />}>
-                <Route path="/gerente" element={<ManagerDashboard />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['asistencia', 'admin', 'gerente']} />}>
-                <Route path="/asistencia" element={<AttendanceView />} />
-              </Route>
-
-              <Route element={<ProtectedRoute allowedModules={['tareas']} />}>
-                <Route path="/tareas" element={<TasksView />} />
-              </Route>
-
-              {/* Sin acceso al módulo */}
-              <Route path="/unauthorized" element={<UnauthorizedView />} />
-
-            </Route>
-            {/* ──────────────────────────────────────────────── */}
-
-            {/* Cualquier ruta desconocida → login */}
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
+              {/* Cualquier ruta desconocida → login */}
+              <Route path="*" element={<Navigate to="/login" replace />} />
+            </Routes>
+          </React.Suspense>
         </ErrorBoundary>
       </BrowserRouter>
     </>
