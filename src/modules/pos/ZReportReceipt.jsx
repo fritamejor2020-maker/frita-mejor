@@ -444,7 +444,9 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
       ${tc.zShowCashRegisterMatch !== false ? `
       <!-- Cash Register Match -->
       <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 2px;">
-        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Cuadre de Caja (Efectivo)</h3>
+        <div style="text-align: center; border: 1.5px solid black; padding: 2px 0; margin: 2px 0 6px 0; font-weight: 900; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">
+          CUADRE DE CAJA (EFECTIVO)
+        </div>
         
         ${tc.zShowInitialBase !== false ? `
         <div style="display: flex; justify-content: space-between;">
@@ -456,15 +458,18 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           <span>Efectivo Esperado en Caja:</span>
           <span>${formatMoney(expectedCash)}</span>
         </div>
-        ${tc.zShowCurrentMoney === true ? `<div style="display: flex; justify-content: space-between;">
+
+        ${(hasRealCount || tc.zShowCurrentMoney === true) ? `
+        <div style="display: flex; justify-content: space-between;">
           <span>Efectivo Real Contado:</span>
           <span>${formatMoney(countedCash)}</span>
-        </div>` : ''}
+        </div>
         
-        ${tc.zShowCurrentMoney === true ? `<div style="border-top: 1px solid black; padding-top: 2px; margin-top: 2px; display: flex; justify-content: space-between; font-weight: 900; font-size: 12px;">
-          <span>${difference === 0 ? 'CUADRE EXACTO' : (difference > 0 ? 'SOBRANTE' : 'FALTANTE')}:</span>
-          <span>${formatMoney(Math.abs(difference))}</span>
-        </div>` : ''}
+        <div style="border-top: 1.5px solid black; padding-top: 2px; margin-top: 2px; display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; color: ${difference === 0 ? 'inherit' : difference > 0 ? '#15803d' : '#dc2626'};">
+          <span>${difference === 0 ? 'CUADRE EXACTO ✅' : (difference > 0 ? 'SOBRANTE' : 'FALTANTE')}:</span>
+          <span>${difference > 0 ? '+' : difference < 0 ? '-' : ''}${formatMoney(Math.abs(difference))}</span>
+        </div>
+        ` : ''}
       </div>
       ` : ''}
 
