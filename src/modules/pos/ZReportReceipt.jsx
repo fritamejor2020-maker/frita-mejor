@@ -314,6 +314,14 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
         <div style="border-bottom: 1px solid black; margin: 3px 0;"></div>
 
+        <!-- Total Salidas / Gastos -->
+        ${totalExpenses > 0 ? `
+        <div style="display: flex; justify-content: space-between; font-weight: bold; color: #b91c1c; font-size: 10.5px; padding-top: 1px;">
+          <span>Total Salidas / Gastos:</span>
+          <span>-${formatMoney(totalExpenses)}</span>
+        </div>
+        ` : ''}
+
         <!-- Total General del cierre -->
         <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 11.5px; padding: 2px 0;">
           <span>Total General del cierre:</span>

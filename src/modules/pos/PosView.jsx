@@ -4674,10 +4674,18 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
                 </div>
               </div>
 
-              {/* Total General */}
-              <div className="flex justify-between text-sm font-black text-amber-400 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
-                <span>TOTAL GENERAL DEL CIERRE:</span>
-                <span>{formatMoney(totalGeneralNeto)}</span>
+              {/* Total General & Gastos */}
+              <div className="space-y-1 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                {totalRetiros > 0 && (
+                  <div className="flex justify-between text-xs font-bold text-red-400">
+                    <span>Total Salidas / Gastos:</span>
+                    <span>-{formatMoney(totalRetiros)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between text-sm font-black text-amber-400">
+                  <span>TOTAL GENERAL DEL CIERRE:</span>
+                  <span>{formatMoney(totalGeneralNeto)}</span>
+                </div>
               </div>
 
               {/* Arqueo Efectivo */}
