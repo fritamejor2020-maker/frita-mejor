@@ -30,6 +30,11 @@ const AudioDurationLabel = ({ mediaUrl, initialDuration }) => {
       tempAudio.addEventListener('loadedmetadata', handleMetadata);
       return () => {
         tempAudio.removeEventListener('loadedmetadata', handleMetadata);
+        try {
+          tempAudio.pause();
+          tempAudio.removeAttribute('src');
+          tempAudio.load();
+        } catch (_) {}
       };
     } catch (_) {}
   }, [mediaUrl, initialDuration]);

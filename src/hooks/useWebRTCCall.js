@@ -39,6 +39,17 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
   useEffect(() => {
     if (!currentUserId || typeof window === 'undefined') return;
 
+    if (!activeCall || activeCall.status === 'ended') {
+      return;
+    }
+
+    const isCaller = activeCall.callerId === currentUserId;
+    const isReceiver =
+      activeCall.receiverId === currentUserId ||
+      (String(currentUserId).toLowerCase() === 'dejador' && String(activeCall.receiverId).toLowerCase() === 'dejador');
+
+    if (!isCaller && !isReceiver) return;
+
     let channel = supabase.channel('public_chat_channel');
 
     const cleanupWebRTC = () => {
@@ -64,21 +75,13 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           domAudioRef.current.srcObject = null;
         } catch (_) {}
       }
+      if (channel) {
+        try { supabase.removeChannel(channel); } catch (_) {}
+        channel = null;
+      }
       pendingCandidatesRef.current = [];
       isInitializingRef.current = false;
     };
-
-    if (!activeCall || activeCall.status === 'ended') {
-      cleanupWebRTC();
-      return;
-    }
-
-    const isCaller = activeCall.callerId === currentUserId;
-    const isReceiver =
-      activeCall.receiverId === currentUserId ||
-      (String(currentUserId).toLowerCase() === 'dejador' && String(activeCall.receiverId).toLowerCase() === 'dejador');
-
-    if (!isCaller && !isReceiver) return;
 
     // Procesar candidatos ICE acumulados en la cola
     const processPendingCandidates = async () => {

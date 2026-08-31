@@ -9,14 +9,16 @@ import { useDejadorSessionStore } from '../store/useDejadorSessionStore';
 import { usePushSubscription } from '../lib/usePushSubscription';
 import { NumberSelectorGroup } from '../components/ui/NumberSelectorGroup';
 import { getProductAbbreviation } from '../utils/formatUtils';
-import { MapTrackingView } from './MapTrackingView';
 import { VehicleShiftCard } from '../components/admin/AdminVehicleInventoryTab';
 import { useChatStore } from '../store/useChatStore';
-import { IntercomChatModule } from '../components/chat/IntercomChatModule';
 import { useChatSoundNotifier, getAudioCtx, resumeAudioContext } from '../hooks/useChatSoundNotifier';
 import { ActiveCallBanner } from '../components/chat/ActiveCallBanner';
 import { supabase } from '../lib/supabase';
 import { initLogisticsRealtime } from '../lib/logisticsBroadcast';
+
+// ── Lazy loading de módulos pesados (Leaflet map y WebRTC/Chat) para no saturar memoria en Tablets ──
+const MapTrackingView = React.lazy(() => import('./MapTrackingView').then(m => ({ default: m.MapTrackingView })));
+const IntercomChatModule = React.lazy(() => import('../components/chat/IntercomChatModule').then(m => ({ default: m.IntercomChatModule })));
 
 // ─── Hook: Relative time that auto-refreshes ─────────────────────────────
 const useRelativeTime = () => {
@@ -312,34 +314,36 @@ export const DejadorDashboard = () => {
   }, [remoteShifts, posShifts, userBranchId]);
 
   // Filtro defensivo: excluir pedidos ya completados o rechazados
-  const processedIds = new Set([
+  const processedIds = React.useMemo(() => new Set([
     ...(completedRequests || []).map((r: any) => r.id),
     ...(rejectedRequests  || []).map((r: any) => r.id),
-  ]);
+  ]), [completedRequests, rejectedRequests]);
 
   const activeShiftsList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
 
   // Mostrar todos los pedidos pendientes no procesados de la sede (o sin sede asignada)
   // Ignora solicitudes de turnos ya cerrados o con más de 24 horas de antigüedad
-  const truePendingRequests = (pendingRequests || []).filter((r: any) => {
-    if (!r || !r.id || processedIds.has(r.id)) return false;
-    
-    // Si la solicitud pertenece a un turno ya cerrado, no es un pedido activo
-    if (r.shiftId) {
-      const shift = activeShiftsList.find((s: any) => s?.id === r.shiftId);
-      if (shift?.closedAt) return false;
-    }
+  const truePendingRequests = React.useMemo(() => {
+    return (pendingRequests || []).filter((r: any) => {
+      if (!r || !r.id || processedIds.has(r.id)) return false;
+      
+      // Si la solicitud pertenece a un turno ya cerrado, no es un pedido activo
+      if (r.shiftId) {
+        const shift = activeShiftsList.find((s: any) => s?.id === r.shiftId);
+        if (shift?.closedAt) return false;
+      }
 
-    // Si tiene más de 24h y no tiene turno abierto asociado, descartar
-    const reqTime = r.created_at || r.timestamp;
-    if (reqTime && (Date.now() - new Date(reqTime).getTime() > 24 * 60 * 60 * 1000)) {
+      // Si tiene más de 24h y no tiene turno abierto asociado, descartar
+      const reqTime = r.created_at || r.timestamp;
+      if (reqTime && (Date.now() - new Date(reqTime).getTime() > 24 * 60 * 60 * 1000)) {
+        return false;
+      }
+
+      if (!userBranchId || userBranchId === 'BRANCH-001') return true; // HQ / Admin ve todas las sedes
+      if (!r.branchId || r.branchId === userBranchId) return true; // Dejador de sede específica ve sus pedidos
       return false;
-    }
-
-    if (!userBranchId || userBranchId === 'BRANCH-001') return true; // HQ / Admin ve todas las sedes
-    if (!r.branchId || r.branchId === userBranchId) return true; // Dejador de sede específica ve sus pedidos
-    return false;
-  });
+    });
+  }, [pendingRequests, processedIds, activeShiftsList, userBranchId]);
 
   // Conteo de pedidos genuinos del vendedor (sin los reencolados por el dejador)
   const genuinePendingCount = truePendingRequests.filter((r: any) => !r.isPostponed).length;
@@ -1571,12 +1575,14 @@ export const DejadorDashboard = () => {
             </div>
 
             {/* Mapa */}
-            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white" style={{ height: 320 }}>
-              <MapTrackingView
-                embedded
-                onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
-                activeShifts={posShifts || []}
-              />
+            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white bg-amber-50 flex items-center justify-center" style={{ height: 320 }}>
+              <React.Suspense fallback={<div className="font-bold text-gray-500 text-xs">Cargando mapa GPS...</div>}>
+                <MapTrackingView
+                  embedded
+                  onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
+                  activeShifts={posShifts || []}
+                />
+              </React.Suspense>
             </div>
 
             {/* Inventario en ruta del triciclo seleccionado */}
@@ -1641,15 +1647,17 @@ export const DejadorDashboard = () => {
             </div>
 
             <div className="flex-1 min-h-0 w-full max-w-5xl mx-auto flex flex-col overflow-hidden">
-              <IntercomChatModule
-                currentUserId="DEJADOR"
-                currentUserName={dejadorName || 'Dejador Logística'}
-                currentUserRole="DEJADOR"
-                targetUserId={selectedVehicle === 'ALL' ? 'ALL' : (selectedVehicle || 'ALL')}
-                targetUserName={(!selectedVehicle || selectedVehicle === 'ALL') ? 'Canal General Logística' : `Triciclo ${selectedVehicle} (${vehicleVendorMap[selectedVehicle] || 'Vendedor'})`}
-                branchId={userBranchId || 'BRANCH-001'}
-                shiftId="shift-active"
-              />
+              <React.Suspense fallback={<div className="p-8 text-center font-bold text-gray-500 text-xs">Cargando Radio / Chat...</div>}>
+                <IntercomChatModule
+                  currentUserId="DEJADOR"
+                  currentUserName={dejadorName || 'Dejador Logística'}
+                  currentUserRole="DEJADOR"
+                  targetUserId={selectedVehicle === 'ALL' ? 'ALL' : (selectedVehicle || 'ALL')}
+                  targetUserName={(!selectedVehicle || selectedVehicle === 'ALL') ? 'Canal General Logística' : `Triciclo ${selectedVehicle} (${vehicleVendorMap[selectedVehicle] || 'Vendedor'})`}
+                  branchId={userBranchId || 'BRANCH-001'}
+                  shiftId="shift-active"
+                />
+              </React.Suspense>
             </div>
           </div>
         )}

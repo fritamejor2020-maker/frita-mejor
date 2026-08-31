@@ -53,6 +53,10 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
         }
       })
       .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch (_) {}
+    };
   }, [currentUserId, activeCall?.id]);
 
   // Timer de llamada en curso
