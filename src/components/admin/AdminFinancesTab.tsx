@@ -780,16 +780,46 @@ export const AdminFinancesTab = ({
          const transferAmt = s.transferAmount || 0;
          real = cashAmt + transferAmt + expenses;  // efectivo + transferencia + salidas
 
-
-
      } else {
          // POS Shift
          const shiftSales = (posSales || []).filter((sale: any) => sale.shiftId === s.id && sale.status === 'PAID');
          theoretical = shiftSales.reduce((acc: number, sale: any) => acc + sale.total, 0);
-         expenses = (posExpenses || []).filter((e: any) => e.shiftId === s.id).reduce((acc: number, e: any) => acc + e.amount, 0); 
+         expenses = (posExpenses || []).filter((e: any) => e.shiftId === s.id && e.type !== 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0); 
          
-         const transferSales = shiftSales.filter((sale: any) => sale.paymentMethod !== 'EFECTIVO').reduce((acc: number, sale: any) => acc + sale.total, 0);
-         real = (s.realAmount || 0) + transferSales; // realAmount in POS is just cash in drawer. Total real is cash + transfer
+         const configuredMethods = posSettings?.paymentMethods || [
+           { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+           { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+           { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+           { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
+         ];
+         const isDigital = (pmName: string) => {
+           const norm = String(pmName || '').trim().toUpperCase();
+           const found = configuredMethods.find((m: any) => String(m.name || '').trim().toUpperCase() === norm);
+           if (!found) return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR' && norm !== 'CASH';
+           if (found.isTransfer === true) return true;
+           if (found.isTransfer === false || found.openDrawer === true) return false;
+           return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+         };
+
+         const contrataCustomers = (customers || []).filter((c: any) => c.typeId);
+         const contrataIds = new Set(contrataCustomers.map((c: any) => c.id));
+         const contrataSales = shiftSales.filter((sale: any) => sale.customerId && contrataIds.has(sale.customerId));
+         const localSales    = shiftSales.filter((sale: any) => !sale.customerId || !contrataIds.has(sale.customerId));
+
+         const localCash = localSales.filter((sale: any) => !isDigital(sale.paymentMethod)).reduce((acc: number, sale: any) => acc + sale.total, 0);
+         const localTransfers = localSales.filter((sale: any) => isDigital(sale.paymentMethod)).reduce((acc: number, sale: any) => acc + sale.total, 0);
+
+         const contrataNonCredit = contrataSales.filter((sale: any) => sale.contrataPaymentMethod !== 'credit');
+         const contrataCash = contrataNonCredit.filter((sale: any) => !isDigital(sale.paymentMethod)).reduce((acc: number, sale: any) => acc + sale.total, 0);
+         const contrataTransfers = contrataNonCredit.filter((sale: any) => isDigital(sale.paymentMethod)).reduce((acc: number, sale: any) => acc + sale.total, 0);
+         const contrataCredit = contrataSales.filter((sale: any) => sale.contrataPaymentMethod === 'credit').reduce((acc: number, sale: any) => acc + (sale.creditAmount || sale.total), 0);
+
+         const totalCash = localCash + contrataCash;
+         const totalTransfers = localTransfers + contrataTransfers;
+
+         const posCash = s.cashAmount !== undefined ? s.cashAmount : (s.realAmount !== null && s.realAmount !== undefined ? s.realAmount : totalCash);
+         const posTransfer = s.transferAmount !== undefined ? s.transferAmount : totalTransfers;
+         real = posCash + posTransfer + contrataCredit;
          
          const itemsMap: Record<string, any> = {};
          shiftSales.forEach((sale: any) => {
@@ -808,15 +838,14 @@ export const AdminFinancesTab = ({
      // Buscar el cierre del DEJADOR de la misma jornada (mismo turno y fecha)
      const matchingDejadorShift = (posShifts || []).find((ds: any) =>
        ds.type === 'DEJADOR' &&
-       ds.shift === (s.shift || '') &&
-       ds.closedAt &&
-       new Date(ds.closedAt).toISOString().split('T')[0] === shiftDate
+       ds.shift === s.shift &&
+       dateOf(ds.closedAt) === shiftDate
      );
 
      // Fallback: buscar en cualquier entrada del vehículo en esa fecha
      // (carga, recepcion, o completedRequest surtido)
      const anyEntry = [
-       // loadHistory entries (carga / recepcion)
+       // loadHistory items (carga)
        ...(loadHistory || []),
        // completedRequest items payload (surtido)
        ...(completedRequests || [])
@@ -841,8 +870,8 @@ export const AdminFinancesTab = ({
         dejadorName,
         theoretical,
         real,
-        cashAmount: s.cashAmount || 0,
-        transferAmount: s.transferAmount || 0,
+        cashAmount: s.cashAmount !== undefined ? s.cashAmount : (s.type === 'VENDEDOR' ? 0 : (s.realAmount !== null && s.realAmount !== undefined ? s.realAmount : (s.cashAmount || 0))),
+        transferAmount: s.transferAmount !== undefined ? s.transferAmount : (s.type === 'VENDEDOR' ? 0 : (s.transferAmount || 0)),
         expenses,
         details,
         shiftTransfers: (() => {

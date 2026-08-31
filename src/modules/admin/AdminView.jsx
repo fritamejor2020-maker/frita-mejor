@@ -3730,8 +3730,35 @@ function PosHistoryPanel() {
               const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
               const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
               
-              const cashSales = shiftSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
-              const otherSales = shiftSales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, s) => acc + s.total, 0);
+              const configuredMethods = posSettings?.paymentMethods || [
+                { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+                { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+                { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+                { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
+              ];
+              const isDigital = (pmName) => {
+                const norm = String(pmName || '').trim().toUpperCase();
+                const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
+                if (!found) return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR' && norm !== 'CASH';
+                if (found.isTransfer === true) return true;
+                if (found.isTransfer === false || found.openDrawer === true) return false;
+                return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+              };
+
+              const contrataCustomers = (customers || []).filter(c => c.typeId);
+              const contrataIds = new Set(contrataCustomers.map(c => c.id));
+              const contrataSales = shiftSales.filter(s => s.customerId && contrataIds.has(s.customerId));
+              const localSales    = shiftSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
+
+              const localCash = localSales.filter(s => !isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
+              const localTransfers = localSales.filter(s => isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
+
+              const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
+              const contrataCash = contrataNonCredit.filter(s => !isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
+              const contrataTransfers = contrataNonCredit.filter(s => isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
+
+              const cashSales = localCash + contrataCash;
+              const otherSales = localTransfers + contrataTransfers;
               const retiros = shiftExpenses.filter(e => e.type !== 'deposito').reduce((acc, e) => acc + e.amount, 0);
               const depositos = shiftExpenses.filter(e => e.type === 'deposito').reduce((acc, e) => acc + e.amount, 0);
               

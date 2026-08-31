@@ -599,26 +599,39 @@ export function IncomesModal({ onClose }) {
                 const contrataCustomers = customers.filter(c => c.typeId);
                 const contrataIds = new Set(contrataCustomers.map(c => c.id));
 
+                const configuredMethods = posSettings?.paymentMethods || [
+                  { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+                  { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+                  { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+                  { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
+                ];
+                const isDigital = (pmName) => {
+                  const norm = String(pmName || '').trim().toUpperCase();
+                  const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
+                  if (!found) return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR' && norm !== 'CASH';
+                  if (found.isTransfer === true) return true;
+                  if (found.isTransfer === false || found.openDrawer === true) return false;
+                  return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+                };
+
                 const contrataSales = shiftSales.filter(s => s.customerId && contrataIds.has(s.customerId));
                 const localSalesOnly = shiftSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
 
-                const totalCashAll = shiftSales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((a, s) => a + s.total, 0);
-                const contrataCash = contrataSales.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
-                const localCash = totalCashAll - contrataCash;
+                const localCash = localSalesOnly.filter(s => !isDigital(s.paymentMethod)).reduce((a, s) => a + s.total, 0);
+                const localTransfers = localSalesOnly.filter(s => isDigital(s.paymentMethod)).reduce((a, s) => a + s.total, 0);
 
-                const nequi = shiftSales.filter(s => s.paymentMethod === 'NEQUI').reduce((a, s) => a + s.total, 0);
-                const banc  = shiftSales.filter(s => s.paymentMethod === 'BANCOLOMBIA').reduce((a, s) => a + s.total, 0);
-                const totalTransfers = nequi + banc;
-                const contrataTransfers = contrataSales.filter(s => (s.paymentMethod === 'NEQUI' || s.paymentMethod === 'BANCOLOMBIA') && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
-                const localTransfers = totalTransfers - contrataTransfers;
+                const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
+                const contrataCash = contrataNonCredit.filter(s => !isDigital(s.paymentMethod)).reduce((a, s) => a + s.total, 0);
+                const contrataTransfers = contrataNonCredit.filter(s => isDigital(s.paymentMethod)).reduce((a, s) => a + s.total, 0);
+                const totalTransfers = localTransfers + contrataTransfers;
 
-                const totalPosExpenses = posExpenses.filter(e => e.shiftId === lastClosed.id).reduce((a, e) => a + e.amount, 0);
+                const totalPosExpenses = posExpenses.filter(e => e.shiftId === lastClosed.id && e.type !== 'deposito').reduce((a, e) => a + e.amount, 0);
 
                 const contrataByClient = contrataCustomers.map(c => {
                   const cs = contrataSales.filter(s => s.customerId === c.id);
                   if (cs.length === 0) return null;
-                  const cash = cs.filter(s => s.paymentMethod === 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
-                  const transfer = cs.filter(s => s.paymentMethod !== 'EFECTIVO' && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                  const cash = cs.filter(s => !isDigital(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
+                  const transfer = cs.filter(s => isDigital(s.paymentMethod) && s.contrataPaymentMethod !== 'credit').reduce((a, s) => a + s.total, 0);
                   const credit = cs.filter(s => s.contrataPaymentMethod === 'credit').reduce((a, s) => a + (s.creditAmount || s.total), 0);
                   return { name: c.name, cash, transfer, credit, total: cash + transfer + credit };
                 }).filter(Boolean);

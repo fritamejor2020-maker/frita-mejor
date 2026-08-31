@@ -4521,11 +4521,58 @@ function DiscountModal({ currentDiscount, onApply, onClose }) {
 // ─── Shift Complete Count Modal ───
 function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm }) {
   const [realCount, setRealCount] = useState('');
-  
+  const { customers = [], posSettings } = useInventoryStore();
+
+  const configuredMethods = posSettings?.paymentMethods || [
+    { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
+    { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
+    { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
+  ];
+
+  const isDigital = (pmName) => {
+    const norm = String(pmName || '').trim().toUpperCase();
+    const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
+    if (!found) {
+      if (norm === 'EFECTIVO' || norm === 'IMPRIMIR' || norm === 'CASH') return false;
+      return true;
+    }
+    if (found.isTransfer === true) return true;
+    if (found.isTransfer === false || found.openDrawer === true) return false;
+    return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
+  };
+
+  const contrataCustomers = customers.filter(c => c.typeId);
+  const contrataIds = new Set(contrataCustomers.map(c => c.id));
+
+  const contrataSales = (sales || []).filter(s => s.customerId && contrataIds.has(s.customerId));
+  const localSales    = (sales || []).filter(s => !s.customerId || !contrataIds.has(s.customerId));
+
+  const localCash = localSales
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const localTransfers = localSales
+    .filter(s => isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
+  const contrataCash = contrataNonCredit
+    .filter(s => !isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const contrataTransfers = contrataNonCredit
+    .filter(s => isDigital(s.paymentMethod))
+    .reduce((acc, s) => acc + s.total, 0);
+
+  const contrataCredit = contrataSales
+    .filter(s => s.contrataPaymentMethod === 'credit')
+    .reduce((acc, s) => acc + (s.creditAmount || s.total), 0);
+
   // Calculate expected
   const initial = shift.initialAmount || 0;
-  const cashSales = sales.filter(s => s.paymentMethod === 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
-  const otherSales = sales.filter(s => s.paymentMethod !== 'EFECTIVO').reduce((acc, sale) => acc + sale.total, 0);
+  const cashSales = localCash + contrataCash;
+  const otherSales = localTransfers + contrataTransfers;
   const retiros = (expenses || []).filter(e => e.type !== 'deposito');
   const depositos = (expenses || []).filter(e => e.type === 'deposito');
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
@@ -4548,8 +4595,11 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
         <div className="p-6 overflow-y-auto space-y-6">
             <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-3 text-sm font-bold text-gray-300 shadow-inner">
               <div className="flex justify-between"><span>Base Inicial:</span> <span>{formatMoney(initial)}</span></div>
-              <div className="flex justify-between text-green-400"><span>Ventas Efectivo:</span> <span>+{formatMoney(cashSales)}</span></div>
-              <div className="flex justify-between text-blue-400"><span>Ventas Electrónicas:</span> <span>+{formatMoney(otherSales)}</span></div>
+              <div className="flex justify-between text-green-400"><span>Ventas Efectivo Total:</span> <span>+{formatMoney(cashSales)}</span></div>
+              <div className="flex justify-between text-blue-400"><span>Ventas Transferencias Total:</span> <span>+{formatMoney(otherSales)}</span></div>
+              {contrataCredit > 0 && (
+                <div className="flex justify-between text-purple-400"><span>Ventas Contratas a Crédito:</span> <span>{formatMoney(contrataCredit)}</span></div>
+              )}
               <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
               {totalDepositos > 0 && (
                 <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
