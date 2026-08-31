@@ -651,6 +651,17 @@ export const AdminFinancesTab = ({
        if (mShiftId && s.id) {
          return mShiftId === s.id;
        }
+       const isRecepcion = e.type === 'recepcion' || e.type === 'recibir';
+       if (isRecepcion) {
+         const t = new Date(e.timestamp || e.completed_at || e.created_at || 0).getTime();
+         let recWindowEnd = Infinity;
+         if (idx >= 0 && idx < group.length - 1) {
+           const nextShift = group[idx + 1];
+           if (nextShift.openedAt) recWindowEnd = new Date(nextShift.openedAt).getTime();
+         }
+         if (windowStart > 0) return t > windowStart && t <= recWindowEnd;
+         return dateOf(e.timestamp || e.created_at) === shiftDate;
+       }
        return inWindow(e.timestamp || e.completed_at || e.created_at);
      };
 

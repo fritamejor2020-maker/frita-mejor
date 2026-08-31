@@ -698,21 +698,39 @@ export const useLogisticsStore = create(
     const posShifts = getPosShifts();
     const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
     const now = Date.now();
-    const activeShift = posShifts.find(s => {
+    const today = new Date().toISOString().slice(0, 10);
+    
+    // Buscar turnos de hoy para este vehículo
+    const vehicleShiftsToday = (posShifts || []).filter(s => {
       if (!s) return false;
-      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+      const cleanPoint = String(s.pointId || s.vehicle || s.point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
       const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
-      const shiftMatches = !s.shift || s.shift === dejadorJornada;
-      return pointMatches && shiftMatches;
+      const sDate = (s.fecha || s.openedAt || s.closedAt || s.createdAt || '').slice(0, 10);
+      return pointMatches && (!sDate || sDate === today);
     });
+
+    // Prioridad: 1. Turno abierto actualmente. 2. Turno más reciente de hoy (aunque esté recién cerrado)
+    const activeShift = vehicleShiftsToday.find(s => !s.closedAt) ||
+      vehicleShiftsToday.sort((a, b) => new Date(b.closedAt || b.openedAt || 0).getTime() - new Date(a.closedAt || a.openedAt || 0).getTime())[0];
+
+    // Sincronizar sobrantes directamente en el turno si existe
+    if (activeShift) {
+      const currentSobrantes = { ...(activeShift.sobrantes || {}) };
+      items.forEach(item => {
+        currentSobrantes[item.productId] = (currentSobrantes[item.productId] || 0) + item.qty;
+      });
+      const allShifts = useInventoryStore.getState().posShifts || [];
+      const updatedShifts = allShifts.map(s => s.id === activeShift.id ? { ...s, sobrantes: currentSobrantes } : s);
+      useInventoryStore.setState({ posShifts: updatedShifts });
+    }
 
     const entry = {
       id: `RECV-${now}`,
       type: 'recepcion',
       vehicleId,
       branchId: affectedBranchId,
-      shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la recepción
+      shiftId: activeShift?.id || null,   // ← ID del turno activo o recién cerrado al momento de la recepción
       jornada: activeShift?.shift || dejadorJornada,
       items,
       anotadorName: anotadorName || null,

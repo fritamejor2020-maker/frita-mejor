@@ -182,7 +182,19 @@ function buildShiftLogistics(
       return false;
     }
 
-    // 5. Delimitar estrictamente por ventana de tiempo (openedAt -> closedAt)
+    // 5. Delimitar por ventana de tiempo
+    const isRecepcion = e.type === 'recepcion' || e.type === 'recibir';
+    if (isRecepcion) {
+      // Las recepciones de sobrantes ocurren al cierre o minutos/horas DESPUÉS de que el vendedor cerró sesión
+      const t = new Date(e.timestamp || e.completed_at || e.created_at || 0).getTime();
+      let recWindowEnd = Infinity;
+      if (shiftIdx >= 0 && shiftIdx < sameDayVehicleShifts.length - 1) {
+        const nextShift = sameDayVehicleShifts[shiftIdx + 1];
+        if (nextShift.openedAt) recWindowEnd = new Date(nextShift.openedAt).getTime();
+      }
+      return t >= windowStart && t <= recWindowEnd;
+    }
+
     return inWindow(e.timestamp || e.completed_at || e.created_at);
   };
 
