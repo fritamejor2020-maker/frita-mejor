@@ -716,13 +716,20 @@ export const useLogisticsStore = create(
 
     // Sincronizar sobrantes directamente en el turno si existe
     if (activeShift) {
-      const currentSobrantes = { ...(activeShift.sobrantes || {}) };
-      items.forEach(item => {
-        currentSobrantes[item.productId] = (currentSobrantes[item.productId] || 0) + item.qty;
-      });
-      const allShifts = useInventoryStore.getState().posShifts || [];
-      const updatedShifts = allShifts.map(s => s.id === activeShift.id ? { ...s, sobrantes: currentSobrantes } : s);
-      useInventoryStore.setState({ posShifts: updatedShifts });
+      try {
+        const invStore = globalThis.__inventoryStore__;
+        if (invStore && typeof invStore.getState === 'function') {
+          const currentSobrantes = { ...(activeShift.sobrantes || {}) };
+          items.forEach(item => {
+            currentSobrantes[item.productId] = (currentSobrantes[item.productId] || 0) + item.qty;
+          });
+          const allShifts = invStore.getState().posShifts || [];
+          const updatedShifts = allShifts.map(s => s.id === activeShift.id ? { ...s, sobrantes: currentSobrantes } : s);
+          invStore.setState({ posShifts: updatedShifts });
+        }
+      } catch (err) {
+        console.warn('[commitReception] Sync shift sobrantes error:', err);
+      }
     }
 
     const entry = {
