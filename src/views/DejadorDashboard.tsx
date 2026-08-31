@@ -24,7 +24,7 @@ const IntercomChatModule = React.lazy(() => import('../components/chat/IntercomC
 const useRelativeTime = () => {
   const [now, setNow] = useState(Date.now());
   useEffect(() => {
-    const id = setInterval(() => setNow(Date.now()), 30_000); // refresh every 30s
+    const id = setInterval(() => setNow(Date.now()), 120_000); // refresh every 2 min (less re-renders on tablets)
     return () => clearInterval(id);
   }, []);
 
@@ -615,7 +615,7 @@ export const DejadorDashboard = () => {
     fetchPendingRequests();
     const interval = setInterval(() => {
       fetchPendingRequests();
-    }, 10000);
+    }, 30000);
     return () => clearInterval(interval);
   }, []);
 

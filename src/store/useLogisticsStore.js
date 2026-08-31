@@ -401,9 +401,9 @@ export const useLogisticsStore = create(
 
       set({
         pendingRequests: freshPending,
-        completedRequests: freshCompleted,
-        rejectedRequests: freshRejected,
-        loadHistory: freshHistory
+        completedRequests: freshCompleted.slice(0, 150),
+        rejectedRequests: freshRejected.slice(0, 50),
+        loadHistory: freshHistory.slice(0, 150)
       });
     } catch (err) {
       console.warn('[LogisticsStore] Error in loadFromRemote:', err);

@@ -198,7 +198,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });
-  applicators['chatMessages']      = (v) => useChatStore.setState({ messages: v });
+  applicators['chatMessages']      = (v) => useChatStore.setState({ messages: (v || []).slice(0, 50) });
   applicators['posShifts']        = (v) => {
     const state = useInventoryStore.getState();
     const deleted = new Set(state.deletedShiftIds || []);
@@ -345,7 +345,7 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     applicators[`chatMessages_${bid}`]      = (v) => {
       const state = useChatStore.getState();
       const merged = mergeArrays(state.messages || [], v || [], 'chatMessages');
-      useChatStore.setState({ messages: merged });
+      useChatStore.setState({ messages: (merged || []).slice(0, 50) });
     };
     applicators[`payrollRecords_${bid}`]    = (v) => {
       const state = usePayrollStore.getState();

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PhoneCall, PhoneOff, Mic, Volume2 } from 'lucide-react';
-import { useChatStore } from '../../store/useChatStore';
+import { useChatStore, getChatRealtimeChannel } from '../../store/useChatStore';
 import { resumeAudioContext, playRadioChime } from '../../hooks/useChatSoundNotifier';
 import { useWebRTCCall } from '../../hooks/useWebRTCCall';
 import { supabase } from '../../lib/supabase';
@@ -31,32 +31,32 @@ export const ActiveCallBanner: React.FC<ActiveCallBannerProps> = ({ currentUserI
   // 🎙️ Conexión de Voz WebRTC con Relevo TURN
   useWebRTCCall(currentUserId, domAudioRef);
 
-  // Escuchar ráfagas de voz instantáneas por el canal de radio Supabase
+  // Escuchar ráfagas de voz instantáneas por el canal COMPARTIDO de chat (no crear uno nuevo)
   useEffect(() => {
     if (!currentUserId || typeof window === 'undefined') return;
 
-    const channel = supabase.channel('public_chat_channel');
+    // Reuse the shared channel from useChatStore to avoid duplicate WebSocket connections
+    const channel = getChatRealtimeChannel();
+    if (!channel) return; // Channel not ready yet, will be available on next render
 
-    channel
-      .on('broadcast', { event: 'radio_instant_voice' }, ({ payload }) => {
-        if (!payload || !payload.mediaUrl || payload.senderId === currentUserId) return;
-        if (payload.callId && activeCall && payload.callId !== activeCall.id) return;
+    const handler = ({ payload }: { payload: any }) => {
+      if (!payload || !payload.mediaUrl || payload.senderId === currentUserId) return;
+      if (payload.callId && activeCall && payload.callId !== activeCall.id) return;
 
-        setIsListeningPtt(true);
-        try {
-          const audio = new Audio(payload.mediaUrl);
-          audio.onended = () => setIsListeningPtt(false);
-          audio.onerror = () => setIsListeningPtt(false);
-          audio.play().catch(() => setIsListeningPtt(false));
-        } catch (_) {
-          setIsListeningPtt(false);
-        }
-      })
-      .subscribe();
-
-    return () => {
-      try { supabase.removeChannel(channel); } catch (_) {}
+      setIsListeningPtt(true);
+      try {
+        const audio = new Audio(payload.mediaUrl);
+        audio.onended = () => setIsListeningPtt(false);
+        audio.onerror = () => setIsListeningPtt(false);
+        audio.play().catch(() => setIsListeningPtt(false));
+      } catch (_) {
+        setIsListeningPtt(false);
+      }
     };
+
+    channel.on('broadcast', { event: 'radio_instant_voice' }, handler);
+
+    // NOTE: Do NOT remove the shared channel on cleanup — it belongs to useChatStore
   }, [currentUserId, activeCall?.id]);
 
   // Timer de llamada en curso

@@ -278,8 +278,13 @@ function App() {
     Promise.resolve().then(syncAllRemoteStores);
 
     // Auto-actualizar desde la nube cada vez que la app regresa a primer plano o recupera conexión a internet
+    let lastSyncTime = 0;
     const handleSyncTrigger = () => {
+      const now = Date.now();
+      // Debounce/Throttle: al menos 30 segundos entre syncs automáticos de pantalla/conexión
+      if (now - lastSyncTime < 30000) return;
       if (document.visibilityState === 'visible' && navigator.onLine) {
+        lastSyncTime = now;
         syncAllRemoteStores();
       }
     };
@@ -363,8 +368,9 @@ function App() {
       unsubIncome();
       unsubGoals();
       document.removeEventListener('pointerdown', handleGlobalPointer, true);
-      window.removeEventListener('focus', handleFocusSync);
-      document.removeEventListener('visibilitychange', handleFocusSync);
+      window.removeEventListener('focus', handleSyncTrigger);
+      window.removeEventListener('online', handleSyncTrigger);
+      document.removeEventListener('visibilitychange', handleSyncTrigger);
     };
   }, []);
 

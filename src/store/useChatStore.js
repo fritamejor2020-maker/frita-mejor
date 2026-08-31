@@ -18,14 +18,20 @@ import { safeJSONStorage } from '../utils/safeStorage';
 
 function syncChatMessages(messages, branchId) {
   const effectiveBranch = branchId || 'BRANCH-001';
+  const capped = (messages || []).slice(0, 50);
   markLocalWrite('chatMessages', effectiveBranch);
-  push('chatMessages', messages, effectiveBranch).catch(err =>
+  push('chatMessages', capped, effectiveBranch).catch(err =>
     console.warn('[Sync] chatMessages:', err.message)
   );
 }
 
 // Canal Global Supabase Realtime para recibir broadcasts instantáneos entre dispositivos
 let realtimeChannel = null;
+
+/** Returns the shared chat realtime channel (or null if not yet set up). */
+export function getChatRealtimeChannel() {
+  return realtimeChannel;
+}
 
 function handleCallSignalFromPayload(msg, set, get) {
   if (!msg || !msg.type) return;
@@ -62,9 +68,9 @@ function setupChatRealtime(set, get) {
     realtimeChannel
       .on('broadcast', { event: 'new_chat_message' }, ({ payload }) => {
         if (!payload || !payload.id) return;
-        const currentMsgs = get().messages;
+        const currentMsgs = get().messages || [];
         if (!currentMsgs.some(m => m.id === payload.id)) {
-          set({ messages: [payload, ...currentMsgs] });
+          set({ messages: [payload, ...currentMsgs].slice(0, 50) });
           handleCallSignalFromPayload(payload, set, get);
         }
       })
@@ -149,7 +155,7 @@ export const useChatStore = create(
             createdAt: now.toISOString(),
           };
 
-          const updated = [newMessage, ...get().messages];
+          const updated = [newMessage, ...(get().messages || [])].slice(0, 50);
           set({ messages: updated });
           syncChatMessages(updated, effectiveBranch);
 

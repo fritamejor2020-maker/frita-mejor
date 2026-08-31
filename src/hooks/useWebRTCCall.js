@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
-import { useChatStore } from '../store/useChatStore';
+import { useChatStore, getChatRealtimeChannel } from '../store/useChatStore';
 
 const ICE_SERVERS = {
   iceServers: [
@@ -50,7 +50,7 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
 
     if (!isCaller && !isReceiver) return;
 
-    let channel = supabase.channel('public_chat_channel');
+    const channel = getChatRealtimeChannel() || supabase.channel('public_chat_channel');
 
     const cleanupWebRTC = () => {
       if (offerIntervalRef.current) {
@@ -74,10 +74,6 @@ export function useWebRTCCall(currentUserId, domAudioRef) {
           domAudioRef.current.pause();
           domAudioRef.current.srcObject = null;
         } catch (_) {}
-      }
-      if (channel) {
-        try { supabase.removeChannel(channel); } catch (_) {}
-        channel = null;
       }
       pendingCandidatesRef.current = [];
       isInitializingRef.current = false;
