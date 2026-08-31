@@ -15,15 +15,20 @@ let _audioCtx = null;
 
 export function getAudioCtx() {
   if (typeof window === 'undefined') return null;
-  if (!_audioCtx) {
-    const AC = window.AudioContext || window.webkitAudioContext;
-    if (!AC) return null;
-    _audioCtx = new AC();
+  try {
+    if (!_audioCtx || _audioCtx.state === 'closed') {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      _audioCtx = new AC();
+    }
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(() => {});
+    }
+    return _audioCtx;
+  } catch (e) {
+    console.warn('[Audio] Failed to get AudioContext:', e);
+    return null;
   }
-  if (_audioCtx.state === 'suspended') {
-    _audioCtx.resume().catch(() => {});
-  }
-  return _audioCtx;
 }
 
 // Desbloqueo global automático en el primer toque o clic del usuario

@@ -53,13 +53,20 @@ function useDeliveryAlert() {
   // ── Precargar el archivo WAV al montar ──────────────────────────────────────
   useEffect(() => {
     try {
-      const audio = new Audio('/sounds/alarm.wav');
+      const audio = new Audio();
+      audio.src = '/sounds/alarm.wav';
       audio.preload = 'none';
       audio.volume  = 1.0;
       audioRef.current = audio;
     } catch (_) {}
     return () => {
       stopAll();
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+        } catch (_) {}
+      }
       audioRef.current = null;
     };
   }, []);
@@ -508,6 +515,27 @@ export const DejadorDashboard = () => {
       : allDeliveryProducts;
     return ordered.filter((p: any) => !userHiddenProducts.includes(p.id));
   }, [allDeliveryProducts, userProductOrder, userHiddenProducts]);
+
+  const reorderedProducts = React.useMemo(() => {
+    const half = Math.ceil(products.length / 2);
+    const col1 = products.slice(0, half);
+    const col2 = products.slice(half);
+    return col1.map((item: any, i: number) => [item, col2[i]]).flat().filter(Boolean);
+  }, [products]);
+
+  const recentCargas = React.useMemo(() => {
+    return [...(loadHistory as any[])]
+      .filter((e: any) => e.type === 'carga')
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 30);
+  }, [loadHistory]);
+
+  const recentRecepciones = React.useMemo(() => {
+    return [...(loadHistory as any[])]
+      .filter((e: any) => e.type === 'recepcion' || e.type === 'recibir')
+      .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 30);
+  }, [loadHistory]);
 
   // Modo organizar productos
   const [organizeMode, setOrganizeMode] = useState(false);
@@ -994,15 +1022,7 @@ export const DejadorDashboard = () => {
         {/* ─── TAB: SURTIR & RECIBIR (PRODUCT GRID) ─── */}
         {(activeTab === 'carga' || activeTab === 'recibir') && (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 animate-fade-in mb-8">
-          {/* Reordenar para que la grid rellene de arriba a abajo (columna por columna):
-               [0,1,2,3,4,5] con 2 cols → [0,3,1,4,2,5] así queda:
-               col1: 0,1,2   col2: 3,4,5  */}
-            {(() => {
-              const half = Math.ceil(products.length / 2);
-              const col1 = products.slice(0, half);
-              const col2 = products.slice(half);
-              const reordered = col1.map((item: any, i: number) => [item, col2[i]]).flat().filter(Boolean);
-              return reordered.map((p: any) => {
+            {reorderedProducts.map((p: any) => {
               const action = activeTab === 'carga' ? 'surtir' : 'recibir';
               const productPresetValues = getPresetsForProduct(p.id, action);
               return (
@@ -1042,20 +1062,14 @@ export const DejadorDashboard = () => {
                    />
                 </div>
               </div>
-              );})
-            })()}
+              );
+            })}
           </div>
         )}
 
         {/* ─── HISTORIAL DE CARGAS INICIALES ─── */}
-        {activeTab === 'carga' && (() => {
-          const recentCargas = [...(loadHistory as any[])]
-            .filter((e: any) => e.type === 'carga')
-            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 30);
-          if (recentCargas.length === 0) return null;
-          return (
-            <div className="mt-8 mb-6">
+        {activeTab === 'carga' && recentCargas.length > 0 && (
+          <div className="mt-8 mb-6">
               <h2 className="font-black text-gray-700 tracking-wide text-base mb-3 px-1">📦 Historial de Cargas</h2>
               <div className="space-y-2.5">
                 {recentCargas.map((entry: any) => {
@@ -1137,23 +1151,16 @@ export const DejadorDashboard = () => {
                 })}
               </div>
             </div>
-          );
-        })()}
+        )}
 
         {/* ─── HISTORIAL DE RECEPCIONES (SOBRANTES RECIBIDOS) ─── */}
-        {activeTab === 'recibir' && (() => {
-          const recentRecepciones = [...(loadHistory as any[])]
-            .filter((e: any) => e.type === 'recepcion' || e.type === 'recibir')
-            .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-            .slice(0, 30);
-          if (recentRecepciones.length === 0) return null;
-          return (
-            <div className="mt-8 mb-6 pb-20">
-              <h2 className="font-black text-gray-700 tracking-wide text-base mb-3 px-1 flex items-center gap-2">
-                <span>📥 Historial de Recepción de Sobrantes</span>
-              </h2>
-              <div className="space-y-2.5">
-                {recentRecepciones.map((entry: any) => {
+        {activeTab === 'recibir' && recentRecepciones.length > 0 && (
+          <div className="mt-8 mb-6 pb-20">
+            <h2 className="font-black text-gray-700 tracking-wide text-base mb-3 px-1 flex items-center gap-2">
+              <span>📥 Historial de Recepción de Sobrantes</span>
+            </h2>
+            <div className="space-y-2.5">
+              {recentRecepciones.map((entry: any) => {
                   const totalItems = (entry.items || []).reduce((sum: number, i: any) => sum + (i.qty || 0), 0);
                   const d = new Date(entry.timestamp);
                   const timeStr = `${String(d.getDate()).padStart(2,'0')}/${String(d.getMonth()+1).padStart(2,'0')} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
@@ -1234,8 +1241,7 @@ export const DejadorDashboard = () => {
                 })}
               </div>
             </div>
-          );
-        })()}
+        )}
 
         {/* ─── TAB: PEDIDOS ─── */}
         {activeTab === 'surtir' && (

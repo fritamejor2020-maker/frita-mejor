@@ -67,21 +67,53 @@ export const safeLocalStorage = {
 const DB_NAME = 'FritaMejorStorageDB';
 const STORE_NAME = 'kv_store';
 
+let dbInstance = null;
+let dbPromise = null;
+
 function getDB() {
-  return new Promise((resolve, reject) => {
+  if (dbInstance) return Promise.resolve(dbInstance);
+  if (dbPromise) return dbPromise;
+
+  dbPromise = new Promise((resolve, reject) => {
     if (typeof window === 'undefined' || !window.indexedDB) {
+      dbPromise = null;
       return reject(new Error('IndexedDB not supported'));
     }
-    const request = window.indexedDB.open(DB_NAME, 1);
-    request.onupgradeneeded = (e) => {
-      const db = e.target.result;
-      if (!db.objectStoreNames.contains(STORE_NAME)) {
-        db.createObjectStore(STORE_NAME);
-      }
-    };
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
+    try {
+      const request = window.indexedDB.open(DB_NAME, 1);
+      request.onupgradeneeded = (e) => {
+        const db = e.target.result;
+        if (!db.objectStoreNames.contains(STORE_NAME)) {
+          db.createObjectStore(STORE_NAME);
+        }
+      };
+      request.onsuccess = () => {
+        dbInstance = request.result;
+        dbInstance.onversionchange = () => {
+          try { dbInstance.close(); } catch (_) {}
+          dbInstance = null;
+          dbPromise = null;
+        };
+        dbInstance.onclose = () => {
+          dbInstance = null;
+          dbPromise = null;
+        };
+        resolve(dbInstance);
+      };
+      request.onerror = (e) => {
+        dbPromise = null;
+        reject(request.error || e);
+      };
+      request.onblocked = () => {
+        console.warn('[SafeStorage] IndexedDB open blocked');
+      };
+    } catch (err) {
+      dbPromise = null;
+      reject(err);
+    }
   });
+
+  return dbPromise;
 }
 
 export const idbStorage = {

@@ -3,11 +3,11 @@
 // Maneja push notifications en background (app cerrada / bloqueada)
 // ============================================================
 
-const APP_VERSION = 'v1.0.5';
+const APP_VERSION = 'v1.0.6';
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  console.log('[SW] Nuevo Service Worker v1.0.5 instalado.');
+  console.log('[SW] Nuevo Service Worker v1.0.6 instalado.');
 });
 
 self.addEventListener('activate', (event) => {
