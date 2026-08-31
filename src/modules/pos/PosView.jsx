@@ -893,7 +893,7 @@ export function PosView() {
 
     // Check if this is a contrata client
     const saleCustomer = customers?.find(c => c.id === selectedCustomer);
-    const isContrata = saleCustomer && saleCustomer.typeId;
+    const isContrata = !!(saleCustomer && saleCustomer.typeId);
 
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
@@ -926,11 +926,11 @@ export function PosView() {
       } : {}),
     };
     
-    // ── EVALUAR CAMPANA DE LA SUERTE & PREMIACIÓN ALEATORIA (SOLO PARA VENTAS NUEVAS) ──
+    // ── EVALUAR CAMPANA DE LA SUERTE & PREMIACIÓN ALEATORIA (SOLO PARA VENTAS NUEVAS Y SOLO PARA CLIENTES GENERALES / NO CONTRATAS) ──
     let isLuckyWinner = false;
     let rewardConfig = null;
 
-    if (!activeSuspendedId) {
+    if (!activeSuspendedId && !isContrata) {
       try {
         const userBranch = user?.branchId || 'GLOBAL';
         const branchRewardsConfig = posSettings?.luckyRewardsConfig?.[userBranch] || posSettings?.luckyRewardsConfig?.['GLOBAL'] || {};
