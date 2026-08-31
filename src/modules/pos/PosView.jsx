@@ -244,13 +244,17 @@ export function PosView() {
     s => s.status === 'SUSPENDED' && !deletedSaleSet.has(s.id) && (!s.originalOlaClickId || !deletedSaleSet.has(s.originalOlaClickId))
   );
   
-  // Unificar ventas en espera locales y de base de datos evitando duplicados por ID
-  const combinedSales = [...(heldSales || [])];
+  // Unificar ventas en espera dando absoluta prioridad a posSales (fuente de verdad sincronizada)
+  const combinedSalesMap = new Map();
   suspendedSales.forEach(s => {
-    if (!combinedSales.some(h => h.id === s.id || (h.originalOlaClickId && h.originalOlaClickId === s.originalOlaClickId))) {
-      combinedSales.push(s);
+    if (s?.id) combinedSalesMap.set(s.id, s);
+  });
+  (heldSales || []).forEach(h => {
+    if (h?.id && !combinedSalesMap.has(h.id) && (!h.originalOlaClickId || !combinedSalesMap.has(h.originalOlaClickId))) {
+      combinedSalesMap.set(h.id, h);
     }
   });
+  const combinedSales = Array.from(combinedSalesMap.values());
 
   const allHeldAndSuspended = combinedSales.map(s => {
     const cust = (customers || []).find(c => c.id === s.customerId);
@@ -822,6 +826,8 @@ export function PosView() {
   };
 
   const handleLoadSuspended = (sale) => {
+    if (!sale) return;
+
     // 1. AUTO-GUARDADO: Si el carrito actual tiene productos y no es la misma venta que se está seleccionando,
     // persistir automáticamente el carrito actual en Espera para no perderlo JAMÁS al cambiar entre ventas.
     if (ticketItems && ticketItems.length > 0 && activeSuspendedId !== sale.id) {
@@ -838,7 +844,7 @@ export function PosView() {
         isLuckyWinner: isLuckyWinnerSession || String(currentSaleId).includes('LUCKY'),
         prizeType: isLuckyWinnerSession ? 'RASPA_Y_GANA' : undefined,
         publicId: pendingDeliveryInfo?.publicId || null,
-        items: [...ticketItems],
+        items: ticketItems.map(i => ({ ...i })),
         subtotal,
         discountPercent,
         discountAmount,
@@ -857,25 +863,28 @@ export function PosView() {
       toast.info('Venta anterior guardada en espera automáticamente', { icon: '💾' });
     }
 
-    const isLucky = !!(sale.isLuckyWinner || (sale.id && String(sale.id).includes('LUCKY')));
+    // 2. OBTENER LA VERSIÓN FRESCA DE LA VENTA A RETOMAR
+    const freshSale = (posSales || []).find(s => s.id === sale.id) || (heldSales || []).find(h => h.id === sale.id) || sale;
+    const isLucky = !!(freshSale.isLuckyWinner || (freshSale.id && String(freshSale.id).includes('LUCKY')));
+
     setIsLuckyWinnerSession(isLucky);
-    setTicketItems(sale.items || []);
-    setSelectedCustomer(sale.customerId || '');
-    setActiveSuspendedId(sale.id);
-    setManualDiscountPercent(sale.discountPercent || (sale.isLuckyWinner && sale.prizeType === 'DISCOUNT' ? (sale.discountPercentage || 0) : 0));
+    setTicketItems((freshSale.items || []).map(i => ({ ...i })));
+    setSelectedCustomer(freshSale.customerId || '');
+    setActiveSuspendedId(freshSale.id);
+    setManualDiscountPercent(freshSale.discountPercent || (freshSale.isLuckyWinner && freshSale.prizeType === 'DISCOUNT' ? (freshSale.discountPercentage || 0) : 0));
     setPendingDeliveryInfo({
-      customerName: sale.customerName || '',
-      customerPhone: sale.customerPhone || '',
-      deliveryAddress: sale.deliveryAddress || '',
-      serviceType: sale.serviceType || 'DELIVERY',
-      isOlaClick: !!sale.isOlaClick,
-      publicId: sale.publicId || ''
+      customerName: freshSale.customerName || '',
+      customerPhone: freshSale.customerPhone || '',
+      deliveryAddress: freshSale.deliveryAddress || '',
+      serviceType: freshSale.serviceType || 'DELIVERY',
+      isOlaClick: !!freshSale.isOlaClick,
+      publicId: freshSale.publicId || ''
     });
 
-    // NO eliminamos la venta de la base de datos para que persista ante cualquier cambio entre ventas o recarga
+    // Cerrar modales inmediatamente
     setShowSuspendedModal(false);
     setShowHeldSalesModal(false);
-    toast.success(`Pedido de ${sale.customerName || 'Cliente'} retomado`, { icon: '▶️' });
+    toast.success(`Pedido de ${freshSale.customerName || 'Cliente'} retomado`, { icon: '▶️' });
   };
 
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
