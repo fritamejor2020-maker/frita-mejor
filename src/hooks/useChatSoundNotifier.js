@@ -26,17 +26,19 @@ export function getAudioCtx() {
   return _audioCtx;
 }
 
-// Desbloqueo global automático en cualquier toque o clic del usuario
+// Desbloqueo global automático en el primer toque o clic del usuario
 if (typeof window !== 'undefined') {
   const unlockAudio = () => {
-    const ctx = getAudioCtx();
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume().catch(() => {});
-    }
+    try {
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') {
+        ctx.resume().catch(() => {});
+      }
+    } catch (_) {}
   };
-  window.addEventListener('click', unlockAudio, { passive: true });
-  window.addEventListener('touchstart', unlockAudio, { passive: true });
-  window.addEventListener('pointerdown', unlockAudio, { passive: true });
+  window.addEventListener('click', unlockAudio, { passive: true, once: true });
+  window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
+  window.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
 }
 
 export function resumeAudioContext() {

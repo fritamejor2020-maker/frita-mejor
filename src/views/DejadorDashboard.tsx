@@ -41,7 +41,7 @@ const useRelativeTime = () => {
 };
 
 
-// ─── Hook: Audio — alarma máximo volumen con WAV real + vibración ─────────────
+// ─── Hook: Audio — alarma con WAV y Web Audio seguro ─────────────
 function useDeliveryAlert() {
   const audioRef      = useRef<HTMLAudioElement | null>(null);
   const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -50,67 +50,46 @@ function useDeliveryAlert() {
 
   // ── Precargar el archivo WAV al montar ──────────────────────────────────────
   useEffect(() => {
-    const audio = new Audio('/sounds/alarm.wav');
-    audio.preload = 'auto';
-    audio.volume  = 1.0;
-    audioRef.current = audio;
+    try {
+      const audio = new Audio('/sounds/alarm.wav');
+      audio.preload = 'none';
+      audio.volume  = 1.0;
+      audioRef.current = audio;
+    } catch (_) {}
     return () => {
-      audio.pause();
+      stopAll();
       audioRef.current = null;
     };
   }, []);
 
-  // ── Vibración del dispositivo (iOS Safari 16.4+ y Android Chrome) ───────────
+  // ── Vibración del dispositivo ──────────────────────────────────────────────
   const vibrate = () => {
     try {
-      if ('vibrate' in navigator) {
-        // Patrón: vibra 200ms, pausa 80ms, vibra 200ms, pausa 80ms, vibra 400ms
+      if ('vibrate' in navigator && document.hasFocus && document.hasFocus()) {
         navigator.vibrate([200, 80, 200, 80, 400]);
       }
     } catch (_) {}
   };
 
-  // ── Fallback: Web Audio API con compressor para más volumen ─────────────────
+  // ── Fallback: Web Audio API seguro (usa el singleton getAudioCtx) ──────────
   const playFallbackBeep = () => {
     try {
-      const ctx  = new (window.AudioContext || (window as any).webkitAudioContext)();
-      if (ctx.state === 'suspended') ctx.resume();
-      const compressor = ctx.createDynamicsCompressor();
-      compressor.threshold.value = -3;
-      compressor.knee.value      = 0;
-      compressor.ratio.value     = 20;
-      compressor.attack.value    = 0.001;
-      compressor.release.value   = 0.1;
-      compressor.connect(ctx.destination);
-
-      const playTone = (startTime: number, freq: number, dur: number) => {
-        // Sine wave con armónico suave — mismo sonido que el WAV
-        [[freq, 1.0], [freq * 2, 0.15], [freq * 3, 0.05]].forEach(([f, amp]) => {
-          const osc  = ctx.createOscillator();
-          const gain = ctx.createGain();
-          osc.type = 'sine';
-          osc.frequency.setValueAtTime(f, startTime);
-          // Envolvente campana: ataque 5ms, decay exponencial
-          gain.gain.setValueAtTime(0, startTime);
-          gain.gain.linearRampToValueAtTime(amp as number, startTime + 0.005);
-          gain.gain.exponentialRampToValueAtTime(0.001, startTime + dur);
-          osc.connect(gain);
-          gain.connect(compressor);
-          osc.start(startTime);
-          osc.stop(startTime + dur);
-        });
-      };
-
-      const t = ctx.currentTime;
-      playTone(t + 0.00, 1318.5, 0.30);  // E6
-      playTone(t + 0.18, 1046.5, 0.30);  // C6
-      playTone(t + 0.36, 1567.9, 0.45);  // G6
-
-      setTimeout(() => { try { ctx.close(); } catch (_) {} }, 1500);
+      const ctx = getAudioCtx();
+      if (!ctx || ctx.state !== 'running') return;
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(1046.5, now);
+      gain.gain.setValueAtTime(0.3, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.3);
     } catch (_) {}
   };
 
-  // ── Reproducir el archivo WAV (siempre desde el inicio) ─────────────────────
+  // ── Reproducir el archivo WAV de forma segura ─────────────────────────────
   const playAlarm = () => {
     if (stoppedRef.current) return;
     try {
@@ -119,12 +98,17 @@ function useDeliveryAlert() {
         audio.currentTime = 0;
         audio.volume = 1.0;
         const p = audio.play();
-        // Fallback Web Audio API si el archivo no se puede reproducir
-        if (p) p.catch(() => playFallbackBeep());
+        if (p && typeof p.catch === 'function') {
+          p.catch(() => {
+            playFallbackBeep();
+          });
+        }
       } else {
         playFallbackBeep();
       }
-    } catch (_) { playFallbackBeep(); }
+    } catch (_) {
+      playFallbackBeep();
+    }
     vibrate();
   };
 
@@ -403,11 +387,6 @@ export const DejadorDashboard = () => {
     if (isInitialMountRef.current) {
       isInitialMountRef.current = false;
       knownPendingIdsRef.current = currentPendingIds;
-      if (currentPendingIds.size > 0) {
-        playOnce();
-        setIsAlertPlaying(true);
-        scheduleInactivityAlert();
-      }
       return;
     }
 
