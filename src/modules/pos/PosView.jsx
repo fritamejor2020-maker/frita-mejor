@@ -4609,16 +4609,26 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
     .filter(s => s.contrataPaymentMethod === 'credit')
     .reduce((acc, s) => acc + (s.creditAmount || s.total), 0);
 
-  // Calculate expected
+  // Calculate cascade deductions
   const initial = shift.initialAmount || 0;
-  const cashSales = localCash + contrataCash;
-  const otherSales = localTransfers + contrataTransfers;
   const retiros = (expenses || []).filter(e => e.type !== 'deposito');
   const depositos = (expenses || []).filter(e => e.type === 'deposito');
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDepositos = depositos.reduce((acc, e) => acc + e.amount, 0);
 
-  const expectedCashInDrawer = initial + cashSales - totalRetiros + totalDepositos;
+  // Lógica de absorción en cascada
+  const localSalidasAbsorbidas = Math.min(totalRetiros, localCash);
+  const localCashNeto = localCash - localSalidasAbsorbidas;
+  const localTotalNeto = localCashNeto + localTransfers;
+
+  const salidasRestantes = totalRetiros - localSalidasAbsorbidas;
+  const contrataSalidasAbsorbidas = Math.min(salidasRestantes, contrataCash);
+  const contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
+  const contrataTotalNeto = contrataCashNeto + contrataTransfers + contrataCredit;
+
+  const totalGeneralNeto = localTotalNeto + contrataTotalNeto;
+
+  const expectedCashInDrawer = initial + localCash + contrataCash - totalRetiros + totalDepositos;
   const counted = parseFloat(realCount || 0);
   const difference = counted - expectedCashInDrawer;
 
@@ -4632,20 +4642,53 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
           <p className="text-gray-400 text-xs font-bold mt-1">Registrar efectivo real contado para el turno cerrado.</p>
         </div>
         
-        <div className="p-6 overflow-y-auto space-y-6">
-            <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-3 text-sm font-bold text-gray-300 shadow-inner">
-              <div className="flex justify-between"><span>Base Inicial:</span> <span>{formatMoney(initial)}</span></div>
-              <div className="flex justify-between text-green-400"><span>Ventas Efectivo Total:</span> <span>+{formatMoney(cashSales)}</span></div>
-              <div className="flex justify-between text-blue-400"><span>Ventas Transferencias Total:</span> <span>+{formatMoney(otherSales)}</span></div>
-              {contrataCredit > 0 && (
-                <div className="flex justify-between text-purple-400"><span>Ventas Contratas a Crédito:</span> <span>{formatMoney(contrataCredit)}</span></div>
-              )}
-              <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
-              {totalDepositos > 0 && (
-                <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
-              )}
-              <div className="border-t border-gray-700 pt-3 flex justify-between text-xl text-white font-black mt-2">
-                 <span>Efectivo Esperado en Cajón:</span> <span>{formatMoney(expectedCashInDrawer)}</span>
+        <div className="p-6 overflow-y-auto space-y-5">
+            <div className="bg-[#16171d] rounded-[24px] p-5 border border-gray-800 space-y-4 text-xs font-bold text-gray-300 shadow-inner">
+              
+              {/* Sección Local */}
+              <div className="space-y-1.5 border-b border-gray-800/80 pb-3">
+                <div className="text-[11px] font-black uppercase text-blue-400 tracking-wider">🏪 Local</div>
+                <div className="flex justify-between text-gray-300"><span>Efectivo Local (Neto):</span> <span>{formatMoney(localCashNeto)}</span></div>
+                {totalRetiros > 0 && (
+                  <div className="flex justify-between text-red-400"><span>Salidas Local:</span> <span>-{formatMoney(localSalidasAbsorbidas)}</span></div>
+                )}
+                <div className="flex justify-between text-blue-300"><span>Transferencias Local:</span> <span>{formatMoney(localTransfers)}</span></div>
+                <div className="flex justify-between text-white font-black pt-1 border-t border-gray-800/50">
+                  <span>Total Local:</span> <span>{formatMoney(localTotalNeto)}</span>
+                </div>
+              </div>
+
+              {/* Sección Contratas */}
+              <div className="space-y-1.5 border-b border-gray-800/80 pb-3">
+                <div className="text-[11px] font-black uppercase text-purple-400 tracking-wider">🏢 Contratas</div>
+                <div className="flex justify-between text-gray-300"><span>Efectivo Contratas:</span> <span>{formatMoney(contrataCashNeto)}</span></div>
+                {contrataSalidasAbsorbidas > 0 && (
+                  <div className="flex justify-between text-red-400"><span>Salidas Contratas:</span> <span>-{formatMoney(contrataSalidasAbsorbidas)}</span></div>
+                )}
+                <div className="flex justify-between text-purple-300"><span>Transferencias Contratas:</span> <span>{formatMoney(contrataTransfers)}</span></div>
+                {contrataCredit > 0 && (
+                  <div className="flex justify-between text-amber-400"><span>Crédito Contratas:</span> <span>{formatMoney(contrataCredit)}</span></div>
+                )}
+                <div className="flex justify-between text-white font-black pt-1 border-t border-gray-800/50">
+                  <span>Total Contratas:</span> <span>{formatMoney(contrataTotalNeto)}</span>
+                </div>
+              </div>
+
+              {/* Total General */}
+              <div className="flex justify-between text-sm font-black text-amber-400 bg-amber-500/10 p-2.5 rounded-xl border border-amber-500/20">
+                <span>TOTAL GENERAL DEL CIERRE:</span>
+                <span>{formatMoney(totalGeneralNeto)}</span>
+              </div>
+
+              {/* Arqueo Efectivo */}
+              <div className="pt-1 space-y-1">
+                <div className="flex justify-between text-gray-400"><span>Base Inicial Caja:</span> <span>{formatMoney(initial)}</span></div>
+                {totalDepositos > 0 && (
+                  <div className="flex justify-between text-emerald-400"><span>Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
+                )}
+                <div className="border-t border-gray-700 pt-2 flex justify-between text-base text-white font-black">
+                   <span>Efectivo Esperado en Cajón:</span> <span className="text-emerald-400">{formatMoney(expectedCashInDrawer)}</span>
+                </div>
               </div>
             </div>
 

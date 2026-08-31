@@ -627,6 +627,13 @@ export function IncomesModal({ onClose }) {
 
                 const totalPosExpenses = posExpenses.filter(e => e.shiftId === lastClosed.id && e.type !== 'deposito').reduce((a, e) => a + e.amount, 0);
 
+                // Lógica de absorción en cascada
+                const localSalidasAbsorbidas = Math.min(totalPosExpenses, localCash);
+                const localCashNeto = localCash - localSalidasAbsorbidas;
+                const salidasRestantes = totalPosExpenses - localSalidasAbsorbidas;
+                const contrataSalidasAbsorbidas = Math.min(salidasRestantes, contrataCash);
+                const contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
+
                 const contrataByClient = contrataCustomers.map(c => {
                   const cs = contrataSales.filter(s => s.customerId === c.id);
                   if (cs.length === 0) return null;
@@ -642,16 +649,16 @@ export function IncomesModal({ onClose }) {
                 const handleLoadZ = () => {
                   // Unified Local+Contratas fields
                   setEfectivoReal('');  // user must count and enter
-                  setContraEfectivoZ(String(contrataCash));
-                  setSalidasLocal(String(totalPosExpenses));
+                  setContraEfectivoZ(String(contrataCashNeto));
+                  setSalidasLocal(String(localSalidasAbsorbidas));
                   setTransferenciasLocal(String(localTransfers));
                   setTransferenciasContratas(String(contrataTransfers));
                   // Legacy fields (for banner display)
-                  setEfectivo(String(localCash));
+                  setEfectivo(String(localCashNeto));
                   setTransferencias(String(totalTransfers));
                   setSalidas(String(totalPosExpenses));
                   setVendedor(lastClosed.userName || '');
-                  setZLoadedData({ localCash, totalTransfers, localTransfers, contrataTransfers, totalPosExpenses, nequi, banc, contrataCash, contrataByClient, shiftId: lastClosed.id, time: timeStr });
+                  setZLoadedData({ localCash: localCashNeto, totalTransfers, localTransfers, contrataTransfers, totalPosExpenses, contrataCash: contrataCashNeto, contrataByClient, shiftId: lastClosed.id, time: timeStr });
                 };
 
                 return (
