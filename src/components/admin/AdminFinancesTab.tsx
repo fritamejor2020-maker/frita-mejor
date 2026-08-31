@@ -74,7 +74,7 @@ export const ResumenOperativoTab = () => {
       .sort((a: any, b: any) => new Date(b.closedAt).getTime() - new Date(a.closedAt).getTime());
     const latestShift = vs[0] || null;
 
-    const shiftDate = latestShift ? dateOf(latestShift.closedAt) : dateOf(loadHistory.find((e: any) => e.vehicleId === vehicleId)?.timestamp || '');
+    const shiftDate = latestShift ? dateOf(latestShift.openedAt || latestShift.closedAt) : dateOf(loadHistory.find((e: any) => e.vehicleId === vehicleId)?.timestamp || '');
     const shiftTurno = latestShift?.shift || '—';
 
     // Aplicar filtros
@@ -597,7 +597,7 @@ export const AdminFinancesTab = ({
       ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'))
       : (s.type === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')) || s.vehicle)))
     .forEach((s: any) => {
-      const key = `${s.pointId || s.registerId || ''}__${dateOf(s.closedAt)}`;
+      const key = `${s.pointId || s.registerId || ''}__${dateOf(s.openedAt || s.closedAt)}`;
       if (!shiftsByVehicleDate[key]) shiftsByVehicleDate[key] = [];
       shiftsByVehicleDate[key].push(s);
     });
@@ -617,9 +617,9 @@ export const AdminFinancesTab = ({
      let real = 0;
      let expenses = 0;
 
-     // Calcular la fecha del cierre al inicio para usarla en los filtros logísticos
+     // Asignar fecha contable a la FECHA DE APERTURA del turno
      // ⚠️ Usar dateOf() (fecha local) y NO toISOString() para evitar desfase UTC-5 Colombia
-     const shiftDate = dateOf(s.closedAt);
+     const shiftDate = dateOf(s.openedAt || s.closedAt);
 
      // Calcular ventana de tiempo de este turno para separar logística cuando
      // hay varios turnos en el mismo día (AM + MD, etc.)
@@ -930,8 +930,8 @@ export const AdminFinancesTab = ({
       }
     }
     return Array.from(seen.values()).sort((a: any, b: any) => {
-      const timeA = new Date(a._raw?.closedAt || a.date || 0).getTime();
-      const timeB = new Date(b._raw?.closedAt || b.date || 0).getTime();
+      const timeA = new Date(a._raw?.openedAt || a._raw?.closedAt || a.date || 0).getTime();
+      const timeB = new Date(b._raw?.openedAt || b._raw?.closedAt || b.date || 0).getTime();
       return timeB - timeA;
     });
   })();
