@@ -326,44 +326,48 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
       <!-- 4. RESUMEN FINANCIERO DEL TURNO -->
       ${tc.zShowFinancialSummary !== false ? `
-      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px; display: flex; flex-direction: column; gap: 3px;">
-        <h3 style="text-align: center; border: 1px solid black; padding: 2px 0; margin: 0 0 4px 0; font-weight: 900; text-transform: uppercase; font-size: 11px;">Resumen Financiero del Turno</h3>
+      <div style="font-size: 10.5px; font-weight: bold; margin-bottom: 6px;">
+        <div style="text-align: center; border: 1.5px solid black; padding: 2px 0; margin: 2px 0 6px 0; font-weight: 900; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px;">
+          RESUMEN FINANCIERO DEL TURNO
+        </div>
         
         <!-- Local -->
         <div style="margin-bottom: 2px;">
-          <div style="font-weight: 900; margin-bottom: 1px; font-size: 11px;">Local</div>
+          <div style="font-weight: 900; text-decoration: underline; margin-bottom: 3px; font-size: 11px;">Local</div>
           <div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCashNeto)}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Salidas Local:</span><span>${formatMoney(localSalidasAbsorbidas)}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span></div>
-          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dashed black; margin-top: 1px; padding-top: 1px;">
+          <div style="border-top: 1px dashed black; margin: 3px 0 2px 0;"></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 900;">
             <span>Total Local:</span><span>${formatMoney(localTotalCalculado)}</span>
           </div>
         </div>
 
-        <div style="border-bottom: 1px dashed #aaa; margin: 3px 0;"></div>
+        <div style="border-bottom: 1px dashed #999; margin: 5px 0;"></div>
 
         <!-- Contratas -->
         <div style="margin-bottom: 2px;">
-          <div style="font-weight: 900; margin-bottom: 1px; font-size: 11px;">Contratas</div>
+          <div style="font-weight: 900; text-decoration: underline; margin-bottom: 3px; font-size: 11px;">Contratas</div>
           <div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCashNeto)}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Salidas Contratas:</span><span>${formatMoney(contrataSalidasAbsorbidas)}</span></div>
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span></div>
           ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900;"><span>Créditos Contratas:</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
-          <div style="display: flex; justify-content: space-between; font-weight: 900; border-top: 1px dashed black; margin-top: 1px; padding-top: 1px;">
+          <div style="border-top: 1px dashed black; margin: 3px 0 2px 0;"></div>
+          <div style="display: flex; justify-content: space-between; font-weight: 900;">
             <span>Total Contratas:</span><span>${formatMoney(contrataTotalCalculado)}</span>
           </div>
         </div>
 
-        <div style="border-bottom: 1px solid black; margin: 3px 0;"></div>
+        <div style="border-bottom: 1.5px solid black; margin: 5px 0;"></div>
 
         <!-- Total Gastos del cierre -->
-        <div style="display: flex; justify-content: space-between; font-weight: bold; color: #b91c1c; font-size: 10.5px; padding-top: 1px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; color: #dc2626 !important; font-size: 11px; margin-bottom: 4px;">
           <span>Total Gastos del cierre:</span>
           <span>${formatMoney(totalGastosCierre)}</span>
         </div>
 
         <!-- Total General del cierre -->
-        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 11.5px; padding: 2px 0;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px;">
           <span>Total General del cierre:</span>
           <span>${formatMoney(totalGeneralCalculado)}</span>
         </div>
