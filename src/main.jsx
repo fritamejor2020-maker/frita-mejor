@@ -10,14 +10,26 @@ createRoot(document.getElementById('root')).render(
   </StrictMode>,
 )
 
-// ── Service Worker PWA (Auto-actualización suave sin bucles de recarga) ──
-registerSW({
-  immediate: true,
-  onNeedRefresh() {
-    console.log('[PWA] Nueva versión disponible en segundo plano.');
-  },
-  onOfflineReady() {
-    console.log('[PWA] Aplicación lista para operar sin conexión.');
-  },
-});
+// ── Service Worker PWA (Auto-actualización suave en Desktop / Bypass en Tablets para evitar saturación de RAM) ──
+if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+  const isMobileOrTablet = /Android|iPad|iPhone|iPod|Tablet/i.test(navigator.userAgent);
+  if (isMobileOrTablet) {
+    // 🛡️ En tablets y móviles Android: Desactivar Service Worker para evitar colapso de RAM de Chromium (Aw Snap / Ups)
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      for (const reg of registrations) {
+        reg.unregister();
+      }
+    }).catch(() => {});
+  } else {
+    registerSW({
+      immediate: true,
+      onNeedRefresh() {
+        console.log('[PWA] Nueva versión disponible en segundo plano.');
+      },
+      onOfflineReady() {
+        console.log('[PWA] Aplicación lista para operar sin conexión.');
+      },
+    });
+  }
+}
 

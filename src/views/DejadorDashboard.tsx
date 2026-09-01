@@ -43,44 +43,18 @@ const useRelativeTime = () => {
 };
 
 
-// ─── Hook: Audio — alarma con WAV y Web Audio seguro ─────────────
+// ─── Hook: Audio — alerta ultraligera y segura (Cero fugas de RAM en Tablets) ─────────────
 function useDeliveryAlert() {
-  const audioRef      = useRef<HTMLAudioElement | null>(null);
-  const loopRef       = useRef<ReturnType<typeof setInterval> | null>(null);
-  const loopActiveRef = useRef(false);
-  const stoppedRef    = useRef(false);
+  const isPlayingRef = useRef(false);
 
-  // ── Precargar el archivo WAV al montar ──────────────────────────────────────
-  useEffect(() => {
-    try {
-      const audio = new Audio();
-      audio.src = '/sounds/alarm.wav';
-      audio.preload = 'none';
-      audio.volume  = 1.0;
-      audioRef.current = audio;
-    } catch (_) {}
-    return () => {
-      stopAll();
-      if (audioRef.current) {
-        try {
-          audioRef.current.pause();
-          audioRef.current.src = '';
-        } catch (_) {}
-      }
-      audioRef.current = null;
-    };
-  }, []);
-
-  // ── Vibración del dispositivo ──────────────────────────────────────────────
   const vibrate = () => {
     try {
-      if ('vibrate' in navigator && document.hasFocus && document.hasFocus()) {
+      if ('vibrate' in navigator && typeof document !== 'undefined' && document.hasFocus && document.hasFocus()) {
         navigator.vibrate([200, 80, 200, 80, 400]);
       }
     } catch (_) {}
   };
 
-  // ── Fallback: Web Audio API seguro (usa el singleton getAudioCtx) ──────────
   const playFallbackBeep = () => {
     try {
       const ctx = getAudioCtx();
@@ -90,30 +64,21 @@ function useDeliveryAlert() {
       const gain = ctx.createGain();
       osc.type = 'sine';
       osc.frequency.setValueAtTime(1046.5, now);
-      gain.gain.setValueAtTime(0.3, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+      gain.gain.setValueAtTime(0.2, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.25);
       osc.connect(gain).connect(ctx.destination);
       osc.start(now);
-      osc.stop(now + 0.3);
+      osc.stop(now + 0.25);
     } catch (_) {}
   };
 
-  // ── Reproducir el archivo WAV de forma segura ─────────────────────────────
-  const playAlarm = () => {
-    if (stoppedRef.current) return;
+  const playOnce = () => {
     try {
-      const audio = audioRef.current;
-      if (audio) {
-        audio.currentTime = 0;
-        audio.volume = 1.0;
-        const p = audio.play();
-        if (p && typeof p.catch === 'function') {
-          p.catch(() => {
-            playFallbackBeep();
-          });
-        }
-      } else {
-        playFallbackBeep();
+      const audio = new Audio('/sounds/alarm.wav');
+      audio.volume = 0.8;
+      const p = audio.play();
+      if (p && typeof p.catch === 'function') {
+        p.catch(() => playFallbackBeep());
       }
     } catch (_) {
       playFallbackBeep();
@@ -121,36 +86,17 @@ function useDeliveryAlert() {
     vibrate();
   };
 
-  const playOnce = () => {
-    stoppedRef.current = false;
-    playAlarm();
-  };
-
   const startLoop = () => {
-    if (loopActiveRef.current) return;
-    stoppedRef.current    = false;
-    loopActiveRef.current = true;
-    playAlarm();
-    loopRef.current = setInterval(playAlarm, 3000);
+    playOnce();
+    isPlayingRef.current = true;
   };
 
   const stopAll = () => {
-    stoppedRef.current    = true;
-    loopActiveRef.current = false;
-    if (loopRef.current) { clearInterval(loopRef.current); loopRef.current = null; }
-    try {
-      audioRef.current?.pause();
-      if (audioRef.current) audioRef.current.currentTime = 0;
-    } catch (_) {}
-    // Detener vibración
+    isPlayingRef.current = false;
     try { if ('vibrate' in navigator) navigator.vibrate(0); } catch (_) {}
   };
 
-  useEffect(() => () => {
-    stopAll();
-  }, []);
-
-  return { playOnce, startLoop, stopAll, isLooping: loopActiveRef };
+  return { playOnce, startLoop, stopAll, isLooping: isPlayingRef };
 }
 
 
