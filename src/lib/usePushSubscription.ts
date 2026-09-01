@@ -25,19 +25,17 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return outputArray;
 }
 
-/** Registra el Service Worker si aún no está activo */
+/** Obtiene el Service Worker activo registrado por la PWA */
 async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
   if (!('serviceWorker' in navigator)) {
     console.warn('[Push] Service Workers no soportados en este navegador');
     return null;
   }
   try {
-    const registration = await navigator.serviceWorker.register('/sw.js', { scope: '/' });
-    // Esperar a que el SW esté activo
-    await navigator.serviceWorker.ready;
+    const registration = await navigator.serviceWorker.ready;
     return registration;
   } catch (err) {
-    console.error('[Push] Error registrando Service Worker:', err);
+    console.warn('[Push] Service Worker ready timeout/error:', err);
     return null;
   }
 }
