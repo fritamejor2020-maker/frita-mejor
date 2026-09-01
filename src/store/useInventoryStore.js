@@ -25,9 +25,11 @@ function syncKey(key, value) {
   }
 
   // Bloqueo 2: Si la app no ha terminado de cargar datos remotos, no sincronizar
-  // Esto evita que los valores INITIAL_* del código sobreescriban Supabase al arrancar
+  // Esto evita que los valores INITIAL_* del código sobreescriban Supabase al arrancar.
+  // EXCEPCIÓN: Las ventas, gastos y turnos del POS SIEMPRE deben guardarse y encolarse de inmediato.
   const store = useInventoryStore.getState();
-  if (!store._hasLoadedRemote && key !== 'posShifts' && !key.startsWith('posShifts_')) {
+  const isPosOperationalKey = key === 'posShifts' || key.startsWith('posShifts_') || key === 'posSales' || key.startsWith('posSales_') || key === 'posExpenses' || key.startsWith('posExpenses_');
+  if (!store._hasLoadedRemote && !isPosOperationalKey) {
     console.warn(`[SyncGuard] Push de "${key}" bloqueado: aún no se ha cargado el estado remoto.`);
     return;
   }
@@ -1283,10 +1285,13 @@ export const useInventoryStore = create(
               return invItem;
             });
           }
-          // Limpiar de deletedPosSaleIds únicamente si es una venta en espera que se está re-guardando
-          const newDeleted = sale.status === 'SUSPENDED'
-            ? (s.deletedPosSaleIds || []).filter(dId => dId !== saleId)
-            : (s.deletedPosSaleIds || []);
+          // Limpiar de deletedPosSaleIds SIEMPRE que se agregue una venta (evita que una venta pagada sea borrada por tombstone residual)
+          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => 
+            dId !== saleId && 
+            dId !== sale.id && 
+            dId !== sale.originalOlaClickId && 
+            dId !== sale.publicId
+          );
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);

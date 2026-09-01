@@ -612,14 +612,38 @@ export function PosView() {
     
     setShowClosingModal(false);
     
+    const isShiftSale = (sale, targetShift) => {
+      if (!sale || !targetShift || sale.status !== 'PAID') return false;
+      if (sale.shiftId && targetShift.id && sale.shiftId === targetShift.id) return true;
+      if (sale.registerId && targetShift.registerId && sale.registerId === targetShift.registerId) {
+        const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
+        const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
+        const closeTime = targetShift.closedAt ? new Date(targetShift.closedAt).getTime() : (Date.now() + 60000);
+        return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+      }
+      return false;
+    };
+
+    const isShiftExpense = (exp, targetShift) => {
+      if (!exp || !targetShift) return false;
+      if (exp.shiftId && targetShift.id && exp.shiftId === targetShift.id) return true;
+      if (exp.registerId && targetShift.registerId && exp.registerId === targetShift.registerId) {
+        const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
+        const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
+        const closeTime = targetShift.closedAt ? new Date(targetShift.closedAt).getTime() : (Date.now() + 60000);
+        return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+      }
+      return false;
+    };
+
     if (!isPostponed) {
       setLastClosedShift(closedShiftData);
       
       // Auto print Z report & Open Drawer
       const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
       
-      const shiftSales = (posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID');
-      const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === activeShift.id);
+      const shiftSales = (posSales || []).filter(s => isShiftSale(s, activeShift));
+      const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, activeShift));
       
       const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
       setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
@@ -633,8 +657,30 @@ export function PosView() {
   };
 
   const handleReprintZReport = (shift) => {
-    const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
-    const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
+    const isShiftSale = (sale, targetShift) => {
+      if (!sale || !targetShift || sale.status !== 'PAID') return false;
+      if (sale.shiftId && targetShift.id && sale.shiftId === targetShift.id) return true;
+      if (sale.registerId && targetShift.registerId && sale.registerId === targetShift.registerId) {
+        const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
+        const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
+        const closeTime = targetShift.closedAt ? new Date(targetShift.closedAt).getTime() : (Date.now() + 60000);
+        return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+      }
+      return false;
+    };
+    const isShiftExpense = (exp, targetShift) => {
+      if (!exp || !targetShift) return false;
+      if (exp.shiftId && targetShift.id && exp.shiftId === targetShift.id) return true;
+      if (exp.registerId && targetShift.registerId && exp.registerId === targetShift.registerId) {
+        const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
+        const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
+        const closeTime = targetShift.closedAt ? new Date(targetShift.closedAt).getTime() : (Date.now() + 60000);
+        return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+      }
+      return false;
+    };
+    const shiftSales = (posSales || []).filter(s => isShiftSale(s, shift));
+    const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, shift));
     const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, '', posSettings?.paymentMethods);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
@@ -957,9 +1003,8 @@ export function PosView() {
       status: 'PAID',
       paymentMethod: isCredit ? 'CRÉDITO' : methodConfig.name,
       amountProvided: isCredit ? 0 : amountProvided,
-      change: isCredit ? 0 : (amountProvided - total),
       timestamp: new Date().toISOString(),
-      shiftId: activeShift?.id,
+      shiftId: activeShift?.id || (posShifts || []).find(s => !s.closedAt && (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001')))?.id || null,
       registerId: selectedRegisterId,
       userName: activeShift?.userName || user?.name || 'PRINCIPAL',
       // Contrata fields - only credit when explicitly requested
@@ -2045,8 +2090,28 @@ export function PosView() {
       {showClosingModal && activeShift && (
         <ShiftCloseModal 
           shift={activeShift} 
-          sales={(posSales || []).filter(s => s.shiftId === activeShift.id && s.status === 'PAID')} 
-          expenses={(posExpenses || []).filter(e => e.shiftId === activeShift.id)}
+          sales={(posSales || []).filter(s => {
+            if (!s || s.status !== 'PAID') return false;
+            if (s.shiftId && activeShift.id && s.shiftId === activeShift.id) return true;
+            if (s.registerId && activeShift.registerId && s.registerId === activeShift.registerId) {
+              const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+              const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
+              const closeTime = activeShift.closedAt ? new Date(activeShift.closedAt).getTime() : (Date.now() + 60000);
+              return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+            }
+            return false;
+          })} 
+          expenses={(posExpenses || []).filter(e => {
+            if (!e) return false;
+            if (e.shiftId && activeShift.id && e.shiftId === activeShift.id) return true;
+            if (e.registerId && activeShift.registerId && e.registerId === activeShift.registerId) {
+              const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
+              const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
+              const closeTime = activeShift.closedAt ? new Date(activeShift.closedAt).getTime() : (Date.now() + 60000);
+              return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+            }
+            return false;
+          })}
           onClose={() => setShowClosingModal(false)}
           onConfirm={handleCloseShift} 
         />
@@ -2055,8 +2120,28 @@ export function PosView() {
       {shiftToCompleteCount && (
         <ShiftCompleteCountModal 
           shift={shiftToCompleteCount}
-          sales={(posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID')}
-          expenses={(posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id)}
+          sales={(posSales || []).filter(s => {
+            if (!s || s.status !== 'PAID') return false;
+            if (s.shiftId && shiftToCompleteCount.id && s.shiftId === shiftToCompleteCount.id) return true;
+            if (s.registerId && shiftToCompleteCount.registerId && s.registerId === shiftToCompleteCount.registerId) {
+              const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+              const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
+              const closeTime = shiftToCompleteCount.closedAt ? new Date(shiftToCompleteCount.closedAt).getTime() : (Date.now() + 60000);
+              return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+            }
+            return false;
+          })}
+          expenses={(posExpenses || []).filter(e => {
+            if (!e) return false;
+            if (e.shiftId && shiftToCompleteCount.id && e.shiftId === shiftToCompleteCount.id) return true;
+            if (e.registerId && shiftToCompleteCount.registerId && e.registerId === shiftToCompleteCount.registerId) {
+              const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
+              const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
+              const closeTime = shiftToCompleteCount.closedAt ? new Date(shiftToCompleteCount.closedAt).getTime() : (Date.now() + 60000);
+              return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+            }
+            return false;
+          })}
           onClose={() => setShiftToCompleteCount(null)}
           onConfirm={(realCount) => {
             try {
@@ -2068,8 +2153,30 @@ export function PosView() {
               });
               
               // Print Z Report
-              const shiftSales = (posSales || []).filter(s => s.shiftId === shiftToCompleteCount.id && s.status === 'PAID');
-              const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shiftToCompleteCount.id);
+              const isMatch = (s) => {
+                if (!s || s.status !== 'PAID') return false;
+                if (s.shiftId && shiftToCompleteCount.id && s.shiftId === shiftToCompleteCount.id) return true;
+                if (s.registerId && shiftToCompleteCount.registerId && s.registerId === shiftToCompleteCount.registerId) {
+                  const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+                  const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
+                  const closeTime = shiftToCompleteCount.closedAt ? new Date(shiftToCompleteCount.closedAt).getTime() : (Date.now() + 60000);
+                  return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+                }
+                return false;
+              };
+              const isExpMatch = (e) => {
+                if (!e) return false;
+                if (e.shiftId && shiftToCompleteCount.id && e.shiftId === shiftToCompleteCount.id) return true;
+                if (e.registerId && shiftToCompleteCount.registerId && e.registerId === shiftToCompleteCount.registerId) {
+                  const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
+                  const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
+                  const closeTime = shiftToCompleteCount.closedAt ? new Date(shiftToCompleteCount.closedAt).getTime() : (Date.now() + 60000);
+                  return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+                }
+                return false;
+              };
+              const shiftSales = (posSales || []).filter(isMatch);
+              const shiftExpenses = (posExpenses || []).filter(isExpMatch);
               const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
               const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
               setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
@@ -4339,7 +4446,17 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney, onCo
             </div>
           ) : (
             filteredShifts.map(shift => {
-              const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
+              const shiftSales = (posSales || []).filter(s => {
+                if (!s || s.status !== 'PAID') return false;
+                if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
+                if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
+                  const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+                  const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+                  const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+                  return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+                }
+                return false;
+              });
               const totalSales = shiftSales.reduce((acc, s) => acc + s.total, 0);
               const salesCount = shiftSales.length;
               const opened = new Date(shift.openedAt);

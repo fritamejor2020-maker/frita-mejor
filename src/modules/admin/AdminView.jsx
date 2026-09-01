@@ -3727,8 +3727,28 @@ function PosHistoryPanel() {
             <p className="text-center text-gray-400 py-10 font-bold">No hay turnos registrados.</p>
           ) : (
             filteredShifts.map(shift => {
-              const shiftSales = (posSales || []).filter(s => s.shiftId === shift.id && s.status === 'PAID');
-              const shiftExpenses = (posExpenses || []).filter(e => e.shiftId === shift.id);
+              const shiftSales = (posSales || []).filter(s => {
+                if (!s || s.status !== 'PAID') return false;
+                if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
+                if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
+                  const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+                  const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+                  const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+                  return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+                }
+                return false;
+              });
+              const shiftExpenses = (posExpenses || []).filter(e => {
+                if (!e) return false;
+                if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
+                if (e.registerId && shift.registerId && e.registerId === shift.registerId) {
+                  const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
+                  const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+                  const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+                  return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+                }
+                return false;
+              });
               
               const configuredMethods = posSettings?.paymentMethods || [
                 { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },

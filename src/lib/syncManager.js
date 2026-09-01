@@ -342,6 +342,53 @@ async function _writeToSupabaseImpl(key, value) {
     }
   }
 
+  // 🛡️ Ventas POS (posSales): NUNCA permitir que una escritura sobreescriba y borre ventas concurrentes
+  if ((key === 'posSales' || key.startsWith('posSales_')) && Array.isArray(value)) {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
+      if (data && Array.isArray(data.value) && data.value.length > 0) {
+        const saleMap = new Map();
+        // 1. Cargar ventas remotas existentes
+        data.value.forEach(item => { if (item?.id) saleMap.set(item.id, item); });
+        // 2. Fusionar ventas locales asegurando que ventas PAID ganen sobre suspendidas
+        value.forEach(item => {
+          if (item?.id) {
+            const existing = saleMap.get(item.id);
+            if (existing) {
+              if (item.status === 'PAID') {
+                saleMap.set(item.id, { ...existing, ...item });
+              } else if (existing.status === 'PAID') {
+                saleMap.set(item.id, existing);
+              } else {
+                saleMap.set(item.id, { ...existing, ...item });
+              }
+            } else {
+              saleMap.set(item.id, item);
+            }
+          }
+        });
+        value = Array.from(saleMap.values());
+      }
+    } catch (e) {
+      console.warn('[SyncManager] Error merging posSales before write:', e);
+    }
+  }
+
+  // 🛡️ Gastos de Caja POS (posExpenses): Fusión atómica para no perder gastos registrados
+  if ((key === 'posExpenses' || key.startsWith('posExpenses_')) && Array.isArray(value)) {
+    try {
+      const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
+      if (data && Array.isArray(data.value) && data.value.length > 0) {
+        const expMap = new Map();
+        data.value.forEach(item => { if (item?.id) expMap.set(item.id, item); });
+        value.forEach(item => { if (item?.id) expMap.set(item.id, item); });
+        value = Array.from(expMap.values());
+      }
+    } catch (e) {
+      console.warn('[SyncManager] Error merging posExpenses before write:', e);
+    }
+  }
+
   // 🛡️ Asistencias y Turnos (Contratos, Plantillas, Horarios Maestro): Propagar a todas las sedes y a la clave global
   const isAttendanceConfig = key.startsWith('attendance_contracts') || key.startsWith('attendance_shifts') || key.startsWith('attendance_groups') || key.startsWith('attendance_terminals');
   if (isAttendanceConfig && Array.isArray(value)) {
