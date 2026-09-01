@@ -2345,12 +2345,38 @@ export function PosView() {
                   Pedidos de OlaClick aceptados y ventas pausadas de caja listos para procesar.
                 </p>
               </div>
-              <button 
-                onClick={() => setShowHeldSalesModal(false)}
-                className="w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold transition-all shadow-md"
-              >
-                ✕
-              </button>
+              <div className="flex items-center gap-2">
+                {allHeldAndSuspended.length > 0 && (
+                  <button
+                    onClick={() => {
+                      if (confirm(`¿Estás seguro de limpiar todas las ${allHeldAndSuspended.length} ventas en espera?`)) {
+                        allHeldAndSuspended.forEach(sale => {
+                          deleteHeldSale(sale.id);
+                          deletePosSale(sale.id);
+                        });
+                        usePosStore.setState({ heldSales: [] });
+                        setTicketItems([]);
+                        setActiveSuspendedId(null);
+                        setIsLuckyWinnerSession(false);
+                        setPendingDeliveryInfo(null);
+                        setSelectedCustomer('');
+                        setManualDiscountPercent(0);
+                        try { usePosStore.getState().clearCart(); } catch(_) {}
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-xl bg-red-950/50 border border-red-800/60 text-red-300 hover:bg-red-900 text-xs font-bold transition-all flex items-center gap-1"
+                    title="Eliminar todas las ventas en espera"
+                  >
+                    🧹 Limpiar todas
+                  </button>
+                )}
+                <button 
+                  onClick={() => setShowHeldSalesModal(false)}
+                  className="w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold transition-all shadow-md"
+                >
+                  ✕
+                </button>
+              </div>
             </div>
 
             {/* Listado de Ventas en Espera */}

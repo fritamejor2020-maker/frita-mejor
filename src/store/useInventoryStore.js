@@ -562,8 +562,9 @@ export const useInventoryStore = create(
                 }
               }
 
-              // 2. LUEGO incluir ítems de la llave legacy (sin sufijo) SOLO si no estaban ya en la llave de sede
-              if (remote[key] && Array.isArray(remote[key])) {
+              // 2. LUEGO incluir ítems de la llave legacy (sin sufijo) SOLO si no había datos de sede
+              const hasBranchPartitionData = allBranchIds.some(bId => Array.isArray(remote[`${key}_${bId}`]) && remote[`${key}_${bId}`].length > 0);
+              if (!hasBranchPartitionData && remote[key] && Array.isArray(remote[key])) {
                 remote[key].forEach(item => {
                   if (item?.id && !addedIds.has(item.id)) {
                     merged.push(item);
