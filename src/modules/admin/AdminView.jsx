@@ -3650,7 +3650,7 @@ function PosInventoryConfigPanel() {
 
 // ─── Panel: Historial POS (Ventas y Cierres Z) ────────────────────────────────
 function PosHistoryPanel() {
-  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift, customers = [] } = useInventoryStore();
+  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift, customers = [], posSettings } = useInventoryStore();
   const [activeSubtab, setActiveSubtab] = useState('SHIFTS'); // SHIFTS | SALES
   const [expandedShiftId, setExpandedShiftId] = useState(null);
   const [shiftSubtabs, setShiftSubtabs] = useState({});
