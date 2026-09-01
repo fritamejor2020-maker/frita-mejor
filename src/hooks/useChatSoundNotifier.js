@@ -26,28 +26,16 @@ export function getAudioCtx() {
     }
     return _audioCtx;
   } catch (e) {
-    console.warn('[Audio] Failed to get AudioContext:', e);
     return null;
   }
 }
 
-// Desbloqueo global automático en el primer toque o clic del usuario
-if (typeof window !== 'undefined') {
-  const unlockAudio = () => {
-    try {
-      const ctx = getAudioCtx();
-      if (ctx && ctx.state === 'suspended') {
-        ctx.resume().catch(() => {});
-      }
-    } catch (_) {}
-  };
-  window.addEventListener('click', unlockAudio, { passive: true, once: true });
-  window.addEventListener('touchstart', unlockAudio, { passive: true, once: true });
-  window.addEventListener('pointerdown', unlockAudio, { passive: true, once: true });
-}
-
 export function resumeAudioContext() {
-  getAudioCtx();
+  try {
+    if (_audioCtx && _audioCtx.state === 'suspended') {
+      _audioCtx.resume().catch(() => {});
+    }
+  } catch (_) {}
 }
 
 /**

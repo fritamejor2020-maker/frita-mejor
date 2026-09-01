@@ -27,15 +27,18 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 
 /** Obtiene el Service Worker activo registrado por la PWA */
 async function getServiceWorkerRegistration(): Promise<ServiceWorkerRegistration | null> {
-  if (!('serviceWorker' in navigator)) {
-    console.warn('[Push] Service Workers no soportados en este navegador');
+  if (typeof navigator === 'undefined' || !('serviceWorker' in navigator)) {
     return null;
   }
   try {
-    const registration = await navigator.serviceWorker.ready;
-    return registration;
+    const isMobileOrTablet = /Android|iPad|iPhone|iPod|Tablet/i.test(navigator.userAgent);
+    if (isMobileOrTablet) return null;
+
+    // Timeout defensivo de 1.5s para que no bloquee el hilo en dispositivos sin SW activo
+    const readyPromise = navigator.serviceWorker.ready;
+    const timeoutPromise = new Promise<null>((resolve) => setTimeout(() => resolve(null), 1500));
+    return await Promise.race([readyPromise, timeoutPromise]);
   } catch (err) {
-    console.warn('[Push] Service Worker ready timeout/error:', err);
     return null;
   }
 }

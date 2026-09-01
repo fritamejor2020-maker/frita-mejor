@@ -106,7 +106,8 @@ export const DejadorDashboard = () => {
   const { pendingRequests, completedRequests, rejectedRequests, loadHistory, fetchPendingRequests, commitRestock, commitPartialRestock, commitLoad, commitReception, updatePendingRequest, rejectRequest, postponeRequest, markRequestRead } = useLogisticsStore();
   const { loadTemplates, addLoadTemplate, deleteLoadTemplate, posSettings, getDeliveryItems, addPosShift } = useInventoryStore();
   const posShifts = useInventoryStore((state: any) => state.posShifts) || [];
-  const allDeliveryProducts = getDeliveryItems();
+  const inventory = useInventoryStore((state: any) => state.inventory);
+  const allDeliveryProducts = React.useMemo(() => getDeliveryItems(), [inventory]);
   const { user, signOut, updateUserPresets } = useAuthStore();
   const userBranchId = (user as any)?.branchId ?? null;
   const { isSetupComplete, shift, anotadorName, dejadorName, endShift } = useDejadorSessionStore();
@@ -587,10 +588,6 @@ export const DejadorDashboard = () => {
 
   useEffect(() => {
     fetchPendingRequests();
-    const interval = setInterval(() => {
-      fetchPendingRequests();
-    }, 30000);
-    return () => clearInterval(interval);
   }, []);
 
   const handleCommit = async (id: string, point: string, req: any) => {
