@@ -363,11 +363,8 @@ interface ClosingDetail {
 export const AdminFinancesTab = ({ 
   allowDelete = true,
   mode = 'VENDEDOR'
-}: { 
-  allowDelete?: boolean;
-  mode?: 'VENDEDOR' | 'POS';
 } = {}) => {
-  const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift } = useInventoryStore();
+  const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift, posSettings, customers = [] } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
   const user = useAuthStore((s: any) => s.user);
   const vehicles = useVehicleStore((s: any) => s.vehicles);
