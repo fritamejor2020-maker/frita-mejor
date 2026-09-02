@@ -358,18 +358,70 @@ async function _writeToSupabaseImpl(key, value) {
         }
       });
 
+      // Recopilar todos los identificadores de ventas PAGADAS (locales y remotas)
+      const allPaidIds = new Set();
+      const allPaidOlaIds = new Set();
+      const allPaidPublicIds = new Set();
+
+      value.forEach(s => {
+        if (s?.status === 'PAID') {
+          if (s.id) {
+            allPaidIds.add(s.id);
+            if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
+              allPaidOlaIds.add(s.id.replace('HELD-OLA-', ''));
+            }
+          }
+          if (s.originalHeldId) allPaidIds.add(s.originalHeldId);
+          if (s.originalOlaClickId) allPaidOlaIds.add(s.originalOlaClickId);
+          if (s.publicId) allPaidPublicIds.add(s.publicId);
+        }
+      });
+
       const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
       if (data && Array.isArray(data.value) && data.value.length > 0) {
+        data.value.forEach(s => {
+          if (s?.status === 'PAID') {
+            if (s.id) {
+              allPaidIds.add(s.id);
+              if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
+                allPaidOlaIds.add(s.id.replace('HELD-OLA-', ''));
+              }
+            }
+            if (s.originalHeldId) allPaidIds.add(s.originalHeldId);
+            if (s.originalOlaClickId) allPaidOlaIds.add(s.originalOlaClickId);
+            if (s.publicId) allPaidPublicIds.add(s.publicId);
+          }
+        });
+
+        const isSaleDeadOrPaid = (item) => {
+          if (!item || !item.id) return true;
+          const itemId = String(item.id);
+          if (deletedSalesSet.has(itemId)) return true;
+          if (item.originalOlaClickId && deletedSalesSet.has(item.originalOlaClickId)) return true;
+          if (item.publicId && deletedSalesSet.has(item.publicId)) return true;
+          if (item.originalHeldId && deletedSalesSet.has(item.originalHeldId)) return true;
+
+          // Si es una venta en espera/suspendida pero ya fue cobrada con cualquier identificador, está procesada
+          if (item.status === 'SUSPENDED') {
+            if (allPaidIds.has(itemId)) return true;
+            if (item.originalHeldId && allPaidIds.has(item.originalHeldId)) return true;
+            if (item.originalOlaClickId && allPaidOlaIds.has(item.originalOlaClickId)) return true;
+            if (item.publicId && allPaidPublicIds.has(item.publicId)) return true;
+            if (itemId.startsWith('HELD-OLA-') && allPaidOlaIds.has(itemId.replace('HELD-OLA-', ''))) return true;
+          }
+          return false;
+        };
+
         const saleMap = new Map();
-        // 1. Cargar ventas remotas existentes SOLO si no fueron eliminadas
+        // 1. Cargar ventas remotas existentes SOLO si no fueron eliminadas ni pagadas
         data.value.forEach(item => {
-          if (item?.id && !deletedSalesSet.has(item.id) && (!item.originalOlaClickId || !deletedSalesSet.has(item.originalOlaClickId)) && (!item.publicId || !deletedSalesSet.has(item.publicId))) {
+          if (!isSaleDeadOrPaid(item)) {
             saleMap.set(item.id, item);
           }
         });
-        // 2. Fusionar ventas locales asegurando que ventas PAID ganen sobre suspendidas y que ventas eliminadas NUNCA se agreguen
+        // 2. Fusionar ventas locales asegurando que ventas PAID ganen sobre suspendidas
         value.forEach(item => {
-          if (item?.id && !deletedSalesSet.has(item.id) && (!item.originalOlaClickId || !deletedSalesSet.has(item.originalOlaClickId)) && (!item.publicId || !deletedSalesSet.has(item.publicId))) {
+          if (!isSaleDeadOrPaid(item)) {
             const existing = saleMap.get(item.id);
             if (existing) {
               if (item.status === 'PAID') {

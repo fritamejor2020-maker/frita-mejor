@@ -516,6 +516,14 @@ export const useInventoryStore = create(
                   let finalVal = [...val, ...userCreatedOffline];
                   // Aplicar tombstones
                   if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
+                  if (key === 'posSales') {
+                    const allDelSales = new Set([
+                      ...(get().deletedPosSaleIds || []),
+                      ...(remote['deletedPosSaleIds'] || []),
+                      ...(remote[`deletedPosSaleIds_${effectiveBranch}`] || [])
+                    ]);
+                    finalVal = finalVal.filter(s => !allDelSales.has(s.id) && (!s.originalOlaClickId || !allDelSales.has(s.originalOlaClickId)) && (!s.publicId || !allDelSales.has(s.publicId)));
+                  }
                   if (key === 'inventory') {
                     // 🛡️ Filtro de seguridad: preserte productos activos de triciclos frente a tombstones viejos
                     finalVal = finalVal.filter(i => {
@@ -625,8 +633,16 @@ export const useInventoryStore = create(
                   merged = Array.from(shiftMap.values());
                 }
                 if (key === 'posRegisters') merged = merged.filter(r => !deletedRegs.has(r.id));
+                if (key === 'posSales') {
+                  const delSales = new Set(get().deletedPosSaleIds || []);
+                  merged = merged.filter(s => !delSales.has(s.id) && (!s.originalOlaClickId || !delSales.has(s.originalOlaClickId)) && (!s.publicId || !delSales.has(s.publicId)));
+                }
                 if (key === 'deletedInventoryIds') {
                   const localDeleted = get().deletedInventoryIds || [];
+                  merged = [...new Set([...merged, ...localDeleted])];
+                }
+                if (key === 'deletedPosSaleIds') {
+                  const localDeleted = get().deletedPosSaleIds || [];
                   merged = [...new Set([...merged, ...localDeleted])];
                 }
                 if (key === 'deletedPosRegisterIds') {
@@ -1414,9 +1430,9 @@ export const useInventoryStore = create(
           const newDeleted = [...new Set([...(s.deletedPosSaleIds || []), ...extraIds])];
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
+        syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
-        syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
       },
 
       addPosShift: (shift) => {

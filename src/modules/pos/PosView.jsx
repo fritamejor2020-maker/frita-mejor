@@ -241,35 +241,58 @@ export function PosView() {
   const deletedPosSaleIds = useInventoryStore(s => s.deletedPosSaleIds || []);
   const deletedSaleSet = new Set(deletedPosSaleIds);
 
-  // Conjunto de ventas ya PAGADAS para no mostrar jamás una venta suspendida que ya fue cobrada
-  const paidOlaClickIds = new Set(
-    (posSales || [])
-      .filter(s => s.status === 'PAID' && s.originalOlaClickId)
-      .map(s => s.originalOlaClickId)
-  );
-  const paidSaleIds = new Set(
-    (posSales || [])
-      .filter(s => s.status === 'PAID' && s.id)
-      .map(s => s.id)
-  );
+  // Conjuntos de ventas ya PAGADAS para no mostrar jamás una venta suspendida que ya fue cobrada
+  const paidSaleIds = new Set();
+  const paidOlaClickIds = new Set();
+  const paidPublicIds = new Set();
+
+  (posSales || []).forEach(s => {
+    if (s && s.status === 'PAID') {
+      if (s.id) {
+        paidSaleIds.add(s.id);
+        if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
+          paidOlaClickIds.add(s.id.replace('HELD-OLA-', ''));
+        }
+      }
+      if (s.originalHeldId) paidSaleIds.add(s.originalHeldId);
+      if (s.originalOlaClickId) paidOlaClickIds.add(s.originalOlaClickId);
+      if (s.publicId) paidPublicIds.add(s.publicId);
+    }
+  });
 
   const isStaleSuspended = (sale) => {
     if (!sale) return true;
     const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
     if (isNaN(saleTime) || saleTime === 0) return true;
-    // Ventas suspendidas de más de 16 horas son automáticamente obsoletas de turnos anteriores
-    const sixteenHoursMs = 16 * 60 * 60 * 1000;
-    return (Date.now() - saleTime) > sixteenHoursMs;
+    // Ventas suspendidas de más de 12 horas o de fechas anteriores son obsoletas
+    const twelveHoursMs = 12 * 60 * 60 * 1000;
+    const isOld = (Date.now() - saleTime) > twelveHoursMs;
+    const saleDate = new Date(saleTime).toISOString().slice(0, 10);
+    const today = new Date().toISOString().slice(0, 10);
+    return isOld || saleDate < today;
+  };
+
+  const isSalePaidOrDeleted = (s) => {
+    if (!s) return true;
+    const sId = String(s.id || '');
+    if (deletedSaleSet.has(sId)) return true;
+    if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return true;
+    if (s.publicId && deletedSaleSet.has(s.publicId)) return true;
+    if (s.originalHeldId && deletedSaleSet.has(s.originalHeldId)) return true;
+
+    if (paidSaleIds.has(sId)) return true;
+    if (s.originalHeldId && paidSaleIds.has(s.originalHeldId)) return true;
+    if (s.originalOlaClickId && paidOlaClickIds.has(s.originalOlaClickId)) return true;
+    if (s.publicId && paidPublicIds.has(s.publicId)) return true;
+    if (sId.startsWith('HELD-OLA-') && paidOlaClickIds.has(sId.replace('HELD-OLA-', ''))) return true;
+
+    return false;
   };
 
   const heldSales = (usePosStore(s => s.heldSales || [])).filter(h => {
     if (!h || h.status !== 'SUSPENDED') return false;
     if (isStaleSuspended(h)) return false;
-    if (deletedSaleSet.has(h.id)) return false;
-    if (h.originalOlaClickId && deletedSaleSet.has(h.originalOlaClickId)) return false;
-    if (h.publicId && deletedSaleSet.has(h.publicId)) return false;
-    if (paidSaleIds.has(h.id)) return false;
-    if (h.originalOlaClickId && paidOlaClickIds.has(h.originalOlaClickId)) return false;
+    if (isSalePaidOrDeleted(h)) return false;
     if (!h.items || !Array.isArray(h.items) || h.items.length === 0) return false;
     return true;
   });
@@ -279,11 +302,7 @@ export function PosView() {
   const suspendedSales = (posSales || []).filter(s => {
     if (!s || s.status !== 'SUSPENDED') return false;
     if (isStaleSuspended(s)) return false;
-    if (deletedSaleSet.has(s.id)) return false;
-    if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return false;
-    if (s.publicId && deletedSaleSet.has(s.publicId)) return false;
-    if (paidSaleIds.has(s.id)) return false;
-    if (s.originalOlaClickId && paidOlaClickIds.has(s.originalOlaClickId)) return false;
+    if (isSalePaidOrDeleted(s)) return false;
     if (!s.items || !Array.isArray(s.items) || s.items.length === 0) return false;
     return true;
   });
@@ -628,6 +647,15 @@ export function PosView() {
     });
     
     setShowClosingModal(false);
+
+    // Limpiar ventas en espera residuales que hayan quedado abiertas durante este turno
+    try {
+      allHeldAndSuspended.forEach(hs => {
+        deleteHeldSale(hs.id);
+        deletePosSale(hs.id);
+      });
+      usePosStore.setState({ heldSales: [] });
+    } catch (_) {}
     
     const isShiftSale = (sale, targetShift) => {
       if (!sale || !targetShift || sale.status !== 'PAID') return false;
@@ -963,13 +991,16 @@ export function PosView() {
       setSelectedCustomer(freshSale.customerId || '');
       setActiveSuspendedId(freshSale.id);
       setManualDiscountPercent(freshSale.discountPercent || (freshSale.isLuckyWinner && freshSale.prizeType === 'DISCOUNT' ? (freshSale.discountPercentage || 0) : 0));
+      const resolvedOlaId = freshSale.originalOlaClickId || (freshSale.id && String(freshSale.id).startsWith('HELD-OLA-') ? String(freshSale.id).replace('HELD-OLA-', '') : null);
       setPendingDeliveryInfo({
         customerName: freshSale.customerName || '',
         customerPhone: freshSale.customerPhone || '',
         deliveryAddress: freshSale.deliveryAddress || '',
         serviceType: freshSale.serviceType || 'DELIVERY',
-        isOlaClick: !!freshSale.isOlaClick,
-        publicId: freshSale.publicId || ''
+        isOlaClick: !!freshSale.isOlaClick || !!resolvedOlaId,
+        publicId: freshSale.publicId || '',
+        originalOlaClickId: resolvedOlaId,
+        originalHeldId: freshSale.id
       });
 
       // Cerrar modales inmediatamente
@@ -1004,15 +1035,19 @@ export function PosView() {
     const isContrata = !!(saleCustomer && saleCustomer.typeId);
 
     const isLuckyTicket = isLuckyWinnerSession || !!(activeSuspendedId && String(activeSuspendedId).includes('LUCKY'));
+    const resolvedOlaClickId = pendingDeliveryInfo?.originalOlaClickId || 
+      (activeSuspendedId && String(activeSuspendedId).startsWith('HELD-OLA-') ? String(activeSuspendedId).replace('HELD-OLA-', '') : null);
 
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
+      originalHeldId: activeSuspendedId || pendingDeliveryInfo?.originalHeldId || null,
+      originalOlaClickId: resolvedOlaClickId || null,
       customerId: selectedCustomer || null,
       customerName: saleCustomer?.name || pendingDeliveryInfo?.customerName || (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Cliente General')),
       customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
       deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
       serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
-      isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+      isOlaClick: pendingDeliveryInfo?.isOlaClick || !!resolvedOlaClickId || false,
       publicId: pendingDeliveryInfo?.publicId || null,
       items: ticketItems,
       subtotal,
@@ -1123,15 +1158,27 @@ export function PosView() {
 
     if (activeSuspendedId) {
       try { deleteHeldSale(activeSuspendedId); } catch(e) {}
-      try { deletePosSale(activeSuspendedId); } catch(e) {}
+      if (resolvedOlaClickId) {
+        try { deleteHeldSale(`HELD-OLA-${resolvedOlaClickId}`); } catch(e) {}
+        try { deleteHeldSale(resolvedOlaClickId); } catch(e) {}
+      }
+
+      // Si la venta ya existía en posSales como SUSPENDED, actualizarla a PAID directamente
+      // para evitar condiciones de carrera entre borrado y agregado simultáneo
+      const existsInPos = (posSales || []).some(s => s.id === activeSuspendedId);
+      if (existsInPos) {
+        updatePosSale(activeSuspendedId, saleData);
+      } else {
+        addPosSale(saleData);
+      }
+    } else {
+      addPosSale(saleData);
     }
-    if (saleData.originalOlaClickId) {
-      try { deleteHeldSale(`HELD-OLA-${saleData.originalOlaClickId}`); } catch(e) {}
-      try { deletePosSale(`HELD-OLA-${saleData.originalOlaClickId}`); } catch(e) {}
-      try { deleteHeldSale(saleData.originalOlaClickId); } catch(e) {}
-      try { deletePosSale(saleData.originalOlaClickId); } catch(e) {}
+
+    if (resolvedOlaClickId) {
+      // Marcar orden en Supabase como DELIVERED
+      supabase.from('olaclick_orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', resolvedOlaClickId).catch(() => {});
     }
-    addPosSale(saleData);
     
     // Clear ticket
     setTicketItems([]);
