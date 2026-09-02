@@ -3648,475 +3648,634 @@ function PosInventoryConfigPanel() {
   );
 }
 
-// ─── Panel: Historial POS (Ventas y Cierres Z) ────────────────────────────────
+// ─── Panel: Historial POS (Cierres Z y Ventas Totales con Auditoría) ─────────
 function PosHistoryPanel() {
-  const { posShifts, posSales, posExpenses = [], updatePosShift, deletePosShift, customers = [], posSettings } = useInventoryStore();
-  const [activeSubtab, setActiveSubtab] = useState('SHIFTS'); // SHIFTS | SALES
-  const [expandedShiftId, setExpandedShiftId] = useState(null);
-  const [shiftSubtabs, setShiftSubtabs] = useState({});
+  const { posShifts = [], posSales = [], posExpenses = [], customers = [], posSettings } = useInventoryStore();
+  const [activeSubtab, setActiveSubtab] = useState('CIERRES_Z'); // 'CIERRES_Z' | 'SALES_AUDIT'
 
-  const getShiftSubtab = (shiftId) => shiftSubtabs[shiftId] || 'SALES_LIST';
-  const setShiftSubtab = (shiftId, tab) => setShiftSubtabs(prev => ({ ...prev, [shiftId]: tab }));
+  // Estados de Filtro y Búsqueda para Ventas Totales
+  const [searchTerm, setSearchTerm] = useState('');
+  const [dateFilterMode, setDateFilterMode] = useState('TODAS'); // 'TODAS' | 'HOY' | 'AYER' | '7_DIAS' | 'MES' | 'CUSTOM'
+  const [customDate, setCustomDate] = useState('');
+  const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('ALL');
+  const [selectedStatus, setSelectedStatus] = useState('ALL'); // 'ALL' | 'PAID' | 'SUSPENDED'
+  const [sortBy, setSortBy] = useState('DATE_DESC'); // 'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC' | 'TICKET_DESC'
+  const [expandedSaleId, setExpandedSaleId] = useState(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(25);
 
-  const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val);
+  const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
+
+  // Lista única de métodos de pago disponibles
+  const availablePaymentMethods = useMemo(() => {
+    const methodsSet = new Set();
+    (posSettings?.paymentMethods || []).forEach(m => { if (m?.name) methodsSet.add(m.name.toUpperCase().trim()); });
+    (posSales || []).forEach(s => { if (s?.paymentMethod) methodsSet.add(s.paymentMethod.toUpperCase().trim()); });
+    return Array.from(methodsSet).sort();
+  }, [posSettings, posSales]);
+
+  // Filtrado de Ventas
+  const filteredSales = useMemo(() => {
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    const yesterdayStr = `${yesterday.getFullYear()}-${String(yesterday.getMonth() + 1).padStart(2, '0')}-${String(yesterday.getDate()).padStart(2, '0')}`;
+
+    const sevenDaysAgo = new Date(now);
+    sevenDaysAgo.setDate(now.getDate() - 7);
+
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
+    const term = searchTerm.toLowerCase().trim();
+
+    return (posSales || []).filter(sale => {
+      if (!sale) return false;
+
+      // 1. Filtro por Estado
+      if (selectedStatus !== 'ALL' && sale.status !== selectedStatus) return false;
+
+      // 2. Filtro por Método de Pago
+      if (selectedPaymentMethod !== 'ALL') {
+        const saleMethod = String(sale.paymentMethod || '').toUpperCase().trim();
+        if (saleMethod !== selectedPaymentMethod) return false;
+      }
+
+      // 3. Filtro por Fecha
+      const saleDateObj = new Date(sale.timestamp || sale.createdAt || 0);
+      const saleDateStr = !isNaN(saleDateObj.getTime())
+        ? `${saleDateObj.getFullYear()}-${String(saleDateObj.getMonth() + 1).padStart(2, '0')}-${String(saleDateObj.getDate()).padStart(2, '0')}`
+        : '';
+
+      if (dateFilterMode === 'HOY') {
+        if (saleDateStr !== todayStr) return false;
+      } else if (dateFilterMode === 'AYER') {
+        if (saleDateStr !== yesterdayStr) return false;
+      } else if (dateFilterMode === '7_DIAS') {
+        if (saleDateObj < sevenDaysAgo) return false;
+      } else if (dateFilterMode === 'MES') {
+        if (saleDateObj < firstDayOfMonth) return false;
+      } else if (dateFilterMode === 'CUSTOM' && customDate) {
+        if (saleDateStr !== customDate) return false;
+      }
+
+      // 4. Búsqueda por Texto
+      if (term) {
+        const ticketId = String(sale.id || '').toLowerCase();
+        const shortTicket = ticketId.replace('sale-', '');
+        const cust = customers.find(c => c.id === sale.customerId);
+        const customerName = String(sale.customerName || cust?.name || '').toLowerCase();
+        const itemsNames = (sale.items || []).map(i => String(i.name || '').toLowerCase()).join(' ');
+        const cashierName = String(sale.userName || sale.cashierName || '').toLowerCase();
+
+        const match = ticketId.includes(term) ||
+          shortTicket.includes(term) ||
+          customerName.includes(term) ||
+          itemsNames.includes(term) ||
+          cashierName.includes(term);
+
+        if (!match) return false;
+      }
+
+      return true;
+    }).sort((a, b) => {
+      // Ordenamiento
+      if (sortBy === 'DATE_DESC') {
+        return new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime();
+      }
+      if (sortBy === 'DATE_ASC') {
+        return new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime();
+      }
+      if (sortBy === 'AMOUNT_DESC') {
+        return (b.total || 0) - (a.total || 0);
+      }
+      if (sortBy === 'AMOUNT_ASC') {
+        return (a.total || 0) - (b.total || 0);
+      }
+      if (sortBy === 'TICKET_DESC') {
+        return String(b.id).localeCompare(String(a.id));
+      }
+      return 0;
+    });
+  }, [posSales, customers, searchTerm, dateFilterMode, customDate, selectedPaymentMethod, selectedStatus, sortBy]);
+
+  // Cálculos de KPIs en Vivo
+  const kpis = useMemo(() => {
+    let totalFacturado = 0;
+    let totalEfectivo = 0;
+    let totalDigital = 0;
+    let countPagadas = 0;
+    let countSuspendidas = 0;
+
+    filteredSales.forEach(s => {
+      const tot = s.total || 0;
+      if (s.status === 'PAID') {
+        totalFacturado += tot;
+        countPagadas++;
+        const method = String(s.paymentMethod || '').toUpperCase().trim();
+        if (method === 'EFECTIVO' || method === 'CASH') {
+          totalEfectivo += tot;
+        } else {
+          totalDigital += tot;
+        }
+      } else {
+        countSuspendidas++;
+      }
+    });
+
+    const ticketPromedio = countPagadas > 0 ? Math.round(totalFacturado / countPagadas) : 0;
+
+    return {
+      totalFacturado,
+      totalEfectivo,
+      totalDigital,
+      countTotal: filteredSales.length,
+      countPagadas,
+      countSuspendidas,
+      ticketPromedio
+    };
+  }, [filteredSales]);
+
+  // Paginación
+  const totalPages = rowsPerPage === 0 ? 1 : Math.ceil(filteredSales.length / rowsPerPage);
+  const paginatedSales = useMemo(() => {
+    if (rowsPerPage === 0) return filteredSales;
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredSales.slice(start, start + rowsPerPage);
+  }, [filteredSales, currentPage, rowsPerPage]);
 
   const formatEditHistory = (edit) => {
     const changes = [];
     const before = edit.before || {};
     const after = edit.after || {};
-    
-    if (before.paymentMethod !== after.paymentMethod) {
-      changes.push(`Pago: ${before.paymentMethod} → ${after.paymentMethod}`);
-    }
-    if (before.discountAmount !== after.discountAmount) {
-      changes.push(`Desc: ${formatMoney(before.discountAmount)} → ${formatMoney(after.discountAmount)}`);
-    }
-    if (before.total !== after.total) {
-      changes.push(`Total: ${formatMoney(before.total)} → ${formatMoney(after.total)}`);
-    }
-    if (JSON.stringify(before.items) !== JSON.stringify(after.items)) {
-      const itemLines = [];
-      const bItems = before.items || [];
-      const aItems = after.items || [];
-      bItems.forEach(bi => {
-        const ai = aItems.find(item => item.name === bi.name);
-        if (!ai) {
-          itemLines.push(`Eliminado ${bi.name}`);
-        } else if (bi.qty !== ai.qty) {
-          itemLines.push(`${bi.name}: x${bi.qty} → x${ai.qty}`);
-        }
-      });
-      aItems.forEach(ai => {
-        const bi = bItems.find(item => item.name === ai.name);
-        if (!bi) {
-          itemLines.push(`Agregado ${ai.name} (x${ai.qty})`);
-        }
-      });
-      if (itemLines.length > 0) {
-        changes.push(`Productos: ${itemLines.join(', ')}`);
-      }
-    }
-    return changes.length > 0 ? changes.join(' | ') : 'Sin cambios detectables';
+    if (before.paymentMethod !== after.paymentMethod) changes.push(`Pago: ${before.paymentMethod} → ${after.paymentMethod}`);
+    if (before.discountAmount !== after.discountAmount) changes.push(`Desc: ${formatMoney(before.discountAmount)} → ${formatMoney(after.discountAmount)}`);
+    if (before.total !== after.total) changes.push(`Total: ${formatMoney(before.total)} → ${formatMoney(after.total)}`);
+    return changes.length > 0 ? changes.join(' | ') : 'Modificación de ítems';
   };
-
-  const handleForceClose = (shiftId) => {
-    if (!window.confirm('¿Forzar cierre de este turno? Se registrará como cerrado con $0 de conteo real.')) return;
-    updatePosShift(shiftId, { closedAt: new Date().toISOString(), realAmount: 0, forceClosed: true });
-  };
-
-  const handleDeleteShift = (shiftId) => {
-    if (!window.confirm('¿Eliminar este turno permanentemente? Esta acción no se puede deshacer.')) return;
-    deletePosShift(shiftId);
-  };
-
-  const filteredShifts = (posShifts || []).filter(s => !s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'));
 
   return (
-    <div>
-      <div className="flex justify-between items-center mb-6">
-        <h3 className="font-black text-chunky-dark text-lg">Historial de Caja</h3>
-        <div className="bg-gray-100 rounded-full p-1 inline-flex">
-          <button className={`px-4 py-1.5 rounded-full text-sm font-bold ${activeSubtab === 'SHIFTS' ? 'bg-white shadow-sm text-chunky-dark' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => setActiveSubtab('SHIFTS')}>Ver Turnos (Z)</button>
-          <button className={`px-4 py-1.5 rounded-full text-sm font-bold ${activeSubtab === 'SALES' ? 'bg-white shadow-sm text-chunky-dark' : 'text-gray-500 hover:text-gray-700'}`} onClick={() => setActiveSubtab('SALES')}>Ver Ventas Totales</button>
+    <div className="space-y-6">
+      {/* Selector de Subvista Principal */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
+        <div>
+          <h3 className="text-xl font-black text-chunky-dark flex items-center gap-2">
+            <span>🧾</span> Historial y Cierres de Punto de Venta
+          </h3>
+          <p className="text-xs text-gray-500 font-bold mt-0.5">
+            Consulta y descarga reportes de Cierre Z por turno o audita cada venta individual con filtros avanzados.
+          </p>
+        </div>
+        <div className="bg-gray-100 p-1 rounded-2xl inline-flex shadow-inner">
+          <button
+            onClick={() => setActiveSubtab('CIERRES_Z')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              activeSubtab === 'CIERRES_Z'
+                ? 'bg-white text-gray-900 shadow-md scale-100'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <span>📊</span> Cierres Z (Turnos de Caja)
+          </button>
+          <button
+            onClick={() => setActiveSubtab('SALES_AUDIT')}
+            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
+              activeSubtab === 'SALES_AUDIT'
+                ? 'bg-white text-gray-900 shadow-md scale-100'
+                : 'text-gray-500 hover:text-gray-800'
+            }`}
+          >
+            <span>💰</span> Ventas Totales (Detalle & Auditoría)
+          </button>
         </div>
       </div>
 
-      {activeSubtab === 'SHIFTS' && (
-        <div className="space-y-4">
-          {filteredShifts.length === 0 ? (
-            <p className="text-center text-gray-400 py-10 font-bold">No hay turnos registrados.</p>
-          ) : (
-            filteredShifts.map(shift => {
-              const shiftSales = (posSales || []).filter(s => {
-                if (!s || s.status !== 'PAID') return false;
-                if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
-                if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
-                  const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
-                  const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
-                  const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
-                  return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
-                }
-                return false;
-              });
-              const shiftExpenses = (posExpenses || []).filter(e => {
-                if (!e) return false;
-                if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
-                if (e.registerId && shift.registerId && e.registerId === shift.registerId) {
-                  const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
-                  const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
-                  const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
-                  return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
-                }
-                return false;
-              });
-              
-              const configuredMethods = posSettings?.paymentMethods || [
-                { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
-                { id: '2', name: 'TARJETA', openDrawer: false, printReceipt: false, isTransfer: true },
-                { id: '3', name: 'NEQUI', openDrawer: false, printReceipt: false, isTransfer: true },
-                { id: '4', name: 'BANCOLOMBIA', openDrawer: false, printReceipt: false, isTransfer: true }
-              ];
-              const isDigital = (pmName) => {
-                const norm = String(pmName || '').trim().toUpperCase();
-                const found = configuredMethods.find(m => String(m.name || '').trim().toUpperCase() === norm);
-                if (!found) return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR' && norm !== 'CASH';
-                if (found.isTransfer === true) return true;
-                if (found.isTransfer === false || found.openDrawer === true) return false;
-                return norm !== 'EFECTIVO' && norm !== 'IMPRIMIR';
-              };
-
-              const contrataCustomers = (customers || []).filter(c => c.typeId);
-              const contrataIds = new Set(contrataCustomers.map(c => c.id));
-              const contrataSales = shiftSales.filter(s => s.customerId && contrataIds.has(s.customerId));
-              const localSales    = shiftSales.filter(s => !s.customerId || !contrataIds.has(s.customerId));
-
-              const localCash = localSales.filter(s => !isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
-              const localTransfers = localSales.filter(s => isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
-
-              const contrataNonCredit = contrataSales.filter(s => s.contrataPaymentMethod !== 'credit');
-              const contrataCash = contrataNonCredit.filter(s => !isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
-              const contrataTransfers = contrataNonCredit.filter(s => isDigital(s.paymentMethod)).reduce((acc, s) => acc + s.total, 0);
-
-              const cashSales = localCash + contrataCash;
-              const otherSales = localTransfers + contrataTransfers;
-              const retiros = shiftExpenses.filter(e => e.type !== 'deposito').reduce((acc, e) => acc + e.amount, 0);
-              const depositos = shiftExpenses.filter(e => e.type === 'deposito').reduce((acc, e) => acc + e.amount, 0);
-              
-              const expected = (shift.initialAmount || 0) + cashSales - retiros + depositos;
-              const counted = shift.realAmount || 0;
-              const diff = counted - expected;
-
-              // Pre-calcular productos vendidos en este turno
-              const itemsMap = {};
-              shiftSales.forEach(sale => {
-                (sale.items || []).forEach(item => {
-                  if (!itemsMap[item.name]) {
-                    itemsMap[item.name] = { name: item.name, qty: 0, price: item.price };
-                  }
-                  itemsMap[item.name].qty += item.qty;
-                });
-              });
-              const itemsSold = Object.values(itemsMap);
-
-              // Todas las ventas (facturas) del turno (sin filtrar por estado pagado)
-              const allShiftSales = (posSales || []).filter(s => s.shiftId === shift.id);
-
-              // Resumen de Métodos de Pago
-              const paymentsSummary = {};
-              shiftSales.forEach(sale => {
-                const method = (sale.paymentMethod || 'No especificado').toUpperCase();
-                if (!paymentsSummary[method]) {
-                  paymentsSummary[method] = 0;
-                }
-                paymentsSummary[method] += sale.total;
-              });
-              const paymentsBreakdown = Object.entries(paymentsSummary).map(([method, total]) => ({ method, total }));
-
-              return (
-                <div key={shift.id} className="border border-gray-100 rounded-2xl p-5 hover:border-gray-200 bg-white">
-                  <div className="flex justify-between items-start mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl">💰</span>
-                      <div>
-                        <h4 className="font-black text-chunky-dark">Turno {shift.id.slice(-6)} {shift.registerName ? `[${shift.registerName}]` : ''}</h4>
-                        <p className="text-xs text-gray-500 font-bold">Cajero: {shift.userName || 'Desconocido'}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-bold ${shift.closedAt ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-600 animate-pulse'}`}>
-                        {shift.closedAt ? 'CERRADO (Reporte Z)' : 'EN CURSO'}
-                      </span>
-                      {!shift.closedAt && (
-                        <button
-                          onClick={() => handleForceClose(shift.id)}
-                          className="px-3 py-1 rounded-full text-xs font-bold bg-orange-100 text-orange-600 hover:bg-orange-200 transition-colors"
-                          title="Forzar cierre del turno"
-                        >
-                          ⚡ Forzar Cierre
-                        </button>
-                      )}
-                      <button
-                        onClick={() => handleDeleteShift(shift.id)}
-                        className="w-8 h-8 flex items-center justify-center rounded-full bg-red-50 text-red-400 hover:bg-red-100 hover:text-red-600 transition-colors"
-                        title="Eliminar turno"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
-                      </button>
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4 pt-4 border-t border-gray-50 text-xs">
-                    <div>
-                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Tiempos</span>
-                      <span className="block font-bold text-gray-600">Apertura: {new Date(shift.openedAt).toLocaleString('es-CO')}</span>
-                      <span className="block font-bold text-gray-600">Cierre: {shift.closedAt ? new Date(shift.closedAt).toLocaleString('es-CO') : 'En Curso'}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Caja (Efectivo)</span>
-                      <span className="block font-bold text-gray-600">Base: {formatMoney(shift.initialAmount || 0)}</span>
-                      <span className="block font-bold text-green-600">Ventas: +{formatMoney(cashSales)}</span>
-                      <span className="block font-bold text-red-500">Retiros: -{formatMoney(retiros)}</span>
-                      {depositos > 0 && <span className="block font-bold text-green-600">Depósitos: +{formatMoney(depositos)}</span>}
-                    </div>
-                    <div>
-                      <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Otros Canales</span>
-                      <span className="block font-bold text-blue-600">Banco/Tarjeta: +{formatMoney(otherSales)}</span>
-                      <span className="block font-black text-gray-900 mt-1 text-sm">Esperado en Caja: {formatMoney(expected)}</span>
-                    </div>
-                    {shift.closedAt && (
-                      <div>
-                        <span className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Resultado de Cierre</span>
-                        <span className="block font-black text-sm text-gray-900">Contado: {formatMoney(counted)}</span>
-                        <span className={`inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-black ${diff === 0 ? 'bg-green-50 text-green-600 border border-green-200' : diff > 0 ? 'bg-blue-50 text-blue-600 border border-blue-200' : 'bg-red-50 text-red-600 border border-red-200'}`}>
-                          {diff === 0 ? '✅ CUADRADO' : diff > 0 ? `🟢 SOBRANTE: +${formatMoney(diff)}` : `🔴 FALTANTE: -${formatMoney(Math.abs(diff))}`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Expandable details button */}
-                  <div className="flex justify-end mt-4 pt-3 border-t border-gray-50/50">
-                    <button
-                      onClick={() => setExpandedShiftId(expandedShiftId === shift.id ? null : shift.id)}
-                      className="text-xs font-bold text-amber-500 hover:text-amber-600 transition-colors flex items-center gap-1"
-                    >
-                      {expandedShiftId === shift.id ? 'Ocultar Detalles' : 'Ver Detalles del Turno'}
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        width="12"
-                        height="12"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="2.5"
-                        className={`transition-transform duration-200 ${expandedShiftId === shift.id ? 'rotate-180' : ''}`}
-                      >
-                        <polyline points="6 9 12 15 18 9" />
-                      </svg>
-                    </button>
-                  </div>
-
-                  {/* Expanded content */}
-                  {expandedShiftId === shift.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 space-y-5 animate-[fadeIn_0.2s_ease-out]">
-                      {/* Resumen de Métodos de Pago */}
-                      <div>
-                        <span className="block text-[10px] text-gray-400 font-bold uppercase tracking-wider mb-2">Ingresos por Método de Pago</span>
-                        {paymentsBreakdown.length === 0 ? (
-                          <p className="text-xs text-gray-400 italic">No se registraron pagos finalizados en este turno.</p>
-                        ) : (
-                          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                            {paymentsBreakdown.map(({ method, total }) => {
-                              const icon = method === 'EFECTIVO' ? '💵' : ['NEQUI', 'DAVIPLATA', 'TRANSFERENCIA'].includes(method.toUpperCase()) ? '📲' : '💳';
-                              return (
-                                <div key={method} className="bg-gray-50 border border-gray-150 rounded-2xl p-3 flex items-center justify-between shadow-sm">
-                                  <div>
-                                    <span className="text-[9px] text-gray-400 font-black block tracking-wider">{method}</span>
-                                    <span className="font-black text-sm text-gray-850">{formatMoney(total)}</span>
-                                  </div>
-                                  <span className="text-xl shrink-0 ml-2">{icon}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                      {/* Sub-tab Selector */}
-                      <div className="flex border-b border-gray-100 pb-2 gap-2 text-xs">
-                        <button
-                          onClick={() => setShiftSubtab(shift.id, 'SALES_LIST')}
-                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'SALES_LIST' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                        >
-                          🧾 Facturas y Ventas ({allShiftSales.length})
-                        </button>
-                        <button
-                          onClick={() => setShiftSubtab(shift.id, 'PRODUCTS_SUMMARY')}
-                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'PRODUCTS_SUMMARY' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                        >
-                          📊 Resumen Productos ({itemsSold.length})
-                        </button>
-                        <button
-                          onClick={() => setShiftSubtab(shift.id, 'CASH_MOVEMENTS')}
-                          className={`px-3 py-1.5 rounded-lg font-black transition-colors ${getShiftSubtab(shift.id) === 'CASH_MOVEMENTS' ? 'bg-[#FF4040] text-white' : 'bg-gray-50 text-gray-500 hover:bg-gray-100'}`}
-                        >
-                          💸 Retiros y Depósitos ({shiftExpenses.length})
-                        </button>
-                      </div>
-
-                      {/* Tab: Facturas y Ventas */}
-                      {getShiftSubtab(shift.id) === 'SALES_LIST' && (
-                        <div>
-                          {allShiftSales.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic py-4 text-center">No se registraron ventas en este turno.</p>
-                          ) : (
-                            <div className="border border-gray-100 rounded-xl overflow-hidden overflow-x-auto">
-                              <table className="w-full text-left text-xs min-w-[650px]">
-                                <thead className="bg-gray-50 text-gray-500 font-bold">
-                                  <tr>
-                                    <th className="py-2.5 px-3">Ticket</th>
-                                    <th className="py-2.5 px-3">Hora</th>
-                                    <th className="py-2.5 px-3">Cliente</th>
-                                    <th className="py-2.5 px-3">Pago</th>
-                                    <th className="py-2.5 px-3">Items</th>
-                                    <th className="py-2.5 px-3 text-right">Descuento</th>
-                                    <th className="py-2.5 px-3 text-right">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-100 text-gray-600 bg-white">
-                                  {allShiftSales.map((sale) => {
-                                    const customer = customers.find(c => c.id === sale.customerId);
-                                    const customerName = customer ? customer.name : 'Cliente General';
-                                    const itemsDesc = (sale.items || []).map(i => `${i.name} x${i.qty}`).join(', ');
-                                    return (
-                                      <React.Fragment key={sale.id}>
-                                        <tr className="hover:bg-gray-50/50 transition-colors">
-                                          <td className="py-2.5 px-3 font-black text-gray-900">
-                                            #{sale.id.slice(-6)}
-                                            {sale.editHistory && sale.editHistory.length > 0 && (
-                                              <span className="ml-1.5 bg-blue-50 text-blue-600 border border-blue-100 text-[8px] font-black px-1.5 py-0.5 rounded-full" title="Venta modificada por Supervisor">
-                                                ✏️ Editada
-                                              </span>
-                                            )}
-                                          </td>
-                                          <td className="py-2.5 px-3 font-semibold text-gray-500">{new Date(sale.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}</td>
-                                          <td className="py-2.5 px-3 font-bold text-gray-700">{customerName}</td>
-                                          <td className="py-2.5 px-3">
-                                            <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase ${sale.status === 'PAID' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-orange-50 text-orange-600 border border-orange-100'}`}>
-                                              {sale.paymentMethod || '—'}
-                                            </span>
-                                          </td>
-                                          <td className="py-2.5 px-3 max-w-[200px] truncate font-medium text-gray-600" title={itemsDesc}>{itemsDesc}</td>
-                                          <td className="py-2.5 px-3 text-right text-orange-400 font-bold">{sale.discountAmount > 0 ? `-${formatMoney(sale.discountAmount)}` : '—'}</td>
-                                          <td className="py-2.5 px-3 text-right font-black text-chunky-dark">{formatMoney(sale.total)}</td>
-                                        </tr>
-                                        {sale.editHistory && sale.editHistory.map((edit, eIdx) => (
-                                          <tr key={`${sale.id}-edit-${eIdx}`} className="bg-blue-50/20 text-[9px] text-blue-700 font-bold border-l-4 border-blue-400">
-                                            <td colSpan="7" className="py-2 px-4 leading-relaxed">
-                                              <span className="font-black text-blue-800">✏️ Cambio #{eIdx + 1} ({new Date(edit.editedAt).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}):</span>
-                                              <span className="ml-1.5 font-bold text-blue-700">{formatEditHistory(edit)}</span>
-                                            </td>
-                                          </tr>
-                                        ))}
-                                      </React.Fragment>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Tab: Resumen Productos */}
-                      {getShiftSubtab(shift.id) === 'PRODUCTS_SUMMARY' && (
-                        <div>
-                          <h5 className="font-black text-gray-800 text-sm mb-2">Consolidado de Ventas</h5>
-                          {itemsSold.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic">No se registraron productos vendidos.</p>
-                          ) : (
-                            <div className="border border-gray-50 rounded-xl overflow-hidden">
-                              <table className="w-full text-left text-xs">
-                                <thead className="bg-gray-50 text-gray-500 font-bold">
-                                  <tr>
-                                    <th className="py-2 px-3">Producto</th>
-                                    <th className="py-2 px-3 text-center">Cant.</th>
-                                    <th className="py-2 px-3 text-right">Precio</th>
-                                    <th className="py-2 px-3 text-right">Total</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 text-gray-600 bg-white">
-                                  {itemsSold.map((item, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50/50">
-                                      <td className="py-2 px-3 font-bold text-gray-700">{item.name}</td>
-                                      <td className="py-2 px-3 text-center font-black text-gray-800">{item.qty}</td>
-                                      <td className="py-2 px-3 text-right text-gray-500">{formatMoney(item.price)}</td>
-                                      <td className="py-2 px-3 text-right font-black text-gray-800">{formatMoney(item.qty * item.price)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      {/* Tab: Retiros y Depósitos */}
-                      {getShiftSubtab(shift.id) === 'CASH_MOVEMENTS' && (
-                        <div>
-                          <h5 className="font-black text-gray-800 text-sm mb-2">Movimientos de Caja</h5>
-                          {shiftExpenses.length === 0 ? (
-                            <p className="text-xs text-gray-400 italic">No se registraron movimientos de efectivo.</p>
-                          ) : (
-                            <div className="border border-gray-50 rounded-xl overflow-hidden">
-                              <table className="w-full text-left text-xs">
-                                <thead className="bg-gray-50 text-gray-500 font-bold">
-                                  <tr>
-                                    <th className="py-2 px-3">Tipo</th>
-                                    <th className="py-2 px-3">Razón</th>
-                                    <th className="py-2 px-3 text-right">Monto</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50 text-gray-600 bg-white">
-                                  {shiftExpenses.map((exp, idx) => (
-                                    <tr key={idx} className="hover:bg-gray-50/50">
-                                      <td className="py-2 px-3">
-                                        <span className={`px-2 py-0.5 rounded text-[10px] font-black ${exp.type === 'deposito' ? 'bg-green-50 text-green-600 border border-green-100' : 'bg-red-50 text-red-600 border border-red-100'}`}>
-                                          {exp.type === 'deposito' ? 'DEPÓSITO' : 'RETIRO'}
-                                        </span>
-                                      </td>
-                                      <td className="py-2 px-3 font-bold text-gray-700">{exp.reason}</td>
-                                      <td className="py-2 px-3 text-right font-black text-gray-800">{formatMoney(exp.amount)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
+      {/* Subvista 1: CIERRES Z */}
+      {activeSubtab === 'CIERRES_Z' && (
+        <div className="animate-fade-in">
+          <AdminFinancesTab mode="POS" />
         </div>
       )}
 
-      {activeSubtab === 'SALES' && (
-        <div className="overflow-x-auto border border-gray-100 rounded-2xl">
-          <table className="w-full text-left text-sm whitespace-nowrap">
-            <thead className="bg-gray-50 border-b border-gray-100 text-gray-500 font-bold">
-              <tr>
-                <th className="py-3 px-4">Fecha</th>
-                <th className="py-3 px-4">Ticket</th>
-                <th className="py-3 px-4">Estado</th>
-                <th className="py-3 px-4">Modo Pago</th>
-                <th className="py-3 px-4">Descuento</th>
-                <th className="py-3 px-4 text-right">Total</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(posSales || []).length === 0 ? (
-                <tr><td colSpan="6" className="text-center text-gray-400 py-10 font-bold">No hay ventas registradas.</td></tr>
-              ) : (
-                (posSales || []).map(sale => (
-                  <tr key={sale.id} className="border-b border-gray-50 hover:bg-gray-50/50">
-                    <td className="py-3 px-4 text-gray-600">{new Date(sale.timestamp).toLocaleString('es-CO')}</td>
-                    <td className="py-3 px-4 font-bold text-chunky-dark">{sale.id.replace('SALE-', '')}</td>
-                    <td className="py-3 px-4">
-                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${sale.status === 'PAID' ? 'bg-green-100 text-green-600' : 'bg-orange-100 text-orange-600'}`}>
-                        {sale.status === 'PAID' ? 'PAGADO' : 'SUSPENDIDA'}
-                      </span>
-                    </td>
-                    <td className="py-3 px-4 font-bold text-gray-600">{sale.paymentMethod || '—'}</td>
-                    <td className="py-3 px-4 text-orange-400">{sale.discountAmount > 0 ? `-${formatMoney(sale.discountAmount)}` : '—'}</td>
-                    <td className="py-3 px-4 text-right font-black text-chunky-dark">{formatMoney(sale.total)}</td>
-                  </tr>
-                ))
+      {/* Subvista 2: AUDITORÍA DE VENTAS TOTALES */}
+      {activeSubtab === 'SALES_AUDIT' && (
+        <div className="space-y-6 animate-fade-in">
+          {/* Tarjetas KPI en Vivo */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+            <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/60 border border-emerald-200/80 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-1">Total Facturado</span>
+              <span className="text-lg sm:text-xl font-black text-emerald-950 block">{formatMoney(kpis.totalFacturado)}</span>
+              <span className="text-[11px] font-bold text-emerald-700 mt-0.5 block">{kpis.countPagadas} ventas pagadas</span>
+            </div>
+
+            <div className="bg-gradient-to-br from-blue-50 to-blue-100/60 border border-blue-200/80 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-blue-800 tracking-wider block mb-1">Efectivo</span>
+              <span className="text-lg sm:text-xl font-black text-blue-950 block">{formatMoney(kpis.totalEfectivo)}</span>
+              <span className="text-[11px] font-bold text-blue-700 mt-0.5 block">Caja física</span>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100/60 border border-purple-200/80 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-purple-800 tracking-wider block mb-1">Bancos / Digital</span>
+              <span className="text-lg sm:text-xl font-black text-purple-950 block">{formatMoney(kpis.totalDigital)}</span>
+              <span className="text-[11px] font-bold text-purple-700 mt-0.5 block">Nequi / Tarjeta / Otros</span>
+            </div>
+
+            <div className="bg-gradient-to-br from-amber-50 to-amber-100/60 border border-amber-200/80 rounded-2xl p-4 shadow-sm">
+              <span className="text-[10px] font-black uppercase text-amber-800 tracking-wider block mb-1">Ticket Promedio</span>
+              <span className="text-lg sm:text-xl font-black text-amber-950 block">{formatMoney(kpis.ticketPromedio)}</span>
+              <span className="text-[11px] font-bold text-amber-700 mt-0.5 block">Por compra pagada</span>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100/80 border border-gray-200/80 rounded-2xl p-4 shadow-sm col-span-2 sm:col-span-1">
+              <span className="text-[10px] font-black uppercase text-gray-700 tracking-wider block mb-1">Total Registros</span>
+              <span className="text-lg sm:text-xl font-black text-gray-900 block">{kpis.countTotal}</span>
+              <span className="text-[11px] font-bold text-gray-500 mt-0.5 block">
+                {kpis.countSuspendidas > 0 ? `${kpis.countSuspendidas} en espera` : 'Todas finalizadas'}
+              </span>
+            </div>
+          </div>
+
+          {/* Barra de Filtros, Búsqueda y Ordenamiento */}
+          <div className="bg-gray-50/80 border border-gray-200/70 rounded-3xl p-4 sm:p-5 space-y-4">
+            {/* Fila 1: Búsqueda y Filtros Rápidos de Fecha */}
+            <div className="flex flex-col lg:flex-row gap-3 items-stretch lg:items-center justify-between">
+              {/* Buscador de Texto */}
+              <div className="relative flex-1">
+                <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                <input
+                  type="text"
+                  placeholder="Buscar por ticket (#1788...), cliente, producto o cajero..."
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                  className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 shadow-sm"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => { setSearchTerm(''); setCurrentPage(1); }}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400 hover:text-gray-700"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Botones de Fecha Rápidos */}
+              <div className="flex flex-wrap items-center gap-1.5 bg-white p-1.5 rounded-2xl border border-gray-200 shadow-sm">
+                {[
+                  { id: 'TODAS', label: 'Todas' },
+                  { id: 'HOY', label: 'Hoy' },
+                  { id: 'AYER', label: 'Ayer' },
+                  { id: '7_DIAS', label: '7 Días' },
+                  { id: 'MES', label: 'Este Mes' },
+                  { id: 'CUSTOM', label: 'Específica 📅' },
+                ].map(b => (
+                  <button
+                    key={b.id}
+                    onClick={() => {
+                      setDateFilterMode(b.id);
+                      setCurrentPage(1);
+                    }}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all ${
+                      dateFilterMode === b.id
+                        ? 'bg-chunky-dark text-white shadow-sm'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Selector de Fecha Personalizada */}
+              {dateFilterMode === 'CUSTOM' && (
+                <input
+                  type="date"
+                  value={customDate}
+                  onChange={(e) => { setCustomDate(e.target.value); setCurrentPage(1); }}
+                  className="py-2 px-3 bg-white rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 shadow-sm"
+                />
               )}
-            </tbody>
-          </table>
+            </div>
+
+            {/* Fila 2: Filtro por Método, Estado y Ordenamiento */}
+            <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200/60 text-xs">
+              <div className="flex flex-wrap items-center gap-3">
+                {/* Método de Pago */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-gray-500">Pago:</span>
+                  <select
+                    value={selectedPaymentMethod}
+                    onChange={(e) => { setSelectedPaymentMethod(e.target.value); setCurrentPage(1); }}
+                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 font-bold text-gray-700 shadow-sm focus:outline-none"
+                  >
+                    <option value="ALL">Todos los métodos</option>
+                    {availablePaymentMethods.map(m => (
+                      <option key={m} value={m}>{m}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Estado */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-gray-500">Estado:</span>
+                  <select
+                    value={selectedStatus}
+                    onChange={(e) => { setSelectedStatus(e.target.value); setCurrentPage(1); }}
+                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 font-bold text-gray-700 shadow-sm focus:outline-none"
+                  >
+                    <option value="ALL">Todos los estados</option>
+                    <option value="PAID">✅ Pagadas</option>
+                    <option value="SUSPENDED">⏸️ En Espera</option>
+                  </select>
+                </div>
+
+                {/* Ordenar Por */}
+                <div className="flex items-center gap-1.5">
+                  <span className="font-bold text-gray-500">Ordenar:</span>
+                  <select
+                    value={sortBy}
+                    onChange={(e) => setSortBy(e.target.value)}
+                    className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 font-bold text-gray-700 shadow-sm focus:outline-none"
+                  >
+                    <option value="DATE_DESC">⏱️ Fecha: Más recientes primero</option>
+                    <option value="DATE_ASC">⏱️ Fecha: Más antiguos primero</option>
+                    <option value="AMOUNT_DESC">💲 Monto: Mayor a Menor</option>
+                    <option value="AMOUNT_ASC">💲 Monto: Menor a Mayor</option>
+                    <option value="TICKET_DESC">🧾 Nº Ticket (Descendente)</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Filas por Página */}
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-gray-500">Mostrar:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => { setRowsPerPage(Number(e.target.value)); setCurrentPage(1); }}
+                  className="bg-white border border-gray-200 rounded-xl px-2.5 py-1.5 font-bold text-gray-700 shadow-sm focus:outline-none"
+                >
+                  <option value={25}>25 filas</option>
+                  <option value={50}>50 filas</option>
+                  <option value={100}>100 filas</option>
+                  <option value={0}>Todas ({filteredSales.length})</option>
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabla de Ventas Responsiva con Scroll Horizontal Suave */}
+          <div className="w-full overflow-x-auto rounded-3xl border border-gray-200/80 shadow-sm bg-white" style={{ scrollbarWidth: 'thin' }}>
+            <table className="w-full text-left text-xs whitespace-nowrap min-w-[860px]">
+              <thead className="bg-gray-50/90 text-gray-500 font-black border-b border-gray-200 text-[10.5px] uppercase tracking-wider">
+                <tr>
+                  <th className="py-3 px-3 w-10 text-center">#</th>
+                  <th className="py-3 px-4">Fecha & Hora</th>
+                  <th className="py-3 px-4">Ticket</th>
+                  <th className="py-3 px-4">Cliente / Info</th>
+                  <th className="py-3 px-4">Modo Pago</th>
+                  <th className="py-3 px-4">Ítems Resumen</th>
+                  <th className="py-3 px-4 text-right">Descuento</th>
+                  <th className="py-3 px-4 text-right">Total</th>
+                  <th className="py-3 px-4 text-center">Detalle</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100 font-bold text-gray-700">
+                {paginatedSales.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-12 text-gray-400">
+                      <p className="text-4xl mb-2">🔍</p>
+                      <p className="font-bold">No se encontraron ventas para los filtros seleccionados.</p>
+                      {(searchTerm || dateFilterMode !== 'TODAS' || selectedPaymentMethod !== 'ALL' || selectedStatus !== 'ALL') && (
+                        <button
+                          onClick={() => {
+                            setSearchTerm('');
+                            setDateFilterMode('TODAS');
+                            setSelectedPaymentMethod('ALL');
+                            setSelectedStatus('ALL');
+                            setCurrentPage(1);
+                          }}
+                          className="mt-3 text-xs text-amber-600 underline font-black"
+                        >
+                          Limpiar todos los filtros
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ) : (
+                  paginatedSales.map((sale, idx) => {
+                    const isExpanded = expandedSaleId === sale.id;
+                    const cust = customers.find(c => c.id === sale.customerId);
+                    const customerName = sale.customerName || cust?.name || (sale.customerId ? 'Cliente' : 'Venta General');
+                    const itemsDesc = (sale.items || []).map(i => `${i.qty}x ${i.name}`).join(', ');
+                    const globalIdx = (currentPage - 1) * (rowsPerPage || 0) + idx + 1;
+
+                    return (
+                      <React.Fragment key={sale.id}>
+                        <tr
+                          onClick={() => setExpandedSaleId(isExpanded ? null : sale.id)}
+                          className={`hover:bg-amber-50/40 transition-colors cursor-pointer ${isExpanded ? 'bg-amber-50/50' : ''}`}
+                        >
+                          {/* Número */}
+                          <td className="py-3.5 px-3 text-center text-gray-400 font-medium text-[11px]">
+                            {globalIdx}
+                          </td>
+
+                          {/* Fecha */}
+                          <td className="py-3.5 px-4 text-gray-600">
+                            <div className="font-black text-gray-900 text-xs">
+                              {new Date(sale.timestamp || sale.createdAt || 0).toLocaleDateString('es-CO')}
+                            </div>
+                            <div className="text-[10.5px] text-gray-400 font-semibold">
+                              {new Date(sale.timestamp || sale.createdAt || 0).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </div>
+                          </td>
+
+                          {/* Ticket */}
+                          <td className="py-3.5 px-4 font-black text-gray-900">
+                            <div className="flex items-center gap-1.5">
+                              <span>#{String(sale.id).replace('SALE-', '').slice(-8)}</span>
+                              {sale.editHistory && sale.editHistory.length > 0 && (
+                                <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-blue-200" title="Venta modificada">
+                                  ✏️ Editada
+                                </span>
+                              )}
+                            </div>
+                          </td>
+
+                          {/* Cliente */}
+                          <td className="py-3.5 px-4 font-bold text-gray-800">
+                            <div>{customerName}</div>
+                            {sale.userName && (
+                              <div className="text-[10px] text-gray-400 font-semibold">Cajero: {sale.userName}</div>
+                            )}
+                          </td>
+
+                          {/* Modo de Pago */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex items-center gap-1.5">
+                              <span className={`px-2.5 py-1 rounded-xl text-[10px] font-black tracking-wider ${
+                                String(sale.paymentMethod || '').toUpperCase() === 'EFECTIVO'
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : 'bg-purple-50 text-purple-700 border border-purple-200'
+                              }`}>
+                                {sale.paymentMethod || 'EFECTIVO'}
+                              </span>
+                              <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                sale.status === 'PAID' ? 'bg-emerald-100 text-emerald-800' : 'bg-orange-100 text-orange-800'
+                              }`}>
+                                {sale.status === 'PAID' ? 'PAGADO' : 'EN ESPERA'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* Resumen de Ítems */}
+                          <td className="py-3.5 px-4 max-w-[220px] truncate text-gray-600 font-medium" title={itemsDesc}>
+                            {itemsDesc || '—'}
+                          </td>
+
+                          {/* Descuento */}
+                          <td className="py-3.5 px-4 text-right text-orange-500 font-bold">
+                            {sale.discountAmount > 0 ? `-${formatMoney(sale.discountAmount)}` : '—'}
+                          </td>
+
+                          {/* Total */}
+                          <td className="py-3.5 px-4 text-right font-black text-gray-950 text-sm">
+                            {formatMoney(sale.total)}
+                          </td>
+
+                          {/* Botón Detalle */}
+                          <td className="py-3.5 px-4 text-center">
+                            <span className={`inline-block transition-transform duration-200 text-gray-400 font-bold text-xs ${isExpanded ? 'rotate-180 text-amber-600' : ''}`}>
+                              ▼
+                            </span>
+                          </td>
+                        </tr>
+
+                        {/* Fila Expandida con Detalle de Productos y Cambios */}
+                        {isExpanded && (
+                          <tr className="bg-gray-50/70 border-b border-gray-200">
+                            <td colSpan={9} className="p-4 sm:p-5 space-y-4">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* Lista de Productos */}
+                                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
+                                  <h6 className="font-black text-gray-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                                    <span>🛒</span> Productos Vendidos ({sale.items?.length || 0})
+                                  </h6>
+                                  <div className="space-y-1.5">
+                                    {(sale.items || []).map((item, iIdx) => (
+                                      <div key={iIdx} className="flex justify-between items-center text-xs py-1 border-b border-gray-50 last:border-0 font-bold">
+                                        <span className="text-gray-800">
+                                          <span className="text-amber-600 font-black mr-1.5">{item.qty}x</span>
+                                          {item.name}
+                                        </span>
+                                        <div className="text-right">
+                                          <span className="text-gray-400 text-[10.5px] font-normal mr-2">({formatMoney(item.price)} c/u)</span>
+                                          <span className="text-gray-900 font-black">{formatMoney((item.price || 0) * (item.qty || 1))}</span>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+
+                                {/* Metadatos de la Venta y Auditoría */}
+                                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm space-y-2.5 text-xs font-bold">
+                                  <h6 className="font-black text-gray-900 text-xs uppercase tracking-wider mb-2.5 flex items-center gap-1.5">
+                                    <span>📋</span> Auditoría y Registro
+                                  </h6>
+                                  <div className="flex justify-between text-gray-600">
+                                    <span>ID Completo:</span>
+                                    <span className="font-mono text-gray-900">{sale.id}</span>
+                                  </div>
+                                  {sale.shiftId && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Turno Z Asociado:</span>
+                                      <span className="text-amber-700 font-black">{sale.shiftId}</span>
+                                    </div>
+                                  )}
+                                  {sale.registerName && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Caja Registradora:</span>
+                                      <span className="text-gray-900 font-black">{sale.registerName}</span>
+                                    </div>
+                                  )}
+                                  {sale.subtotal !== undefined && sale.subtotal !== sale.total && (
+                                    <div className="flex justify-between text-gray-600">
+                                      <span>Subtotal sin descuento:</span>
+                                      <span className="text-gray-800">{formatMoney(sale.subtotal)}</span>
+                                    </div>
+                                  )}
+
+                                  {/* Historial de Edición */}
+                                  {sale.editHistory && sale.editHistory.length > 0 && (
+                                    <div className="mt-3 pt-3 border-t border-gray-100 space-y-1.5">
+                                      <span className="text-[10px] uppercase tracking-wider text-blue-700 font-black block">Historial de Modificaciones:</span>
+                                      {sale.editHistory.map((edit, eIdx) => (
+                                        <div key={eIdx} className="bg-blue-50/60 border border-blue-200/80 rounded-xl p-2 text-[10.5px] text-blue-900">
+                                          <div className="font-black">✏️ Edición #{eIdx + 1} - {new Date(edit.editedAt).toLocaleString('es-CO')}</div>
+                                          <div className="font-semibold text-blue-700 mt-0.5">{formatEditHistory(edit)}</div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Controles de Paginación */}
+          {totalPages > 1 && (
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-2">
+              <span className="text-xs font-bold text-gray-500">
+                Mostrando página <span className="text-gray-900 font-black">{currentPage}</span> de <span className="text-gray-900 font-black">{totalPages}</span> ({filteredSales.length} ventas encontradas)
+              </span>
+              <div className="flex items-center gap-1.5">
+                <button
+                  disabled={currentPage <= 1}
+                  onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                  className="px-3.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all"
+                >
+                  « Anterior
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum = currentPage;
+                  if (totalPages <= 5) pageNum = i + 1;
+                  else if (currentPage <= 3) pageNum = i + 1;
+                  else if (currentPage >= totalPages - 2) pageNum = totalPages - 4 + i;
+                  else pageNum = currentPage - 2 + i;
+
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={`w-8 h-8 rounded-xl text-xs font-black transition-all ${
+                        currentPage === pageNum
+                          ? 'bg-chunky-dark text-white shadow-sm'
+                          : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50'
+                      }`}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  disabled={currentPage >= totalPages}
+                  onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                  className="px-3.5 py-1.5 bg-white border border-gray-200 rounded-xl text-xs font-bold text-gray-700 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm transition-all"
+                >
+                  Siguiente »
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -4469,8 +4628,7 @@ export function AdminView() {
       { id: 'POS_REWARDS',    label: '🎁 Premios & Gamificación' },
       { id: 'POS_CARPETAS',   label: '🗂️ Carpetas POS' },
       { id: 'POS_ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
-      { id: 'POS_HISTORY',    label: '🧾 Historial POS' },
-      { id: 'POS_CIERRES',    label: '📊 Historial Cierres Z' },
+      { id: 'POS_HISTORY',    label: '🧾 Historial & Cierres POS' },
       { id: 'CONTRATAS',      label: '🤝 Contratas' },
       { id: 'TICKET_CONFIG',  label: '🧾 Diseño Tickets' },
     ],
@@ -4632,12 +4790,11 @@ export function AdminView() {
         { activeTab === 'POS_INVENTORY' && <PosInventoryConfigPanel /> }
         { activeTab === 'POS_OLACLICK' && <OlaClickConfigPanel /> }
         { activeTab === 'POS_REWARDS' && <LuckyRewardsConfigPanel /> }
-        { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
+        { (activeTab === 'POS_HISTORY' || activeTab === 'POS_CIERRES') && <PosHistoryPanel /> }
 
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
         { activeTab === 'TICKET_CONFIG' && <AdminTicketConfigTab /> }
         { activeTab === 'POS_CARPETAS' && <PosCategoriesPanel /> }
-        { activeTab === 'POS_CIERRES' && <AdminFinancesTab mode="POS" /> }
         { activeTab === 'CIERRES' && <AdminFinancesTab mode="VENDEDOR" /> }
 
         { activeTab === 'INGRESOS' && <AdminIncomesExpensesTab defaultTab="ingresos" /> }

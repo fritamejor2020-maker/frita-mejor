@@ -1069,8 +1069,8 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
             <p className="font-bold">No hay cierres para los filtros seleccionados.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-2xl border border-gray-200 shadow-sm bg-white">
-            <table className="w-full text-left text-xs whitespace-nowrap">
+          <div className="w-full overflow-x-auto rounded-2xl border border-gray-200 shadow-sm bg-white" style={{ scrollbarWidth: 'thin' }}>
+            <table className="w-full text-left text-xs whitespace-nowrap min-w-[950px]">
               <thead className="bg-gray-100/90 text-gray-500 font-black border-b border-gray-200 text-[10.5px] uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Fecha / Turno</th>
