@@ -364,7 +364,7 @@ export const AdminFinancesTab = ({
   allowDelete = true,
   mode = 'VENDEDOR'
 } = {}) => {
-  const { posShifts, posSales, posExpenses, updatePosShift, deletePosShift, posSettings, customers = [] } = useInventoryStore();
+  const { posShifts, posSales, posExpenses, posDescargues, updatePosShift, deletePosShift, posSettings, customers = [] } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
   const user = useAuthStore((s: any) => s.user);
   const vehicles = useVehicleStore((s: any) => s.vehicles);
@@ -393,7 +393,8 @@ export const AdminFinancesTab = ({
   const [editExpensesDesc, setEditExpensesDesc] = useState('');
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
-  const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string } | null>(null);
+  const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string; items?: any[] } | null>(null);
+  const [descarguesModal, setDescarguesModal] = useState<{ descargues: any[]; amount: number; pointName: string } | null>(null);
   const [transfersModal, setTransfersModal] = useState<{ transfers: any[]; pointName: string } | null>(null);
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -406,6 +407,8 @@ export const AdminFinancesTab = ({
         .in('key', [
           'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
           'deletedShiftIds', 'deletedShiftIds_BRANCH-001',
+          'posExpenses', 'posExpenses_BRANCH-001',
+          'posDescargues', 'posDescargues_BRANCH-001',
           'loadHistory_BRANCH-001', 'loadHistory',
           'completedRequests_BRANCH-001', 'completedRequests'
         ]);
@@ -436,8 +439,28 @@ export const AdminFinancesTab = ({
       ]);
       const filtered = allShifts.filter((s: any) => !deletedIds.has(s.id));
 
-      // Sincronizar en el store global para que Inventario en Ruta y Cierres Finanzas compartan exactamente los mismos datos
-      useInventoryStore.setState({ posShifts: filtered });
+      // Sincronizar gastos POS
+      const expensesMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posExpenses_BRANCH-001']) ? map['posExpenses_BRANCH-001'] : []),
+        ...(Array.isArray(map['posExpenses']) ? map['posExpenses'] : [])
+      ].forEach((e: any) => { if (e?.id) expensesMap.set(e.id, e); });
+      const allExpenses = Array.from(expensesMap.values());
+
+      // Sincronizar descargues POS
+      const descarguesMap = new Map<string, any>();
+      [
+        ...(Array.isArray(map['posDescargues_BRANCH-001']) ? map['posDescargues_BRANCH-001'] : []),
+        ...(Array.isArray(map['posDescargues']) ? map['posDescargues'] : [])
+      ].forEach((d: any) => { if (d?.id) descarguesMap.set(d.id, d); });
+      const allDescargues = Array.from(descarguesMap.values());
+
+      // Sincronizar en el store global
+      useInventoryStore.setState({ 
+        posShifts: filtered,
+        ...(allExpenses.length > 0 ? { posExpenses: allExpenses } : {}),
+        ...(allDescargues.length > 0 ? { posDescargues: allDescargues } : {})
+      });
 
       // Unificar loadHistory
       const historyMap = new Map<string, any>();
@@ -790,9 +813,50 @@ export const AdminFinancesTab = ({
 
      } else {
          // POS Shift
-         const shiftSales = (posSales || []).filter((sale: any) => sale.shiftId === s.id && sale.status === 'PAID');
+         const isShiftSale = (sale: any) => {
+           if (!sale || sale.status !== 'PAID') return false;
+           if (sale.shiftId && s.id && sale.shiftId === s.id) return true;
+           if (sale.registerId && s.registerId && sale.registerId === s.registerId) {
+             const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
+             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
+             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
+             return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
+           }
+           return false;
+         };
+
+         const isShiftExpense = (exp: any) => {
+           if (!exp) return false;
+           if (exp.shiftId && s.id && exp.shiftId === s.id) return true;
+           if (exp.registerId && s.registerId && exp.registerId === s.registerId) {
+             const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
+             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
+             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
+             return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
+           }
+           return false;
+         };
+
+         const isShiftDescargue = (d: any) => {
+           if (!d) return false;
+           if (d.shiftId && s.id && d.shiftId === s.id) return true;
+           if (d.registerId && s.registerId && d.registerId === s.registerId) {
+             const dTime = new Date(d.timestamp || d.createdAt || 0).getTime();
+             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
+             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
+             return dTime >= (openTime - 60000) && dTime <= (closeTime + 60000);
+           }
+           return false;
+         };
+
+         const shiftSales = (posSales || []).filter(isShiftSale);
+         const shiftExpenses = (posExpenses || []).filter(isShiftExpense);
+         const shiftDescargues = (posDescargues || []).filter(isShiftDescargue);
+         
+         const totalDescargues = shiftDescargues.reduce((acc: number, d: any) => acc + (Number(d.amount) || 0), 0);
          theoretical = shiftSales.reduce((acc: number, sale: any) => acc + sale.total, 0);
-         expenses = (posExpenses || []).filter((e: any) => e.shiftId === s.id && e.type !== 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0); 
+         expenses = shiftExpenses.filter((e: any) => e.type !== 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0); 
+         const totalDeposits = shiftExpenses.filter((e: any) => e.type === 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0);
          
          const configuredMethods = posSettings?.paymentMethods || [
            { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
@@ -829,15 +893,32 @@ export const AdminFinancesTab = ({
          const posTransfer = s.transferAmount !== undefined ? s.transferAmount : totalTransfers;
          real = posCash + posTransfer + contrataCredit;
          
+         const baseAmount = Number(s.initialAmount || s.base || 0);
+         const expectedCashInDrawer = baseAmount + totalCash - expenses + totalDeposits - totalDescargues;
+
          const itemsMap: Record<string, any> = {};
          shiftSales.forEach((sale: any) => {
-             sale.items.forEach((item: any) => {
+             (sale.items || []).forEach((item: any) => {
                  if (!itemsMap[item.name]) itemsMap[item.name] = { product: item.name, sold: 0, sent: 0, returned: 0, unitPrice: item.price };
                  itemsMap[item.name].sold += item.qty;
                  itemsMap[item.name].sent += item.qty;
              });
          });
          details = Object.values(itemsMap);
+
+         (s as any)._posExtra = {
+           shiftExpensesList: shiftExpenses,
+           shiftDescargues: shiftDescargues,
+           totalDescargues: totalDescargues,
+           baseAmount: baseAmount,
+           expectedCashInDrawer: expectedCashInDrawer,
+           localCash: localCash,
+           localTransfers: localTransfers,
+           contrataCash: contrataCash,
+           contrataTransfers: contrataTransfers,
+           contrataCredit: contrataCredit,
+           totalDeposits: totalDeposits,
+         };
      }
      // prioritize the vendor's real name, fall back to pointId
      const vendorName = s.userName || s.responsibleName || s.pointId || 'Caja Frita Mejor';
@@ -865,6 +946,8 @@ export const AdminFinancesTab = ({
      const anotadorName = anyEntry?.anotadorName || matchingDejadorShift?.anotadorName || null;
      const dejadorName  = anyEntry?.dejadorName  || matchingDejadorShift?.dejadorName  || null;
 
+     const posExtra = (s as any)._posExtra || {};
+
      return {
         id: s.id,
         _raw: s,
@@ -882,6 +965,17 @@ export const AdminFinancesTab = ({
         transferAmount: s.transferAmount !== undefined ? s.transferAmount : (s.type === 'VENDEDOR' ? 0 : (s.transferAmount || 0)),
         expenses,
         details,
+        shiftExpensesList: posExtra.shiftExpensesList || [],
+        shiftDescargues: posExtra.shiftDescargues || [],
+        totalDescargues: posExtra.totalDescargues || 0,
+        baseAmount: posExtra.baseAmount || 0,
+        expectedCashInDrawer: posExtra.expectedCashInDrawer || 0,
+        localCash: posExtra.localCash || 0,
+        localTransfers: posExtra.localTransfers || 0,
+        contrataCash: posExtra.contrataCash || 0,
+        contrataTransfers: posExtra.contrataTransfers || 0,
+        contrataCredit: posExtra.contrataCredit || 0,
+        totalDeposits: posExtra.totalDeposits || 0,
         shiftTransfers: (() => {
           if (s.type !== 'VENDEDOR') return [];
           const sOpenedAt = s.openedAt || s._raw?.openedAt;
@@ -912,12 +1006,14 @@ export const AdminFinancesTab = ({
       };
    });
 
-  // Deduplicar: si hay 2 registros cerrados para el mismo vehículo+turno+fecha,
-  // quedarse con el más completo (con datos reales) o el más reciente.
+  // Deduplicar: en VENDEDOR si hay 2 registros cerrados para el mismo vehículo+turno+fecha.
+  // En POS cada cierre Z es único e independiente por su ID de turno para no borrar turnos del mismo día.
   const deduplicatedClosings = (() => {
     const seen = new Map<string, any>();
     for (const c of mappedShifts) {
-      const key = `${c.date}__${c.shift}__${c._raw?.pointId || c._raw?.registerId || c.pointName}`;
+      const key = mode === 'POS'
+        ? (c._raw?.id || c.id)
+        : `${c.date}__${c.shift}__${c._raw?.pointId || c._raw?.registerId || c.pointName}`;
       const existing = seen.get(key);
       if (!existing) {
         seen.set(key, c);
@@ -1074,12 +1170,13 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
               <thead className="bg-gray-100/90 text-gray-500 font-black border-b border-gray-200 text-[10.5px] uppercase tracking-wider">
                 <tr>
                   <th className="py-3 px-4">Fecha / Turno</th>
-                  <th className="py-3 px-4">{mode === 'POS' ? 'Cajero / Caja' : 'Vendedor / Punto'}</th>
+                  <th className="py-3 px-4">Cajero / Caja</th>
                   <th className="py-3 px-4 text-right">Teórico (App)</th>
-                  <th className="py-3 px-4 text-right">{mode === 'POS' ? 'Real (Caja)' : 'Real (Entregado)'}</th>
+                  <th className="py-3 px-4 text-right">Real (Caja)</th>
                   <th className="py-3 px-4 text-center">Efectivo</th>
                   <th className="py-3 px-4 text-center">Transferencia</th>
                   <th className="py-3 px-4 text-center">Salidas</th>
+                  <th className="py-3 px-4 text-center">Descargues</th>
                   <th className="py-3 px-4 text-center">Estado / Cuadre</th>
                   <th className="py-3 px-4 text-center">Acciones</th>
                 </tr>
@@ -1101,23 +1198,32 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                     const customerTypes = storeState.customerTypes || [];
                     const posSettings = storeState.posSettings || {};
 
-                    const shiftSales = posSales.filter((s: any) => {
-                      if (s.shiftId === shift.id) return true;
-                      if (shift.openedAt && shift.closedAt) {
-                        const t = new Date(s.timestamp).getTime();
-                        return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                    const isMatch = (s: any) => {
+                      if (!s || s.status !== 'PAID') return false;
+                      if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
+                      if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
+                        const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
+                        const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+                        const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+                        return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
                       }
                       return false;
-                    });
+                    };
 
-                    const shiftExpenses = posExpenses.filter((e: any) => {
-                      if (e.shiftId === shift.id) return true;
-                      if (shift.openedAt && shift.closedAt) {
-                        const t = new Date(e.timestamp || e.date).getTime();
-                        return t >= new Date(shift.openedAt).getTime() && t <= new Date(shift.closedAt).getTime();
+                    const isExpMatch = (e: any) => {
+                      if (!e) return false;
+                      if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
+                      if (e.registerId && shift.registerId && e.registerId === shift.registerId) {
+                        const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
+                        const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+                        const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+                        return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
                       }
                       return false;
-                    });
+                    };
+
+                    const shiftSales = (posSales || []).filter(isMatch);
+                    const shiftExpenses = (posExpenses || []).filter(isExpMatch);
 
                     const html = generateZReportHTML(
                       shift,
@@ -1127,7 +1233,8 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                       customerTypes,
                       posSettings.ticketConfig || {},
                       posSettings.cashDrawerCode || '',
-                      posSettings.paymentMethods || []
+                      posSettings.paymentMethods || [],
+                      c.shiftDescargues || []
                     );
 
                     const win = window.open('', '_blank', 'width=450,height=850');
@@ -1203,11 +1310,35 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                         <td className="py-3.5 px-4 text-center">
                           <button
                             className="font-bold text-red-500 hover:underline text-xs"
-                            onClick={() => setExpensesDescModal({ desc: closing._raw?.expensesDesc || '', amount: closing.expenses, name: closing.pointName })}
-                            title="Ver descripción de salidas"
+                            onClick={() => setExpensesDescModal({ 
+                              desc: closing._raw?.expensesDesc || '', 
+                              amount: closing.expenses, 
+                              name: closing.pointName,
+                              items: closing.shiftExpensesList || []
+                            })}
+                            title="Ver descripción y desglose de salidas"
                           >
                             {fmt(closing.expenses)}
                           </button>
+                        </td>
+
+                        {/* Descargues */}
+                        <td className="py-3.5 px-4 text-center">
+                          {(closing.totalDescargues || 0) > 0 ? (
+                            <button
+                              className="font-black text-amber-700 hover:underline text-xs bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs hover:bg-amber-100 transition-all"
+                              onClick={() => setDescarguesModal({ 
+                                descargues: closing.shiftDescargues || [], 
+                                amount: closing.totalDescargues, 
+                                pointName: closing.pointName 
+                              })}
+                              title="Ver descargues a caja fuerte"
+                            >
+                              📦 {fmt(closing.totalDescargues)}
+                            </button>
+                          ) : (
+                            <span className="text-gray-300 font-normal">—</span>
+                          )}
                         </td>
 
                         {/* Estado / Cuadre */}
@@ -1221,10 +1352,10 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                             {closing._raw && (
                               <button
                                 className="flex items-center gap-1 bg-blue-50 hover:bg-blue-100 text-blue-700 font-black text-[11px] px-2.5 py-1 rounded-lg border border-blue-200 shadow-xs active:scale-95 transition-all"
-                                title={mode === 'POS' ? 'Imprimir o Descargar Ticket Cierre Z' : 'Imprimir o Descargar Resumen Cierre'}
+                                title="Imprimir o Descargar Ticket Cierre Z"
                                 onClick={() => handleDownloadZReport(closing)}
                               >
-                                <span>📊</span> {mode === 'POS' ? 'Ticket Z' : 'Resumen Cierre'}
+                                <span>📊</span> Ticket Z
                               </button>
                             )}
                             <button
@@ -1244,34 +1375,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                                   setEditTransfer(String(closing._raw.transferAmount || 0));
                                   setEditExpenses(String(closing.expenses || 0));
                                   setEditExpensesDesc(closing._raw.expensesDesc || "");
-                                  const _hasRealLogistics = closing.details.some((d: any) => (d.sent || 0) > 0);
-                                  let _initDetails = closing.details.map((d: any) => ({ ...d }));
-                                  if (!_hasRealLogistics) {
-                                    const _vid = closing._raw?.pointId;
-                                    if (_vid) {
-                                      const _tl = buildLogisticsTimeline(_vid, closing.date, closing._raw?.id);
-                                      const _cM: Record<string,number> = {};
-                                      const _sM: Record<string,number> = {};
-                                      const _rM: Record<string,number> = {};
-                                      _tl.forEach((e: any) => {
-                                        (e.items || []).forEach((item: any) => {
-                                          const n = item.name || item.productId || '';
-                                          if (e.type === 'carga')    _cM[n] = (_cM[n] || 0) + (item.qty || 0);
-                                          else if (e.type === 'surtido')  _sM[n] = (_sM[n] || 0) + (item.qty || 0);
-                                          else if (e.type === 'recepcion') _rM[n] = (_rM[n] || 0) + (item.qty || 0);
-                                        });
-                                      });
-                                      _initDetails = closing.details.map((d: any) => {
-                                        const logSent = (_cM[d.product] || 0) + (_sM[d.product] || 0);
-                                        const logRet  = _rM[d.product] || 0;
-                                        if (logSent > 0) return { ...d, sent: logSent, returned: logRet, sold: String(Math.max(0, logSent - logRet)) };
-                                        return { ...d };
-                                      });
-                                    }
-                                  }
-                                  setEditDetails(_initDetails);
-                                  const vehicleId = closing._raw?.pointId;
-                                  setEditLogistics(vehicleId ? buildLogisticsTimeline(vehicleId, closing.date, closing._raw?.id) : []);
+                                  setEditDetails(closing.details.map((d: any) => ({ ...d })));
                                 }}
                               >
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1295,12 +1399,12 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                       {/* ─── Accordion Details (inside the .map) ──────────────── */}
                       {isExpanded && (
                         <tr>
-                          <td colSpan={9} className="p-0">
-                            <div className="mx-4 my-3 border border-gray-100 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out]">
+                          <td colSpan={10} className="p-0">
+                            <div className="mx-4 my-3 border border-gray-200 rounded-2xl overflow-hidden animate-[fadeIn_0.2s_ease-out] bg-stone-50/60 p-5 space-y-5">
 
                               {/* Banner: Valor Editado manualmente */}
                               {(closing as any)._raw?.editedAt && (
-                                <div className="px-5 py-2.5 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+                                <div className="px-5 py-2.5 bg-blue-50 border border-blue-200 rounded-xl flex items-center gap-2">
                                   <span className="text-sm">✏️</span>
                                   <span className="text-xs font-black text-blue-600">Valor Editado por Admin</span>
                                   <span className="text-[10px] font-bold text-blue-400 ml-auto">
@@ -1309,188 +1413,227 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                                 </div>
                               )}
 
-                              {/* Bloque Anotador / Dejador */}
-                              {((closing as any).anotadorName || (closing as any).dejadorName) && (
-                                <div className="px-5 py-3 bg-amber-50/60 border-b border-amber-100 flex flex-wrap gap-3 items-center">
-                                  <span className="text-[10px] font-bold text-amber-600 uppercase tracking-widest">Equipo Jornada:</span>
-                                  {(closing as any).anotadorName && (
-                                    <span className="inline-flex items-center gap-1.5 bg-white border border-amber-200 text-amber-700 text-xs font-bold px-3 py-1 rounded-full">
-                                      📋 Anotador: {(closing as any).anotadorName}
-                                    </span>
-                                  )}
-                                  {(closing as any).dejadorName && (
-                                    <span className="inline-flex items-center gap-1.5 bg-white border border-gray-200 text-gray-600 text-xs font-bold px-3 py-1 rounded-full">
-                                      🛵 Dejador: {(closing as any).dejadorName}
-                                    </span>
+                              {/* 1. Resumen de Arqueo y Cierre Z */}
+                              <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                                <div className="flex items-center justify-between border-b border-gray-100 pb-3 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-lg">💵</span>
+                                    <h4 className="font-black text-gray-900 text-sm">Resumen de Arqueo y Cierre Z</h4>
+                                  </div>
+                                  {(() => {
+                                    const counted = closing._raw?.realAmount !== null && closing._raw?.realAmount !== undefined ? closing._raw.realAmount : closing.real;
+                                    const diff = counted - (closing.expectedCashInDrawer || 0);
+                                    return (
+                                      <span className={`px-3 py-1 rounded-full text-xs font-black border ${
+                                        diff === 0 
+                                          ? 'bg-emerald-50 text-emerald-700 border-emerald-300' 
+                                          : diff > 0 
+                                          ? 'bg-blue-50 text-blue-700 border-blue-300' 
+                                          : 'bg-red-50 text-red-700 border-red-300'
+                                      }`}>
+                                        {diff === 0 ? '✅ Caja Cuadrada Exacta' : diff > 0 ? `🔵 Sobrante: +${fmt(diff)}` : `🔴 Faltante: -${fmt(Math.abs(diff))}`}
+                                      </span>
+                                    );
+                                  })()}
+                                </div>
+
+                                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5 text-xs">
+                                  <div className="bg-gray-50 p-2.5 rounded-xl border border-gray-100">
+                                    <span className="text-gray-400 font-bold block text-[10px] uppercase">Base Inicial</span>
+                                    <span className="font-black text-gray-800 text-sm">{fmt(closing.baseAmount || 0)}</span>
+                                  </div>
+                                  <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100">
+                                    <span className="text-emerald-700 font-bold block text-[10px] uppercase">Ventas Efectivo</span>
+                                    <span className="font-black text-emerald-800 text-sm">+{fmt(closing.cashAmount || 0)}</span>
+                                    <span className="text-[9.5px] text-gray-400 font-semibold block">Loc: {fmt(closing.localCash || 0)}</span>
+                                  </div>
+                                  <div className="bg-purple-50/60 p-2.5 rounded-xl border border-purple-100">
+                                    <span className="text-purple-700 font-bold block text-[10px] uppercase">Transferencias</span>
+                                    <span className="font-black text-purple-800 text-sm">+{fmt(closing.transferAmount || 0)}</span>
+                                    <span className="text-[9.5px] text-gray-400 font-semibold block">Loc: {fmt(closing.localTransfers || 0)}</span>
+                                  </div>
+                                  <div className="bg-red-50/60 p-2.5 rounded-xl border border-red-100">
+                                    <span className="text-red-700 font-bold block text-[10px] uppercase">Salidas / Gastos</span>
+                                    <span className="font-black text-red-700 text-sm">-{fmt(closing.expenses || 0)}</span>
+                                    <span className="text-[9.5px] text-gray-400 font-semibold block">{closing.shiftExpensesList?.length || 0} salidas</span>
+                                  </div>
+                                  <div className="bg-amber-50/60 p-2.5 rounded-xl border border-amber-200">
+                                    <span className="text-amber-800 font-bold block text-[10px] uppercase">Descargues Fuerte</span>
+                                    <span className="font-black text-amber-900 text-sm">-{fmt(closing.totalDescargues || 0)}</span>
+                                    <span className="text-[9.5px] text-amber-700 font-semibold block">{closing.shiftDescargues?.length || 0} entregas</span>
+                                  </div>
+                                  <div className="bg-blue-50 p-2.5 rounded-xl border border-blue-200">
+                                    <span className="text-blue-700 font-bold block text-[10px] uppercase">Esperado en Cajón</span>
+                                    <span className="font-black text-blue-950 text-sm">{fmt(closing.expectedCashInDrawer || 0)}</span>
+                                    <span className="text-[9.5px] text-blue-600 font-semibold block">Real: {fmt(closing._raw?.realAmount !== null && closing._raw?.realAmount !== undefined ? closing._raw.realAmount : closing.real)}</span>
+                                  </div>
+                                </div>
+
+                                {/* Bonificaciones y Colaboradores de Turno si aplica */}
+                                {closing._raw?.earnedBonus > 0 && (
+                                  <div className="mt-3 p-3 bg-violet-50 border border-violet-200 rounded-xl flex items-center justify-between text-xs">
+                                    <div className="flex items-center gap-2">
+                                      <span>🎉</span>
+                                      <div>
+                                        <span className="font-black text-violet-900">¡Meta de Turno Superada!</span>
+                                        <p className="text-[11px] text-violet-700">
+                                          Bono generado: <strong>{fmt(closing._raw.earnedBonus)}</strong>
+                                          {closing._raw.bonusRecipients?.length > 0 && ` repartido entre ${closing._raw.bonusRecipients.map((r: any) => r.name).join(', ')}`}
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <span className="font-black text-violet-800 bg-violet-100 px-2.5 py-1 rounded-full text-xs">+{fmt(closing._raw.earnedBonus)}</span>
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* 2. Bloque de Descargues y Salidas en Paralelo */}
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                {/* 📦 Descargues a Caja Fuerte */}
+                                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs flex flex-col">
+                                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <span>📦</span>
+                                      <h4 className="font-black text-gray-900 text-xs uppercase tracking-wider">
+                                        Descargues a Caja Fuerte ({closing.shiftDescargues?.length || 0})
+                                      </h4>
+                                    </div>
+                                    <span className="font-black text-amber-800 text-xs">{fmt(closing.totalDescargues || 0)}</span>
+                                  </div>
+
+                                  {(!closing.shiftDescargues || closing.shiftDescargues.length === 0) ? (
+                                    <div className="py-6 text-center text-gray-400 text-xs italic">
+                                      Sin descargues a caja fuerte en este turno.
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                      {closing.shiftDescargues.map((d: any, idx: number) => {
+                                        const dTime = d.createdAt || d.timestamp;
+                                        const timeStr = dTime ? new Date(dTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        return (
+                                          <div key={d.id || idx} className="p-2.5 rounded-xl border border-amber-200/70 bg-amber-50/40 flex items-start justify-between text-xs">
+                                            <div>
+                                              <div className="flex items-center gap-1.5">
+                                                <span className="font-black text-amber-950">Descargue #{d.number || idx + 1}</span>
+                                                {timeStr && <span className="text-[10px] text-gray-400 font-bold">🕒 {timeStr}</span>}
+                                              </div>
+                                              {d.cashierName && (
+                                                <p className="text-[10px] text-gray-500 font-semibold">Cajero: {d.cashierName}</p>
+                                              )}
+                                              {d.note && (
+                                                <p className="text-[11px] text-gray-700 italic mt-0.5">"{d.note}"</p>
+                                              )}
+                                            </div>
+                                            <div className="text-right shrink-0 ml-2">
+                                              <span className="font-black text-amber-900">{fmt(d.amount)}</span>
+                                              {d.photoBase64 && (
+                                                <button
+                                                  onClick={() => setFullscreenPhoto(d.photoBase64)}
+                                                  className="block text-[9.5px] text-blue-600 font-bold hover:underline mt-0.5"
+                                                >
+                                                  📷 Ver Foto
+                                                </button>
+                                              )}
+                                            </div>
+                                          </div>
+                                        );
+                                      })}
+                                    </div>
                                   )}
                                 </div>
-                              )}
 
-                              {/* ── Historial de Envíos (colapsable) ── */}
-                              {closing._raw?.pointId && (() => {
-                                const timeline = buildLogisticsTimeline(closing._raw.pointId, closing.date, closing._raw?.id);
-                                const rawHistory = closing._raw?.editHistory;
-                                const buildDiffItems = (snap: any) => {
-                                  const items: any[] = [];
-                                  if (!snap) return items;
-                                  const beforeDetails = snap.before?.details || (Array.isArray(snap.before) ? snap.before : []);
-                                  const afterDetails  = snap.after?.details  || (Array.isArray(snap.after)  ? snap.after  : []);
-                                  afterDetails.forEach((d: any) => {
-                                    const prev = beforeDetails.find((b: any) => b.product === d.product);
-                                    items.push({ name: d.product, qty: d.sold, before: prev?.sold ?? '?' });
-                                  });
-                                  if (snap.before?.cash !== undefined && snap.before.cash !== snap.after.cash)
-                                    items.push({ name: '💵 Efectivo', qty: snap.after.cash, before: snap.before.cash, financial: true });
-                                  if (snap.before?.transfer !== undefined && snap.before.transfer !== snap.after.transfer)
-                                    items.push({ name: '📲 Transferencia', qty: snap.after.transfer, before: snap.before.transfer, financial: true });
-                                  if (snap.before?.expenses !== undefined && snap.before.expenses !== snap.after.expenses)
-                                    items.push({ name: '📌 Salidas', qty: snap.after.expenses, before: snap.before.expenses, financial: true });
-                                  return items;
-                                };
-                                if (rawHistory && rawHistory.length > 0) {
-                                  rawHistory.forEach((hist: any, hIdx: number) => {
-                                    timeline.push({
-                                      id: 'edit-' + closing.id + '-' + hIdx,
-                                      type: 'edicion',
-                                      timestamp: hist.editedAt,
-                                      items: buildDiffItems(hist),
-                                    });
-                                  });
-                                } else if (closing._raw?.editedAt) {
-                                  timeline.push({
-                                    id: 'edit-' + closing.id,
-                                    type: 'edicion',
-                                    timestamp: closing._raw.editedAt,
-                                    items: buildDiffItems(closing._raw.editSnapshot),
-                                  });
-                                  timeline.sort((a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
-                                }
-                                if (timeline.length === 0) return null;
-                                const isHistorialOpen = expandedHistorialId === closing.id;
-                                let surtidoCount = 0;
-                                return (
-                                  <div className="border-b border-gray-100">
-                                    <button
-                                      onClick={() => setExpandedHistorialId(isHistorialOpen ? null : closing.id)}
-                                      className="w-full flex items-center justify-between px-5 py-3 text-sm font-bold text-amber-500 hover:text-amber-600 transition-colors"
-                                    >
-                                      <span>📋 Historial de Envíos ({timeline.length})</span>
-                                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
-                                        className={`transition-transform duration-200 ${isHistorialOpen ? 'rotate-180' : ''}`}>
-                                        <polyline points="6 9 12 15 18 9" />
-                                      </svg>
-                                    </button>
-                                    {isHistorialOpen && (
-                                      <div className="px-5 pb-4 bg-gray-50/30">
-                                        <div className="flex flex-col gap-2.5">
-                                          {timeline.map((entry: any, idx: number) => {
-                                            if (entry.type === 'surtido') surtidoCount++;
-                                            const icon = entry.type === 'carga' ? '📦'
-                                              : entry.type === 'surtido' ? '🔄'
-                                              : entry.type === 'edicion' ? '✏️'
-                                              : '📬';
-                                            const label = entry.type === 'carga' ? 'Carga Inicial'
-                                              : entry.type === 'surtido' ? `Surtido #${surtidoCount}`
-                                              : entry.type === 'edicion' ? 'Valor Editado por Admin'
-                                              : 'Productos Recibidos';
-                                            const bg = entry.type === 'carga' ? 'bg-red-50 border-red-100'
-                                              : entry.type === 'surtido' ? 'bg-amber-50 border-amber-100'
-                                              : entry.type === 'edicion' ? 'bg-blue-50 border-blue-200'
-                                              : 'bg-indigo-50 border-indigo-100';
-                                            const textColor = entry.type === 'carga' ? 'text-red-600'
-                                              : entry.type === 'surtido' ? 'text-amber-700'
-                                              : entry.type === 'edicion' ? 'text-blue-700'
-                                              : 'text-indigo-600';
-                                            const time = new Date(entry.timestamp).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' });
-                                            return (
-                                              <div key={entry.id || idx} className={`rounded-2xl border p-3 ${bg}`}>
-                                                <div className="flex items-center gap-2 mb-2">
-                                                  <span>{icon}</span>
-                                                  <span className={`font-black text-sm ${textColor}`}>{label}</span>
-                                                  <span className="text-gray-400 text-xs font-bold ml-auto">{time}</span>
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                  {entry.type === 'edicion' ? (() => {
-                                                    const diffs = (entry.items || []).filter((item: any) => String(item.before) !== String(item.qty));
-                                                    const fmtV = (v: any, fin: boolean) => fin ? new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(Number(v)) : String(v);
-                                                    return diffs.length === 0
-                                                      ? <span className="text-xs text-gray-400 italic">Sin cambios en valores</span>
-                                                      : diffs.map((item: any, ii: number) => (
-                                                        <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1.5 rounded-xl border border-blue-100 shadow-sm flex items-center gap-1">
-                                                          <span className="text-gray-500">{item.name}:</span>
-                                                          <span className="text-red-400 line-through">{fmtV(item.before, item.financial)}</span>
-                                                          <span className="text-gray-300 mx-0.5">&#x2192;</span>
-                                                          <span className="text-blue-700 font-black">{fmtV(item.qty, item.financial)}</span>
-                                                        </span>
-                                                      ));
-                                                  })() : (entry.items || []).map((item: any, ii: number) => (
-                                                    <span key={ii} className="text-xs font-bold bg-white px-2.5 py-1 rounded-xl border border-white/80 shadow-sm">
-                                                      <span className="text-gray-500">{item.name || item.productId}:</span>{' '}
-                                                      <span className="text-gray-900">{item.qty}</span>
-                                                    </span>
-                                                  ))}
-                                                </div>
-                                              </div>
-                                            );
-                                          })}
-                                        </div>
-                                      </div>
-                                    )}
+                                {/* 📌 Salidas y Gastos de Caja */}
+                                <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs flex flex-col">
+                                  <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                                    <div className="flex items-center gap-2">
+                                      <span>📌</span>
+                                      <h4 className="font-black text-gray-900 text-xs uppercase tracking-wider">
+                                        Salidas y Gastos de Caja ({closing.shiftExpensesList?.length || 0})
+                                      </h4>
+                                    </div>
+                                    <span className="font-black text-red-600 text-xs">-{fmt(closing.expenses || 0)}</span>
                                   </div>
-                                );
-                              })()}
 
-                              <table className="w-full text-left text-sm">
-                                <thead>
-                                  <tr className="border-b border-gray-100 bg-gray-50">
-                                    <th className="py-3 px-5 text-[10px] font-bold text-gray-400 uppercase tracking-widest">Producto</th>
-                                    <th className="py-3 px-5 text-[10px] font-bold text-blue-400 uppercase tracking-widest text-center">Enviado</th>
-                                    <th className="py-3 px-5 text-[10px] font-bold text-indigo-400 uppercase tracking-widest text-center">Quedó</th>
-                                    <th className="py-3 px-5 text-[10px] font-bold text-green-500 uppercase tracking-widest text-right">Venta</th>
-                                  </tr>
-                                </thead>
-                                <tbody className="divide-y divide-gray-50">
-                                  {closing.details.map((d, i) => {
-                                    const ventaQty = Math.max(0, d.sent - d.returned);
-                                    const ventaTotal = ventaQty * d.unitPrice;
-                                    return (
-                                      <tr key={i} className="hover:bg-gray-50/50 transition-colors">
-                                        <td className="py-3.5 px-5">
-                                          <div className="flex items-center gap-2 flex-wrap">
-                                            <span className="bg-gray-900 text-white text-[10px] font-black px-2 py-0.5 rounded-md">
-                                              {(d.product || '??').substring(0, 3).toUpperCase()}
-                                            </span>
-                                            <span className="font-bold text-gray-800">{d.product}</span>
-                                            {(d as any).stringCounts && Object.entries((d as any).stringCounts).map(([sv, n]: [string, any]) => (
-                                              <span key={sv} className="bg-amber-500 text-white text-[9px] font-black px-2 py-0.5 rounded-full tracking-wide">
-                                                {Number(n) > 1 ? `${sv} x${n}` : sv}
-                                              </span>
-                                            ))}
+                                  {(!closing.shiftExpensesList || closing.shiftExpensesList.length === 0) ? (
+                                    <div className="py-6 text-center text-gray-400 text-xs italic">
+                                      Sin salidas ni retiros de efectivo en este turno.
+                                    </div>
+                                  ) : (
+                                    <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                                      {closing.shiftExpensesList.map((e: any, idx: number) => {
+                                        const expTime = e.timestamp || e.createdAt;
+                                        const timeStr = expTime ? new Date(expTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+                                        const reason = e.reason || e.concept || e.description || e.observacion || 'Gasto de caja';
+                                        return (
+                                          <div key={e.id || idx} className="p-2.5 rounded-xl border border-red-100 bg-red-50/40 flex items-start justify-between text-xs">
+                                            <div className="min-w-0 pr-2">
+                                              <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="font-black text-gray-900 truncate">{reason}</span>
+                                                <span className="bg-red-100 text-red-700 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                                                  {e.type || 'salida'}
+                                                </span>
+                                              </div>
+                                              <div className="text-[10px] text-gray-400 font-semibold flex items-center gap-1 mt-0.5">
+                                                {timeStr && <span>🕒 {timeStr}</span>}
+                                                {e.userName && <span>• 👤 {e.userName}</span>}
+                                              </div>
+                                            </div>
+                                            <span className="font-black text-red-600 shrink-0">-{fmt(e.amount)}</span>
                                           </div>
-                                        </td>
-                                        <td className="py-3.5 px-5 text-center">
-                                          <span className="bg-blue-100 text-blue-700 font-black text-xs px-2 py-0.5 rounded-full">{d.sent}</span>
-                                        </td>
-                                        <td className="py-3.5 px-5 text-center">
-                                          {d.returned > 0
-                                            ? <span className="bg-indigo-100 text-indigo-600 font-black text-xs px-2 py-0.5 rounded-full">{d.returned}</span>
-                                            : <span className="text-gray-300 font-bold text-xs">—</span>
-                                          }
-                                        </td>
-                                        <td className="py-3.5 px-5 text-right">
-                                          <span className="font-black text-gray-800">{ventaQty}</span>
-                                          <p className="text-[11px] text-gray-400 font-bold">{fmt(ventaTotal)}</p>
-                                        </td>
-                                      </tr>
-                                    );
-                                  })}
-                                </tbody>
-                              </table>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
 
-                              {/* Total Calculado */}
-                              <div className="border-t border-gray-100 py-4 px-5 flex justify-end items-center gap-3 bg-gray-50/50">
-                                <span className="text-sm font-bold text-gray-500">Total Teórico Calculado:</span>
-                                <span className="text-lg font-black text-[#FF4040]">{fmt(closing.details.reduce((sum: number, d: any) => sum + Math.max(0, d.sent - d.returned) * d.unitPrice, 0))}</span>
+                              {/* 3. Productos Vendidos */}
+                              <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-xs">
+                                <div className="flex items-center justify-between border-b border-gray-100 pb-2 mb-3">
+                                  <div className="flex items-center gap-2">
+                                    <span>🛒</span>
+                                    <h4 className="font-black text-gray-900 text-xs uppercase tracking-wider">
+                                      Productos Vendidos ({closing.details?.length || 0} referencias)
+                                    </h4>
+                                  </div>
+                                  <span className="font-black text-emerald-800 text-xs">
+                                    Total Facturado: {fmt(closing.theoretical || 0)}
+                                  </span>
+                                </div>
+
+                                {(!closing.details || closing.details.length === 0) ? (
+                                  <p className="text-xs text-gray-400 italic text-center py-4">No se registraron productos en este turno.</p>
+                                ) : (
+                                  <div className="overflow-x-auto">
+                                    <table className="w-full text-left text-xs">
+                                      <thead>
+                                        <tr className="border-b border-gray-100 bg-gray-50/70 text-gray-400 font-bold text-[10px] uppercase">
+                                          <th className="py-2.5 px-3">Producto</th>
+                                          <th className="py-2.5 px-3 text-center">Cantidad Vendida</th>
+                                          <th className="py-2.5 px-3 text-right">Precio Unitario</th>
+                                          <th className="py-2.5 px-3 text-right">Subtotal</th>
+                                        </tr>
+                                      </thead>
+                                      <tbody className="divide-y divide-gray-100 font-semibold text-gray-700">
+                                        {closing.details.map((d: any, idx: number) => {
+                                          const subtotal = (d.sold || 0) * (d.unitPrice || 0);
+                                          return (
+                                            <tr key={idx} className="hover:bg-gray-50/50">
+                                              <td className="py-2 px-3 font-bold text-gray-900">{d.product}</td>
+                                              <td className="py-2 px-3 text-center">
+                                                <span className="bg-emerald-50 text-emerald-800 font-black px-2 py-0.5 rounded-md text-[11px] border border-emerald-200">
+                                                  {d.sold || 0}
+                                                </span>
+                                              </td>
+                                              <td className="py-2 px-3 text-right text-gray-500">{fmt(d.unitPrice || 0)}</td>
+                                              <td className="py-2 px-3 text-right font-black text-gray-900">{fmt(subtotal)}</td>
+                                            </tr>
+                                          );
+                                        })}
+                                      </tbody>
+                                    </table>
+                                  </div>
+                                )}
                               </div>
                             </div>
                           </td>
@@ -2177,13 +2320,13 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
           onClick={() => setExpensesDescModal(null)}
         >
           <div
-            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-sm animate-[fadeIn_0.2s_ease-out]"
+            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[85vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-2xl bg-red-50 flex items-center justify-center text-xl">📌</div>
               <div>
-                <h3 className="font-black text-gray-900 text-base leading-tight">Descripción de Salidas</h3>
+                <h3 className="font-black text-gray-900 text-base leading-tight">Salidas y Gastos</h3>
                 <p className="text-xs font-bold text-gray-400">{expensesDescModal.name}</p>
               </div>
               <button
@@ -2194,23 +2337,141 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
               </button>
             </div>
 
-            <div className="bg-red-50 rounded-2xl p-4 mb-4 border border-red-100">
-              <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Monto</p>
-              <p className="text-2xl font-black text-red-600">{fmt(expensesDescModal.amount)}</p>
+            <div className="bg-red-50 rounded-2xl p-4 mb-4 border border-red-100 flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-red-400 uppercase tracking-widest mb-1">Monto Total</p>
+                <p className="text-2xl font-black text-red-600">{fmt(expensesDescModal.amount)}</p>
+              </div>
+              {expensesDescModal.items && expensesDescModal.items.length > 0 && (
+                <span className="bg-red-200/60 text-red-900 font-black text-xs px-3 py-1 rounded-full">
+                  {expensesDescModal.items.length} salidas
+                </span>
+              )}
             </div>
 
-            <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nota del vendedor</p>
-              <p className="text-sm font-bold text-gray-800 leading-relaxed">
-                {expensesDescModal.desc && expensesDescModal.desc.trim() !== ''
-                  ? expensesDescModal.desc
-                  : <span className="text-gray-400 italic">Sin descripción registrada</span>
-                }
-              </p>
-            </div>
+            {expensesDescModal.items && expensesDescModal.items.length > 0 ? (
+              <div className="flex-1 overflow-y-auto space-y-2 pr-1" style={{ scrollbarWidth: 'thin' }}>
+                {expensesDescModal.items.map((e: any, idx: number) => {
+                  const expTime = e.timestamp || e.createdAt;
+                  const timeStr = expTime ? new Date(expTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+                  const reason = e.reason || e.concept || e.description || e.observacion || 'Gasto de caja';
+                  return (
+                    <div key={e.id || idx} className="p-3 rounded-2xl border border-red-100 bg-red-50/40 flex items-start justify-between text-xs">
+                      <div className="min-w-0 pr-2">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-gray-900">{reason}</span>
+                          <span className="bg-red-100 text-red-700 text-[9px] font-black px-1.5 py-0.2 rounded uppercase">
+                            {e.type || 'salida'}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-gray-400 font-semibold flex items-center gap-1 mt-1">
+                          {timeStr && <span>🕒 {timeStr}</span>}
+                          {e.userName && <span>• 👤 {e.userName}</span>}
+                        </div>
+                      </div>
+                      <span className="font-black text-red-600 text-sm shrink-0">-{fmt(e.amount)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="bg-gray-50 rounded-2xl p-4 border border-gray-100">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Nota del vendedor</p>
+                <p className="text-sm font-bold text-gray-800 leading-relaxed">
+                  {expensesDescModal.desc && expensesDescModal.desc.trim() !== ''
+                    ? expensesDescModal.desc
+                    : <span className="text-gray-400 italic">Sin descripción registrada</span>
+                  }
+                </p>
+              </div>
+            )}
 
             <button
               onClick={() => setExpensesDescModal(null)}
+              className="mt-5 w-full py-3 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95"
+            >
+              Cerrar
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Modal: Descargues a Caja Fuerte ─── */}
+      {descarguesModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => setDescarguesModal(null)}
+        >
+          <div
+            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[85vh]"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 border border-amber-200 flex items-center justify-center text-xl">📦</div>
+              <div>
+                <h3 className="font-black text-gray-900 text-base leading-tight">Descargues a Caja Fuerte</h3>
+                <p className="text-xs font-bold text-gray-400">{descarguesModal.pointName}</p>
+              </div>
+              <button
+                onClick={() => setDescarguesModal(null)}
+                className="ml-auto w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-black transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="bg-amber-50 rounded-2xl p-4 mb-4 border border-amber-200 flex items-center justify-between">
+              <div>
+                <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">Total Entregado</p>
+                <p className="text-2xl font-black text-amber-900">{fmt(descarguesModal.amount)}</p>
+              </div>
+              <span className="bg-amber-200/60 text-amber-900 font-black text-xs px-3 py-1 rounded-full">
+                {descarguesModal.descargues.length} descargues
+              </span>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 pr-1" style={{ scrollbarWidth: 'thin' }}>
+              {descarguesModal.descargues.length === 0 ? (
+                <div className="py-8 text-center text-gray-400 text-xs italic">
+                  Sin descargues registrados en este turno.
+                </div>
+              ) : (
+                descarguesModal.descargues.map((d: any, idx: number) => {
+                  const dTime = d.createdAt || d.timestamp;
+                  const timeStr = dTime ? new Date(dTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
+                  return (
+                    <div key={d.id || idx} className="p-3 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-start justify-between text-xs">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-black text-amber-950">Descargue #{d.number || idx + 1}</span>
+                          {timeStr && <span className="text-[10px] text-gray-400 font-bold">🕒 {timeStr}</span>}
+                        </div>
+                        {d.cashierName && (
+                          <p className="text-[10.5px] text-gray-500 font-semibold mt-0.5">Cajero: {d.cashierName}</p>
+                        )}
+                        {d.note && (
+                          <p className="text-xs text-gray-700 italic mt-1 bg-white/80 p-2 rounded-xl border border-amber-100">"{d.note}"</p>
+                        )}
+                      </div>
+                      <div className="text-right shrink-0 ml-3">
+                        <span className="font-black text-amber-900 text-sm block">{fmt(d.amount)}</span>
+                        {d.photoBase64 && (
+                          <button
+                            onClick={() => setFullscreenPhoto(d.photoBase64)}
+                            className="mt-1 text-[10px] text-blue-600 font-bold hover:underline bg-blue-50 px-2 py-0.5 rounded-md border border-blue-200"
+                          >
+                            📷 Foto
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            <button
+              onClick={() => setDescarguesModal(null)}
               className="mt-5 w-full py-3 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95"
             >
               Cerrar
