@@ -639,21 +639,26 @@ export const useLogisticsStore = create(
     const affectedBranchId = getVehicleBranchId(vehicleId);
 
     // ── Asociar al turno activo del vehículo ──────────────────────────────────
-    // Buscar el turno en curso (sin closedAt) cuyo pointId coincida con el vehículo y jornada
     const posShifts = getPosShifts();
     const cleanVehicle = String(vehicleId).toLowerCase().replace(/[^a-z0-9]/g, '');
     const now = Date.now();
+    const today = new Date().toISOString().slice(0, 10);
     const { anotadorName, dejadorName, shift: dejadorShift } = useDejadorSessionStore.getState();
     const dejadorJornada = dejadorShift || (new Date().getHours() < 12 ? 'AM' : new Date().getHours() < 17 ? 'MD' : 'PM');
 
-    const activeShift = posShifts.find(s => {
-      if (!s || s.closedAt) return false;
-      const cleanPoint = String(s.pointId || s.vehicle || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    // Buscar turnos de hoy para este vehículo
+    const vehicleShiftsToday = (posShifts || []).filter(s => {
+      if (!s) return false;
+      const cleanPoint = String(s.pointId || s.vehicle || s.point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
       const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
-      const shiftMatches = !s.shift || s.shift === dejadorJornada;
-      return pointMatches && shiftMatches;
+      const sDate = (s.fecha || s.openedAt || s.closedAt || s.createdAt || '').slice(0, 10);
+      return pointMatches && (!sDate || sDate === today);
     });
+
+    // Prioridad: 1. Turno abierto actualmente. 2. Turno más reciente de hoy
+    const activeShift = vehicleShiftsToday.find(s => !s.closedAt) ||
+      vehicleShiftsToday.sort((a, b) => new Date(b.closedAt || b.openedAt || 0).getTime() - new Date(a.closedAt || a.openedAt || 0).getTime())[0];
 
     const entry = {
       id: `LOAD-${now}`,
@@ -661,7 +666,7 @@ export const useLogisticsStore = create(
       vehicleId,
       branchId: affectedBranchId,
       shiftId: activeShift?.id || null,   // ← ID del turno activo al momento de la carga
-      jornada: activeShift?.shift || dejadorJornada, // ← jornada del turno (AM/MD/PM)
+      jornada: activeShift?.shift || activeShift?.jornada || dejadorJornada, // ← jornada del turno del vendedor
       items,
       anotadorName: anotadorName || null,
       dejadorName: dejadorName || null,
@@ -813,9 +818,11 @@ export const useLogisticsStore = create(
         return false;
       }
 
-      // 3. Si se especifica jornada (AM vs PM) y el item tiene jornada incompatible: descartar
+      // 3. Si se especifica jornada (AM vs PM) y el item tiene jornada incompatible: descartar solo si pertenece a otro turno explícito
       if (targetJornada && item.jornada && targetJornada !== 'COMPLETA' && item.jornada !== 'COMPLETA' && targetJornada !== item.jornada) {
-        return false;
+        if (item.shiftId && targetShiftId && item.shiftId !== targetShiftId) {
+          return false;
+        }
       }
 
       // 4. Ventana de tiempo estricta

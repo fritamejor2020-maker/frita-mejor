@@ -176,10 +176,13 @@ function buildShiftLogistics(
     const eDate = dateOf(e.timestamp || e.completed_at || e.created_at || e.fecha || '');
     if (shiftDate && eDate && eDate !== shiftDate) return false;
 
-    // 4. Si el movimiento tiene jornada explícita (AM vs PM) y difiere de la del turno, descartar
+    // 4. Si el movimiento tiene jornada explícita (AM vs PM) y difiere de la del turno:
+    // Solo descartar si el movimiento pertenece explícitamente a otro turno distinto
     const eJornada = (e.jornada || e.shift || '').toUpperCase();
     if (eJornada && shiftJornada && eJornada !== 'COMPLETA' && shiftJornada !== 'COMPLETA' && eJornada !== shiftJornada) {
-      return false;
+      if (mShiftId && mShiftId !== shift.id) {
+        return false;
+      }
     }
 
     // 5. Delimitar por ventana de tiempo

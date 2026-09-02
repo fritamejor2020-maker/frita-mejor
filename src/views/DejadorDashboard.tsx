@@ -200,7 +200,32 @@ export const DejadorDashboard = () => {
     loadRemoteShifts();
     useInventoryStore.getState().loadFromRemote().catch(() => {});
     useLogisticsStore.getState().loadFromRemote().catch(() => {});
+
+    // 🔄 Sincronización continua: refrescar turnos cada 15s para que cuando un vendedor
+    // (ej. Leo en T1) abra turno, su nombre aparezca de inmediato en los botones T1, T2, etc.
+    const intervalId = setInterval(() => {
+      loadRemoteShifts();
+      useLogisticsStore.getState().loadFromRemote().catch(() => {});
+    }, 15000);
+
+    const handleFocus = () => {
+      loadRemoteShifts();
+      useLogisticsStore.getState().loadFromRemote().catch(() => {});
+    };
+    window.addEventListener('focus', handleFocus);
+    window.addEventListener('visibilitychange', handleFocus);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('visibilitychange', handleFocus);
+    };
   }, [userBranchId]);
+
+  // Recargar turnos al cambiar de pestaña
+  useEffect(() => {
+    loadRemoteShifts();
+  }, [activeTab]);
 
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
   const allVehicles = useVehicleStore((state: any) => state.vehicles);
@@ -212,16 +237,27 @@ export const DejadorDashboard = () => {
     const list = branchFiltered.map((v: any) => v.abbreviation || v.name);
     return list.length > 0 ? list : ['T1', 'T2', 'T3', 'T4', 'T5', 'T6'];
   }, [allVehicles, userBranchId]);
+
   // Mapa: tricicloId → nombre del vendedor con turno ABIERTO (EN CURSO)
   const vehicleVendorMap = React.useMemo(() => {
     const map: Record<string, string> = {};
-    const sourceList = (remoteShifts && remoteShifts.length > 0) ? remoteShifts : (posShifts || []);
+    const combinedShiftsMap = new Map<string, any>();
+    [...(posShifts || []), ...(remoteShifts || [])].forEach((s: any) => {
+      if (!s?.id) return;
+      const existing = combinedShiftsMap.get(s.id);
+      if (!existing || (!s.closedAt && existing.closedAt)) {
+        combinedShiftsMap.set(s.id, s);
+      }
+    });
+    const sourceList = Array.from(combinedShiftsMap.values());
     const today = new Date().toISOString().slice(0, 10);
 
     // Filtrar solo turnos de Vendedor ABIERTOS EN CURSO de HOY
     const openShifts = (sourceList || []).filter((s: any) => {
       if (s.closedAt) return false;
-      const isVendor = String(s.type || '').toUpperCase() === 'VENDEDOR';
+      const typeUpper = String(s.type || '').toUpperCase();
+      const pointStr = String(s.pointId || s.vehicle || '').toLowerCase();
+      const isVendor = typeUpper === 'VENDEDOR' || /^[tc]\d+/i.test(pointStr);
       if (!isVendor) return false;
 
       const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
