@@ -3817,50 +3817,20 @@ function PosHistoryPanel() {
 
   return (
     <div className="space-y-6">
-      {/* Selector de Subvista Principal */}
+      {/* Header del Panel */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 pb-4 border-b border-gray-100">
         <div>
           <h3 className="text-xl font-black text-chunky-dark flex items-center gap-2">
-            <span>🧾</span> Historial y Cierres de Punto de Venta
+            <span>🧾</span> Historial de Ventas POS
           </h3>
           <p className="text-xs text-gray-500 font-bold mt-0.5">
-            Consulta y descarga reportes de Cierre Z por turno o audita cada venta individual con filtros avanzados.
+            Consulta y audita cada venta individual con filtros avanzados por fecha, método de pago, buscador y ordenamiento.
           </p>
-        </div>
-        <div className="bg-gray-100 p-1 rounded-2xl inline-flex shadow-inner">
-          <button
-            onClick={() => setActiveSubtab('CIERRES_Z')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-              activeSubtab === 'CIERRES_Z'
-                ? 'bg-white text-gray-900 shadow-md scale-100'
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <span>📊</span> Cierres Z (Turnos de Caja)
-          </button>
-          <button
-            onClick={() => setActiveSubtab('SALES_AUDIT')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 ${
-              activeSubtab === 'SALES_AUDIT'
-                ? 'bg-white text-gray-900 shadow-md scale-100'
-                : 'text-gray-500 hover:text-gray-800'
-            }`}
-          >
-            <span>💰</span> Ventas Totales (Detalle & Auditoría)
-          </button>
         </div>
       </div>
 
-      {/* Subvista 1: CIERRES Z */}
-      {activeSubtab === 'CIERRES_Z' && (
-        <div className="animate-fade-in">
-          <AdminFinancesTab mode="POS" />
-        </div>
-      )}
-
-      {/* Subvista 2: AUDITORÍA DE VENTAS TOTALES */}
-      {activeSubtab === 'SALES_AUDIT' && (
-        <div className="space-y-6 animate-fade-in">
+      {/* AUDITORÍA DE VENTAS TOTALES */}
+      <div className="space-y-6 animate-fade-in">
           {/* Tarjetas KPI en Vivo */}
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
             <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/60 border border-emerald-200/80 rounded-2xl p-4 shadow-sm">
@@ -4277,7 +4247,6 @@ function PosHistoryPanel() {
             </div>
           )}
         </div>
-      )}
     </div>
   );
 }
@@ -4628,7 +4597,8 @@ export function AdminView() {
       { id: 'POS_REWARDS',    label: '🎁 Premios & Gamificación' },
       { id: 'POS_CARPETAS',   label: '🗂️ Carpetas POS' },
       { id: 'POS_ITEM_TYPES', label: '🏷️ Tipos de Ítem' },
-      { id: 'POS_HISTORY',    label: '🧾 Historial & Cierres POS' },
+      { id: 'POS_HISTORY',    label: '🧾 Historial POS' },
+      { id: 'POS_CIERRES',    label: '📊 Historial Cierres Z' },
       { id: 'CONTRATAS',      label: '🤝 Contratas' },
       { id: 'TICKET_CONFIG',  label: '🧾 Diseño Tickets' },
     ],
@@ -4790,7 +4760,8 @@ export function AdminView() {
         { activeTab === 'POS_INVENTORY' && <PosInventoryConfigPanel /> }
         { activeTab === 'POS_OLACLICK' && <OlaClickConfigPanel /> }
         { activeTab === 'POS_REWARDS' && <LuckyRewardsConfigPanel /> }
-        { (activeTab === 'POS_HISTORY' || activeTab === 'POS_CIERRES') && <PosHistoryPanel /> }
+        { activeTab === 'POS_HISTORY' && <PosHistoryPanel /> }
+        { activeTab === 'POS_CIERRES' && <AdminFinancesTab mode="POS" /> }
 
         { activeTab === 'CONTRATAS' && <AdminContratasTab /> }
         { activeTab === 'TICKET_CONFIG' && <AdminTicketConfigTab /> }
