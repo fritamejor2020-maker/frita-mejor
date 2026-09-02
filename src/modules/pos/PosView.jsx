@@ -1003,10 +1003,12 @@ export function PosView() {
     const saleCustomer = customers?.find(c => c.id === selectedCustomer);
     const isContrata = !!(saleCustomer && saleCustomer.typeId);
 
+    const isLuckyTicket = isLuckyWinnerSession || !!(activeSuspendedId && String(activeSuspendedId).includes('LUCKY'));
+
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
       customerId: selectedCustomer || null,
-      customerName: saleCustomer?.name || pendingDeliveryInfo?.customerName || (selectedCustomer ? 'Cliente' : 'Cliente General'),
+      customerName: saleCustomer?.name || pendingDeliveryInfo?.customerName || (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Cliente General')),
       customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
       deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
       serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
@@ -1024,6 +1026,8 @@ export function PosView() {
       shiftId: activeShift?.id || (posShifts || []).find(s => !s.closedAt && (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001')))?.id || null,
       registerId: selectedRegisterId,
       userName: activeShift?.userName || user?.name || 'PRINCIPAL',
+      isLuckyWinner: isLuckyTicket,
+      ...(isLuckyTicket ? { prizeType: 'RASPA_Y_GANA' } : {}),
       // Contrata fields - only credit when explicitly requested
       ...(isCredit && isContrata ? {
         contrataPaymentMethod: 'credit',

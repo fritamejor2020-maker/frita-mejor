@@ -3651,7 +3651,18 @@ function PosInventoryConfigPanel() {
 // ─── Panel: Historial POS (Cierres Z y Ventas Totales con Auditoría) ─────────
 function PosHistoryPanel() {
   const { posShifts = [], posSales = [], posExpenses = [], customers = [], posSettings } = useInventoryStore();
-  const [activeSubtab, setActiveSubtab] = useState('CIERRES_Z'); // 'CIERRES_Z' | 'SALES_AUDIT'
+
+  // Helper para identificar si una venta fue ganadora de Raspa y Gana
+  const isSaleLuckyWinner = (sale) => {
+    if (!sale) return false;
+    return !!(
+      sale.isLuckyWinner ||
+      sale.prizeType === 'RASPA_Y_GANA' ||
+      String(sale.id || '').includes('LUCKY') ||
+      String(sale.customerName || '').toLowerCase().includes('raspa') ||
+      String(sale.customerName || '').toLowerCase().includes('ganador')
+    );
+  };
 
   // Estados de Filtro y Búsqueda para Ventas Totales
   const [searchTerm, setSearchTerm] = useState('');
@@ -3659,12 +3670,18 @@ function PosHistoryPanel() {
   const [customDate, setCustomDate] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL'); // 'ALL' | 'PAID' | 'SUSPENDED'
+  const [onlyLuckyWinners, setOnlyLuckyWinners] = useState(false);
   const [sortBy, setSortBy] = useState('DATE_DESC'); // 'DATE_DESC' | 'DATE_ASC' | 'AMOUNT_DESC' | 'AMOUNT_ASC' | 'TICKET_DESC'
   const [expandedSaleId, setExpandedSaleId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
   const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
+
+  // Total global de ventas con Raspa y Gana
+  const totalLuckyInAllSales = useMemo(() => {
+    return (posSales || []).filter(s => isSaleLuckyWinner(s)).length;
+  }, [posSales]);
 
   // Lista única de métodos de pago disponibles
   const availablePaymentMethods = useMemo(() => {
@@ -3702,7 +3719,10 @@ function PosHistoryPanel() {
         if (saleMethod !== selectedPaymentMethod) return false;
       }
 
-      // 3. Filtro por Fecha
+      // 3. Filtro por Ganadores de Raspa y Gana
+      if (onlyLuckyWinners && !isSaleLuckyWinner(sale)) return false;
+
+      // 4. Filtro por Fecha
       const saleDateObj = new Date(sale.timestamp || sale.createdAt || 0);
       const saleDateStr = !isNaN(saleDateObj.getTime())
         ? `${saleDateObj.getFullYear()}-${String(saleDateObj.getMonth() + 1).padStart(2, '0')}-${String(saleDateObj.getDate()).padStart(2, '0')}`
@@ -3720,7 +3740,7 @@ function PosHistoryPanel() {
         if (saleDateStr !== customDate) return false;
       }
 
-      // 4. Búsqueda por Texto
+      // 5. Búsqueda por Texto
       if (term) {
         const ticketId = String(sale.id || '').toLowerCase();
         const shortTicket = ticketId.replace('sale-', '');
@@ -3733,7 +3753,8 @@ function PosHistoryPanel() {
           shortTicket.includes(term) ||
           customerName.includes(term) ||
           itemsNames.includes(term) ||
-          cashierName.includes(term);
+          cashierName.includes(term) ||
+          (isSaleLuckyWinner(sale) && (term.includes('raspa') || term.includes('gana') || term.includes('premio') || term.includes('lucky')));
 
         if (!match) return false;
       }
@@ -3758,7 +3779,7 @@ function PosHistoryPanel() {
       }
       return 0;
     });
-  }, [posSales, customers, searchTerm, dateFilterMode, customDate, selectedPaymentMethod, selectedStatus, sortBy]);
+  }, [posSales, customers, searchTerm, dateFilterMode, customDate, selectedPaymentMethod, selectedStatus, onlyLuckyWinners, sortBy]);
 
   // Cálculos de KPIs en Vivo
   const kpis = useMemo(() => {
@@ -3767,9 +3788,11 @@ function PosHistoryPanel() {
     let totalDigital = 0;
     let countPagadas = 0;
     let countSuspendidas = 0;
+    let countLucky = 0;
 
     filteredSales.forEach(s => {
       const tot = s.total || 0;
+      if (isSaleLuckyWinner(s)) countLucky++;
       if (s.status === 'PAID') {
         totalFacturado += tot;
         countPagadas++;
@@ -3793,6 +3816,7 @@ function PosHistoryPanel() {
       countTotal: filteredSales.length,
       countPagadas,
       countSuspendidas,
+      countLucky,
       ticketPromedio
     };
   }, [filteredSales]);
@@ -3832,7 +3856,7 @@ function PosHistoryPanel() {
       {/* AUDITORÍA DE VENTAS TOTALES */}
       <div className="space-y-6 animate-fade-in">
           {/* Tarjetas KPI en Vivo */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3.5">
             <div className="bg-gradient-to-br from-emerald-50 to-emerald-100/60 border border-emerald-200/80 rounded-2xl p-4 shadow-sm">
               <span className="text-[10px] font-black uppercase text-emerald-800 tracking-wider block mb-1">Total Facturado</span>
               <span className="text-lg sm:text-xl font-black text-emerald-950 block">{formatMoney(kpis.totalFacturado)}</span>
@@ -3857,6 +3881,29 @@ function PosHistoryPanel() {
               <span className="text-[11px] font-bold text-amber-700 mt-0.5 block">Por compra pagada</span>
             </div>
 
+            <div 
+              onClick={() => { setOnlyLuckyWinners(!onlyLuckyWinners); setCurrentPage(1); }}
+              className={`border rounded-2xl p-4 shadow-sm cursor-pointer transition-all ${
+                onlyLuckyWinners 
+                  ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-400 scale-[1.02]' 
+                  : 'bg-gradient-to-br from-yellow-50 to-amber-100/80 border-amber-200/90 hover:border-amber-300'
+              }`}
+              title="Haz clic para ver solo las ventas ganadoras de Raspa y Gana"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className={`text-[10px] font-black uppercase tracking-wider ${onlyLuckyWinners ? 'text-amber-100' : 'text-amber-900'}`}>
+                  🎁 Raspa y Gana
+                </span>
+                <span className="text-xs">✨</span>
+              </div>
+              <span className={`text-lg sm:text-xl font-black block ${onlyLuckyWinners ? 'text-white' : 'text-amber-950'}`}>
+                {kpis.countLucky}
+              </span>
+              <span className={`text-[11px] font-bold mt-0.5 block ${onlyLuckyWinners ? 'text-amber-100 underline font-black' : 'text-amber-700'}`}>
+                {onlyLuckyWinners ? '✓ Filtro activo (Quitar)' : 'Clic para filtrar'}
+              </span>
+            </div>
+
             <div className="bg-gradient-to-br from-gray-50 to-gray-100/80 border border-gray-200/80 rounded-2xl p-4 shadow-sm col-span-2 sm:col-span-1">
               <span className="text-[10px] font-black uppercase text-gray-700 tracking-wider block mb-1">Total Registros</span>
               <span className="text-lg sm:text-xl font-black text-gray-900 block">{kpis.countTotal}</span>
@@ -3875,7 +3922,7 @@ function PosHistoryPanel() {
                 <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
                 <input
                   type="text"
-                  placeholder="Buscar por ticket (#1788...), cliente, producto o cajero..."
+                  placeholder="Buscar por ticket (#1788...), cliente, producto, cajero o 'raspa y gana'..."
                   value={searchTerm}
                   onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                   className="w-full pl-10 pr-4 py-2.5 bg-white rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 shadow-sm"
@@ -3928,9 +3975,30 @@ function PosHistoryPanel() {
               )}
             </div>
 
-            {/* Fila 2: Filtro por Método, Estado y Ordenamiento */}
+            {/* Fila 2: Filtro por Método, Estado, Botón Raspa y Gana y Ordenamiento */}
             <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-gray-200/60 text-xs">
               <div className="flex flex-wrap items-center gap-3">
+                {/* Botón Filtro Rápido Raspa y Gana */}
+                <button
+                  onClick={() => {
+                    setOnlyLuckyWinners(!onlyLuckyWinners);
+                    setCurrentPage(1);
+                  }}
+                  className={`px-3 py-1.5 rounded-xl font-black transition-all flex items-center gap-1.5 border shadow-sm ${
+                    onlyLuckyWinners
+                      ? 'bg-amber-500 text-white border-amber-600 ring-2 ring-amber-300 scale-100'
+                      : 'bg-amber-50 text-amber-900 border-amber-200 hover:bg-amber-100'
+                  }`}
+                >
+                  <span>🎁</span>
+                  <span>{onlyLuckyWinners ? 'Mostrando: Solo Raspa y Gana' : 'Solo Raspa y Gana'}</span>
+                  <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-black ${
+                    onlyLuckyWinners ? 'bg-amber-700 text-white' : 'bg-amber-200 text-amber-900'
+                  }`}>
+                    {totalLuckyInAllSales}
+                  </span>
+                </button>
+
                 {/* Método de Pago */}
                 <div className="flex items-center gap-1.5">
                   <span className="font-bold text-gray-500">Pago:</span>
@@ -4063,8 +4131,13 @@ function PosHistoryPanel() {
 
                           {/* Ticket */}
                           <td className="py-3.5 px-4 font-black text-gray-900">
-                            <div className="flex items-center gap-1.5">
-                              <span>#{String(sale.id).replace('SALE-', '').slice(-8)}</span>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>#{String(sale.id).replace('SALE-', '').replace('HELD-LUCKY-', 'L-').slice(-8)}</span>
+                              {isSaleLuckyWinner(sale) && (
+                                <span className="bg-gradient-to-r from-amber-400 to-yellow-500 text-stone-900 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-amber-300 shadow-xs flex items-center gap-0.5">
+                                  <span>🎁</span> Raspa
+                                </span>
+                              )}
                               {sale.editHistory && sale.editHistory.length > 0 && (
                                 <span className="bg-blue-100 text-blue-700 text-[9px] font-black px-1.5 py-0.5 rounded-full border border-blue-200" title="Venta modificada">
                                   ✏️ Editada
@@ -4075,7 +4148,14 @@ function PosHistoryPanel() {
 
                           {/* Cliente */}
                           <td className="py-3.5 px-4 font-bold text-gray-800">
-                            <div>{customerName}</div>
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span>{customerName}</span>
+                              {isSaleLuckyWinner(sale) && (
+                                <span className="bg-amber-100 text-amber-900 text-[9.5px] font-black px-2 py-0.5 rounded-full border border-amber-300 shadow-xs flex items-center gap-1">
+                                  <span>✨</span> Ganador Raspa y Gana
+                                </span>
+                              )}
+                            </div>
                             {sale.userName && (
                               <div className="text-[10px] text-gray-400 font-semibold">Cajero: {sale.userName}</div>
                             )}
@@ -4126,6 +4206,25 @@ function PosHistoryPanel() {
                         {isExpanded && (
                           <tr className="bg-gray-50/70 border-b border-gray-200">
                             <td colSpan={9} className="p-4 sm:p-5 space-y-4">
+                              {/* Banner Destacado si es Ganador de Raspa y Gana */}
+                              {isSaleLuckyWinner(sale) && (
+                                <div className="p-3.5 bg-gradient-to-r from-amber-100 via-yellow-50 to-amber-50 border border-amber-300 rounded-2xl flex items-center justify-between shadow-sm">
+                                  <div className="flex items-center gap-3">
+                                    <span className="text-3xl">🎉</span>
+                                    <div>
+                                      <p className="text-xs font-black text-amber-950 flex items-center gap-2">
+                                        <span>¡Venta Ganadora de Raspa y Gana!</span>
+                                        <span className="bg-amber-500 text-white text-[9px] px-2 py-0.5 rounded-full font-black">PREMIO ENTREGADO</span>
+                                      </p>
+                                      <p className="text-[11px] text-amber-800 font-bold mt-0.5">
+                                        Esta venta resultó premiada con la dinámica de Raspa y Gana / Ruleta de la Suerte en el punto de venta.
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <span className="text-xl">🎁</span>
+                                </div>
+                              )}
+
                               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {/* Lista de Productos */}
                                 <div className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
