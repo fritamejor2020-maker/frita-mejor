@@ -388,6 +388,11 @@ export function PosView() {
     setHasInitialCheckDone(false);
   }, [selectedRegisterId]);
 
+  // 🔄 Reactividad multi-sede (Regla 1): Refrescar estado y ventas al cambiar de sede o usuario
+  useEffect(() => {
+    useInventoryStore.getState().loadFromRemote().catch(() => {});
+  }, [user?.branchId, user?.id]);
+
   useEffect(() => {
     // Si ya hay turno activo, la sync ya trajo datos — listo
     if (activeShift) {
@@ -2100,7 +2105,8 @@ export function PosView() {
 
       {showHistoryModal && (
         <SalesHistoryModal
-          sales={(posSales || []).filter(s => s.shiftId === activeShift?.id && s.status === 'PAID').sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))}
+          sales={(posSales || []).filter(s => s.status === 'PAID').sort((a,b) => new Date(b.timestamp) - new Date(a.timestamp))}
+          activeShiftId={activeShift?.id}
           customers={customers}
           onClose={() => setShowHistoryModal(false)}
           onReprint={handleReprintSale}
@@ -3977,13 +3983,20 @@ function SuspendedSalesModal({ sales, customers, onClose, onLoad, onDelete, acti
 }
 
 // ─── Sales History Modal Component — Full Screen Table ───
-function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, onDeleteSale }) {
+function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, onDeleteSale, activeShiftId }) {
   const [filterText, setFilterText] = useState('');
   const [filterDate, setFilterDate] = useState('');
   const [filterPayment, setFilterPayment] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [expandedId, setExpandedId] = useState(null);
   
+  const todayStr = new Date().toISOString().slice(0, 10);
+  const shiftSalesCount = sales.filter(s => activeShiftId && s.shiftId === activeShiftId).length;
+  const todaySalesCount = sales.filter(s => (s.timestamp || '').slice(0, 10) === todayStr).length;
+
+  // Si hay ventas en el turno actual, iniciar en 'shift'. Si el turno se acaba de abrir (0 ventas), mostrar las de 'today' automáticamente
+  const [scope, setScope] = useState(shiftSalesCount > 0 ? 'shift' : 'today');
+
   // Interactive sorting
   const [sortBy, setSortBy] = useState('timestamp'); // 'timestamp', 'ticket', 'paymentMethod', 'customer', 'items', 'discount', 'total'
   const [sortOrder, setSortOrder] = useState('desc'); // 'desc' | 'asc'
@@ -4011,6 +4024,14 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
 
   // Filter logic
   const filtered = sales.filter(s => {
+    // 🛡️ Filtro de alcance: Turno actual vs Hoy vs Todas
+    if (scope === 'shift') {
+      if (!activeShiftId || s.shiftId !== activeShiftId) return false;
+    } else if (scope === 'today') {
+      const sDate = (s.timestamp || '').slice(0, 10);
+      if (sDate !== todayStr) return false;
+    }
+
     const customerName = customers?.find(c => c.id === s.customerId)?.name || 'Consumidor Final';
     const ticketNum = s.id.slice(-6).toLowerCase();
     const itemsText = s.items.map(i => `${i.qty}x ${i.name}`).join(', ').toLowerCase();
@@ -4078,7 +4099,9 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
           <span className="text-2xl">📜</span>
           <div>
             <h2 className="text-xl font-black text-white">Historial de Ventas</h2>
-            <p className="text-xs font-bold text-gray-500">Turno Actual · {sales.length} venta{sales.length !== 1 ? 's' : ''}</p>
+            <p className="text-xs font-bold text-gray-400">
+              {scope === 'shift' ? 'Turno Actual' : scope === 'today' ? `Ventas de Hoy (${todayStr})` : 'Historial Completo'} · <span className="text-chunky-main">{filtered.length} venta{filtered.length !== 1 ? 's' : ''}</span>
+            </p>
           </div>
         </div>
         <button className="text-gray-400 hover:text-white bg-[#16171d] p-2.5 rounded-xl hover:bg-gray-800 transition-colors" onClick={onClose}>
@@ -4086,17 +4109,60 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
         </button>
       </div>
 
-      {/* ── Filters Bar ── */}
-      <div className="bg-[#16171d] border-b border-gray-800/50 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2 shrink-0">
+      {/* ── Scope Tabs & Filters Bar ── */}
+      <div className="bg-[#16171d] border-b border-gray-800/50 px-4 sm:px-6 py-3 flex flex-wrap items-center gap-2.5 shrink-0">
+        {/* Selector de Alcance */}
+        <div className="flex items-center gap-1 bg-[#0c0d11] p-1 rounded-xl border border-gray-800">
+          <button
+            onClick={() => setScope('shift')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+              scope === 'shift'
+                ? 'bg-chunky-main text-gray-950 shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>Este Turno</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${scope === 'shift' ? 'bg-gray-950/20 text-gray-950' : 'bg-gray-800 text-gray-400'}`}>
+              {shiftSalesCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setScope('today')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+              scope === 'today'
+                ? 'bg-chunky-main text-gray-950 shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>Hoy</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${scope === 'today' ? 'bg-gray-950/20 text-gray-950' : 'bg-gray-800 text-gray-400'}`}>
+              {todaySalesCount}
+            </span>
+          </button>
+          <button
+            onClick={() => setScope('all')}
+            className={`px-3 py-1.5 rounded-lg text-xs font-black transition-all flex items-center gap-1.5 ${
+              scope === 'all'
+                ? 'bg-chunky-main text-gray-950 shadow-md'
+                : 'text-gray-400 hover:text-white'
+            }`}
+          >
+            <span>Todas</span>
+            <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-black ${scope === 'all' ? 'bg-gray-950/20 text-gray-950' : 'bg-gray-800 text-gray-400'}`}>
+              {sales.length}
+            </span>
+          </button>
+        </div>
+
         {/* Text search */}
-        <div className="relative flex-1 min-w-[180px] max-w-[300px]">
+        <div className="relative flex-1 min-w-[180px] max-w-[260px]">
           <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">🔍</span>
           <input
             type="text"
-            placeholder="Buscar ticket, producto, cliente..."
+            placeholder="Buscar ticket, producto..."
             value={filterText}
             onChange={e => setFilterText(e.target.value)}
-            className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-sm font-bold text-white outline-none focus:border-chunky-main transition-colors placeholder:text-gray-600"
+            className="w-full bg-[#0c0d11] border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-white outline-none focus:border-chunky-main transition-colors placeholder:text-gray-600"
           />
         </div>
         {/* Date filter */}
@@ -4104,13 +4170,13 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
           type="date"
           value={filterDate}
           onChange={e => setFilterDate(e.target.value)}
-          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors"
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors"
         />
         {/* Payment method */}
         <select
           value={filterPayment}
           onChange={e => setFilterPayment(e.target.value)}
-          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
         >
           <option value="">Todos los pagos</option>
@@ -4120,7 +4186,7 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
         <select
           value={filterCustomer}
           onChange={e => setFilterCustomer(e.target.value)}
-          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-sm font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
+          className="bg-[#0c0d11] border border-gray-700 rounded-xl px-3 py-2 text-xs font-bold text-gray-300 outline-none focus:border-chunky-main cursor-pointer transition-colors appearance-none pr-8"
           style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%236b7280' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 8px center' }}
         >
           <option value="">Todos los clientes</option>
@@ -4145,11 +4211,24 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
       {/* ── Table ── */}
       <div className="flex-1 overflow-auto">
         {filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-20 opacity-50">
+          <div className="flex flex-col items-center justify-center py-20 px-4 text-center">
             <span className="text-5xl mb-4">🛒</span>
-            <p className="text-center text-gray-400 font-bold text-lg">
-              {hasFilters ? 'No hay ventas que coincidan con los filtros.' : 'No hay ventas registradas en este turno.'}
+            <p className="text-gray-300 font-black text-lg mb-1">
+              {scope === 'shift' ? 'No hay ventas en este turno aún' : hasFilters ? 'No hay ventas que coincidan con los filtros' : 'No hay ventas registradas'}
             </p>
+            {scope === 'shift' && todaySalesCount > 0 && (
+              <div className="mt-3 flex flex-col items-center gap-2">
+                <p className="text-xs text-gray-500 max-w-sm">
+                  El turno actual está recién abierto. Puedes consultar las ventas anteriores del día:
+                </p>
+                <button
+                  onClick={() => setScope('today')}
+                  className="px-4 py-2 bg-chunky-main text-gray-950 font-black text-xs rounded-xl hover:bg-yellow-400 transition-all shadow-md flex items-center gap-1.5"
+                >
+                  <span>📅 Ver {todaySalesCount} venta{todaySalesCount !== 1 ? 's' : ''} de hoy</span>
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <table className="w-full text-sm">

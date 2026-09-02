@@ -369,7 +369,10 @@ export const useInventoryStore = create(
           // Obtener IDs de todas las sedes para el Admin
           let allBranchIds = ['BRANCH-001'];
           try {
-            allBranchIds = useBranchStore.getState().branches.map(b => b.id);
+            const bList = useBranchStore.getState().branches;
+            if (Array.isArray(bList) && bList.length > 0) {
+              allBranchIds = bList.map(b => b.id);
+            }
           } catch { /* useBranchStore puede no estar listo aún */ }
 
           const remote = await pullAll(branchId, allBranchIds);
@@ -385,7 +388,9 @@ export const useInventoryStore = create(
           ];
 
           const userAccess = user?.access || [];
-          const isFieldRole = userAccess.length > 0 && userAccess.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
+          const isElectron = typeof window !== 'undefined' && !!window.__ELECTRON__;
+          // 🛡️ isFieldRole aplica ÚNICAMENTE a tablets Android (Dejador/Vendedor en web). En Electron (PC de caja) NUNCA se suprimen ventas.
+          const isFieldRole = !isElectron && userAccess.length > 0 && userAccess.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
 
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
           // 🛡️ En tablets de campo (Dejador / Vendedor): NUNCA cargar posSales, posExpenses ni contrataPayments en RAM
@@ -585,7 +590,8 @@ export const useInventoryStore = create(
               const addedIds = new Set();
 
               // 1. PRIMERO cargar llaves específicas de sede (tienen máxima prioridad sobre llaves legacy)
-              for (const bId of allBranchIds) {
+              const effectiveBranches = (allBranchIds && allBranchIds.length > 0) ? allBranchIds : ['BRANCH-001'];
+              for (const bId of effectiveBranches) {
                 const branchKeyName = `${key}_${bId}`;
                 const val = remote[branchKeyName];
                 if (Array.isArray(val) && val.length > 0) {
@@ -605,7 +611,7 @@ export const useInventoryStore = create(
               }
 
               // 2. LUEGO incluir ítems de la llave legacy (sin sufijo) SOLO si no había datos de sede
-              const hasBranchPartitionData = allBranchIds.some(bId => Array.isArray(remote[`${key}_${bId}`]) && remote[`${key}_${bId}`].length > 0);
+              const hasBranchPartitionData = effectiveBranches.some(bId => Array.isArray(remote[`${key}_${bId}`]) && remote[`${key}_${bId}`].length > 0);
               if (!hasBranchPartitionData && remote[key] && Array.isArray(remote[key])) {
                 remote[key].forEach(item => {
                   if (item?.id && !addedIds.has(item.id)) {
