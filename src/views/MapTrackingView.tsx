@@ -99,6 +99,28 @@ function AutoCenter({ vendors, mapCenter }: { vendors: VendorLocation[]; mapCent
   return null;
 }
 
+// ── Componente auxiliar: fuerza a Leaflet a calcular dimensiones reales al montar (evita mapa blanco/gris) ──
+function MapResizer() {
+  const map = useMap();
+  useEffect(() => {
+    const invalidate = () => {
+      try { map.invalidateSize(); } catch (_) {}
+    };
+    invalidate();
+    const t1 = setTimeout(invalidate, 150);
+    const t2 = setTimeout(invalidate, 500);
+    const t3 = setTimeout(invalidate, 1200);
+    window.addEventListener('resize', invalidate);
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      window.removeEventListener('resize', invalidate);
+    };
+  }, [map]);
+  return null;
+}
+
 // ── Componente principal ──────────────────────────────────────────────────────
 export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShifts = [], branchId = null }: {
   embedded?: boolean;
@@ -480,7 +502,7 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
   };
 
   return (
-    <div style={{ height: embedded ? '100%' : '100dvh', display: 'flex', flexDirection: 'column', background: '#f9fafb' }}>
+    <div style={{ height: embedded ? '100%' : '100dvh', width: '100%', minWidth: '100%', display: 'flex', flexDirection: 'column', background: '#f9fafb', position: 'relative' }}>
       {/* Header — hidden when embedded */}
       {!embedded && (
       <header style={{
@@ -519,18 +541,34 @@ export const MapTrackingView = ({ embedded = false, onVehicleSelect, activeShift
       )}
 
       {/* Contenido: mapa + panel lateral */}
-      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+      <div style={{ flex: 1, width: '100%', height: '100%', minHeight: 0, display: 'flex', overflow: 'hidden', position: 'relative' }}>
+        {/* Banner informativo si no hay vendedores en ruta */}
+        {embedded && vendors.length === 0 && (
+          <div style={{
+            position: 'absolute', top: 12, left: '50%', transform: 'translateX(-50%)',
+            zIndex: 400, background: 'rgba(255, 255, 255, 0.94)', backdropFilter: 'blur(4px)',
+            border: '1px solid #e5e7eb', borderRadius: 20, padding: '5px 14px',
+            boxShadow: '0 2px 8px rgba(0,0,0,0.12)', fontSize: 11, fontWeight: 800,
+            color: '#4b5563', display: 'flex', alignItems: 'center', gap: 6, pointerEvents: 'none',
+            whiteSpace: 'nowrap'
+          }}>
+            <span>🚲</span>
+            <span>Sin triciclos en ruta en este momento</span>
+          </div>
+        )}
+
         {/* Mapa */}
         <MapContainer
           center={mapCenter}
           zoom={DEFAULT_ZOOM}
-          style={{ flex: 1, height: '100%', zIndex: 1 }}
+          style={{ flex: 1, width: '100%', height: '100%', minHeight: '100%', zIndex: 1 }}
           zoomControl={true}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
+          <MapResizer />
           <AutoCenter vendors={vendors} mapCenter={mapCenter} />
           {vendors.map((v) => {
             const stale   = isStale(v.updatedAt);

@@ -1522,8 +1522,8 @@ export const DejadorDashboard = () => {
             </div>
 
             {/* Mapa */}
-            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white bg-amber-50 flex items-center justify-center" style={{ height: 320 }}>
-              <React.Suspense fallback={<div className="font-bold text-gray-500 text-xs">Cargando mapa GPS...</div>}>
+            <div className="rounded-3xl overflow-hidden shadow-lg border-2 border-white bg-amber-50 w-full relative" style={{ height: 320 }}>
+              <React.Suspense fallback={<div className="w-full h-full flex items-center justify-center font-bold text-gray-500 text-xs">Cargando mapa GPS...</div>}>
                 <MapTrackingView
                   embedded
                   onVehicleSelect={(vehicleId) => setGpsSelectedVehicle(vehicleId)}
