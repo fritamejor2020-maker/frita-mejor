@@ -257,18 +257,31 @@ function App() {
         return;
       }
       try {
-        await Promise.allSettled([
+        const currentUser = useAuthStore.getState().user;
+        const access = currentUser?.access || [];
+        const isDejadorOrSellerOnly = access.length > 0 && access.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
+
+        const storesToSync = [
           useAuthStore.getState().loadFromRemote(),
           useBranchStore.getState().loadFromRemote(),
           useVehicleStore.getState().loadFromRemote(),
           useInventoryStore.getState().loadFromRemote(),
           useLogisticsStore.getState().loadFromRemote(),
-          useSupplierStore.getState().loadFromRemote(),
-          useTaskStore.getState().loadFromRemote(),
-          useIncomeConfigStore.getState().loadFromRemote(),
-          useGoalStore.getState().loadFromRemote(),
-          useAttendanceStore.getState().loadFromRemote(),
-        ]);
+        ];
+
+        // 🛡️ Optimización de memoria RAM: roles operativos en campo (Dejador / Vendedor) NUNCA necesitan
+        // proveedores, tareas de caja, metas financieras, configuración de ingresos ni biometría masiva
+        if (!isDejadorOrSellerOnly) {
+          storesToSync.push(
+            useSupplierStore.getState().loadFromRemote(),
+            useTaskStore.getState().loadFromRemote(),
+            useIncomeConfigStore.getState().loadFromRemote(),
+            useGoalStore.getState().loadFromRemote(),
+            useAttendanceStore.getState().loadFromRemote()
+          );
+        }
+
+        await Promise.allSettled(storesToSync);
         flushQueue();
       } catch (err) {
         console.warn('[CloudSync] Error cargando datos de la nube:', err?.message);

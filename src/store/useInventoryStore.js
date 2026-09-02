@@ -384,13 +384,24 @@ export const useInventoryStore = create(
             'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes', 'customers', 'customerTypes', 'salesGoals', 'posRegisters', 'deletedPosRegisterIds',
           ];
 
+          const userAccess = user?.access || [];
+          const isFieldRole = userAccess.length > 0 && userAccess.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
+
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
-          const BRANCH_STORE_KEYS = [
-            'warehouses', 'inventory', 'movements',
-            'posShifts', 'posSales', 'posExpenses', 'posDescargues', 'posRegisters', 'posSettings',
-            'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds',
-            'loadTemplates', 'vendorLocations',
-          ];
+          // 🛡️ En tablets de campo (Dejador / Vendedor): NUNCA cargar posSales, posExpenses ni contrataPayments en RAM
+          const BRANCH_STORE_KEYS = isFieldRole
+            ? [
+                'warehouses', 'inventory',
+                'posShifts', 'posRegisters', 'posSettings',
+                'deletedShiftIds', 'deletedInventoryIds',
+                'loadTemplates', 'vendorLocations',
+              ]
+            : [
+                'warehouses', 'inventory', 'movements',
+                'posShifts', 'posSales', 'posExpenses', 'posDescargues', 'posRegisters', 'posSettings',
+                'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds',
+                'loadTemplates', 'vendorLocations',
+              ];
 
           const updates = {};
 
@@ -466,8 +477,8 @@ export const useInventoryStore = create(
                     }
                   });
                 }
-                // 3. Para posShifts: historial maestro de respaldo
-                if (key === 'posShifts' && Array.isArray(remote['posShifts_master_history'])) {
+                // 3. Para posShifts: historial maestro de respaldo (SOLO para administradores y cajeros, NUNCA para roles de campo)
+                if (!isFieldRole && key === 'posShifts' && Array.isArray(remote['posShifts_master_history'])) {
                   remote['posShifts_master_history'].forEach(item => {
                     if (item?.id) {
                       const existing = combinedMap.get(item.id);
@@ -480,6 +491,16 @@ export const useInventoryStore = create(
                   });
                 }
                 val = Array.from(combinedMap.values());
+                // Si es rol de campo, conservar únicamente turnos activos o de hoy para no saturar memoria
+                if (isFieldRole && key === 'posShifts') {
+                  const todayStr = new Date().toISOString().slice(0, 10);
+                  val = val.filter(s => {
+                    if (!s) return false;
+                    if (!s.closedAt) return true;
+                    const sDate = (s.openedAt || s.createdAt || s.date || '').slice(0, 10);
+                    return sDate >= todayStr;
+                  });
+                }
               }
               if (val !== undefined && val !== null) {
                 if (Array.isArray(val)) {
@@ -539,6 +560,13 @@ export const useInventoryStore = create(
                   updates[key] = val;
                 }
               }
+            }
+            if (isFieldRole) {
+              updates.posSales = [];
+              updates.posExpenses = [];
+              updates.posDescargues = [];
+              updates.movements = [];
+              updates.contrataPayments = [];
             }
             console.log('[Store] Cargado desde Supabase (sede:', effectiveBranch, '):', Object.keys(updates));
           } else {

@@ -293,8 +293,13 @@ export const useLogisticsStore = create(
     try {
       const user = useAuthStore.getState().user;
       const userBranchId = user?.branchId || 'BRANCH-001';
-      const branches = useBranchStore.getState().branches || [];
-      const branchIds = new Set(['BRANCH-001', userBranchId, ...branches.map(b => b.id)]);
+      const userAccess = user?.access || [];
+      const isFieldRole = userAccess.length > 0 && userAccess.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
+
+      // 🛡️ En tablets de campo (Dejador/Vendedor): descargar SOLO la sede activa para no saturar RAM
+      const branchIds = isFieldRole
+        ? new Set([userBranchId])
+        : new Set(['BRANCH-001', userBranchId, ...(useBranchStore.getState().branches || []).map(b => b.id)]);
 
       const keysToFetch = [
         'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory'
@@ -358,9 +363,10 @@ export const useLogisticsStore = create(
         }
       });
 
-      const freshCompletedRaw = Array.from(completedMap.values()).filter(x => isRecentItem(x, 60));
-      const freshRejectedRaw = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, 60));
-      const freshHistory = Array.from(historyMap.values()).filter(x => isRecentItem(x, 60)).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime());
+      const daysToKeep = isFieldRole ? 2 : 60; // Para Dejador / Vendedor: solo 48 horas en memoria RAM
+      const freshCompletedRaw = Array.from(completedMap.values()).filter(x => isRecentItem(x, daysToKeep)).slice(-40);
+      const freshRejectedRaw = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, daysToKeep)).slice(-20);
+      const freshHistory = Array.from(historyMap.values()).filter(x => isRecentItem(x, daysToKeep)).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()).slice(-40);
 
       // 🛡️ PRESERVAR los ítems completados o rechazados localmente en los últimos 15 minutos
       // Esto evita que la latencia de red de Supabase los resucite temporalmente como pendientes (flicker)
@@ -875,16 +881,16 @@ export const useLogisticsStore = create(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.pendingRequests = (state.pendingRequests || []).filter(isTodayItem);
-          state.completedRequests = (state.completedRequests || []).filter(x => isRecentItem(x, 60));
-          state.rejectedRequests = (state.rejectedRequests || []).filter(x => isRecentItem(x, 60));
-          state.loadHistory = (state.loadHistory || []).filter(x => isRecentItem(x, 60));
+          state.completedRequests = (state.completedRequests || []).filter(x => isRecentItem(x, 14));
+          state.rejectedRequests = (state.rejectedRequests || []).filter(x => isRecentItem(x, 14));
+          state.loadHistory = (state.loadHistory || []).filter(x => isRecentItem(x, 14));
         }
       },
       partialize: (state) => ({ 
         pendingRequests: (state.pendingRequests || []).filter(isTodayItem), 
-        completedRequests: (state.completedRequests || []).filter(x => isRecentItem(x, 60)).slice(-100),
-        rejectedRequests: (state.rejectedRequests || []).filter(x => isRecentItem(x, 60)).slice(-50),
-        loadHistory: (state.loadHistory || []).filter(x => isRecentItem(x, 60)).slice(-100) 
+        completedRequests: (state.completedRequests || []).filter(x => isRecentItem(x, 7)).slice(-30),
+        rejectedRequests: (state.rejectedRequests || []).filter(x => isRecentItem(x, 7)).slice(-20),
+        loadHistory: (state.loadHistory || []).filter(x => isRecentItem(x, 7)).slice(-30) 
       }),
     }
   )

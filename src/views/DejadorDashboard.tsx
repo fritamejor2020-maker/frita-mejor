@@ -137,8 +137,10 @@ export const DejadorDashboard = () => {
   // Sincronización directa y periódica con Supabase para turnos de los triciclos e inventario
   const loadRemoteShifts = async () => {
     try {
+      // 🛡️ Optimización Dejador: NUNCA descargar posShifts_master_history (miles de turnos cerrados viejos).
+      // El Dejador solo necesita saber qué vendedores están en ruta HOY.
       const keysToFetch = [
-        'posShifts', 'posShifts_BRANCH-001', 'posShifts_master_history',
+        'posShifts', 'posShifts_BRANCH-001',
         'inventory', 'inventory_BRANCH-001'
       ];
       if (userBranchId && userBranchId !== 'BRANCH-001') {
@@ -167,7 +169,6 @@ export const DejadorDashboard = () => {
 
       const shiftMap = new Map<string, any>();
       [
-        ...(Array.isArray(map['posShifts_master_history']) ? map['posShifts_master_history'] : []),
         ...(Array.isArray(map['posShifts']) ? map['posShifts'] : []),
         ...(Array.isArray(map['posShifts_BRANCH-001']) ? map['posShifts_BRANCH-001'] : []),
         ...(userBranchId && Array.isArray(map[`posShifts_${userBranchId}`]) ? map[`posShifts_${userBranchId}`] : []),
@@ -180,18 +181,15 @@ export const DejadorDashboard = () => {
       });
 
       const today = new Date().toISOString().slice(0, 10);
-      const allShifts = Array.from(shiftMap.values()).map(s => {
-        if (!s.closedAt) {
-          const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
-          if (shiftDate && shiftDate < today) {
-            return { ...s, closedAt: `${shiftDate}T23:59:59.999Z`, _autoClosedStale: true };
-          }
-        }
-        return s;
+      const activeVendorShifts = Array.from(shiftMap.values()).filter(s => {
+        if (!s) return false;
+        if (!s.closedAt) return true;
+        const shiftDate = (s.openedAt || s.fecha || s.date || '').slice(0, 10);
+        return shiftDate >= today;
       });
 
-      setRemoteShifts(allShifts);
-      useInventoryStore.setState({ posShifts: allShifts });
+      setRemoteShifts(activeVendorShifts);
+      useInventoryStore.setState({ posShifts: activeVendorShifts });
     } catch (e) {
       console.warn('[DejadorDashboard] Error loading remote shifts:', e);
     }
