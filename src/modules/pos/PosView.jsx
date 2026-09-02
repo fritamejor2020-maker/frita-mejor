@@ -253,8 +253,18 @@ export function PosView() {
       .map(s => s.id)
   );
 
+  const isStaleSuspended = (sale) => {
+    if (!sale) return true;
+    const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
+    if (isNaN(saleTime) || saleTime === 0) return true;
+    // Ventas suspendidas de más de 16 horas son automáticamente obsoletas de turnos anteriores
+    const sixteenHoursMs = 16 * 60 * 60 * 1000;
+    return (Date.now() - saleTime) > sixteenHoursMs;
+  };
+
   const heldSales = (usePosStore(s => s.heldSales || [])).filter(h => {
     if (!h || h.status !== 'SUSPENDED') return false;
+    if (isStaleSuspended(h)) return false;
     if (deletedSaleSet.has(h.id)) return false;
     if (h.originalOlaClickId && deletedSaleSet.has(h.originalOlaClickId)) return false;
     if (h.publicId && deletedSaleSet.has(h.publicId)) return false;
@@ -268,6 +278,7 @@ export function PosView() {
 
   const suspendedSales = (posSales || []).filter(s => {
     if (!s || s.status !== 'SUSPENDED') return false;
+    if (isStaleSuspended(s)) return false;
     if (deletedSaleSet.has(s.id)) return false;
     if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return false;
     if (s.publicId && deletedSaleSet.has(s.publicId)) return false;
