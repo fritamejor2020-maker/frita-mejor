@@ -109,7 +109,7 @@ export const GLOBAL_KEYS = [
   // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes',
   // Administración global del sistema y configuraciones
-  'users', 'deletedUserIds', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
+  'users', 'deletedUserIds', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'deletedPosSaleIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
   // Traslados (son cross-sede por diseño) y Pedidos de Clientes
   'transfers', 'customer_delivery_requests',
 ];
@@ -123,7 +123,7 @@ export const BRANCH_KEYS = [
   'inventory', 'movements', 'warehouses',
   // POS
   'posShifts', 'posSales', 'posExpenses', 'posSettings',
-  'contrataPayments', 'deletedShiftIds',
+  'contrataPayments', 'deletedShiftIds', 'deletedPosSaleIds',
   // Logística (Dejador / Vendedor) — por sede
   'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',
   // Plantillas de carga — por sede
@@ -342,17 +342,34 @@ async function _writeToSupabaseImpl(key, value) {
     }
   }
 
-  // 🛡️ Ventas POS (posSales): NUNCA permitir que una escritura sobreescriba y borre ventas concurrentes
+  // 🛡️ Ventas POS (posSales): NUNCA permitir que una escritura sobreescriba ventas concurrentes NI resucite ventas eliminadas
   if ((key === 'posSales' || key.startsWith('posSales_')) && Array.isArray(value)) {
     try {
+      const branchSuffix = key.includes('_') ? key.split('_')[1] : 'BRANCH-001';
+      const { data: delRows } = await supabase
+        .from('app_state')
+        .select('key, value')
+        .in('key', ['deletedPosSaleIds', `deletedPosSaleIds_${branchSuffix}`]);
+      
+      const deletedSalesSet = new Set();
+      (delRows || []).forEach(r => {
+        if (Array.isArray(r.value)) {
+          r.value.forEach(id => { if (id) deletedSalesSet.add(id); });
+        }
+      });
+
       const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
       if (data && Array.isArray(data.value) && data.value.length > 0) {
         const saleMap = new Map();
-        // 1. Cargar ventas remotas existentes
-        data.value.forEach(item => { if (item?.id) saleMap.set(item.id, item); });
-        // 2. Fusionar ventas locales asegurando que ventas PAID ganen sobre suspendidas
+        // 1. Cargar ventas remotas existentes SOLO si no fueron eliminadas
+        data.value.forEach(item => {
+          if (item?.id && !deletedSalesSet.has(item.id) && (!item.originalOlaClickId || !deletedSalesSet.has(item.originalOlaClickId)) && (!item.publicId || !deletedSalesSet.has(item.publicId))) {
+            saleMap.set(item.id, item);
+          }
+        });
+        // 2. Fusionar ventas locales asegurando que ventas PAID ganen sobre suspendidas y que ventas eliminadas NUNCA se agreguen
         value.forEach(item => {
-          if (item?.id) {
+          if (item?.id && !deletedSalesSet.has(item.id) && (!item.originalOlaClickId || !deletedSalesSet.has(item.originalOlaClickId)) && (!item.publicId || !deletedSalesSet.has(item.publicId))) {
             const existing = saleMap.get(item.id);
             if (existing) {
               if (item.status === 'PAID') {
