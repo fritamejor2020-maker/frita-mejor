@@ -26,9 +26,8 @@ function syncKey(key, value) {
 
   // Bloqueo 2: Si la app no ha terminado de cargar datos remotos, no sincronizar
   // Esto evita que los valores INITIAL_* del código sobreescriban Supabase al arrancar.
-  // EXCEPCIÓN: Las ventas, gastos y turnos del POS SIEMPRE deben guardarse y encolarse de inmediato.
   const store = useInventoryStore.getState();
-  const isPosOperationalKey = key === 'posShifts' || key.startsWith('posShifts_') || key === 'posSales' || key.startsWith('posSales_') || key === 'posExpenses' || key.startsWith('posExpenses_');
+  const isPosOperationalKey = key === 'posShifts' || key.startsWith('posShifts_') || key === 'posSales' || key.startsWith('posSales_') || key === 'posExpenses' || key.startsWith('posExpenses_') || key === 'posDescargues' || key.startsWith('posDescargues_');
   if (!store._hasLoadedRemote && !isPosOperationalKey) {
     console.warn(`[SyncGuard] Push de "${key}" bloqueado: aún no se ha cargado el estado remoto.`);
     return;
@@ -336,6 +335,7 @@ export const useInventoryStore = create(
       posShifts:          [],
       posSales:           [],
       posExpenses:        [],
+      posDescargues:      [],
       loadTemplates:      INITIAL_LOAD_TEMPLATES,
       deletedShiftIds:    [],  // tombstone: IDs de cierres eliminados por el admin
       deletedPosSaleIds:  [],  // tombstone: IDs de ventas / pedidos en espera eliminados o procesados
@@ -387,7 +387,7 @@ export const useInventoryStore = create(
           // Llaves locales de sede — mapeamos su nombre con sufijo al nombre del store
           const BRANCH_STORE_KEYS = [
             'warehouses', 'inventory', 'movements',
-            'posShifts', 'posSales', 'posExpenses', 'posRegisters', 'posSettings',
+            'posShifts', 'posSales', 'posExpenses', 'posDescargues', 'posRegisters', 'posSettings',
             'contrataPayments', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds',
             'loadTemplates', 'vendorLocations',
           ];
@@ -537,7 +537,7 @@ export const useInventoryStore = create(
             // Admin carga y fusiona datos de TODAS las sedes
             const deleted = get().deletedShiftIds || [];
             const deletedRegs = new Set(get().deletedPosRegisterIds || []);
-            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'movements', 'contrataPayments', 'posRegisters', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds', 'deletedPosRegisterIds'];
+            const mergedArrayKeys = ['inventory', 'warehouses', 'posShifts', 'posSales', 'posExpenses', 'posDescargues', 'movements', 'contrataPayments', 'posRegisters', 'deletedShiftIds', 'deletedInventoryIds', 'deletedPosSaleIds', 'deletedPosRegisterIds'];
             for (const key of BRANCH_STORE_KEYS) {
               let merged = [];
               const addedIds = new Set();
@@ -1568,6 +1568,28 @@ export const useInventoryStore = create(
 
       addPosExpense: (expense) => { set((s) => ({ posExpenses: [{ ...expense, id: `EXP-${Date.now()}` }, ...(s.posExpenses || [])] })); syncKey('posExpenses', useInventoryStore.getState().posExpenses); },
 
+      // ─── DESCARGUES DE EFECTIVO (POS) ─────────────────────────────────────────
+      addPosDescargue: (descargue) => {
+        const newDesc = {
+          id: `DESC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+          createdAt: new Date().toISOString(),
+          ...descargue,
+        };
+        set((s) => ({ posDescargues: [newDesc, ...(s.posDescargues || [])] }));
+        syncKey('posDescargues', useInventoryStore.getState().posDescargues);
+        return newDesc;
+      },
+
+      deletePosDescargue: (id) => {
+        set((s) => ({ posDescargues: (s.posDescargues || []).filter(d => d.id !== id) }));
+        syncKey('posDescargues', useInventoryStore.getState().posDescargues);
+      },
+
+      getPosDescarguesByShift: (shiftId) => {
+        if (!shiftId) return [];
+        return (get().posDescargues || []).filter(d => d.shiftId === shiftId);
+      },
+
       // ─── CONTRATAS: Pagos / Abonos ───────────────────────────────────────────
       // El balance real de una contrata = sum(ventas crédito) - sum(pagos)
       // Se calcula siempre en tiempo real para evitar inconsistencias de sync.
@@ -1703,6 +1725,7 @@ export const useInventoryStore = create(
         posShifts:          state.posShifts,
         posSales:           state.posSales,
         posExpenses:        state.posExpenses,
+        posDescargues:      state.posDescargues || [],
         loadTemplates:      state.loadTemplates,
         salesGoals:         state.salesGoals || [],
         deletedShiftIds:      state.deletedShiftIds || [],

@@ -8,6 +8,7 @@ import { generateReceiptHTML } from './PosReceipt';
 import { generateZReportHTML }   from './ZReportReceipt';
 import { IncomesModal }          from './components/IncomesModal';
 import { ExpensesModal }         from './components/ExpensesModal';
+import { PosDescarguesModal }    from './components/PosDescarguesModal';
 import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
 import { useSupplierStore }      from '../../store/useSupplierStore';
@@ -22,6 +23,7 @@ import toast from 'react-hot-toast';
 export function PosView() {
   const [showMobileTicket, setShowMobileTicket] = useState(false);
   const [showHamburgerMenu, setShowHamburgerMenu] = useState(false);
+  const [showDescarguesModal, setShowDescarguesModal] = useState(false);
   const [appZoom, setAppZoom] = useState(() => {
     const saved = localStorage.getItem('pos_app_zoom');
     return saved ? parseInt(saved, 10) : 100;
@@ -57,6 +59,7 @@ export function PosView() {
     posSales = [], 
     posShifts = [], 
     posExpenses = [], 
+    posDescargues = [],
     customerTypes = [],
     addCustomer,
     addContrataPayment,
@@ -92,6 +95,9 @@ export function PosView() {
 
   // Shift logic (find active shift FOR THIS REGISTER)
   const activeShift = (posShifts || []).find(s => !s.closedAt && (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001')));
+  const activeShiftDescargues = activeShift ? (posDescargues || []).filter(d => d.shiftId === activeShift.id) : [];
+  const activeShiftDescarguesTotal = activeShiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+
   const [showShiftModal, setShowShiftModal] = useState(false);
   const [showClosingModal, setShowClosingModal] = useState(false);
   const [showExpenseModal, setShowExpenseModal] = useState(false);
@@ -1385,6 +1391,16 @@ export function PosView() {
               {activeShift && (
                 <>
                   <div className="h-px bg-gray-800" />
+                  <button className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" onClick={() => { setShowDescarguesModal(true); setShowHamburgerMenu(false); }}>
+                    <span className="flex items-center gap-3">
+                      <span className="text-base">📦</span> Descargues
+                    </span>
+                    {activeShiftDescargues.length > 0 && (
+                      <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-black px-2 py-0.5 rounded-full">
+                        {activeShiftDescargues.length} ({formatMoney(activeShiftDescarguesTotal)})
+                      </span>
+                    )}
+                  </button>
                   <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-green-300 hover:bg-green-950/40 transition-colors" onClick={() => { setPinPromptConfig({ message: 'Contraseña de Ingresos', expectedPin: '7', onSuccess: () => setShowIncomesModal(true) }); setShowHamburgerMenu(false); }}>
                     <span className="text-base">💰</span> Ingresos
                   </button>
@@ -1969,6 +1985,9 @@ export function PosView() {
       )}
       {showIncomesModal && <IncomesModal onClose={() => setShowIncomesModal(false)} />}
       {showExpensesModal && <ExpensesModal onClose={() => setShowExpensesModal(false)} />}
+      {showDescarguesModal && activeShift && (
+        <PosDescarguesModal activeShift={activeShift} onClose={() => setShowDescarguesModal(false)} />
+      )}
 
       {pinPromptConfig && (
         <PinPromptModal 
@@ -3360,7 +3379,10 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDepositos = depositos.reduce((acc, e) => acc + e.amount, 0);
 
-  const expectedCashInDrawer = initial + cashSales - totalRetiros + totalDepositos;
+  const shiftDescargues = (useInventoryStore.getState().posDescargues || []).filter(d => d.shiftId === shift.id);
+  const totalDescargues = shiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+
+  const expectedCashInDrawer = initial + cashSales - totalRetiros + totalDepositos - totalDescargues;
   const counted = parseFloat(realCount || 0);
   const difference = counted - expectedCashInDrawer;
 
@@ -3383,6 +3405,9 @@ function ShiftCloseModal({ shift, sales, expenses, onClose, onConfirm }) {
               <div className="flex justify-between text-red-400 border-t border-gray-800 pt-3 mt-1"><span>⬆️ Retiros (Salidas):</span> <span>-{formatMoney(totalRetiros)}</span></div>
               {totalDepositos > 0 && (
                 <div className="flex justify-between text-green-300"><span>⬇️ Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
+              )}
+              {totalDescargues > 0 && (
+                <div className="flex justify-between text-amber-400"><span>📦 Descargues Previos ({shiftDescargues.length}):</span> <span>-{formatMoney(totalDescargues)}</span></div>
               )}
               <div className="border-t border-gray-700 pt-3 flex justify-between text-xl text-white font-black mt-2">
                  <span>Efectivo Esperado en Cajón:</span> <span>{formatMoney(expectedCashInDrawer)}</span>
@@ -4759,20 +4784,24 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
   const totalRetiros = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDepositos = depositos.reduce((acc, e) => acc + e.amount, 0);
 
+  const shiftDescargues = (useInventoryStore.getState().posDescargues || []).filter(d => d.shiftId === shift.id);
+  const totalDescargues = shiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+
   // Cascada de salidas (Local -> Contratas)
   const localSalidasAbsorbidas = Math.min(totalRetiros, localCash);
-  const localCashNeto = localCash - localSalidasAbsorbidas;
+  const localCashNeto = Math.max(0, localCash - localSalidasAbsorbidas - totalDescargues);
   const localTotalCalculado = localCashNeto + localSalidasAbsorbidas + localTransfers;
 
   const salidasRestantes = totalRetiros - localSalidasAbsorbidas;
   const contrataSalidasAbsorbidas = Math.min(salidasRestantes, contrataCash);
   const contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
-  const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTransfers + contrataCredit;
+  const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTransfers;
 
-  const totalGastosCierre = totalRetiros;
-  const totalGeneralCalculado = localTotalCalculado + contrataTotalCalculado;
+  const totalGastosCierre = localSalidasAbsorbidas + contrataSalidasAbsorbidas;
+  const totalDelCierre = localTotalCalculado + contrataTotalCalculado;
+  const totalGeneralCalculado = totalDelCierre + totalDescargues;
 
-  const expectedCashInDrawer = initial + localCash + contrataCash - totalRetiros + totalDepositos;
+  const expectedCashInDrawer = initial + localCash + contrataCash - totalRetiros + totalDepositos - totalDescargues;
   const counted = parseFloat(realCount || 0);
   const difference = counted - expectedCashInDrawer;
 
@@ -4792,7 +4821,12 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
               {/* Sección Local */}
               <div className="space-y-1.5 border-b border-gray-800/80 pb-3">
                 <div className="text-[11px] font-black uppercase text-blue-400 tracking-wider">🏪 Local</div>
-                <div className="flex justify-between text-gray-300"><span>Efectivo Local:</span> <span>{formatMoney(localCashNeto)}</span></div>
+                {shiftDescargues.map((d, idx) => (
+                  <div key={d.id || idx} className="flex justify-between text-amber-400">
+                    <span>Descargue #{d.number || idx + 1}:</span> <span>{formatMoney(d.amount)}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-gray-300"><span>Efectivo Local (en cierre):</span> <span>{formatMoney(localCashNeto)}</span></div>
                 <div className="flex justify-between text-red-400"><span>Salidas Local:</span> <span>{formatMoney(localSalidasAbsorbidas)}</span></div>
                 <div className="flex justify-between text-blue-300"><span>Transferencias Local:</span> <span>{formatMoney(localTransfers)}</span></div>
                 <div className="flex justify-between text-white font-black pt-1 border-t border-gray-800/50">
@@ -4807,7 +4841,7 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
                 <div className="flex justify-between text-red-400"><span>Salidas Contratas:</span> <span>{formatMoney(contrataSalidasAbsorbidas)}</span></div>
                 <div className="flex justify-between text-purple-300"><span>Transferencias Contratas:</span> <span>{formatMoney(contrataTransfers)}</span></div>
                 {contrataCredit > 0 && (
-                  <div className="flex justify-between text-amber-400"><span>Crédito Contratas:</span> <span>{formatMoney(contrataCredit)}</span></div>
+                  <div className="flex justify-between text-gray-400"><span>* Crédito Contratas:</span> <span>{formatMoney(contrataCredit)}</span></div>
                 )}
                 <div className="flex justify-between text-white font-black pt-1 border-t border-gray-800/50">
                   <span>Total Contratas:</span> <span>{formatMoney(contrataTotalCalculado)}</span>
@@ -4820,6 +4854,16 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
                   <span>Total Gastos del cierre:</span>
                   <span>{formatMoney(totalGastosCierre)}</span>
                 </div>
+                <div className="flex justify-between text-xs font-black text-white">
+                  <span>Total del cierre:</span>
+                  <span>{formatMoney(totalDelCierre)}</span>
+                </div>
+                {totalDescargues > 0 && (
+                  <div className="flex justify-between text-xs font-black text-amber-400">
+                    <span>Total descargues:</span>
+                    <span>{formatMoney(totalDescargues)}</span>
+                  </div>
+                )}
                 <div className="flex justify-between text-sm font-black text-amber-400 pt-1 border-t border-amber-500/30">
                   <span>TOTAL GENERAL DEL CIERRE:</span>
                   <span>{formatMoney(totalGeneralCalculado)}</span>
@@ -4831,6 +4875,9 @@ function ShiftCompleteCountModal({ shift, sales, expenses, onClose, onConfirm })
                 <div className="flex justify-between text-gray-400"><span>Base Inicial Caja:</span> <span>{formatMoney(initial)}</span></div>
                 {totalDepositos > 0 && (
                   <div className="flex justify-between text-emerald-400"><span>Depósitos (Entradas):</span> <span>+{formatMoney(totalDepositos)}</span></div>
+                )}
+                {totalDescargues > 0 && (
+                  <div className="flex justify-between text-amber-400"><span>(-) Descargues del Turno:</span> <span>-{formatMoney(totalDescargues)}</span></div>
                 )}
                 <div className="border-t border-gray-700 pt-2 flex justify-between text-base text-white font-black">
                    <span>Efectivo Esperado en Cajón:</span> <span className="text-emerald-400">{formatMoney(expectedCashInDrawer)}</span>

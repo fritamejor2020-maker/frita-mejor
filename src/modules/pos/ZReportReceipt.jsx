@@ -1,10 +1,11 @@
 import React from 'react';
 import { LOGO_BASE64 } from './logoBase64';
 import { parseDrawerCode } from '../../services/printerAgent';
+import { useInventoryStore } from '../../store/useInventoryStore';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
 
-export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '', paymentMethods = []) => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '', paymentMethods = [], descargues = null) => {
   if (!shift) return '';
 
   const tc = {
@@ -159,6 +160,21 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   const totalExpenses  = retiros.reduce((acc, e) => acc + e.amount, 0);
   const totalDeposits  = depositos.reduce((acc, e) => acc + e.amount, 0);
 
+  // ── Descargues del Turno ──────────────────────────────────────────────────────
+  let shiftDescargues = [];
+  if (Array.isArray(descargues) && descargues.length > 0) {
+    shiftDescargues = descargues;
+  } else if (Array.isArray(shift.descargues) && shift.descargues.length > 0) {
+    shiftDescargues = shift.descargues;
+  } else {
+    try {
+      shiftDescargues = useInventoryStore.getState().getPosDescarguesByShift(shift.id) || [];
+    } catch (_) {
+      shiftDescargues = [];
+    }
+  }
+  const totalDescargues = shiftDescargues.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
+
   // ── Lógica de Cálculo: Efectivo Real Contado vs Modo Teórico ──
   const realCountedCash = Number(shift.realAmount);
   const hasRealCount = !isNaN(realCountedCash) && realCountedCash > 0;
@@ -189,16 +205,17 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
   } else {
     // Modo Sistema Teórico (sin conteo real ingresado):
     localSalidasAbsorbidas = Math.min(totalExpenses, localCash);
-    localCashNeto = localCash - localSalidasAbsorbidas;
+    localCashNeto = Math.max(0, localCash - localSalidasAbsorbidas - totalDescargues);
     contrataSalidasAbsorbidas = Math.min(totalExpenses - localSalidasAbsorbidas, contrataCash);
     contrataCashNeto = contrataCash - contrataSalidasAbsorbidas;
   }
 
   const localTotalCalculado = localCashNeto + localSalidasAbsorbidas + localTotalTransfer;
-  const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTotalTransfer + contrataCredit;
+  const contrataTotalCalculado = contrataCashNeto + contrataSalidasAbsorbidas + contrataTotalTransfer;
 
   const totalGastosCierre = localSalidasAbsorbidas + contrataSalidasAbsorbidas;
-  const totalGeneralCalculado = localTotalCalculado + contrataTotalCalculado;
+  const totalDelCierre = localTotalCalculado + contrataTotalCalculado;
+  const totalGeneralCalculado = totalDelCierre + totalDescargues;
 
   const cashSalesTotal     = localCash + contrataCash;
   const transferSalesTotal = localTotalTransfer + contrataTotalTransfer;
@@ -206,7 +223,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const totalDiscounts = safeSales.reduce((acc, s) => acc + (s.discountAmount || 0), 0);
 
-  const expectedCash = initial + cashSalesTotal - totalExpenses + totalDeposits;
+  const expectedCash = initial + cashSalesTotal - totalExpenses + totalDeposits - totalDescargues;
   const countedCash  = shift.realAmount || 0;
   const difference   = countedCash - expectedCash;
 
@@ -362,6 +379,12 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         <!-- Local -->
         <div style="margin-bottom: 2px;">
           <div style="font-weight: 900; text-decoration: underline; margin-bottom: 3px; font-size: 11px;">Local</div>
+          ${shiftDescargues.map((d, idx) => `
+            <div style="display: flex; justify-content: space-between; color: #b45309;">
+              <span>Descargue ${d.number || idx + 1}:</span>
+              <span>${formatMoney(d.amount)}</span>
+            </div>
+          `).join('')}
           ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Local:</span><span>${formatMoney(localCashNeto)}</span></div>` : ''}
           ${tc.zShowExpensesLine !== false && totalExpenses > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Salidas Local:</span><span>${formatMoney(localSalidasAbsorbidas)}</span></div>` : ''}
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Local:</span><span>${formatMoney(localTotalTransfer)}</span></div>
@@ -379,7 +402,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           ${tc.zShowCashSales !== false ? `<div style="display: flex; justify-content: space-between;"><span>Efectivo Contratas:</span><span>${formatMoney(contrataCashNeto)}</span></div>` : ''}
           ${tc.zShowExpensesLine !== false && contrataSalidasAbsorbidas > 0 ? `<div style="display: flex; justify-content: space-between;"><span>Salidas Contratas:</span><span>${formatMoney(contrataSalidasAbsorbidas)}</span></div>` : ''}
           <div style="display: flex; justify-content: space-between;"><span>Transferencias Contratas:</span><span>${formatMoney(contrataTotalTransfer)}</span></div>
-          ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900;"><span>Créditos Contratas:</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
+          ${contrataCredit > 0 ? `<div style="display: flex; justify-content: space-between; font-weight: 900; color: #6b7280;"><span>* Créditos Contratas:</span><span>${formatMoney(contrataCredit)}</span></div>` : ''}
           <div style="border-top: 1px dashed black; margin: 3px 0 2px 0;"></div>
           <div style="display: flex; justify-content: space-between; font-weight: 900;">
             <span>Total Contratas:</span><span>${formatMoney(contrataTotalCalculado)}</span>
@@ -390,15 +413,29 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
         <!-- Total Gastos del cierre -->
         ${tc.zShowExpensesLine !== false && totalExpenses > 0 ? `
-        <div style="display: flex; justify-content: space-between; font-weight: 900; color: #dc2626 !important; font-size: 11px; margin-bottom: 4px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; color: #dc2626 !important; font-size: 11px; margin-bottom: 3px;">
           <span>Total Gastos del cierre:</span>
           <span>${formatMoney(totalGastosCierre)}</span>
         </div>
         ` : ''}
 
-        <!-- Total General del cierre -->
+        <!-- Total del cierre (dinero líquido del cierre) -->
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 11.5px; margin-bottom: 2px;">
+          <span>Total del cierre:</span>
+          <span>${formatMoney(totalDelCierre)}</span>
+        </div>
+
+        <!-- Total Descargues previos -->
+        ${totalDescargues > 0 ? `
+        <div style="display: flex; justify-content: space-between; font-weight: 900; color: #b45309 !important; font-size: 11.5px; margin-bottom: 2px;">
+          <span>Total descargues:</span>
+          <span>${formatMoney(totalDescargues)}</span>
+        </div>
+        ` : ''}
+
+        <!-- Total General del cierre (suma de cierre + descargues) -->
         ${tc.zShowTotalSales !== false ? `
-        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px;">
+        <div style="display: flex; justify-content: space-between; font-weight: 900; font-size: 12px; border-top: 1px solid black; padding-top: 2px; margin-top: 2px;">
           <span>Total General del cierre:</span>
           <span>${formatMoney(totalGeneralCalculado)}</span>
         </div>
@@ -452,6 +489,12 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
         <div style="display: flex; justify-content: space-between;">
           <span>Base Inicial:</span>
           <span>${formatMoney(initial)}</span>
+        </div>` : ''}
+
+        ${totalDescargues > 0 ? `
+        <div style="display: flex; justify-content: space-between; color: #b45309;">
+          <span>(-) Descargues del Turno:</span>
+          <span>-${formatMoney(totalDescargues)}</span>
         </div>` : ''}
 
         <div style="display: flex; justify-content: space-between;">
