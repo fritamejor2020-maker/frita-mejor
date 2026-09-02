@@ -286,16 +286,18 @@ export const usePosStore = create((set, get) => ({
   },
 
   /**
-   * Elimina una venta en espera (local y persistida)
+   * Elimina una venta en espera (local y opcionalmente de posSales)
    */
-  deleteHeldSale: (heldSaleId) => {
+  deleteHeldSale: (heldSaleId, alsoDeleteFromInventory = true) => {
     set((state) => ({
       heldSales: (state.heldSales || []).filter(h => h.id !== heldSaleId && h.originalOlaClickId !== heldSaleId)
     }));
-    try {
-      useInventoryStore.getState().deletePosSale(heldSaleId);
-    } catch (e) {
-      console.warn('[usePosStore] Error al eliminar de posSales:', e);
+    if (alsoDeleteFromInventory) {
+      try {
+        useInventoryStore.getState().deletePosSale(heldSaleId);
+      } catch (e) {
+        console.warn('[usePosStore] Error al eliminar de posSales:', e);
+      }
     }
   },
 

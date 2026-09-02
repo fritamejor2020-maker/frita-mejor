@@ -512,6 +512,12 @@ export const useInventoryStore = create(
                   const userCreatedOffline = localArr.filter(item => {
                     if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
                     if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
+
+                    // 🛡️ Para posSales: Ventas locales con status 'SUSPENDED' que no están en remoto NUNCA deben resucitar como offline
+                    if (key === 'posSales' && item.status === 'SUSPENDED') {
+                      return false;
+                    }
+
                     // Para posShifts: verificar que no sea un residuo cerrado en remoto
                     if (key === 'posShifts') {
                       // 1. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir

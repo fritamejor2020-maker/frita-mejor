@@ -1157,10 +1157,10 @@ export function PosView() {
     }
 
     if (activeSuspendedId) {
-      try { deleteHeldSale(activeSuspendedId); } catch(e) {}
+      try { deleteHeldSale(activeSuspendedId, false); } catch(e) {}
       if (resolvedOlaClickId) {
-        try { deleteHeldSale(`HELD-OLA-${resolvedOlaClickId}`); } catch(e) {}
-        try { deleteHeldSale(resolvedOlaClickId); } catch(e) {}
+        try { deleteHeldSale(`HELD-OLA-${resolvedOlaClickId}`, false); } catch(e) {}
+        try { deleteHeldSale(resolvedOlaClickId, false); } catch(e) {}
       }
 
       // Si la venta ya existía en posSales como SUSPENDED, actualizarla a PAID directamente
