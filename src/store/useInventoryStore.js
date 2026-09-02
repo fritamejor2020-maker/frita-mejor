@@ -1482,18 +1482,21 @@ export const useInventoryStore = create(
         // Generar ID determinista por fecha, sede, caja y jornada
         const dateStr = shift.openedAt ? shift.openedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
         const branch = shift.branchId || 'BRANCH-001';
-        const reg = shift.registerId || 'REG-001';
+        const isDejador = shift.type === 'DEJADOR';
+        const reg = isDejador ? null : (shift.registerId || 'REG-001');
         const jornadaLabel = shift.jornada || shift.shift || 'AM';
         const jornadaSlug = String(jornadaLabel).toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
 
-        // ── CRÍTICO: Si el turno es de VENDEDOR (triciclo/vehículo), incluir pointId, responsable y timestamp para distinguir vendedores distintos de forma 100% única
+        // ── CRÍTICO: Si el turno es de VENDEDOR o DEJADOR, generar IDs aislados para NUNCA colisionar con cajas registradoras (POS)
         const cleanPoint = shift.pointId ? String(shift.pointId).toLowerCase().replace(/[^a-z0-9]/g, '') : null;
         const cleanResp = shift.responsibleName ? String(shift.responsibleName).toLowerCase().replace(/[^a-z0-9]/g, '') : '';
         const shiftTime = shift.openedAt ? new Date(shift.openedAt).getTime() : Date.now();
         const deterministicId = shift.id || (
           shift.type === 'VENDEDOR' && cleanPoint
             ? `SHIFT-VENDOR-${cleanPoint}-${cleanResp || 'vendor'}-${dateStr}-${jornadaSlug}-${shiftTime}`
-            : `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`
+            : isDejador
+              ? `SHIFT-DEJADOR-${branch}-${dateStr}-${jornadaSlug}-${shiftTime}`
+              : `SHIFT-${branch}-${reg}-${dateStr}-${jornadaSlug}`
         );
 
         // ── CASO 1: CIERRE DE TURNO (shift.closedAt presente) ──
@@ -1506,7 +1509,8 @@ export const useInventoryStore = create(
               (!s.closedAt && (
                 (cleanPoint && String(s.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanPoint &&
                  (s.shift === jornadaLabel || !s.shift || s.shift === s.jornada)) ||
-                (s.type !== 'VENDEDOR' && s.branchId === branch && s.registerId === reg)
+                (isDejador && s.type === 'DEJADOR' && s.branchId === branch) ||
+                (!isDejador && s.type !== 'VENDEDOR' && s.type !== 'DEJADOR' && s.branchId === branch && s.registerId === reg)
               ))
             );
             if (isMatch) {

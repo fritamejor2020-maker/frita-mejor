@@ -94,7 +94,13 @@ export function PosView() {
   };
 
   // Shift logic (find active shift FOR THIS REGISTER)
-  const activeShift = (posShifts || []).find(s => !s.closedAt && (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001')));
+  // 🛡️ NUNCA emparejar con turnos de logística (DEJADOR) ni de triciclos (VENDEDOR)
+  const activeShift = (posShifts || []).find(s => 
+    !s.closedAt && 
+    s.type !== 'DEJADOR' && 
+    s.type !== 'VENDEDOR' && 
+    (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001'))
+  );
   const activeShiftDescargues = activeShift ? (posDescargues || []).filter(d => d.shiftId === activeShift.id) : [];
   const activeShiftDescarguesTotal = activeShiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
 
