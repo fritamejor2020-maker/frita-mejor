@@ -222,10 +222,6 @@ export const DejadorDashboard = () => {
     };
   }, [userBranchId]);
 
-  // Recargar turnos al cambiar de pestaña
-  useEffect(() => {
-    loadRemoteShifts();
-  }, [activeTab]);
 
   // Vehículos base disponibles en la sede (todos los botones T1, T2, etc. siempre visibles)
   const allVehicles = useVehicleStore((state: any) => state.vehicles);
@@ -426,6 +422,7 @@ export const DejadorDashboard = () => {
 
   // Limpiar selección de vehículo y cantidades al cambiar de pestaña
   useEffect(() => {
+    loadRemoteShifts();
     setSelectedVehicle('');
     setLoadQuantities({});
     setStringSelections({});
