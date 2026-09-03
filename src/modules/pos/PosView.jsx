@@ -1094,25 +1094,97 @@ export function PosView() {
         rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
 
         if (rewardConfig && rewardConfig.enabled) {
-          const minAmount = rewardConfig.minPurchaseAmount || 0;
+          const minAmount = Number(rewardConfig.minPurchaseAmount) || 0;
           if (total >= minAmount) {
             const now = new Date();
             const hour = now.getHours();
-            let currentSlot = '16-19';
-            if (hour >= 6 && hour < 10) currentSlot = '06-10';
-            else if (hour >= 10 && hour < 12) currentSlot = '10-12';
-            else if (hour >= 12 && hour < 14) currentSlot = '12-14';
-            else if (hour >= 14 && hour < 16) currentSlot = '14-16';
-            else if (hour >= 16 && hour < 19) currentSlot = '16-19';
-            else if (hour >= 19 && hour < 21) currentSlot = '19-21';
 
-            const slotPercent = rewardConfig.hourlyDistribution?.[currentSlot] ?? 20;
-            const dailyTotal = rewardConfig.dailyPrizes || 100;
-            const slotQuota = Math.max(1, Math.round((dailyTotal * slotPercent) / 100));
+            // Franjas horarias oficiales de la configuración
+            const SLOTS = [
+              { id: '06-10', start: 6,  end: 10, defaultPct: 15 },
+              { id: '10-12', start: 10, end: 12, defaultPct: 8  },
+              { id: '12-14', start: 12, end: 14, defaultPct: 10 },
+              { id: '14-16', start: 14, end: 16, defaultPct: 7  },
+              { id: '16-19', start: 16, end: 19, defaultPct: 45 },
+              { id: '19-21', start: 19, end: 21, defaultPct: 15 },
+            ];
 
-            // Probabilidad de ganar ponderada por cuota del horario
-            const probability = Math.min(0.85, Math.max(0.1, slotQuota / 35));
-            isLuckyWinner = Math.random() < probability;
+            const currentSlotObj = SLOTS.find(s => hour >= s.start && hour < s.end);
+
+            // Solo entregar premios dentro del horario comercial activo (6:00 AM a 9:00 PM)
+            if (currentSlotObj) {
+              const dailyTotal = Number(rewardConfig.dailyPrizes) || 15;
+
+              // Helper para fecha local (YYYY-MM-DD)
+              const getLocalDateStr = (dInput) => {
+                const d = new Date(dInput);
+                if (isNaN(d.getTime())) return '';
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}-${m}-${day}`;
+              };
+
+              const todayLocal = getLocalDateStr(now);
+              const todayUtc = now.toISOString().slice(0, 10);
+
+              // 🔍 Recopilar todas las ventas de hoy (cobradas + suspendidas en espera)
+              const allSales = [
+                ...(posSales || []),
+                ...(usePosStore.getState().heldSales || [])
+              ];
+
+              const countedWinnerIds = new Set();
+              let totalAwardedToday = 0;
+
+              allSales.forEach(s => {
+                if (!s || !s.id || countedWinnerIds.has(s.id)) return;
+                if (s.status === 'REJECTED' || s.status === 'CANCELLED') return;
+                const isWinner = s.isLuckyWinner === true || String(s.id).includes('LUCKY');
+                if (!isWinner) return;
+
+                const rawDate = s.timestamp || s.date || s.fecha || s.heldAt;
+                if (!rawDate) return;
+                const saleLocal = getLocalDateStr(rawDate);
+                const isToday = saleLocal === todayLocal || String(rawDate).slice(0, 10) === todayUtc;
+                if (!isToday) return;
+
+                countedWinnerIds.add(s.id);
+                totalAwardedToday++;
+              });
+
+              // 🛡️ REGLA 1: FRENO TOPE DIARIO ESTRICTO (No pasar de dailyTotal, ej. 15)
+              if (totalAwardedToday < dailyTotal) {
+                const hourlyDist = rewardConfig.hourlyDistribution || {};
+
+                // Calcular meta acumulada programada hasta la franja actual (permite arrastrar premios no entregados)
+                let cumulativeTargetUntilNow = 0;
+                let currentSlotQuota = 0;
+
+                for (const slot of SLOTS) {
+                  const pct = hourlyDist[slot.id] ?? slot.defaultPct;
+                  const quota = Math.max(1, Math.round((dailyTotal * pct) / 100));
+                  cumulativeTargetUntilNow += quota;
+                  if (slot.id === currentSlotObj.id) {
+                    currentSlotQuota = quota;
+                    break;
+                  }
+                }
+
+                // La meta acumulada nunca puede superar el tope diario fijado
+                cumulativeTargetUntilNow = Math.min(dailyTotal, cumulativeTargetUntilNow);
+
+                // 🛡️ REGLA 2: FRENO POR FRANJA HORARIA
+                // ¿Cuántos premios están disponibles en este momento del día?
+                const prizesAvailableNow = cumulativeTargetUntilNow - totalAwardedToday;
+
+                if (prizesAvailableNow > 0) {
+                  // Probabilidad calibrada por cuota disponible sin pisos artificiales excesivos
+                  const baseProb = Math.min(0.35, Math.max(0.04, (currentSlotQuota / 25)));
+                  isLuckyWinner = Math.random() < baseProb;
+                }
+              }
+            }
           }
         }
       } catch (luckyErr) {
