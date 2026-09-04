@@ -1190,9 +1190,9 @@ export function PosView() {
                   const minutesLeftInShift = slotEndMinutes - currentMinutes;
 
                   // ⚡ REGLA 3: MODO ACELERACIÓN AL FINALIZAR EL TURNO
-                  // Si faltan 35 minutos o menos para terminar el turno y hay premios pendientes:
+                  // Si faltan 10 minutos o menos para terminar el turno y hay premios pendientes:
                   // ¡La próxima compra que cumpla el monto mínimo GANA AL 100% GARANTIZADO!
-                  if (minutesLeftInShift <= 35) {
+                  if (minutesLeftInShift <= 10) {
                     isLuckyWinner = true;
                   } else {
                     // Durante el transcurso normal del turno: probabilidad saludable (30% - 50%)
