@@ -1095,21 +1095,26 @@ export function PosView() {
 
         if (rewardConfig && rewardConfig.enabled) {
           const minAmount = Number(rewardConfig.minPurchaseAmount) || 0;
+          // 🛡️ REGLA ESTRICTA: El monto mínimo configurado en Admin NUNCA se baja
           if (total >= minAmount) {
             const now = new Date();
             const hour = now.getHours();
+            const minute = now.getMinutes();
 
-            // Franjas horarias oficiales de la configuración
+            // Franjas horarias oficiales de la configuración (coinciden 1 a 1 con los 6 turnos)
             const SLOTS = [
-              { id: '06-10', start: 6,  end: 10, defaultPct: 15 },
-              { id: '10-12', start: 10, end: 12, defaultPct: 8  },
-              { id: '12-14', start: 12, end: 14, defaultPct: 10 },
-              { id: '14-16', start: 14, end: 16, defaultPct: 7  },
-              { id: '16-19', start: 16, end: 19, defaultPct: 45 },
-              { id: '19-21', start: 19, end: 21, defaultPct: 15 },
+              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15 },
+              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8  },
+              { id: '12-14', jornada: '12-2 pm', start: 12, end: 14, defaultPct: 10 },
+              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7  },
+              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45 },
+              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15 },
             ];
 
-            const currentSlotObj = SLOTS.find(s => hour >= s.start && hour < s.end);
+            // Identificar la franja por el turno activo o por la hora actual
+            const shiftJornada = activeShift?.jornada;
+            const currentSlotObj = SLOTS.find(s => (shiftJornada && s.jornada === shiftJornada)) ||
+                                   SLOTS.find(s => hour >= s.start && hour < s.end);
 
             // Solo entregar premios dentro del horario comercial activo (6:00 AM a 9:00 PM)
             if (currentSlotObj) {
@@ -1153,11 +1158,13 @@ export function PosView() {
                 totalAwardedToday++;
               });
 
-              // 🛡️ REGLA 1: FRENO TOPE DIARIO ESTRICTO (No pasar de dailyTotal, ej. 15)
+              // 🛡️ REGLA 1: FRENO TOPE DIARIO ESTRICTO (No sobrepasar dailyTotal fijado en Admin)
               if (totalAwardedToday < dailyTotal) {
                 const hourlyDist = rewardConfig.hourlyDistribution || {};
 
-                // Calcular meta acumulada programada hasta la franja actual (permite arrastrar premios no entregados)
+                // 🎯 REGLA 2: META ACUMULADA POR TURNO CON ARRASTRE
+                // Sumamos la cuota de cada turno transcurrido hasta el actual.
+                // Si un turno anterior no cumplió su objetivo, su cuota pendiente se acumula automáticamente.
                 let cumulativeTargetUntilNow = 0;
                 let currentSlotQuota = 0;
 
@@ -1171,17 +1178,27 @@ export function PosView() {
                   }
                 }
 
-                // La meta acumulada nunca puede superar el tope diario fijado
                 cumulativeTargetUntilNow = Math.min(dailyTotal, cumulativeTargetUntilNow);
 
-                // 🛡️ REGLA 2: FRENO POR FRANJA HORARIA
-                // ¿Cuántos premios están disponibles en este momento del día?
+                // ¿Cuántos premios están pendientes y disponibles para este turno (incluyendo acumulados)?
                 const prizesAvailableNow = cumulativeTargetUntilNow - totalAwardedToday;
 
                 if (prizesAvailableNow > 0) {
-                  // Probabilidad calibrada por cuota disponible sin pisos artificiales excesivos
-                  const baseProb = Math.min(0.35, Math.max(0.04, (currentSlotQuota / 25)));
-                  isLuckyWinner = Math.random() < baseProb;
+                  // Calcular minutos restantes para que termine este turno
+                  const slotEndMinutes = currentSlotObj.end * 60;
+                  const currentMinutes = (hour * 60) + minute;
+                  const minutesLeftInShift = slotEndMinutes - currentMinutes;
+
+                  // ⚡ REGLA 3: MODO ACELERACIÓN AL FINALIZAR EL TURNO
+                  // Si faltan 35 minutos o menos para terminar el turno y hay premios pendientes:
+                  // ¡La próxima compra que cumpla el monto mínimo GANA AL 100% GARANTIZADO!
+                  if (minutesLeftInShift <= 35) {
+                    isLuckyWinner = true;
+                  } else {
+                    // Durante el transcurso normal del turno: probabilidad saludable (30% - 50%)
+                    const baseProb = Math.min(0.50, Math.max(0.25, (prizesAvailableNow / 4)));
+                    isLuckyWinner = Math.random() < baseProb;
+                  }
                 }
               }
             }
