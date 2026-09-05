@@ -6,7 +6,7 @@ import { useIncomeConfigStore } from '../../../store/useIncomeConfigStore';
 import { useInventoryStore } from '../../../store/useInventoryStore';
 import { Button } from '../../../components/ui/Button';
 import { MoneyInput } from '../../../components/ui/MoneyInput';
-import { formatMoney } from '../../../utils/formatUtils';
+import { formatMoney, compressImage } from '../../../utils/formatUtils';
 
 export function IncomesModal({ onClose }) {
   const { addIncome, addMultipleIncomes, getTodayDescarguesFor } = useFinanceStore();
@@ -44,16 +44,23 @@ export function IncomesModal({ onClose }) {
   const photoInputRef = useRef(null);
   const photoCameraInputRef = useRef(null);
 
-  const handlePhotoCapture = (e) => {
+  const handlePhotoCapture = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => {
-      setPhotoBase64(ev.target.result);
+    try {
+      const compressed = await compressImage(file, 800, 0.65);
+      setPhotoBase64(compressed || null);
       setPhotoRotation(0);
       setPhotoConfirmed(false);
-    };
-    reader.readAsDataURL(file);
+    } catch (_) {
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        setPhotoBase64(ev.target.result);
+        setPhotoRotation(0);
+        setPhotoConfirmed(false);
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const rotatePhoto = (dir) => {
@@ -70,14 +77,24 @@ export function IncomesModal({ onClose }) {
       const swap = degrees === 90 || degrees === 270;
       const w    = swap ? img.height : img.width;
       const h    = swap ? img.width  : img.height;
+      const maxDim = 800;
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      const targetW = Math.max(1, Math.round(w * scale));
+      const targetH = Math.max(1, Math.round(h * scale));
       const canvas = document.createElement('canvas');
-      canvas.width  = w;
-      canvas.height = h;
+      canvas.width  = targetW;
+      canvas.height = targetH;
       const ctx = canvas.getContext('2d');
-      ctx.translate(w / 2, h / 2);
-      ctx.rotate(rad);
-      ctx.drawImage(img, -img.width / 2, -img.height / 2);
-      resolve(canvas.toDataURL('image/jpeg', 0.92));
+      if (ctx) {
+        ctx.translate(targetW / 2, targetH / 2);
+        ctx.rotate(rad);
+        const drawW = Math.round(img.width * scale);
+        const drawH = Math.round(img.height * scale);
+        ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+        resolve(canvas.toDataURL('image/jpeg', 0.65));
+      } else {
+        resolve(base64);
+      }
     };
     img.onerror = () => resolve(base64);
     img.src = base64;

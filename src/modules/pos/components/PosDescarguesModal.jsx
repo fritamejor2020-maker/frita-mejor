@@ -3,7 +3,7 @@ import { useInventoryStore } from '../../../store/useInventoryStore';
 import { useFinanceStore } from '../../../store/useFinanceStore';
 import { useAuthStore } from '../../../store/useAuthStore';
 import { Button } from '../../../components/ui/Button';
-import { formatMoney } from '../../../utils/formatUtils';
+import { formatMoney, compressImage } from '../../../utils/formatUtils';
 import { X, Plus, Trash2, Camera, CheckCircle, Clock } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
@@ -28,12 +28,17 @@ export function PosDescarguesModal({ activeShift, onClose }) {
   const totalDescargado = shiftDescargues.reduce((sum, d) => sum + (Number(d.amount) || 0), 0);
   const nextDescargueNumber = shiftDescargues.length + 1;
 
-  const handlePhotoCapture = (e) => {
+  const handlePhotoCapture = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = (ev) => { setPhotoBase64(ev.target.result); };
-    reader.readAsDataURL(file);
+    try {
+      const compressed = await compressImage(file, 800, 0.65);
+      setPhotoBase64(compressed || null);
+    } catch (_) {
+      const reader = new FileReader();
+      reader.onload = (ev) => { setPhotoBase64(ev.target.result); };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSave = async (e) => {

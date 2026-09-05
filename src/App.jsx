@@ -359,8 +359,26 @@ function App() {
       const { restockCart, pendingRequests, completedRequests, rejectedRequests, loadHistory } = state;
       broadcastState('frita-mejor-logistics', { restockCart, pendingRequests, completedRequests, rejectedRequests, loadHistory });
     });
+    let prevInventorySubset = null;
     const unsubInventory = useInventoryStore.subscribe((state) => {
       if (isApplyingRemoteState() || isApplyingRealtimeState()) return;
+      if (prevInventorySubset &&
+          prevInventorySubset.products === state.products &&
+          prevInventorySubset.posSettings === state.posSettings &&
+          prevInventorySubset.posRegisters === state.posRegisters &&
+          prevInventorySubset.loadTemplates === state.loadTemplates &&
+          prevInventorySubset.posShifts === state.posShifts &&
+          prevInventorySubset.posSales === state.posSales) {
+        return;
+      }
+      prevInventorySubset = {
+        products: state.products,
+        posSettings: state.posSettings,
+        posRegisters: state.posRegisters,
+        loadTemplates: state.loadTemplates,
+        posShifts: state.posShifts,
+        posSales: state.posSales,
+      };
       const { products, posSettings, posRegisters, loadTemplates, posShifts, posSales } = state;
       broadcastState('frita-mejor-inventory', { products, posSettings, posRegisters, loadTemplates, posShifts, posSales });
     });

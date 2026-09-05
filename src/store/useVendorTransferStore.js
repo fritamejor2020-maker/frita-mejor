@@ -4,6 +4,33 @@ import { push, BRANCH_KEYS } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useAuthStore } from './useAuthStore';
 import { safeJSONStorage } from '../utils/safeStorage';
+import { supabase } from '../lib/supabase';
+
+// Helper para subir foto a Supabase Storage y no engordar el JSON
+async function uploadTransferPhoto(transferId, base64) {
+  if (!base64 || typeof base64 !== 'string' || !base64.startsWith('data:image/')) return null;
+  try {
+    const res = await fetch(base64);
+    const blob = await res.blob();
+    const ext = blob.type.includes('png') ? 'png' : 'jpg';
+    const path = `transfers/${transferId}_${Date.now()}.${ext}`;
+
+    const { error } = await supabase.storage
+      .from('income-photos')
+      .upload(path, blob, { contentType: blob.type, upsert: true });
+
+    if (error) {
+      console.warn('[VendorTransferStore] uploadTransferPhoto error:', error.message);
+      return null;
+    }
+
+    const { data } = supabase.storage.from('income-photos').getPublicUrl(path);
+    return data?.publicUrl || null;
+  } catch (e) {
+    console.warn('[VendorTransferStore] uploadTransferPhoto falló:', e.message);
+    return null;
+  }
+}
 
 /**
  * Store de Transferencias Bancarias del Vendedor
@@ -18,6 +45,7 @@ import { safeJSONStorage } from '../utils/safeStorage';
  *     shiftOpenedAt: string,         // ISO - timestamp del inicio del turno
  *     amount:       number,          // Valor en COP
  *     photoBase64:  string | null,   // Foto del comprobante (base64)
+ *     photoUrl:     string | null,   // URL pública en Supabase Storage
  *     note:         string,          // Observación opcional
  *     vendorName:   string,          // Nombre del vendedor
  *     vendorId:     string,          // userId
@@ -52,6 +80,7 @@ export const useVendorTransferStore = create(
           shiftOpenedAt,
           amount: Number(amount) || 0,
           photoBase64: photoBase64 || null,
+          photoUrl: null,
           note: note?.trim() || '',
           vendorName: user?.name || 'Vendedor',
           vendorId: user?.id || 'unknown',
@@ -62,6 +91,16 @@ export const useVendorTransferStore = create(
         const updated = [newTransfer, ...get().transfers];
         set({ transfers: updated });
         syncTransfers(updated);
+
+        // Subir en segundo plano a Supabase Storage para no engordar la base de datos
+        if (photoBase64 && typeof photoBase64 === 'string' && photoBase64.startsWith('data:image/')) {
+          uploadTransferPhoto(newTransfer.id, photoBase64).then(url => {
+            if (url) {
+              get().updateTransfer(newTransfer.id, { photoUrl: url, photoBase64: null });
+            }
+          });
+        }
+
         return newTransfer;
       },
 
@@ -83,6 +122,18 @@ export const useVendorTransferStore = create(
         );
         set({ transfers: updated });
         syncTransfers(updated);
+
+        if (updates.photoBase64 && typeof updates.photoBase64 === 'string' && updates.photoBase64.startsWith('data:image/')) {
+          uploadTransferPhoto(id, updates.photoBase64).then(url => {
+            if (url) {
+              const current = get().transfers.map(t =>
+                t.id === id ? { ...t, photoUrl: url, photoBase64: null } : t
+              );
+              set({ transfers: current });
+              syncTransfers(current);
+            }
+          });
+        }
       },
 
       /**

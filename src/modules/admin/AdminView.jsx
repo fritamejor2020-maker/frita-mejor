@@ -3666,7 +3666,7 @@ function PosHistoryPanel() {
 
   // Estados de Filtro y Búsqueda para Ventas Totales
   const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilterMode, setDateFilterMode] = useState('TODAS'); // 'TODAS' | 'HOY' | 'AYER' | '7_DIAS' | 'MES' | 'CUSTOM'
+  const [dateFilterMode, setDateFilterMode] = useState('MES'); // 'MES' por defecto para carga inmediata
   const [customDate, setCustomDate] = useState('');
   const [selectedPaymentMethod, setSelectedPaymentMethod] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL'); // 'ALL' | 'PAID' | 'SUSPENDED'
@@ -3676,20 +3676,64 @@ function PosHistoryPanel() {
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(25);
 
+  // Soporte de Historial Antiguo bajo demanda
+  const [archivedSales, setArchivedSales] = useState([]);
+  const [isLoadingArchive, setIsLoadingArchive] = useState(false);
+  const [archiveLoaded, setArchiveLoaded] = useState(false);
+
+  const loadFullArchive = async () => {
+    if (isLoadingArchive || archiveLoaded) return;
+    setIsLoadingArchive(true);
+    try {
+      const { data, error } = await supabase
+        .from('app_state')
+        .select('value')
+        .eq('key', 'posSales_archive_BRANCH-001_master')
+        .maybeSingle();
+      if (data?.value && Array.isArray(data.value)) {
+        setArchivedSales(data.value);
+        setArchiveLoaded(true);
+        toast.success(`Se cargaron ${data.value.length} ventas del historial anterior`);
+      } else {
+        toast.error('No se encontraron ventas archivadas');
+      }
+    } catch (err) {
+      console.warn('[PosHistoryPanel] Error al cargar archivo:', err);
+      toast.error('Error al cargar historial antiguo');
+    } finally {
+      setIsLoadingArchive(false);
+    }
+  };
+
+  useEffect(() => {
+    if (dateFilterMode === 'TODAS' && !archiveLoaded && !isLoadingArchive) {
+      loadFullArchive();
+    }
+  }, [dateFilterMode, archiveLoaded, isLoadingArchive]);
+
+  // Fuente de ventas unificada (activas + archivadas si se cargaron)
+  const allSalesSource = useMemo(() => {
+    if (!archivedSales || archivedSales.length === 0) return posSales || [];
+    const map = new Map();
+    (archivedSales || []).forEach(s => { if (s?.id) map.set(s.id, s); });
+    (posSales || []).forEach(s => { if (s?.id) map.set(s.id, s); });
+    return Array.from(map.values());
+  }, [posSales, archivedSales]);
+
   const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
 
   // Total global de ventas con Raspa y Gana
   const totalLuckyInAllSales = useMemo(() => {
-    return (posSales || []).filter(s => isSaleLuckyWinner(s)).length;
-  }, [posSales]);
+    return (allSalesSource || []).filter(s => isSaleLuckyWinner(s)).length;
+  }, [allSalesSource]);
 
   // Lista única de métodos de pago disponibles
   const availablePaymentMethods = useMemo(() => {
     const methodsSet = new Set();
     (posSettings?.paymentMethods || []).forEach(m => { if (m?.name) methodsSet.add(m.name.toUpperCase().trim()); });
-    (posSales || []).forEach(s => { if (s?.paymentMethod) methodsSet.add(s.paymentMethod.toUpperCase().trim()); });
+    (allSalesSource || []).forEach(s => { if (s?.paymentMethod) methodsSet.add(s.paymentMethod.toUpperCase().trim()); });
     return Array.from(methodsSet).sort();
-  }, [posSettings, posSales]);
+  }, [posSettings, allSalesSource]);
 
   // Filtrado de Ventas
   const filteredSales = useMemo(() => {
@@ -3707,7 +3751,7 @@ function PosHistoryPanel() {
 
     const term = searchTerm.toLowerCase().trim();
 
-    return (posSales || []).filter(sale => {
+    return (allSalesSource || []).filter(sale => {
       if (!sale) return false;
 
       // 1. Filtro por Estado
@@ -3972,6 +4016,23 @@ function PosHistoryPanel() {
                   onChange={(e) => { setCustomDate(e.target.value); setCurrentPage(1); }}
                   className="py-2 px-3 bg-white rounded-2xl border border-gray-200 text-xs font-bold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500/40 shadow-sm"
                 />
+              )}
+
+              {/* Botón para Cargar Historial Antiguo bajo demanda */}
+              {!archiveLoaded ? (
+                <button
+                  type="button"
+                  onClick={loadFullArchive}
+                  disabled={isLoadingArchive}
+                  className="px-3.5 py-2 rounded-2xl text-xs font-black transition-all bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 flex items-center gap-1.5 shadow-sm active:scale-95"
+                  title="Carga ventas de meses pasados (Abril - Agosto) desde la base de datos"
+                >
+                  {isLoadingArchive ? '⏳ Cargando archivo...' : '📦 Cargar Historial Antiguo'}
+                </button>
+              ) : (
+                <span className="px-3.5 py-2 rounded-2xl text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 flex items-center gap-1 shadow-sm">
+                  ✓ Historial Completo ({allSalesSource.length} ventas)
+                </span>
               )}
             </div>
 

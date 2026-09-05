@@ -61,6 +61,26 @@ function syncKey(key, value) {
   }
 }
 
+// Helper: sanitiza los ítems de una venta para no persistir metadatos pesados de inventario (fotos, etc)
+export function sanitizeSaleItems(items) {
+  if (!Array.isArray(items)) return [];
+  return items.map(item => {
+    if (!item) return item;
+    return {
+      id: item.id || item.realId,
+      name: item.name || '',
+      qty: item.qty || 1,
+      price: item.price || 0,
+      subtotal: item.subtotal || (Number(item.qty || 1) * Number(item.price || 0)),
+      ...(item.isCustomPrice ? { isCustomPrice: true, originalPrice: item.originalPrice } : {}),
+      ...(item.tipo ? { tipo: item.tipo } : {}),
+      ...(item.type ? { type: item.type } : {}),
+      ...(item.unit ? { unit: item.unit } : {}),
+      ...(item.notes ? { notes: item.notes } : {}),
+    };
+  });
+}
+
 // Helper: realiza un merge inteligente de arrays locales y remotos para evitar
 // pérdida de actualizaciones concurrentes (como el cierre de un turno en otro dispositivo)
 export function mergeArrays(localArr, remoteArr, key) {
@@ -1392,12 +1412,17 @@ export const useInventoryStore = create(
       addPosSale: (sale) => {
         set((s) => {
           const saleId = sale.id || `SALE-${Date.now()}`;
-          const updatedSales = [{ ...sale, id: saleId }, ...(s.posSales || []).filter(item => item.id !== saleId)];
+          const cleanSale = {
+            ...sale,
+            id: saleId,
+            ...(sale.items ? { items: sanitizeSaleItems(sale.items) } : {})
+          };
+          const updatedSales = [cleanSale, ...(s.posSales || []).filter(item => item.id !== saleId)];
           let newInventory = s.inventory;
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
-          if (linkSales && sale.items && sale.status === 'PAID') {
+          if (linkSales && cleanSale.items && cleanSale.status === 'PAID') {
             newInventory = s.inventory.map(invItem => {
-              const soldItem = sale.items.find(i => String(i.productId || i.id) === String(invItem.id));
+              const soldItem = cleanSale.items.find(i => String(i.productId || i.id) === String(invItem.id));
               if (soldItem) {
                 return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
               }
@@ -1420,17 +1445,21 @@ export const useInventoryStore = create(
       },
       updatePosSale: (id, data) => {
         set((s) => {
+          const cleanData = {
+            ...data,
+            ...(data.items ? { items: sanitizeSaleItems(data.items) } : {})
+          };
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           let newInventory = s.inventory;
           const updatedSales = (s.posSales || []).map((sale) => {
             if (sale.id === id) {
               const wasPaid = sale.status === 'PAID';
-              const isPaid = (data.status || sale.status) === 'PAID';
+              const isPaid = (cleanData.status || sale.status) === 'PAID';
 
               if (linkSales) {
                 // Caso A: De suspendida a pagada (descontar inventario)
                 if (!wasPaid && isPaid) {
-                  const saleItems = data.items || sale.items || [];
+                  const saleItems = cleanData.items || sale.items || [];
                   newInventory = newInventory.map(invItem => {
                     const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
                     if (soldItem) {
@@ -1459,9 +1488,9 @@ export const useInventoryStore = create(
                   });
                 }
               }
-              let updatedSale = { ...sale, ...data };
-              if (sale.contrataPaymentMethod === 'credit' && data.total !== undefined && data.creditAmount === undefined) {
-                updatedSale.creditAmount = data.total;
+              let updatedSale = { ...sale, ...cleanData };
+              if (sale.contrataPaymentMethod === 'credit' && cleanData.total !== undefined && cleanData.creditAmount === undefined) {
+                updatedSale.creditAmount = cleanData.total;
               }
 
               // Registrar historial de modificaciones (cambios)
@@ -1471,11 +1500,11 @@ export const useInventoryStore = create(
               const oldDiscount = sale.discountAmount || 0;
               const oldCustomerId = sale.customerId || null;
 
-              const hasItemsChanged = data.items && JSON.stringify(oldItems) !== JSON.stringify(data.items);
-              const hasTotalChanged = data.total !== undefined && oldTotal !== data.total;
-              const hasPaymentMethodChanged = data.paymentMethod !== undefined && oldPaymentMethod !== data.paymentMethod;
-              const hasDiscountChanged = data.discountAmount !== undefined && oldDiscount !== data.discountAmount;
-              const hasCustomerChanged = data.customerId !== undefined && oldCustomerId !== data.customerId;
+              const hasItemsChanged = cleanData.items && JSON.stringify(oldItems) !== JSON.stringify(cleanData.items);
+              const hasTotalChanged = cleanData.total !== undefined && oldTotal !== cleanData.total;
+              const hasPaymentMethodChanged = cleanData.paymentMethod !== undefined && oldPaymentMethod !== cleanData.paymentMethod;
+              const hasDiscountChanged = cleanData.discountAmount !== undefined && oldDiscount !== cleanData.discountAmount;
+              const hasCustomerChanged = cleanData.customerId !== undefined && oldCustomerId !== cleanData.customerId;
 
               if (hasItemsChanged || hasTotalChanged || hasPaymentMethodChanged || hasDiscountChanged || hasCustomerChanged) {
                 const editRecord = {
@@ -1488,11 +1517,11 @@ export const useInventoryStore = create(
                     customerId: oldCustomerId
                   },
                   after: {
-                    items: (data.items || oldItems).map(i => ({ ...i })),
-                    total: data.total !== undefined ? data.total : oldTotal,
-                    paymentMethod: data.paymentMethod || oldPaymentMethod,
-                    discountAmount: data.discountAmount !== undefined ? data.discountAmount : oldDiscount,
-                    customerId: data.customerId !== undefined ? data.customerId : oldCustomerId
+                    items: (cleanData.items || oldItems).map(i => ({ ...i })),
+                    total: cleanData.total !== undefined ? cleanData.total : oldTotal,
+                    paymentMethod: cleanData.paymentMethod || oldPaymentMethod,
+                    discountAmount: cleanData.discountAmount !== undefined ? cleanData.discountAmount : oldDiscount,
+                    customerId: cleanData.customerId !== undefined ? cleanData.customerId : oldCustomerId
                   }
                 };
                 updatedSale.editHistory = [...(sale.editHistory || []), editRecord];

@@ -13,6 +13,7 @@ dist-electron
 scratch
 dist-ssr
 *.local
+backup_app_state_*.json
 
 # Variables de entorno — NUNCA subir al repositorio
 .env
