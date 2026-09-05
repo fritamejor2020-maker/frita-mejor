@@ -284,15 +284,26 @@ export function useAttendanceData(selectedBranchId: string | null, weekStartDate
 
           if (!assignedShift) {
             if (contract.shiftType === 'FIXED' && contract.defaultShiftId) {
-              assignedShift = shiftTemplates.find((s) => s.id === contract.defaultShiftId);
-            } else if (rawFirstIn) {
+              assignedShift = shiftTemplates.find((s) =>
+                s.id === contract.defaultShiftId ||
+                (contract.defaultShiftId?.includes('MANANA') && s.name.toLowerCase().includes('local am'))
+              );
+            }
+
+            if (!assignedShift && rawFirstIn) {
               const firstInMins = timeToMinutes(rawFirstIn.slice(0, 5));
               const lastOutMins = rawLastOut ? timeToMinutes(rawLastOut.slice(0, 5)) : null;
 
               // Filtrar únicamente los turnos que pertenecen al Grupo de Horarios asignado al trabajador
-              const empGroup = scheduleGroups?.find((g) => g.id === contract.scheduleGroupId);
-              const candidateTemplates = (empGroup && empGroup.shiftIds && empGroup.shiftIds.length > 0)
-                ? shiftTemplates.filter((st) => empGroup.shiftIds.includes(st.id))
+              const empGroup = scheduleGroups?.find((g) =>
+                g.id === contract.scheduleGroupId ||
+                (contract.scheduleGroupId === 'GROUP-LOCAL' && (g.id === 'GROUP-1787410593211' || g.name.toLowerCase().includes('local')))
+              );
+              // Fallback seguro: si no tiene grupo explícito, restringir a grupo 'Local' en vez de abrir todo el catálogo
+              const effectiveGroup = empGroup || scheduleGroups?.find((g) => g.name.toLowerCase().includes('local'));
+
+              const candidateTemplates = (effectiveGroup && effectiveGroup.shiftIds && effectiveGroup.shiftIds.length > 0)
+                ? shiftTemplates.filter((st) => effectiveGroup.shiftIds.includes(st.id))
                 : shiftTemplates;
 
               let bestScore = Infinity;

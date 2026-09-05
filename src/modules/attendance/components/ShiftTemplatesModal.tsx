@@ -48,11 +48,28 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
   const [editingEmpContract, setEditingEmpContract] = useState<EmployeeContract | null>(null);
   const [selectedEmpNos, setSelectedEmpNos] = useState<string[]>([]);
   const [empShiftType, setEmpShiftType] = useState<'FIXED' | 'VARIABLE'>('VARIABLE');
-  const [empScheduleGroupId, setEmpScheduleGroupId] = useState<string>('GROUP-LOCAL');
-  const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>('SHIFT-MANANA-COMPLETO');
+  const [empScheduleGroupId, setEmpScheduleGroupId] = useState<string>(() => {
+    const local = scheduleGroups.find((g) => g.name.toLowerCase().includes('local') || g.id === 'GROUP-LOCAL');
+    return local?.id || scheduleGroups[0]?.id || '';
+  });
+  const [empDefaultShiftId, setEmpDefaultShiftId] = useState<string>(() => {
+    const def = shiftTemplates.find((s) => s.name.toLowerCase().includes('local am') || s.name.toLowerCase().includes('mañana'));
+    return def?.id || shiftTemplates[0]?.id || '';
+  });
   const [empWeeklyTargetHours, setEmpWeeklyTargetHours] = useState<number>(44);
   const [empBaseHourlyRate, setEmpBaseHourlyRate] = useState<number>(6500);
   const [bulkSuccessMsg, setBulkSuccessMsg] = useState<string | null>(null);
+
+  // Mantener sincronizado el grupo de horario predeterminado si cargan o cambian los grupos
+  React.useEffect(() => {
+    if (scheduleGroups.length > 0) {
+      const exists = scheduleGroups.some((g) => g.id === empScheduleGroupId);
+      if (!exists) {
+        const local = scheduleGroups.find((g) => g.name.toLowerCase().includes('local'));
+        setEmpScheduleGroupId(local?.id || scheduleGroups[0].id);
+      }
+    }
+  }, [scheduleGroups, empScheduleGroupId]);
 
   const PRESET_COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899', '#06B6D4', '#6366F1'];
 
@@ -61,7 +78,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
     setEditingGroup(null);
     setGrpName('');
     setGrpDescription('');
-    setGrpSelectedShiftIds(shiftTemplates.map((s) => s.id));
+    setGrpSelectedShiftIds([]); // 🛡️ Iniciar vacío para no asignar todos los turnos posibles por defecto
     setIsCreatingGroup(true);
   };
 
@@ -206,8 +223,18 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
   const handleStartEditEmpContract = (emp: EmployeeContract) => {
     setEditingEmpContract(emp);
     setEmpShiftType(emp.shiftType || 'VARIABLE');
-    setEmpScheduleGroupId(emp.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
-    setEmpDefaultShiftId(emp.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+
+    const matchedGrp = scheduleGroups.find((g) =>
+      g.id === emp.scheduleGroupId ||
+      (emp.scheduleGroupId === 'GROUP-LOCAL' && (g.name.toLowerCase().includes('local') || g.id === 'GROUP-1787410593211'))
+    );
+    setEmpScheduleGroupId(matchedGrp?.id || scheduleGroups[0]?.id || '');
+
+    const matchedShift = shiftTemplates.find((s) =>
+      s.id === emp.defaultShiftId ||
+      (emp.defaultShiftId?.includes('MANANA') && s.name.toLowerCase().includes('local am'))
+    );
+    setEmpDefaultShiftId(matchedShift?.id || shiftTemplates[0]?.id || '');
     setEmpWeeklyTargetHours(emp.weeklyTargetHours || 44);
     setEmpBaseHourlyRate(emp.baseHourlyRate || 6500);
   };
@@ -928,7 +955,14 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                   </thead>
                   <tbody className="divide-y divide-gray-100 font-bold text-gray-800">
                     {employeeContracts.map((emp) => {
-                      const grp = scheduleGroups.find((g) => g.id === emp.scheduleGroupId);
+                      const grp = scheduleGroups.find((g) =>
+                        g.id === emp.scheduleGroupId ||
+                        (emp.scheduleGroupId === 'GROUP-LOCAL' && (g.name.toLowerCase().includes('local') || g.id === 'GROUP-1787410593211'))
+                      );
+                      const fixedShift = shiftTemplates.find((s) =>
+                        s.id === emp.defaultShiftId ||
+                        (emp.defaultShiftId?.includes('MANANA') && s.name.toLowerCase().includes('local am'))
+                      );
                       const isSelected = selectedEmpNos.includes(emp.employeeNo);
                       return (
                         <tr
@@ -959,12 +993,16 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                             )}
                           </td>
                           <td className="py-3 px-4">
-                            {grp ? (
+                            {emp.shiftType === 'FIXED' ? (
+                              <span className="font-black text-blue-900 bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">
+                                📌 {fixedShift ? `${fixedShift.name} (${fixedShift.startTime} - ${fixedShift.endTime})` : 'Turno Fijo'}
+                              </span>
+                            ) : grp ? (
                               <span className="font-black text-amber-900 bg-amber-100/80 px-2.5 py-1 rounded-lg border border-amber-200">
-                                📅 {grp.name}
+                                📅 {grp.name} ({(grp.shiftIds || []).length} turnos)
                               </span>
                             ) : (
-                              <span className="text-gray-400">Todos los turnos</span>
+                              <span className="text-gray-400 italic">Sin Horario Maestro</span>
                             )}
                           </td>
                           <td className="py-3 px-4 text-right">

@@ -134,22 +134,35 @@ const INITIAL_SHIFTS: ShiftTemplate[] = [
 
 export const INITIAL_SCHEDULE_GROUPS: ShiftScheduleGroup[] = [
   {
-    id: 'GROUP-LOCAL',
-    name: 'Horario del Local (Variables)',
-    description: 'Turnos variables del local: 6am-2pm, 2pm-9pm, 4pm-9pm, 6am-12pm, 3pm-7pm',
+    id: 'GROUP-1787410593211',
+    name: 'Local',
+    description: 'Personal de punto de venta (Local)',
     shiftIds: [
-      'SHIFT-MANANA-COMPLETO',
-      'SHIFT-MEDIA-MANANA',
-      'SHIFT-TARDE-COMPLETO',
-      'SHIFT-PICO-TARDE',
-      'SHIFT-INTERMEDIO-TARDE',
+      'SHIFT-1787410192821', // Local AM (06:00 - 14:00)
+      'SHIFT-1787410269592', // Local PM (14:00 - 21:00)
+      'SHIFT-1787410221426', // Local PM 2 (16:00 - 21:00)
     ],
   },
   {
-    id: 'GROUP-ADMIN',
-    name: 'Horario Administración',
-    description: 'Horario fijo de oficina 8am - 5pm',
-    shiftIds: ['SHIFT-MANANA-COMPLETO'],
+    id: 'GROUP-1787411556638',
+    name: 'Vendedor Triciclos',
+    description: 'Vendedores de calle en triciclos',
+    shiftIds: [
+      'SHIFT-1787411346311',
+      'SHIFT-1787411390223',
+      'SHIFT-1787411493851',
+      'SHIFT-1787411525031',
+    ],
+  },
+  {
+    id: 'GROUP-1788022818812',
+    name: 'Fritadoras',
+    description: 'Personal de cocina y fritado',
+    shiftIds: [
+      'SHIFT-1788022664050',
+      'SHIFT-1788022751192',
+      'SHIFT-1788022793839',
+    ],
   },
 ];
 
@@ -235,10 +248,24 @@ const INITIAL_CONTRACTS: EmployeeContract[] = REAL_BIOMETRIC_USERS.map((u, idx) 
 function mergeBiometricContracts(incoming: EmployeeContract[] = [], currentLocal: EmployeeContract[] = []): EmployeeContract[] {
   const map = new Map<string, EmployeeContract>();
 
+  const normalizeGroupId = (id?: string) => {
+    if (!id || id === 'GROUP-LOCAL') return 'GROUP-1787410593211';
+    return id;
+  };
+
+  const normalizeDefaultShiftId = (id?: string) => {
+    if (!id || id === 'SHIFT-MANANA-COMPLETO' || id === 'SHIFT-MANANA') return 'SHIFT-1787410192821';
+    return id;
+  };
+
   // 1. Agregar contratos locales actuales como base
   (currentLocal || []).forEach((c) => {
     const empNo = String(c.employeeNo || '').trim();
-    if (empNo) map.set(empNo, { ...c });
+    if (empNo) map.set(empNo, {
+      ...c,
+      scheduleGroupId: normalizeGroupId(c.scheduleGroupId),
+      defaultShiftId: normalizeDefaultShiftId(c.defaultShiftId),
+    });
   });
 
   // 2. Agregar / actualizar con los entrantes (preservando campos clave si el entrante los trae incompletos)
@@ -246,15 +273,22 @@ function mergeBiometricContracts(incoming: EmployeeContract[] = [], currentLocal
     const empNo = String(c.employeeNo || '').trim();
     if (!empNo) return;
     const existing = map.get(empNo);
+    const resolvedGroup = normalizeGroupId(c.scheduleGroupId || existing?.scheduleGroupId);
+    const resolvedDefaultShift = normalizeDefaultShiftId(c.defaultShiftId || existing?.defaultShiftId);
+
     if (!existing) {
-      map.set(empNo, { ...c, scheduleGroupId: c.scheduleGroupId || 'GROUP-LOCAL' });
+      map.set(empNo, {
+        ...c,
+        scheduleGroupId: resolvedGroup,
+        defaultShiftId: resolvedDefaultShift,
+      });
     } else {
       map.set(empNo, {
         ...existing,
         ...c,
-        scheduleGroupId: c.scheduleGroupId || existing.scheduleGroupId || 'GROUP-LOCAL',
+        scheduleGroupId: resolvedGroup,
         shiftType: c.shiftType || existing.shiftType || 'VARIABLE',
-        defaultShiftId: c.defaultShiftId || existing.defaultShiftId || 'SHIFT-MANANA-COMPLETO',
+        defaultShiftId: resolvedDefaultShift,
         weeklyTargetHours: c.weeklyTargetHours || existing.weeklyTargetHours || 44,
         baseHourlyRate: c.baseHourlyRate || existing.baseHourlyRate || 6500,
         overtimeHourlyRate: c.overtimeHourlyRate || existing.overtimeHourlyRate || 9750,
@@ -266,7 +300,11 @@ function mergeBiometricContracts(incoming: EmployeeContract[] = [], currentLocal
   INITIAL_CONTRACTS.forEach((c) => {
     const empNo = String(c.employeeNo || '').trim();
     if (empNo && !map.has(empNo)) {
-      map.set(empNo, { ...c, scheduleGroupId: 'GROUP-LOCAL' });
+      map.set(empNo, {
+        ...c,
+        scheduleGroupId: normalizeGroupId(c.scheduleGroupId),
+        defaultShiftId: normalizeDefaultShiftId(c.defaultShiftId),
+      });
     }
   });
 

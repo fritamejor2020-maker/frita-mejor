@@ -37,8 +37,14 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
   const [fullName, setFullName] = useState('');
   const [branchId, setBranchId] = useState(branches[0]?.id || 'BRANCH-001');
   const [shiftType, setShiftType] = useState<'FIXED' | 'VARIABLE'>('VARIABLE');
-  const [scheduleGroupId, setScheduleGroupId] = useState(scheduleGroups[0]?.id || 'GROUP-LOCAL');
-  const [defaultShiftId, setDefaultShiftId] = useState(shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+  const [scheduleGroupId, setScheduleGroupId] = useState(() => {
+    const local = scheduleGroups.find((g) => g.name.toLowerCase().includes('local') || g.id === 'GROUP-LOCAL');
+    return local?.id || scheduleGroups[0]?.id || '';
+  });
+  const [defaultShiftId, setDefaultShiftId] = useState(() => {
+    const def = shiftTemplates.find((s) => s.name.toLowerCase().includes('local am') || s.name.toLowerCase().includes('mañana'));
+    return def?.id || shiftTemplates[0]?.id || '';
+  });
   const [weeklyTargetHours, setWeeklyTargetHours] = useState(44);
   const [baseHourlyRate, setBaseHourlyRate] = useState(6500);
   const [overtimeHourlyRate, setOvertimeHourlyRate] = useState(9750);
@@ -53,8 +59,17 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
       const match = employeeContracts.find((c) => c.employeeId === selectedEmpId);
       if (match) {
         setShiftType(match.shiftType || 'VARIABLE');
-        setScheduleGroupId(match.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
-        setDefaultShiftId(match.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+        const matchedGrp = scheduleGroups.find((g) =>
+          g.id === match.scheduleGroupId ||
+          (match.scheduleGroupId === 'GROUP-LOCAL' && (g.name.toLowerCase().includes('local') || g.id === 'GROUP-1787410593211'))
+        );
+        setScheduleGroupId(matchedGrp?.id || scheduleGroups[0]?.id || '');
+
+        const matchedShift = shiftTemplates.find((s) =>
+          s.id === match.defaultShiftId ||
+          (match.defaultShiftId?.includes('MANANA') && s.name.toLowerCase().includes('local am'))
+        );
+        setDefaultShiftId(matchedShift?.id || shiftTemplates[0]?.id || '');
         setWeeklyTargetHours(match.weeklyTargetHours || 44);
         setBaseHourlyRate(match.baseHourlyRate || 6500);
         setOvertimeHourlyRate(match.overtimeHourlyRate || 9750);
@@ -62,7 +77,7 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
         setPinPassword(match.pinPassword || '123456');
       }
     }
-  }, [employeeContracts, selectedEmpId]);
+  }, [employeeContracts, selectedEmpId, scheduleGroups, shiftTemplates]);
 
   // Preseleccionar si viene por prop
   React.useEffect(() => {
@@ -112,8 +127,19 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     setFullName(c.fullName);
     setBranchId(c.branchId);
     setShiftType(c.shiftType);
-    setScheduleGroupId(c.scheduleGroupId || scheduleGroups[0]?.id || 'GROUP-LOCAL');
-    setDefaultShiftId(c.defaultShiftId || shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+
+    const matchedGrp = scheduleGroups.find((g) =>
+      g.id === c.scheduleGroupId ||
+      (c.scheduleGroupId === 'GROUP-LOCAL' && (g.name.toLowerCase().includes('local') || g.id === 'GROUP-1787410593211'))
+    );
+    setScheduleGroupId(matchedGrp?.id || scheduleGroups[0]?.id || '');
+
+    const matchedShift = shiftTemplates.find((s) =>
+      s.id === c.defaultShiftId ||
+      (c.defaultShiftId?.includes('MANANA') && s.name.toLowerCase().includes('local am'))
+    );
+    setDefaultShiftId(matchedShift?.id || shiftTemplates[0]?.id || '');
+
     setWeeklyTargetHours(c.weeklyTargetHours);
     setBaseHourlyRate(c.baseHourlyRate);
     setOvertimeHourlyRate(c.overtimeHourlyRate);
@@ -127,8 +153,13 @@ export function AdminEmployeeBiometricsModal({ onClose, initialSelectedEmployeeN
     setFullName('');
     setBranchId(branches[0]?.id || 'BRANCH-001');
     setShiftType('VARIABLE');
-    setScheduleGroupId(scheduleGroups[0]?.id || 'GROUP-LOCAL');
-    setDefaultShiftId(shiftTemplates[0]?.id || 'SHIFT-MANANA-COMPLETO');
+
+    const localGrp = scheduleGroups.find((g) => g.name.toLowerCase().includes('local'));
+    setScheduleGroupId(localGrp?.id || scheduleGroups[0]?.id || '');
+
+    const localShift = shiftTemplates.find((s) => s.name.toLowerCase().includes('local am'));
+    setDefaultShiftId(localShift?.id || shiftTemplates[0]?.id || '');
+
     setWeeklyTargetHours(44);
     setBaseHourlyRate(6500);
     setOvertimeHourlyRate(9750);
