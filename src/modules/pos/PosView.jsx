@@ -252,9 +252,11 @@ export function PosView() {
   const paidSaleIds = new Set();
   const paidOlaClickIds = new Set();
   const paidPublicIds = new Set();
+  const paidSalesList = [];
 
   (posSales || []).forEach(s => {
     if (s && s.status === 'PAID') {
+      paidSalesList.push(s);
       if (s.id) {
         paidSaleIds.add(s.id);
         if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
@@ -264,6 +266,52 @@ export function PosView() {
       if (s.originalHeldId) paidSaleIds.add(s.originalHeldId);
       if (s.originalOlaClickId) paidOlaClickIds.add(s.originalOlaClickId);
       if (s.publicId) paidPublicIds.add(s.publicId);
+    }
+  });
+
+  // 🛡️ Auto-reconciliación inteligente: si un borrador coincide en productos, total y ventana de tiempo
+  // con una venta cobrada en el mismo turno, vincular su ID a paidSaleIds para extinguir ventas fantasma
+  const matchedPaidSaleIds = new Set();
+  (posSales || []).forEach(s => {
+    if (!s || s.status !== 'SUSPENDED') return;
+    if (paidSaleIds.has(s.id)) return;
+    const sItems = s.items || [];
+    if (sItems.length === 0) return;
+    const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
+    if (isNaN(sTime) || sTime === 0) return;
+
+    for (const p of paidSalesList) {
+      if (matchedPaidSaleIds.has(p.id)) continue;
+      if (Math.abs((s.total || 0) - (p.total || 0)) > 1) continue;
+      const pTime = new Date(p.timestamp || p.createdAt || 0).getTime();
+      if (isNaN(pTime) || pTime === 0) continue;
+      const diffMs = pTime - sTime;
+      // Pago ocurrió dentro de los 20 minutos posteriores a la comanda/borrador
+      if (diffMs < -10000 || diffMs > (20 * 60 * 1000)) continue;
+
+      const pItems = p.items || [];
+      if (sItems.length !== pItems.length) continue;
+
+      // Comparar ítems por cantidad y coincidencia
+      let allMatch = true;
+      for (let i = 0; i < sItems.length; i++) {
+        const sIt = sItems[i];
+        const pIt = pItems.find(x => 
+          (x.productId && sIt.productId && String(x.productId) === String(sIt.productId)) ||
+          (x.id && sIt.id && String(x.id) === String(sIt.id)) ||
+          (x.name && sIt.name && String(x.name).trim().toLowerCase() === String(sIt.name).trim().toLowerCase())
+        );
+        if (!pIt || Math.abs(Number(pIt.qty || 1) - Number(sIt.qty || 1)) > 0.001) {
+          allMatch = false;
+          break;
+        }
+      }
+
+      if (allMatch) {
+        paidSaleIds.add(s.id);
+        matchedPaidSaleIds.add(p.id);
+        break;
+      }
     }
   });
 
@@ -950,8 +998,50 @@ export function PosView() {
       </div>
     `;
     printHTML(orderHtml, 'Pedido');
-    // Also save as suspended
-    handleSaveSale();
+
+    // 🛡️ Guardar / actualizar borrador en posSales sin vaciar la pantalla,
+    // permitiendo al cajero cobrar inmediatamente en efectivo/tarjeta con un solo clic si el cliente paga ya.
+    try {
+      const itemsToSave = ticketItems.map(i => ({ ...i }));
+      const currentCustomer = selectedCustomer;
+      const targetId = activeSuspendedId || `SALE-${Date.now()}`;
+
+      const saleData = {
+        id: targetId,
+        customerId: currentCustomer || null,
+        customerName: c?.name || pendingDeliveryInfo?.customerName || (selectedCustomer ? 'Cliente' : 'Venta Pausada'),
+        customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
+        deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
+        serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
+        isOlaClick: pendingDeliveryInfo?.isOlaClick || false,
+        publicId: pendingDeliveryInfo?.publicId || null,
+        items: itemsToSave,
+        subtotal,
+        discountPercent,
+        discountAmount,
+        total,
+        status: 'SUSPENDED',
+        heldAt: new Date().toISOString(),
+        timestamp: new Date().toISOString(),
+        shiftId: activeShift?.id || null,
+        registerId: selectedRegisterId,
+        userName: activeShift?.userName || user?.name || 'PRINCIPAL'
+      };
+
+      const existsInStore = (posSales || []).some(s => s.id === targetId);
+      if (existsInStore) {
+        updatePosSale(targetId, saleData);
+      } else {
+        addPosSale(saleData);
+      }
+
+      if (!activeSuspendedId) {
+        setActiveSuspendedId(targetId);
+      }
+      toast.success('Comanda impresa y guardada en espera', { icon: '📋' });
+    } catch (err) {
+      console.error('[POS] Error al guardar comanda en espera:', err);
+    }
   };
 
   const handleLoadSuspended = (sale) => {

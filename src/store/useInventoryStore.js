@@ -109,11 +109,14 @@ export function mergeArrays(localArr, remoteArr, key) {
             merged.push({ ...localItem, ...remoteVersion });
           }
         } else if (key === 'posSales') {
+          const isEitherPaid = localItem.status === 'PAID' || remoteVersion.status === 'PAID';
           const isDeleted = deletedSales.has(localItem.id) || deletedSales.has(remoteVersion.id) || 
-            (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
-            (remoteVersion.originalOlaClickId && deletedSales.has(remoteVersion.originalOlaClickId)) ||
-            (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId)) ||
-            (remoteVersion.originalHeldId && deletedSales.has(remoteVersion.originalHeldId));
+            (!isEitherPaid && (
+              (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
+              (remoteVersion.originalOlaClickId && deletedSales.has(remoteVersion.originalOlaClickId)) ||
+              (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId)) ||
+              (remoteVersion.originalHeldId && deletedSales.has(remoteVersion.originalHeldId))
+            ));
 
           if (isDeleted) {
             // Ignorar ventas eliminadas
@@ -147,10 +150,13 @@ export function mergeArrays(localArr, remoteArr, key) {
         addedIds.add(localItem.id);
       } else {
         // Solo existe localmente en el localStorage de este dispositivo.
+        const isPaid = key === 'posSales' && (localItem.status === 'PAID' || localItem.status === 'REJECTED');
         const isDeletedTombstone =
           deletedSales.has(localItem.id) ||
-          (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
-          (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId)) ||
+          (!isPaid && (
+            (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
+            (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId))
+          )) ||
           deletedShifts.has(localItem.id) ||
           deletedInvs.has(localItem.id) ||
           deletedRegs.has(localItem.id) ||
@@ -168,8 +174,10 @@ export function mergeArrays(localArr, remoteArr, key) {
                 (localItem.originalHeldId && allPaidSaleIds.has(localItem.originalHeldId)) ||
                 (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
               const hasItems = localItem.items && localItem.items.length > 0;
-              // 🛡️ Ventas locales SUSPENDED no en remoto solo se conservan si están en cola offline
-              if (!isAlreadyPaid && hasItems && isQueuedOffline) {
+              const saleTime = new Date(localItem.heldAt || localItem.timestamp || localItem.createdAt || 0).getTime();
+              const isRecentOrToday = !isNaN(saleTime) && (Date.now() - saleTime) < (12 * 60 * 60 * 1000);
+              // 🛡️ Ventas locales SUSPENDED no en remoto se conservan si están en cola offline o son recientes de hoy
+              if (!isAlreadyPaid && hasItems && (isQueuedOffline || isRecentOrToday)) {
                 merged.push(localItem);
                 addedIds.add(localItem.id);
               }
@@ -187,11 +195,14 @@ export function mergeArrays(localArr, remoteArr, key) {
 
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
+      const isPaid = key === 'posSales' && (remoteItem.status === 'PAID' || remoteItem.status === 'REJECTED');
       const isDeletedTombstone =
         (key === 'posSales' && (
           deletedSales.has(remoteItem.id) || 
-          (remoteItem.originalOlaClickId && deletedSales.has(remoteItem.originalOlaClickId)) ||
-          (remoteItem.originalHeldId && deletedSales.has(remoteItem.originalHeldId))
+          (!isPaid && (
+            (remoteItem.originalOlaClickId && deletedSales.has(remoteItem.originalOlaClickId)) ||
+            (remoteItem.originalHeldId && deletedSales.has(remoteItem.originalHeldId))
+          ))
         )) ||
         (key === 'posShifts' && deletedShifts.has(remoteItem.id)) ||
         (key === 'inventory' && deletedInvs.has(remoteItem.id)) ||
@@ -587,12 +598,16 @@ export const useInventoryStore = create(
                       ...(remote['deletedPosSaleIds'] || []),
                       ...(remote[`deletedPosSaleIds_${effectiveBranch}`] || [])
                     ]);
-                    finalVal = finalVal.filter(s => 
-                      !allDelSales.has(s.id) && 
-                      (!s.originalOlaClickId || !allDelSales.has(s.originalOlaClickId)) && 
-                      (!s.publicId || !allDelSales.has(s.publicId)) &&
-                      (!s.originalHeldId || !allDelSales.has(s.originalHeldId))
-                    );
+                    finalVal = finalVal.filter(s => {
+                      if (!s || !s.id) return false;
+                      if (allDelSales.has(s.id)) return false;
+                      // 🛡️ Ventas PAGADAS representan dinero real: JAMÁS se eliminan por IDs de pedidos o borradores previos
+                      if (s.status === 'PAID') return true;
+                      if (s.originalOlaClickId && allDelSales.has(s.originalOlaClickId)) return false;
+                      if (s.publicId && allDelSales.has(s.publicId)) return false;
+                      if (s.originalHeldId && allDelSales.has(s.originalHeldId)) return false;
+                      return true;
+                    });
                   }
                   if (key === 'inventory') {
                     // 🛡️ Filtro de seguridad: preserte productos activos de triciclos frente a tombstones viejos
@@ -713,7 +728,16 @@ export const useInventoryStore = create(
                 if (key === 'posRegisters') merged = merged.filter(r => !deletedRegs.has(r.id));
                 if (key === 'posSales') {
                   const delSales = new Set(get().deletedPosSaleIds || []);
-                  merged = merged.filter(s => !delSales.has(s.id) && (!s.originalOlaClickId || !delSales.has(s.originalOlaClickId)) && (!s.publicId || !delSales.has(s.publicId)));
+                  merged = merged.filter(s => {
+                    if (!s || !s.id) return false;
+                    if (delSales.has(s.id)) return false;
+                    // 🛡️ Ventas PAGADAS representan dinero real: JAMÁS se eliminan por IDs de pedidos o borradores previos
+                    if (s.status === 'PAID') return true;
+                    if (s.originalOlaClickId && delSales.has(s.originalOlaClickId)) return false;
+                    if (s.publicId && delSales.has(s.publicId)) return false;
+                    if (s.originalHeldId && delSales.has(s.originalHeldId)) return false;
+                    return true;
+                  });
                 }
                 if (key === 'deletedInventoryIds') {
                   const localDeleted = get().deletedInventoryIds || [];
@@ -1510,7 +1534,7 @@ export const useInventoryStore = create(
           if (saleToDelete?.id) extraIds.push(saleToDelete.id);
           if (saleToDelete?.originalOlaClickId) extraIds.push(saleToDelete.originalOlaClickId);
           if (saleToDelete?.publicId) extraIds.push(saleToDelete.publicId);
-          if (saleToDelete?.originalHeldId) extraIds.push(saleToDelete.originalHeldId);
+          if (saleToDelete?.originalHeldId && saleToDelete?.status !== 'PAID') extraIds.push(saleToDelete.originalHeldId);
 
           const newDeleted = [...new Set([...(s.deletedPosSaleIds || []), ...extraIds])];
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };

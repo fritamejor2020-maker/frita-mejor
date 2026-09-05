@@ -396,7 +396,14 @@ async function _writeToSupabaseImpl(key, value) {
         const isSaleDeadOrPaid = (item) => {
           if (!item || !item.id) return true;
           const itemId = String(item.id);
+          // Si el ID directo de la venta fue eliminado expresamente, está eliminada
           if (deletedSalesSet.has(itemId)) return true;
+
+          // 🛡️ Ventas PAGADAS representan dinero real: JAMÁS se descartan por IDs de pedidos o borradores previos
+          if (item.status === 'PAID') {
+            return false;
+          }
+
           if (item.originalOlaClickId && deletedSalesSet.has(item.originalOlaClickId)) return true;
           if (item.publicId && deletedSalesSet.has(item.publicId)) return true;
           if (item.originalHeldId && deletedSalesSet.has(item.originalHeldId)) return true;
