@@ -1094,21 +1094,21 @@ export function PosView() {
         rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
 
         if (rewardConfig && rewardConfig.enabled) {
-          const minAmount = Number(rewardConfig.minPurchaseAmount) || 0;
-          // 🛡️ REGLA ESTRICTA: El monto mínimo configurado en Admin NUNCA se baja
+          // 🛡️ REGLA SAGRADA: El monto mínimo NUNCA puede ser inferior a $20.000 COP
+          const minAmount = Math.max(20000, Number(rewardConfig.minPurchaseAmount) || 20000);
           if (total >= minAmount) {
             const now = new Date();
             const hour = now.getHours();
             const minute = now.getMinutes();
 
-            // Franjas horarias oficiales de la configuración (coinciden 1 a 1 con los 6 turnos)
+            // Franjas horarias oficiales con probabilidades base calibradas al tráfico real
             const SLOTS = [
-              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15 },
-              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8  },
-              { id: '12-14', jornada: '12-2 pm', start: 12, end: 14, defaultPct: 10 },
-              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7  },
-              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45 },
-              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15 },
+              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15, baseProb: 0.11 },
+              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8,  baseProb: 0.09 },
+              { id: '12-14', jornada: '12-2 pm', start: 12, end: 14, defaultPct: 10, baseProb: 0.25 },
+              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7,  baseProb: 0.07 },
+              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45, baseProb: 0.12 },
+              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15, baseProb: 0.11 },
             ];
 
             // Identificar la franja por el turno activo o por la hora actual
@@ -1189,17 +1189,18 @@ export function PosView() {
                   const currentMinutes = (hour * 60) + minute;
                   const minutesLeftInShift = slotEndMinutes - currentMinutes;
 
-                  // ⚡ REGLA 3: MODO ACELERACIÓN AL FINALIZAR EL TURNO
-                  // Si faltan 10 minutos o menos para terminar el turno y hay premios pendientes:
-                  // ¡La próxima compra que cumpla el monto mínimo GANA AL 100% GARANTIZADO!
-                  if (minutesLeftInShift <= 10) {
-                    isLuckyWinner = true;
+                  // ⚡ REGLA 3: FASE RUSH FINAL (ÚLTIMOS 20 MINUTOS DEL TURNO)
+                  // Si faltan 20 minutos o menos para terminar el turno y aún hay premios pendientes de la meta:
+                  // La probabilidad sube al 50% para empujar el cumplimiento de la meta del turno.
+                  if (minutesLeftInShift <= 20) {
+                    isLuckyWinner = Math.random() < 0.50;
                   } else {
-                    // Durante el transcurso normal del turno: probabilidad saludable (30% - 50%)
-                    const baseProb = Math.min(0.50, Math.max(0.25, (prizesAvailableNow / 4)));
-                    isLuckyWinner = Math.random() < baseProb;
+                    // 🟢 FASE NORMAL: Probabilidad base calibrada según el flujo real de la franja horaria
+                    const shiftProb = currentSlotObj.baseProb ?? 0.11;
+                    isLuckyWinner = Math.random() < shiftProb;
                   }
                 }
+                // Si prizesAvailableNow <= 0: FRENO ESTRICTO (isLuckyWinner permanece false = 0% hasta el siguiente turno)
               }
             }
           }
