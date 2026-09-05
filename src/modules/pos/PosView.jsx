@@ -76,6 +76,7 @@ export function PosView() {
   // - Usuario de sede: ve solo cajas asignadas a su sede (branchId coincide)
   const isGlobal = user?.role === 'ADMIN' || !user?.branchId;
   const userBranchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
+  const effectiveBranch = userBranchId;
   const activeRegisters = (posRegisters || []).filter(r =>
     r.active !== false &&
     (r.branchId === userBranchId)
