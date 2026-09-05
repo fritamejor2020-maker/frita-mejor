@@ -4,6 +4,19 @@ import { registerSW } from 'virtual:pwa-register'
 import './index.css'
 import App from './App.jsx'
 
+// 🛡️ Auto-recuperación ante nuevos despliegues de Vercel (Vite dynamic import chunk failure)
+if (typeof window !== 'undefined') {
+  window.addEventListener('vite:preloadError', (event) => {
+    event.preventDefault();
+    const lastReload = sessionStorage.getItem('chunk_reload_ts');
+    const now = Date.now();
+    if (!lastReload || (now - Number(lastReload)) > 10000) {
+      sessionStorage.setItem('chunk_reload_ts', String(now));
+      window.location.reload();
+    }
+  });
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
