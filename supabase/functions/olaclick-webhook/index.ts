@@ -62,11 +62,11 @@ serve(async (req: Request) => {
     const orderId = String(orderRaw.id || `OLA-${Date.now()}`);
     const publicId = orderRaw.public_id || '';
     const customerName = orderRaw.client?.name || 'Cliente OlaClick';
-    const customerPhone = orderRaw.client?.phone || '';
-    // Construir dirección desde address.area + address.city
-    const addressArea = orderRaw.address?.area || '';
-    const addressCity = orderRaw.address?.city || '';
-    const deliveryAddress = [addressArea, addressCity].filter(Boolean).join(', ') || '';
+    const customerPhone = orderRaw.client?.phone_number || orderRaw.client?.phone || '';
+    // Construir dirección desde address.address + reference + complement o area + city
+    const addrObj = orderRaw.address || {};
+    const deliveryAddress = [addrObj.address, addrObj.reference, addrObj.complement].filter(Boolean).join(', ') ||
+      [addrObj.area, addrObj.city].filter(Boolean).join(', ') || '';
     // El total de OlaClick viene en COP (pesos colombianos), NO en centavos
     const totalAmount = Math.round(Number(orderRaw.total || 0));
     const deliveryPrice = Math.round(Number(orderRaw.delivery_price || 0));

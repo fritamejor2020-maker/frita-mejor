@@ -198,17 +198,22 @@ export const usePosStore = create((set, get) => ({
       }
     });
 
+    const customerPhone = order.customer_phone || order.raw_payload?.data?.client?.phone_number || order.raw_payload?.client?.phone_number || '';
+    const rawAddr = order.raw_payload?.data?.address || order.raw_payload?.address;
+    const deliveryAddress = order.delivery_address || 
+      [rawAddr?.address, rawAddr?.reference, rawAddr?.complement].filter(Boolean).join(' - ') || '';
+
     const newHeldSale = {
       id: `HELD-OLA-${order.id}`,
       originalOlaClickId: order.id,
       publicId: order.public_id || String(order.id)?.substring(0, 8),
-      customerName: order.customer_name || 'Cliente OlaClick',
-      customerPhone: order.customer_phone || '',
-      deliveryAddress: order.delivery_address || '',
-      serviceType: order.service_type || 'DELIVERY',
+      customerName: order.customer_name || order.raw_payload?.data?.client?.name || 'Cliente OlaClick',
+      customerPhone: customerPhone,
+      deliveryAddress: deliveryAddress,
+      serviceType: order.service_type || order.raw_payload?.data?.service_type || 'DELIVERY',
       items: normalizedCartItems,
       subtotal: calculateCartTotal(normalizedCartItems),
-      total: order.total_amount || calculateCartTotal(normalizedCartItems),
+      total: order.total_amount || order.raw_payload?.data?.total || calculateCartTotal(normalizedCartItems),
       status: 'SUSPENDED',
       timestamp: new Date().toISOString(),
       heldAt: new Date().toISOString(),

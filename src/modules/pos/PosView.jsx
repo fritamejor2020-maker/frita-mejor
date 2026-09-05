@@ -351,16 +351,15 @@ export function PosView() {
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const loadPendingCount = async () => {
     try {
-      const merchantId = posSettings?.olaclickMerchantId || '';
-      if (!merchantId) {
-        setPendingOrdersCount(0);
-        return;
-      }
+      const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[effectiveBranch]?.merchantId || 'frita-mejor';
+      // Considerar pedidos pendientes de las últimas 48 horas para alertar de pedidos del día / turno activo
+      const sinceDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       const { data, count, error } = await supabase
         .from('olaclick_orders')
         .select('id', { count: 'exact' })
         .eq('status', 'PENDING')
-        .eq('store_id', merchantId);
+        .gte('created_at', sinceDate)
+        .or(`store_id.eq.${merchantId},store_id.eq.frita-mejor,store_id.is.null,store_id.eq.""`);
       
       if (!error) {
         setPendingOrdersCount(count ?? (data ? data.length : 0));
@@ -387,7 +386,7 @@ export function PosView() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [posSettings?.olaclickMerchantId]);
+  }, [posSettings?.olaclickMerchantId, effectiveBranch]);
 
   // Reset check when register changes
   useEffect(() => {

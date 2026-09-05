@@ -53,18 +53,15 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     async function fetchOrders() {
       try {
         setLoading(true);
-        const merchantId = posSettings?.olaclickMerchantId || '';
-        if (!merchantId) {
-          setOrders([]);
-          setLoading(false);
-          return;
-        }
+        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+        const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[userBranch]?.merchantId || 'frita-mejor';
 
         const { data, error } = await supabase
           .from('olaclick_orders')
           .select('*')
-          .eq('store_id', merchantId)
-          .order('created_at', { ascending: false });
+          .or(`store_id.eq.${merchantId},store_id.eq.frita-mejor,store_id.is.null,store_id.eq.""`)
+          .order('created_at', { ascending: false })
+          .limit(50);
 
         if (error) throw error;
         setOrders(data || []);
@@ -81,7 +78,8 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
   // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)
   useEffect(() => {
-    const merchantId = posSettings?.olaclickMerchantId || '';
+    const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+    const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[userBranch]?.merchantId || 'frita-mejor';
     
     const channel = supabase
       .channel('olaclick_realtime')
@@ -93,8 +91,9 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
           console.log('[OlaClickTab] Realtime update:', eventType, newRecord);
 
           // Si es un evento de creación o actualización, validar comercio/sede
-          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord && newRecord.store_id !== merchantId) {
-            return;
+          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord) {
+            const isOurStore = !newRecord.store_id || newRecord.store_id === merchantId || newRecord.store_id === 'frita-mejor';
+            if (!isOurStore) return;
           }
 
           setOrders((prev) => {
@@ -504,18 +503,27 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                 {/* Contenido: Detalles e Ítems */}
                 <div className="py-3 flex-1 space-y-3">
                   {/* Dirección y teléfono */}
-                  <div className="space-y-1">
-                    {order.customer_phone && (
-                      <p className="text-xs text-gray-400 font-bold flex items-center gap-1">
-                        <Phone size={12} className="text-gray-500" /> {order.customer_phone}
-                      </p>
-                    )}
-                    {order.delivery_address && (
-                      <p className="text-xs text-gray-400 font-bold flex items-start gap-1">
-                        <MapPin size={12} className="text-gray-500 mt-0.5" /> {order.delivery_address}
-                      </p>
-                    )}
-                  </div>
+                  {(() => {
+                    const phone = order.customer_phone || order.raw_payload?.data?.client?.phone_number || order.raw_payload?.client?.phone_number || '';
+                    const rawAddr = order.raw_payload?.data?.address || order.raw_payload?.address;
+                    const address = order.delivery_address || 
+                      [rawAddr?.address, rawAddr?.reference, rawAddr?.complement].filter(Boolean).join(' - ') || '';
+
+                    return (
+                      <div className="space-y-1">
+                        {phone && (
+                          <p className="text-xs text-gray-400 font-bold flex items-center gap-1">
+                            <Phone size={12} className="text-gray-500" /> {phone}
+                          </p>
+                        )}
+                        {address && (
+                          <p className="text-xs text-gray-400 font-bold flex items-start gap-1">
+                            <MapPin size={12} className="text-gray-500 mt-0.5" /> {address}
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Listado de Productos */}
                   <div className="bg-[#181a23] rounded-xl p-3 border border-gray-900/40">
