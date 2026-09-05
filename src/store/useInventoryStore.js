@@ -436,7 +436,17 @@ export const useInventoryStore = create(
             }
           } catch { /* useBranchStore puede no estar listo aún */ }
 
+          // 🛡️ Escape de emergencia: si la red tarda más de 6s, habilitar escrituras para jamás congelar la app
+          const fallbackTimer = setTimeout(() => {
+            if (!get()._hasLoadedRemote) {
+              console.warn('[SyncGuard] ⚠️ Carga remota demorada — desbloqueando app con estado local de respaldo.');
+              set({ _hasLoadedRemote: true });
+              markAppReady();
+            }
+          }, 6000);
+
           const remote = await pullAll(branchId, allBranchIds);
+          clearTimeout(fallbackTimer);
 
           // Rehidratar inmediatamente TODOS los stores de la aplicación con el snapshot fresco de la nube
           if (remote && Object.keys(remote).length > 0) {

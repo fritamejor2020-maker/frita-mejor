@@ -636,10 +636,20 @@ export async function pullAll(branchId = null, allBranchIds = ['BRANCH-001']) {
     }
   }
 
-  const { data, error } = await supabase
+  // 🛡️ Blindaje de Resiliencia: Timeout de 8s para que una desconexión o lentitud en Supabase jamás congele la app
+  const fetchPromise = supabase
     .from('app_state')
     .select('key, value')
     .in('key', keysToFetch);
+
+  const timeoutPromise = new Promise((resolve) =>
+    setTimeout(() => {
+      console.warn('[SyncManager] ⏱️ Timeout en pullAll (8s) — resolviendo con respaldo local');
+      resolve({ data: null, error: new Error('pullAll timeout') });
+    }, 8000)
+  );
+
+  const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
   if (error || !data) return {};
   return Object.fromEntries(data.map(row => [row.key, row.value]));
