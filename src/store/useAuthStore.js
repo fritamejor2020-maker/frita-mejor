@@ -171,13 +171,29 @@ export const MANAGER_PERMISSIONS = [
 // Solo se borra cuando el usuario cierra sesión explícitamente.
 // =============================================================================
 
+const getInitialAuthState = () => {
+  if (typeof window === 'undefined') return { user: null, activeBranchId: null };
+  try {
+    const raw = localStorage.getItem('frita-mejor-auth-v2');
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        user: parsed?.state?.user || null,
+        activeBranchId: parsed?.state?.activeBranchId || null,
+      };
+    }
+  } catch (_) {}
+  return { user: null, activeBranchId: null };
+};
+
+const initialAuth = getInitialAuthState();
+
 export const useAuthStore = create(
   persist(
     (set, get) => ({
       // ─── Estado ─────────────────────────────────────────────────
-      _hasHydrated: false,
-      user:    null, // usuario autenticado actual
-      activeBranchId: null, // Sede activa actual (para operación)
+      user:           initialAuth.user, // Inicializado síncronamente desde localStorage
+      activeBranchId: initialAuth.activeBranchId, // Sede activa actual (para operación)
       loading: false,
       error:   null,
       users:   DEFAULT_USERS, // todos los usuarios del sistema
@@ -509,7 +525,6 @@ export const useAuthStore = create(
         return state;
       },
       onRehydrateStorage: () => (state) => {
-        useAuthStore.setState({ _hasHydrated: true });
         if (!state) return;
         // Si estamos en entorno Electron, requerir siempre inicio de sesión al abrir la app
         if (typeof window !== 'undefined' && window.__ELECTRON__) {

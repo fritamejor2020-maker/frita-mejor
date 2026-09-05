@@ -11,18 +11,6 @@ import { useAuthStore } from '../../store/useAuthStore';
  */
 export function ProtectedRoute({ allowedRoles, allowedModules }) {
   const user = useAuthStore((s) => s.user);
-  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const isHydrated = _hasHydrated || (useAuthStore.persist?.hasHydrated ? useAuthStore.persist.hasHydrated() : true);
-
-  // 🛡️ Prevenir expulsión a /login durante el ciclo de lectura de localStorage
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#FFF8E7] gap-3">
-        <div className="w-10 h-10 border-4 border-amber-400 border-t-amber-600 rounded-full animate-spin"></div>
-        <span className="text-xs font-black text-amber-900 tracking-wider uppercase">Verificando sesión...</span>
-      </div>
-    );
-  }
 
   if (!user) {
     return <Navigate to="/login" replace />;

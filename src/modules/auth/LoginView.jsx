@@ -59,13 +59,11 @@ const GLOBAL_OPTION = { id: '__global__', name: 'Acceso Global', type: '__global
 export function LoginView() {
   const { signIn, error, clearError } = useAuthStore();
   const user = useAuthStore((s) => s.user);
-  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const isHydrated = _hasHydrated || (useAuthStore.persist?.hasHydrated ? useAuthStore.persist.hasHydrated() : true);
   const navigate = useNavigate();
 
   // 🛡️ Auto-recuperar sesión: Si el usuario ya está autenticado, redirigir automáticamente
   useEffect(() => {
-    if (isHydrated && user) {
+    if (user) {
       const access = user.access || [];
       if (access.length > 1) {
         navigate('/selector', { replace: true });
@@ -78,7 +76,7 @@ export function LoginView() {
         navigate('/pos', { replace: true });
       }
     }
-  }, [isHydrated, user, navigate]);
+  }, [user, navigate]);
 
   const allBranches = useBranchStore(s => s.branches);
   const activeBranches = allBranches.filter(b => b.active !== false);
