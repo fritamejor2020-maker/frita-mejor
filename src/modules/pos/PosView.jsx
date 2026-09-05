@@ -18,6 +18,7 @@ import { supabase } from '../../lib/supabase';
 import { usePosStore } from '../../store/usePosStore';
 import { useTaskStore } from '../../store/useTaskStore';
 import { QuickTaskDrawer } from '../../components/ui/QuickTaskDrawer';
+import { getProductImageUrl, getProductLocalFallback } from '../../utils/productImages';
 import toast from 'react-hot-toast';
 
 export function PosView() {
@@ -2069,56 +2070,73 @@ export function PosView() {
             {/* Folders (Removed per user request) */}
 
             {/* Show Products */}
-            {paginatedItems.map(item => (
-              <button 
-                key={item.id} 
-                className={`${posSettings?.layout?.gridRows ? 'h-full' : 'aspect-square'} bg-[#21242d] hover:bg-[#2a2d38] border-2 border-transparent hover:border-chunky-main/50 rounded-[32px] flex flex-col justify-between p-4 text-left shadow-xl shadow-black/20 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-300 relative overflow-hidden group`}
-                onClick={() => handleItemAdd(item)}
-              >
-                {/* Background Image if available */}
-                {item.imageUrl && (
-                  <>
-                    <div className="absolute top-0 left-0 right-0 bottom-1/3 overflow-hidden rounded-t-[32px]">
-                      <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" onError={(e) => { e.target.style.display = 'none'; }} />
-                    </div>
-                    {/* Gradient Overlay positioned outside to overlap the seam by 2px and avoid subpixel gaps */}
-                    <div className="absolute top-0 left-0 right-0 bottom-[calc(33.333%-2px)] bg-gradient-to-t from-[#21242d] group-hover:from-[#2a2d38] via-transparent to-transparent transition-all duration-300 z-10 rounded-t-[32px]"></div>
-                  </>
-                )}
+            {paginatedItems.map(item => {
+              const itemImg = getProductImageUrl(item);
+              return (
+                <button 
+                  key={item.id} 
+                  className={`${posSettings?.layout?.gridRows ? 'h-full' : 'aspect-square'} bg-[#21242d] hover:bg-[#2a2d38] border-2 border-transparent hover:border-chunky-main/50 rounded-[32px] flex flex-col justify-between p-4 text-left shadow-xl shadow-black/20 hover:shadow-2xl hover:-translate-y-2 active:scale-95 transition-all duration-300 relative overflow-hidden group`}
+                  onClick={() => handleItemAdd(item)}
+                >
+                  {/* Background Image if available */}
+                  {itemImg && (
+                    <>
+                      <div className="absolute top-0 left-0 right-0 bottom-1/3 overflow-hidden rounded-t-[32px]">
+                        <img 
+                          src={itemImg} 
+                          alt={item.name} 
+                          loading="eager"
+                          decoding="async"
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
+                          onError={(e) => {
+                            const fallback = getProductLocalFallback(item);
+                            if (fallback && !e.target.src.endsWith(fallback)) {
+                              e.target.src = fallback;
+                            } else {
+                              e.target.style.display = 'none';
+                            }
+                          }} 
+                        />
+                      </div>
+                      {/* Gradient Overlay positioned outside to overlap the seam by 2px and avoid subpixel gaps */}
+                      <div className="absolute top-0 left-0 right-0 bottom-[calc(33.333%-2px)] bg-gradient-to-t from-[#21242d] group-hover:from-[#2a2d38] via-transparent to-transparent transition-all duration-300 z-10 rounded-t-[32px]"></div>
+                    </>
+                  )}
 
-                <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
+                  <div className="absolute inset-0 bg-chunky-main/5 opacity-0 group-hover:opacity-100 transition-opacity z-10 duration-300 pointer-events-none"></div>
 
-                <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
-                  <span className={`font-bold leading-tight line-clamp-2 text-white ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
-                  <span className={`font-bold tracking-tight text-amber-500 ${item.imageUrl ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
-                    {(() => {
-                      const eff = getEffectivePrice(item, customer, customerTypes);
-                      if (eff.isCustomPrice) {
-                        return (
-                          <span className="flex items-center gap-1.5 flex-wrap">
-                            <span className="line-through text-gray-400 text-xs font-normal">{formatMoney(item.price)}</span>
-                            <span className="text-amber-500 font-black">{formatMoney(eff.price)}</span>
-                          </span>
-                        );
-                      }
-                      const isVariable = item.variablePrice === true || !item.price || item.price <= 0;
-                      if (isVariable) {
-                        const refPrice = (item.referencePrice && Number(item.referencePrice) > 0) ? Number(item.referencePrice) : (eff.originalPrice && Number(eff.originalPrice) > 0) ? Number(eff.originalPrice) : 0;
-                        if (refPrice > 0) {
+                  <div className={`relative z-20 flex flex-col gap-0.5 w-full mt-auto`}>
+                    <span className={`font-bold leading-tight line-clamp-2 text-white ${itemImg ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-[13px] sm:text-sm' : posSettings?.gridSize === 'large' ? 'text-base sm:text-lg' : 'text-sm sm:text-base'}`} title={item.name}>{item.name.replace('Chorizo', 'Chor.')}</span>
+                    <span className={`font-bold tracking-tight text-amber-500 ${itemImg ? 'drop-shadow-md' : ''} ${posSettings?.gridSize === 'small' ? 'text-sm sm:text-base' : posSettings?.gridSize === 'large' ? 'text-lg sm:text-xl' : 'text-base'}`}>
+                      {(() => {
+                        const eff = getEffectivePrice(item, customer, customerTypes);
+                        if (eff.isCustomPrice) {
                           return (
-                            <span className="text-amber-500 font-bold flex items-center gap-1">
-                              <span>{formatMoney(refPrice)}</span>
+                            <span className="flex items-center gap-1.5 flex-wrap">
+                              <span className="line-through text-gray-400 text-xs font-normal">{formatMoney(item.price)}</span>
+                              <span className="text-amber-500 font-black">{formatMoney(eff.price)}</span>
                             </span>
                           );
                         }
-                        return <span className="text-amber-500 font-bold text-xs">Precio Variable</span>;
-                      }
-                      return formatMoney(item.price);
-                    })()}
-                  </span>
-                </div>
-              </button>
-            ))}
+                        const isVariable = item.variablePrice === true || !item.price || item.price <= 0;
+                        if (isVariable) {
+                          const refPrice = (item.referencePrice && Number(item.referencePrice) > 0) ? Number(item.referencePrice) : (eff.originalPrice && Number(eff.originalPrice) > 0) ? Number(eff.originalPrice) : 0;
+                          if (refPrice > 0) {
+                            return (
+                              <span className="text-amber-500 font-bold flex items-center gap-1">
+                                <span>{formatMoney(refPrice)}</span>
+                              </span>
+                            );
+                          }
+                          return <span className="text-amber-500 font-bold text-xs">Precio Variable</span>;
+                        }
+                        return formatMoney(item.price);
+                      })()}
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
 
           {paginatedItems.length === 0 && (
