@@ -302,17 +302,17 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
   };
 
   return (
-    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
-      <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col max-h-[90vh] animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[60] bg-black/70 backdrop-blur-xs flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white rounded-3xl max-w-4xl w-full shadow-2xl overflow-hidden border border-gray-100 flex flex-col h-[92vh] max-h-[92vh] min-h-0 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Header */}
-        <div className="bg-gray-900 text-white px-6 py-5 flex items-center justify-between">
+        <div className="bg-gray-900 text-white px-6 py-4 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-3">
             <div className="p-2.5 bg-amber-400 text-gray-950 rounded-2xl">
               <Layers size={22} />
             </div>
             <div>
-              <h2 className="text-xl font-black tracking-tight">Gestión de Horarios y Grupos de Turnos</h2>
+              <h2 className="text-lg sm:text-xl font-black tracking-tight">Gestión de Horarios y Grupos de Turnos</h2>
               <p className="text-xs text-gray-400 font-medium">Crea conjuntos de turnos posibles y asígnalos a cada persona para auto-detección automática</p>
             </div>
           </div>
@@ -326,10 +326,10 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
         </div>
 
         {/* Navigation Tabs */}
-        <div className="flex border-b border-gray-200 bg-gray-100/90 px-6 py-3 gap-2 overflow-x-auto">
+        <div className="flex border-b border-gray-200 bg-gray-100/90 px-4 sm:px-6 py-2.5 gap-2 overflow-x-auto shrink-0">
           <button
             onClick={() => { setActiveTab('groups'); setEditingGroup(null); setIsCreatingGroup(false); }}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'groups'
                 ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
                 : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
@@ -340,7 +340,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
 
           <button
             onClick={() => { setActiveTab('templates'); setEditingTemplate(null); setIsCreatingTemplate(false); }}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'templates'
                 ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
                 : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
@@ -351,7 +351,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
 
           <button
             onClick={() => { setActiveTab('employees'); setEditingEmpContract(null); }}
-            className={`px-4 py-2.5 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+            className={`px-4 py-2 font-black text-xs sm:text-sm rounded-xl transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
               activeTab === 'employees'
                 ? 'bg-amber-400 text-gray-950 shadow-xs scale-[1.02]'
                 : 'bg-white text-gray-600 hover:text-gray-900 hover:bg-gray-200/70 border border-gray-200/80'
@@ -362,7 +362,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
         </div>
 
         {/* Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 bg-gray-50/50">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 min-h-0 bg-gray-50/50">
           
           {/* TAB 1: GRUPOS DE HORARIOS */}
           {activeTab === 'groups' && (
@@ -447,10 +447,10 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
 
                   {/* Selección de turnos que componen este grupo */}
                   <div>
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-                      <label className="block text-xs font-bold text-gray-800">
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2 bg-amber-50/80 p-2.5 rounded-xl border border-amber-200">
+                      <label className="block text-xs font-black text-amber-950">
                         Selecciona los Turnos Posibles que componen este Horario:
-                        <span className="ml-2 text-[11px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
+                        <span className="ml-2 text-[11px] font-black text-amber-800 bg-amber-200 px-2 py-0.5 rounded-md">
                           {grpSelectedShiftIds.length} seleccionados
                         </span>
                       </label>
@@ -458,16 +458,16 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                         <button
                           type="button"
                           onClick={() => setGrpSelectedShiftIds([])}
-                          className="text-[11px] font-bold text-gray-500 hover:text-gray-900 px-2 py-0.5 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                          className="px-3 py-1 bg-white hover:bg-gray-100 text-gray-700 border border-gray-300 rounded-lg text-xs font-black transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
                         >
-                          Deseleccionar todos
+                          ✗ Deseleccionar todos
                         </button>
                         <button
                           type="button"
                           onClick={() => setGrpSelectedShiftIds(shiftTemplates.map((s) => s.id))}
-                          className="text-[11px] font-bold text-amber-800 hover:text-amber-950 px-2 py-0.5 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
+                          className="px-3 py-1 bg-amber-400 hover:bg-amber-500 text-gray-950 rounded-lg text-xs font-black transition-colors cursor-pointer shadow-2xs flex items-center gap-1"
                         >
-                          Seleccionar todos ({shiftTemplates.length})
+                          ✓ Seleccionar todos ({shiftTemplates.length})
                         </button>
                       </div>
                     </div>
@@ -500,13 +500,14 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                             <button
                               type="button"
                               onClick={(e) => {
+                                e.preventDefault();
                                 e.stopPropagation();
-                                handleDeleteTemplate(st.id, st.name);
+                                handleStartEditTemplate(st);
                               }}
-                              className="p-1.5 hover:bg-red-50 text-red-500 hover:text-red-700 rounded-lg transition-colors cursor-pointer shrink-0"
-                              title="Eliminar este turno por completo"
+                              className="text-[10px] font-bold text-gray-400 hover:text-amber-600 p-1 cursor-pointer"
+                              title="Editar este turno"
                             >
-                              <Trash2 size={15} />
+                              Editar
                             </button>
                           </label>
                         );
@@ -519,7 +520,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs flex justify-end gap-2 pt-3 pb-1 border-t border-gray-200 z-10">
                     <button
                       type="button"
                       onClick={() => { setIsCreatingGroup(false); setEditingGroup(null); }}
@@ -669,7 +670,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs flex justify-end gap-2 pt-3 pb-1 border-t border-gray-200 z-10">
                     <button
                       type="button"
                       onClick={() => { setIsCreatingTemplate(false); setEditingTemplate(null); }}
@@ -773,16 +774,16 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                       <button
                         type="button"
                         onClick={() => setSelectedEmpNos(employeeContracts.map((e) => e.employeeNo))}
-                        className="text-xs font-black text-amber-900 bg-amber-200/90 px-3 py-1.5 rounded-xl hover:bg-amber-300 transition-colors cursor-pointer"
+                        className="text-xs font-black text-amber-950 bg-amber-200 hover:bg-amber-300 px-3 py-1.5 rounded-xl transition-colors cursor-pointer border border-amber-300 shadow-2xs"
                       >
                         ✓ Seleccionar los {employeeContracts.length}
                       </button>
                       <button
                         type="button"
                         onClick={() => setSelectedEmpNos([])}
-                        className="text-xs font-bold text-gray-500 hover:text-gray-900 px-2 py-1 cursor-pointer"
+                        className="text-xs font-black text-gray-700 hover:text-gray-950 bg-white hover:bg-gray-100 px-3 py-1.5 rounded-xl border border-gray-300 transition-colors cursor-pointer shadow-2xs"
                       >
-                        Deseleccionar todos
+                        ✗ Deseleccionar todos
                       </button>
                     </div>
                   </div>
@@ -843,7 +844,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-amber-200/80">
+                  <div className="sticky bottom-0 bg-amber-50/95 backdrop-blur-xs flex justify-end gap-2 pt-3 pb-1 border-t border-amber-200/80 z-10">
                     <button
                       type="button"
                       onClick={() => setSelectedEmpNos([])}
@@ -923,7 +924,7 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                     </div>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                  <div className="sticky bottom-0 bg-white/95 backdrop-blur-xs flex justify-end gap-2 pt-3 pb-1 border-t border-gray-200 z-10">
                     <button
                       type="button"
                       onClick={() => setEditingEmpContract(null)}
@@ -940,17 +941,36 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
                   </div>
                 </form>
               ) : (
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gray-100/70 p-3.5 rounded-2xl border border-gray-200/80">
-                  <p className="text-xs text-gray-600 font-bold flex items-center gap-1.5">
-                    💡 Marca las casillas para asignar horarios en lote o haz clic en <b>"⚙️ Asignar Horario"</b> individualmente.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={handleToggleSelectAllEmps}
-                    className="px-3.5 py-1.5 bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer shrink-0 transition-transform active:scale-95"
-                  >
-                    <Zap size={14} /> {selectedEmpNos.length === employeeContracts.length ? 'Deseleccionar Todos' : `Seleccionar Todos (${employeeContracts.length})`}
-                  </button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-amber-200/80 shadow-2xs">
+                  <div>
+                    <p className="text-xs text-gray-900 font-black flex items-center gap-1.5">
+                      👥 Asignación de Horarios por Trabajador ({employeeContracts.length} personas)
+                    </p>
+                    <p className="text-[11px] text-gray-500 font-bold mt-0.5">
+                      💡 Marca casillas en la tabla o usa los botones para asignar en lote:
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmpNos(employeeContracts.map((e) => e.employeeNo))}
+                      className="px-3.5 py-2 bg-amber-400 hover:bg-amber-500 text-gray-950 font-black text-xs rounded-xl flex items-center gap-1.5 shadow-2xs cursor-pointer transition-transform active:scale-95"
+                    >
+                      <Zap size={14} /> ✓ Seleccionar Todos ({employeeContracts.length})
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setSelectedEmpNos([])}
+                      disabled={selectedEmpNos.length === 0}
+                      className={`px-3 py-2 text-xs font-black rounded-xl border transition-colors ${
+                        selectedEmpNos.length > 0
+                          ? 'bg-gray-100 hover:bg-gray-200 text-gray-800 border-gray-300 cursor-pointer shadow-2xs'
+                          : 'bg-gray-50 text-gray-400 border-gray-200 cursor-not-allowed'
+                      }`}
+                    >
+                      ✗ Deseleccionar
+                    </button>
+                  </div>
                 </div>
               )}
 
