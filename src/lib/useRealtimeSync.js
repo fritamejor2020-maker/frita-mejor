@@ -195,6 +195,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     const setDeleted = new Set(merged);
     useInventoryStore.setState({ posRegisters: currentRegs.filter(r => !setDeleted.has(r.id)) });
   };
+  applicators['deletedPosSaleIds'] = (v) => {
+    const local = useInventoryStore.getState().deletedPosSaleIds || [];
+    const merged = [...new Set([...local, ...(v || [])])];
+    useInventoryStore.setState({ deletedPosSaleIds: merged });
+    const currentSales = useInventoryStore.getState().posSales || [];
+    const setDeleted = new Set(merged);
+    useInventoryStore.setState({ posSales: currentSales.filter(s => !setDeleted.has(s.id) && (!s.originalOlaClickId || !setDeleted.has(s.originalOlaClickId)) && (!s.publicId || !setDeleted.has(s.publicId))) });
+  };
   applicators['transfers']         = (v) => useTransferStore.getState().loadFromRemote(v);
   applicators['tasks_data']        = (v) => useTaskStore.getState().loadFromRemote(v);
   applicators['salesGoals']        = (v) => useInventoryStore.setState({ salesGoals: v });
@@ -320,6 +328,14 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       // MERGE: no perder tombstones locales al recibir los de otra sede
       const local = useInventoryStore.getState().deletedInventoryIds || [];
       useInventoryStore.setState({ deletedInventoryIds: [...new Set([...local, ...(v || [])])] });
+    };
+    applicators[`deletedPosSaleIds_${bid}`] = (v) => {
+      const local = useInventoryStore.getState().deletedPosSaleIds || [];
+      const merged = [...new Set([...local, ...(v || [])])];
+      useInventoryStore.setState({ deletedPosSaleIds: merged });
+      const currentSales = useInventoryStore.getState().posSales || [];
+      const setDeleted = new Set(merged);
+      useInventoryStore.setState({ posSales: currentSales.filter(s => !setDeleted.has(s.id) && (!s.originalOlaClickId || !setDeleted.has(s.originalOlaClickId)) && (!s.publicId || !setDeleted.has(s.publicId))) });
     };
     applicators[`vehicles_${bid}`] = (v) => {
       if (Array.isArray(v)) {

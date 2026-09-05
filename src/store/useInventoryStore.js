@@ -39,7 +39,7 @@ function syncKey(key, value) {
   markLocalWrite(key, effectiveBranchId);
   push(key, value, effectiveBranchId).catch(err => console.warn('[Sync]', resolvedKey, err.message));
 
-  if (key === 'inventory' || key === 'products' || key === 'posSettings' || key === 'posCategories') {
+  if (key === 'inventory' || key === 'products' || key === 'posSettings' || key === 'posCategories' || key === 'deletedPosSaleIds' || key === 'deletedShiftIds' || key === 'deletedInventoryIds') {
     markLocalWrite(key, null);
     markLocalWrite(key, 'BRANCH-001');
     const branches = useBranchStore.getState().branches || [];
@@ -194,10 +194,8 @@ export function mergeArrays(localArr, remoteArr, key) {
                 (localItem.originalHeldId && allPaidSaleIds.has(localItem.originalHeldId)) ||
                 (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
               const hasItems = localItem.items && localItem.items.length > 0;
-              const saleTime = new Date(localItem.heldAt || localItem.timestamp || localItem.createdAt || 0).getTime();
-              const isRecentOrToday = !isNaN(saleTime) && (Date.now() - saleTime) < (12 * 60 * 60 * 1000);
-              // 🛡️ Ventas locales SUSPENDED no en remoto se conservan si están en cola offline o son recientes de hoy
-              if (!isAlreadyPaid && hasItems && (isQueuedOffline || isRecentOrToday)) {
+              // 🛡️ Ventas locales SUSPENDED no en remoto SOLO se conservan si están en cola offline pendiente de envío
+              if (!isAlreadyPaid && hasItems && isQueuedOffline) {
                 merged.push(localItem);
                 addedIds.add(localItem.id);
               }

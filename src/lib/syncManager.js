@@ -109,7 +109,7 @@ export const GLOBAL_KEYS = [
   // Catálogos de productos (los mismos en todas las sedes)
   'products', 'recipes', 'fritadoRecipes', 'posCategories', 'itemTypes',
   // Administración global del sistema y configuraciones
-  'users', 'deletedUserIds', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'deletedPosSaleIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
+  'users', 'deletedUserIds', 'branches', 'deletedBranchIds', 'suppliers', 'posRegisters', 'deletedPosRegisterIds', 'customers', 'customerTypes', 'payrollEmployees', 'salesGoals', 'monthlyGoals', 'incomeConfig', 'vehicles',
   // Traslados (son cross-sede por diseño) y Pedidos de Clientes
   'transfers', 'customer_delivery_requests',
 ];

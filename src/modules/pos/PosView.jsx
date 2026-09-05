@@ -286,9 +286,8 @@ export function PosView() {
       if (Math.abs((s.total || 0) - (p.total || 0)) > 1) continue;
       const pTime = new Date(p.timestamp || p.createdAt || 0).getTime();
       if (isNaN(pTime) || pTime === 0) continue;
-      const diffMs = pTime - sTime;
-      // Pago ocurrió dentro de los 20 minutos posteriores a la comanda/borrador
-      if (diffMs < -10000 || diffMs > (20 * 60 * 1000)) continue;
+      // Pago ocurrió dentro de las 8 horas posteriores a la comanda/borrador
+      if (diffMs < -10000 || diffMs > (8 * 60 * 60 * 1000)) continue;
 
       const pItems = p.items || [];
       if (sItems.length !== pItems.length) continue;
@@ -320,9 +319,9 @@ export function PosView() {
     if (!sale) return true;
     const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
     if (isNaN(saleTime) || saleTime === 0) return true;
-    // Ventas suspendidas de más de 12 horas o de fechas anteriores son obsoletas
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
-    const isOld = (Date.now() - saleTime) > twelveHoursMs;
+    // Ventas suspendidas de más de 6 horas o de fechas anteriores son obsoletas
+    const maxAgeMs = 6 * 60 * 60 * 1000;
+    const isOld = (Date.now() - saleTime) > maxAgeMs;
     const saleDate = new Date(saleTime).toISOString().slice(0, 10);
     const today = new Date().toISOString().slice(0, 10);
     return isOld || saleDate < today;
