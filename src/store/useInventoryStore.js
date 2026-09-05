@@ -82,7 +82,11 @@ export function mergeArrays(localArr, remoteArr, key) {
     [...localArr, ...remoteArr].forEach(s => {
       if (s && s.status === 'PAID') {
         if (s.id) allPaidSaleIds.add(s.id);
+        if (s.originalHeldId) allPaidSaleIds.add(s.originalHeldId);
         if (s.originalOlaClickId) allPaidOlaClickIds.add(s.originalOlaClickId);
+        if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
+          allPaidOlaClickIds.add(s.id.replace('HELD-OLA-', ''));
+        }
         if (s.publicId) allPaidSaleIds.add(s.publicId);
       }
     });
@@ -107,17 +111,27 @@ export function mergeArrays(localArr, remoteArr, key) {
         } else if (key === 'posSales') {
           const isDeleted = deletedSales.has(localItem.id) || deletedSales.has(remoteVersion.id) || 
             (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
-            (remoteVersion.originalOlaClickId && deletedSales.has(remoteVersion.originalOlaClickId));
+            (remoteVersion.originalOlaClickId && deletedSales.has(remoteVersion.originalOlaClickId)) ||
+            (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId)) ||
+            (remoteVersion.originalHeldId && deletedSales.has(remoteVersion.originalHeldId));
 
           if (isDeleted) {
             // Ignorar ventas eliminadas
           } else if (remoteVersion.status === 'PAID' || remoteVersion.status === 'REJECTED') {
-            merged.push(remoteVersion);
+            if (localItem.status === 'PAID') {
+              // Ambos pagados: conservar versión local fresca para no perder método de pago o datos locales
+              merged.push({ ...remoteVersion, ...localItem });
+            } else {
+              merged.push(remoteVersion);
+            }
           } else if (localItem.status === 'PAID' || localItem.status === 'REJECTED') {
+            // 🛡️ El estado local PAID NUNCA puede ser degradado a SUSPENDED por una instantánea remota desactualizada
             merged.push(localItem);
           } else {
             // Venta suspendida: comprobar si ya fue pagada con otro ID o si está vacía
             const isAlreadyPaid = allPaidSaleIds.has(localItem.id) || allPaidSaleIds.has(remoteVersion.id) ||
+              (localItem.originalHeldId && allPaidSaleIds.has(localItem.originalHeldId)) ||
+              (remoteVersion.originalHeldId && allPaidSaleIds.has(remoteVersion.originalHeldId)) ||
               (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId)) ||
               (remoteVersion.originalOlaClickId && allPaidOlaClickIds.has(remoteVersion.originalOlaClickId));
             const hasItems = (localItem.items && localItem.items.length > 0) || (remoteVersion.items && remoteVersion.items.length > 0);
@@ -136,6 +150,7 @@ export function mergeArrays(localArr, remoteArr, key) {
         const isDeletedTombstone =
           deletedSales.has(localItem.id) ||
           (localItem.originalOlaClickId && deletedSales.has(localItem.originalOlaClickId)) ||
+          (localItem.originalHeldId && deletedSales.has(localItem.originalHeldId)) ||
           deletedShifts.has(localItem.id) ||
           deletedInvs.has(localItem.id) ||
           deletedRegs.has(localItem.id) ||
@@ -144,14 +159,22 @@ export function mergeArrays(localArr, remoteArr, key) {
         const isQueuedOffline = queuedIds.has(localItem.id);
 
         if (!isDeletedTombstone) {
-          if (key === 'posSales' && localItem.status === 'SUSPENDED') {
-            const isAlreadyPaid = allPaidSaleIds.has(localItem.id) || (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
-            const hasItems = localItem.items && localItem.items.length > 0;
-            if (!isAlreadyPaid && hasItems) {
+          if (key === 'posSales') {
+            if (localItem.status === 'PAID' || localItem.status === 'REJECTED') {
               merged.push(localItem);
               addedIds.add(localItem.id);
+            } else if (localItem.status === 'SUSPENDED') {
+              const isAlreadyPaid = allPaidSaleIds.has(localItem.id) || 
+                (localItem.originalHeldId && allPaidSaleIds.has(localItem.originalHeldId)) ||
+                (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
+              const hasItems = localItem.items && localItem.items.length > 0;
+              // 🛡️ Ventas locales SUSPENDED no en remoto solo se conservan si están en cola offline
+              if (!isAlreadyPaid && hasItems && isQueuedOffline) {
+                merged.push(localItem);
+                addedIds.add(localItem.id);
+              }
             }
-          } else if (isQueuedOffline || key === 'posSales' || key === 'posShifts' || key === 'movements') {
+          } else if (isQueuedOffline || key === 'posShifts' || key === 'movements') {
             merged.push(localItem);
             addedIds.add(localItem.id);
           }
@@ -165,7 +188,11 @@ export function mergeArrays(localArr, remoteArr, key) {
   remoteArr.forEach(remoteItem => {
     if (remoteItem?.id && !addedIds.has(remoteItem.id)) {
       const isDeletedTombstone =
-        (key === 'posSales' && (deletedSales.has(remoteItem.id) || (remoteItem.originalOlaClickId && deletedSales.has(remoteItem.originalOlaClickId)))) ||
+        (key === 'posSales' && (
+          deletedSales.has(remoteItem.id) || 
+          (remoteItem.originalOlaClickId && deletedSales.has(remoteItem.originalOlaClickId)) ||
+          (remoteItem.originalHeldId && deletedSales.has(remoteItem.originalHeldId))
+        )) ||
         (key === 'posShifts' && deletedShifts.has(remoteItem.id)) ||
         (key === 'inventory' && deletedInvs.has(remoteItem.id)) ||
         (key === 'posRegisters' && deletedRegs.has(remoteItem.id)) ||
@@ -173,7 +200,10 @@ export function mergeArrays(localArr, remoteArr, key) {
 
       if (!isDeletedTombstone) {
         if (key === 'posSales' && remoteItem.status === 'SUSPENDED') {
-          const isAlreadyPaid = allPaidSaleIds.has(remoteItem.id) || (remoteItem.originalOlaClickId && allPaidOlaClickIds.has(remoteItem.originalOlaClickId));
+          const isAlreadyPaid = allPaidSaleIds.has(remoteItem.id) || 
+            (remoteItem.originalHeldId && allPaidSaleIds.has(remoteItem.originalHeldId)) ||
+            (remoteItem.originalOlaClickId && allPaidOlaClickIds.has(remoteItem.originalOlaClickId)) ||
+            (typeof remoteItem.id === 'string' && remoteItem.id.startsWith('HELD-OLA-') && allPaidOlaClickIds.has(remoteItem.id.replace('HELD-OLA-', '')));
           const hasItems = remoteItem.items && remoteItem.items.length > 0;
           if (!isAlreadyPaid && hasItems) {
             merged.push(remoteItem);
@@ -509,43 +539,46 @@ export const useInventoryStore = create(
               }
               if (val !== undefined && val !== null) {
                 if (Array.isArray(val)) {
-                  // Remoto reemplaza local; preservar solo offline genuinos
-                  const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
-                  // Mapa de turnos remotos por ID para comparar estado de cierre
-                  const remoteById = new Map(val.filter(x => x?.id).map(x => [x.id, x]));
                   const localArr = get()[key] || [];
-                  const userCreatedOffline = localArr.filter(item => {
-                    if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
-                    if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
+                  let finalVal;
 
-                    // 🛡️ Para posSales: Ventas locales con status 'SUSPENDED' que no están en remoto NUNCA deben resucitar como offline
-                    if (key === 'posSales' && item.status === 'SUSPENDED') {
-                      return false;
-                    }
+                  if (key === 'posSales') {
+                    // 🛡️ BLINDAJE ATÓMICO: Jamás degradar ventas pagadas localmente a SUSPENDED por un snapshot remoto obsoleto
+                    finalVal = mergeArrays(localArr, val, 'posSales');
+                  } else {
+                    // Remoto reemplaza local; preservar solo offline genuinos
+                    const remoteIds = new Set(val.filter(x => x?.id).map(x => x.id));
+                    // Mapa de turnos remotos por ID para comparar estado de cierre
+                    const remoteById = new Map(val.filter(x => x?.id).map(x => [x.id, x]));
+                    const userCreatedOffline = localArr.filter(item => {
+                      if (!item?.id || DEMO_IDS.has(item.id) || deletedRegs.has(item.id)) return false;
+                      if (remoteIds.has(item.id)) return false; // ya en remoto, no duplicar
 
-                    // Para posShifts: verificar que no sea un residuo cerrado en remoto
-                    if (key === 'posShifts') {
-                      // 1. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
-                      const allRemoteSources = [
-                        ...(remote['posShifts'] || []),
-                        ...(remote['posShifts_BRANCH-001'] || []),
-                        ...(remote['posShifts_master_history'] || []),
-                      ];
-                      const remoteVersion = allRemoteSources.find(r => r?.id === item.id);
-                      if (remoteVersion?.closedAt && !item.closedAt) return false; // remoto cerrado gana
+                      // Para posShifts: verificar que no sea un residuo cerrado en remoto
+                      if (key === 'posShifts') {
+                        // 1. Si el item local está "abierto" pero existe una versión cerrada en cualquier fuente remota, NO incluir
+                        const allRemoteSources = [
+                          ...(remote['posShifts'] || []),
+                          ...(remote['posShifts_BRANCH-001'] || []),
+                          ...(remote['posShifts_master_history'] || []),
+                        ];
+                        const remoteVersion = allRemoteSources.find(r => r?.id === item.id);
+                        if (remoteVersion?.closedAt && !item.closedAt) return false; // remoto cerrado gana
 
-                      // 3. Si en remoto ya hay un turno activo para ese mismo vehículo hoy, el remoto manda
-                      if (!item.closedAt && item.pointId) {
-                        const cleanP = String(item.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const remoteHasPoint = val.some(r =>
-                          !r.closedAt && String(r.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP
-                        );
-                        if (remoteHasPoint) return false;
+                        // 3. Si en remoto ya hay un turno activo para ese mismo vehículo hoy, el remoto manda
+                        if (!item.closedAt && item.pointId) {
+                          const cleanP = String(item.pointId).toLowerCase().replace(/[^a-z0-9]/g, '');
+                          const remoteHasPoint = val.some(r =>
+                            !r.closedAt && String(r.pointId || '').toLowerCase().replace(/[^a-z0-9]/g, '') === cleanP
+                          );
+                          if (remoteHasPoint) return false;
+                        }
                       }
-                    }
-                    return true;
-                  });
-                  let finalVal = [...val, ...userCreatedOffline];
+                      return true;
+                    });
+                    finalVal = [...val, ...userCreatedOffline];
+                  }
+
                   // Aplicar tombstones
                   if (key === 'posShifts') finalVal = finalVal.filter(s => !deletedShifts.includes(s.id));
                   if (key === 'posSales') {
@@ -554,7 +587,12 @@ export const useInventoryStore = create(
                       ...(remote['deletedPosSaleIds'] || []),
                       ...(remote[`deletedPosSaleIds_${effectiveBranch}`] || [])
                     ]);
-                    finalVal = finalVal.filter(s => !allDelSales.has(s.id) && (!s.originalOlaClickId || !allDelSales.has(s.originalOlaClickId)) && (!s.publicId || !allDelSales.has(s.publicId)));
+                    finalVal = finalVal.filter(s => 
+                      !allDelSales.has(s.id) && 
+                      (!s.originalOlaClickId || !allDelSales.has(s.originalOlaClickId)) && 
+                      (!s.publicId || !allDelSales.has(s.publicId)) &&
+                      (!s.originalHeldId || !allDelSales.has(s.originalHeldId))
+                    );
                   }
                   if (key === 'inventory') {
                     // 🛡️ Filtro de seguridad: preserte productos activos de triciclos frente a tombstones viejos
@@ -1347,7 +1385,8 @@ export const useInventoryStore = create(
             dId !== saleId && 
             dId !== sale.id && 
             dId !== sale.originalOlaClickId && 
-            dId !== sale.publicId
+            dId !== sale.publicId &&
+            (!sale.originalHeldId || dId !== sale.originalHeldId)
           );
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
@@ -1439,7 +1478,12 @@ export const useInventoryStore = create(
             }
             return sale;
           });
-          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => dId !== id && dId !== data.originalOlaClickId && dId !== data.publicId);
+          const newDeleted = (s.deletedPosSaleIds || []).filter(dId => 
+            dId !== id && 
+            dId !== data.originalOlaClickId && 
+            dId !== data.publicId &&
+            (!data.originalHeldId || dId !== data.originalHeldId)
+          );
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
@@ -1466,6 +1510,7 @@ export const useInventoryStore = create(
           if (saleToDelete?.id) extraIds.push(saleToDelete.id);
           if (saleToDelete?.originalOlaClickId) extraIds.push(saleToDelete.originalOlaClickId);
           if (saleToDelete?.publicId) extraIds.push(saleToDelete.publicId);
+          if (saleToDelete?.originalHeldId) extraIds.push(saleToDelete.originalHeldId);
 
           const newDeleted = [...new Set([...(s.deletedPosSaleIds || []), ...extraIds])];
           return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };

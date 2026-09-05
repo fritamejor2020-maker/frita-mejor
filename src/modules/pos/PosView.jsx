@@ -1046,20 +1046,20 @@ export function PosView() {
     const isContrata = !!(saleCustomer && saleCustomer.typeId);
 
     const isLuckyTicket = isLuckyWinnerSession || !!(activeSuspendedId && String(activeSuspendedId).includes('LUCKY'));
-    const resolvedOlaClickId = pendingDeliveryInfo?.originalOlaClickId || 
+    const resolvedOlaClickId = (activeSuspendedId ? pendingDeliveryInfo?.originalOlaClickId : null) || 
       (activeSuspendedId && String(activeSuspendedId).startsWith('HELD-OLA-') ? String(activeSuspendedId).replace('HELD-OLA-', '') : null);
 
     const saleData = {
       id: activeSuspendedId || `SALE-${Date.now()}`,
-      originalHeldId: activeSuspendedId || pendingDeliveryInfo?.originalHeldId || null,
+      originalHeldId: activeSuspendedId || null,
       originalOlaClickId: resolvedOlaClickId || null,
       customerId: selectedCustomer || null,
-      customerName: saleCustomer?.name || pendingDeliveryInfo?.customerName || (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Cliente General')),
-      customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
-      deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
-      serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
-      isOlaClick: pendingDeliveryInfo?.isOlaClick || !!resolvedOlaClickId || false,
-      publicId: pendingDeliveryInfo?.publicId || null,
+      customerName: saleCustomer?.name || (activeSuspendedId ? pendingDeliveryInfo?.customerName : null) || (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Cliente General')),
+      customerPhone: saleCustomer?.phone || (activeSuspendedId ? pendingDeliveryInfo?.customerPhone : '') || '',
+      deliveryAddress: saleCustomer?.address || (activeSuspendedId ? pendingDeliveryInfo?.deliveryAddress : '') || '',
+      serviceType: (activeSuspendedId ? pendingDeliveryInfo?.serviceType : null) || 'DELIVERY',
+      isOlaClick: !!(activeSuspendedId && (pendingDeliveryInfo?.isOlaClick || resolvedOlaClickId)),
+      publicId: (activeSuspendedId ? pendingDeliveryInfo?.publicId : null) || null,
       items: ticketItems,
       subtotal,
       discountPercent,
@@ -1284,6 +1284,7 @@ export function PosView() {
     // Clear ticket
     setTicketItems([]);
     setActiveSuspendedId(null);
+    setPendingDeliveryInfo(null);
     setSelectedCustomer('');
     setManualDiscountPercent(0);
     setIsLuckyWinnerSession(false);
