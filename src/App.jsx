@@ -77,7 +77,14 @@ const UnauthorizedView = () => {
 };
 
 function RoleRedirect() {
-  const { user } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const isHydrated = _hasHydrated || (useAuthStore.persist?.hasHydrated ? useAuthStore.persist.hasHydrated() : true);
+
+  if (!isHydrated) {
+    return <LoadingFallback />;
+  }
+
   if (!user) return <Navigate to="/login" replace />;
 
   const access = user.access || [];

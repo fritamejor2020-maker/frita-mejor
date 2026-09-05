@@ -175,6 +175,7 @@ export const useAuthStore = create(
   persist(
     (set, get) => ({
       // ─── Estado ─────────────────────────────────────────────────
+      _hasHydrated: false,
       user:    null, // usuario autenticado actual
       activeBranchId: null, // Sede activa actual (para operación)
       loading: false,
@@ -508,6 +509,7 @@ export const useAuthStore = create(
         return state;
       },
       onRehydrateStorage: () => (state) => {
+        useAuthStore.setState({ _hasHydrated: true });
         if (!state) return;
         // Si estamos en entorno Electron, requerir siempre inicio de sesión al abrir la app
         if (typeof window !== 'undefined' && window.__ELECTRON__) {

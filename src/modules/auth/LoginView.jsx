@@ -58,7 +58,27 @@ const GLOBAL_OPTION = { id: '__global__', name: 'Acceso Global', type: '__global
 // ─── Componente principal ─────────────────────────────────────────────────────
 export function LoginView() {
   const { signIn, error, clearError } = useAuthStore();
+  const user = useAuthStore((s) => s.user);
+  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const isHydrated = _hasHydrated || (useAuthStore.persist?.hasHydrated ? useAuthStore.persist.hasHydrated() : true);
   const navigate = useNavigate();
+
+  // 🛡️ Auto-recuperar sesión: Si el usuario ya está autenticado, redirigir automáticamente
+  useEffect(() => {
+    if (isHydrated && user) {
+      const access = user.access || [];
+      if (access.length > 1) {
+        navigate('/selector', { replace: true });
+      } else if (access.length === 1) {
+        const key = access[0];
+        if (key === 'vendedor-setup' || key === 'vendedor') navigate(getVendedorRoute(user), { replace: true });
+        else if (key === 'dejador') navigate(getDejadorRoute(), { replace: true });
+        else navigate(MODULE_ROUTES[key] ?? '/selector', { replace: true });
+      } else {
+        navigate('/pos', { replace: true });
+      }
+    }
+  }, [isHydrated, user, navigate]);
 
   const allBranches = useBranchStore(s => s.branches);
   const activeBranches = allBranches.filter(b => b.active !== false);
