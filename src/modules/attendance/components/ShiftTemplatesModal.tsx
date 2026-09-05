@@ -447,9 +447,30 @@ export function ShiftTemplatesModal({ onClose, initialTab = 'groups' }: ShiftTem
 
                   {/* Selección de turnos que componen este grupo */}
                   <div>
-                    <label className="block text-xs font-bold text-gray-800 mb-2">
-                      Selecciona los Turnos Posibles que componen este Horario:
-                    </label>
+                    <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
+                      <label className="block text-xs font-bold text-gray-800">
+                        Selecciona los Turnos Posibles que componen este Horario:
+                        <span className="ml-2 text-[11px] font-black text-amber-700 bg-amber-100 px-2 py-0.5 rounded-md">
+                          {grpSelectedShiftIds.length} seleccionados
+                        </span>
+                      </label>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setGrpSelectedShiftIds([])}
+                          className="text-[11px] font-bold text-gray-500 hover:text-gray-900 px-2 py-0.5 rounded-lg hover:bg-gray-200 transition-colors cursor-pointer"
+                        >
+                          Deseleccionar todos
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setGrpSelectedShiftIds(shiftTemplates.map((s) => s.id))}
+                          className="text-[11px] font-bold text-amber-800 hover:text-amber-950 px-2 py-0.5 rounded-lg hover:bg-amber-100 transition-colors cursor-pointer"
+                        >
+                          Seleccionar todos ({shiftTemplates.length})
+                        </button>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 bg-gray-50 p-3 rounded-xl border border-gray-200">
                       {shiftTemplates.map((st) => {
                         const isChecked = grpSelectedShiftIds.includes(st.id);
