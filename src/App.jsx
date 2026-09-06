@@ -24,6 +24,7 @@ import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { QuickTaskDrawer } from './components/ui/QuickTaskDrawer';
 import { SignOutGuardModal } from './components/auth/SignOutGuardModal';
+import { TaskReminderNotifier } from './components/notifications/TaskReminderNotifier';
 
 // ── Code-Splitting: Carga diferida de vistas pesadas para ahorrar memoria en tablets ──
 const ProductionView = React.lazy(() => import('./modules/production/ProductionView').then(m => ({ default: m.ProductionView })));
@@ -430,6 +431,7 @@ function App() {
       <BrowserRouter>
         <QuickTaskDrawer />
         <SignOutGuardModal />
+        <TaskReminderNotifier />
         <ErrorBoundary>
           <React.Suspense fallback={<LoadingFallback />}>
             <Routes>

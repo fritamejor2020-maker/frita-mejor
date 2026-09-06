@@ -446,12 +446,23 @@ export const useTaskStore = create(
 
           if (rec.type === 'DAILY') {
             shouldGenerate = true;
-          } else if (rec.type === 'WEEKLY') {
-            const days = rec.daysOfWeek || [1, 2, 3, 4, 5, 6, 0];
+          } else if (rec.type === 'WEEKLY' || rec.type === 'WEEKLY_CUSTOM') {
+            const days = rec.daysOfWeek && rec.daysOfWeek.length > 0 ? rec.daysOfWeek : [1, 2, 3, 4, 5, 6, 0];
             if (days.includes(dayOfWeek)) shouldGenerate = true;
-          } else if (rec.type === 'MONTHLY') {
-            const targetDay = rec.dayOfMonth || 1;
-            if (dayOfMonth === targetDay) shouldGenerate = true;
+          } else if (rec.type === 'MONTHLY' || rec.type === 'MONTHLY_DAY') {
+            if (rec.isLastDay) {
+              const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+              if (dayOfMonth === lastDayOfMonth) shouldGenerate = true;
+            } else {
+              const targetDay = parseInt(rec.dayOfMonth, 10) || 1;
+              if (dayOfMonth === targetDay) shouldGenerate = true;
+            }
+          } else if (rec.type === 'INTERVAL' || rec.type === 'INTERVAL_DAYS') {
+            const interval = Math.max(1, parseInt(rec.intervalDays, 10) || 1);
+            const startEpoch = rec.startDate ? new Date(rec.startDate + 'T00:00:00').getTime() : now.getTime();
+            const todayEpoch = new Date(todayStr + 'T00:00:00').getTime();
+            const diffDays = Math.floor((todayEpoch - startEpoch) / (1000 * 60 * 60 * 24));
+            if (diffDays >= 0 && diffDays % interval === 0) shouldGenerate = true;
           }
 
           if (shouldGenerate) {
@@ -461,10 +472,12 @@ export const useTaskStore = create(
               projectId: tpl.projectId,
               priority: tpl.priority,
               assignedToUserId: tpl.assignedToUserId,
+              assignedToUserName: tpl.assignedToUserName || null,
               assignedToRole: tpl.assignedToRole,
               branchId: tpl.branchId,
               dueDate: todayStr,
               dueTime: tpl.dueTime,
+              targetModule: tpl.targetModule || 'none',
               enforcementLevel: tpl.enforcementLevel,
               requirePhoto: tpl.requirePhoto,
               requireNote: tpl.requireNote,

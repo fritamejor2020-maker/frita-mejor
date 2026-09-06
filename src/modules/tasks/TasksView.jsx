@@ -7,7 +7,7 @@ import {
   ChevronDown, X, Sparkles, Filter, Lock, ShieldAlert, Tag, Calendar, 
   FolderPlus, Flag, CheckSquare, Layers, Trash2, Edit2, ArrowLeft,
   QrCode, UserCheck, Phone, Video, Wrench, ExternalLink, Repeat,
-  Thermometer, Droplets
+  Thermometer, Droplets, Bell
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -87,6 +87,13 @@ function TaskCard({
               {task.isDamageReport && (
                 <span className="bg-red-500/20 text-red-400 text-[10px] font-black px-2 py-0.5 rounded-md border border-red-500/40 flex items-center gap-1">
                   <Wrench size={10} /> Reporte de Falla
+                </span>
+              )}
+
+              {/* Recurrence Badge */}
+              {task.templateId && (
+                <span className="bg-purple-950/70 text-purple-300 text-[10px] font-black px-2 py-0.5 rounded-md border border-purple-500/40 flex items-center gap-1" title="Tarea generada automáticamente por regla recurrente">
+                  <Repeat size={10} /> Recurrente
                 </span>
               )}
 
@@ -351,7 +358,43 @@ export function TasksView() {
   const [dueTime, setDueTime] = useState('');
   const [assigneeSelect, setAssigneeSelect] = useState('role:all');
   const [targetModule, setTargetModule] = useState('none');
-  const [recurrenceType, setRecurrenceType] = useState('NONE'); // 'NONE' | 'DAILY' | 'WEEKLY'
+  
+  // Recurrencia totalmente personalizada
+  const [recurrenceMode, setRecurrenceMode] = useState('NONE'); // 'NONE' | 'DAILY' | 'WEEKLY_CUSTOM' | 'MONTHLY_DAY' | 'INTERVAL'
+  const [selectedDaysOfWeek, setSelectedDaysOfWeek] = useState([1, 2, 3, 4, 5]); // 1: Lun .. 5: Vie, 6: Sáb, 0: Dom
+  const [selectedDayOfMonth, setSelectedDayOfMonth] = useState(1);
+  const [isLastDayOfMonth, setIsLastDayOfMonth] = useState(false);
+  const [selectedIntervalDays, setSelectedIntervalDays] = useState(2);
+
+  // Permisos y Estado de Notificaciones Web
+  const [notifPerm, setNotifPerm] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'default'
+  );
+
+  const handleRequestNotification = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const perm = await Notification.requestPermission();
+        setNotifPerm(perm);
+        if (perm === 'granted') {
+          toast.success('🔔 ¡Notificaciones y recordatorios activados!');
+          try {
+            new Notification('Frita Mejor • Notificaciones Activas', {
+              body: 'Recibirás recordatorios sonoros y avisos de tareas programadas en tiempo real.',
+              icon: '/pwa-192x192.png',
+            });
+          } catch (_) {}
+        } else if (perm === 'denied') {
+          toast.error('Las notificaciones están bloqueadas en tu navegador.');
+        }
+      } catch (err) {
+        console.error('Error requesting notification permission:', err);
+      }
+    } else {
+      toast.error('Tu navegador no soporta notificaciones de escritorio.');
+    }
+  };
+
   const [enforcementLevel, setEnforcementLevel] = useState('NORMAL');
   const [requirePhoto, setRequirePhoto] = useState(false);
   const [subtasksInput, setSubtasksInput] = useState(['']);
@@ -546,6 +589,28 @@ export function TasksView() {
       }
     }
 
+    let recurrence = null;
+    if (recurrenceMode === 'DAILY') {
+      recurrence = { type: 'DAILY' };
+    } else if (recurrenceMode === 'WEEKLY_CUSTOM') {
+      recurrence = {
+        type: 'WEEKLY_CUSTOM',
+        daysOfWeek: selectedDaysOfWeek.length > 0 ? selectedDaysOfWeek : [1, 2, 3, 4, 5, 6, 0]
+      };
+    } else if (recurrenceMode === 'MONTHLY_DAY') {
+      recurrence = {
+        type: 'MONTHLY_DAY',
+        dayOfMonth: isLastDayOfMonth ? null : (parseInt(selectedDayOfMonth, 10) || 1),
+        isLastDay: isLastDayOfMonth
+      };
+    } else if (recurrenceMode === 'INTERVAL') {
+      recurrence = {
+        type: 'INTERVAL_DAYS',
+        intervalDays: Math.max(1, parseInt(selectedIntervalDays, 10) || 1),
+        startDate: dueDate || todayStr
+      };
+    }
+
     addTask({
       title: title.trim(),
       description: description.trim(),
@@ -561,14 +626,18 @@ export function TasksView() {
       enforcementLevel,
       requirePhoto,
       subtasks: cleanSubtasks,
-      recurrence: recurrenceType !== 'NONE' ? { type: recurrenceType } : null,
+      recurrence,
     });
 
     setTitle('');
     setDescription('');
     setDueTime('');
     setRequirePhoto(false);
-    setRecurrenceType('NONE');
+    setRecurrenceMode('NONE');
+    setSelectedDaysOfWeek([1, 2, 3, 4, 5]);
+    setSelectedDayOfMonth(1);
+    setIsLastDayOfMonth(false);
+    setSelectedIntervalDays(2);
     setTargetModule('none');
     setSubtasksInput(['']);
     setShowAddBox(false);
@@ -794,14 +863,34 @@ export function TasksView() {
               </p>
             </div>
 
-            {/* Enlace a formulario público de reporte */}
-            <button
-              onClick={() => window.open(publicReportUrl, '_blank')}
-              className="text-xs text-amber-400 hover:underline font-bold flex items-center gap-1"
-            >
-              <span>Abrir Formulario QR</span>
-              <QrCode size={14} />
-            </button>
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Notificaciones del Sistema / PWA */}
+              {notifPerm !== 'granted' ? (
+                <button
+                  type="button"
+                  onClick={handleRequestNotification}
+                  className="bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/40 text-amber-300 font-bold text-xs px-3 py-1.5 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-sm"
+                  title="Activar avisos sonoros y recordatorios de tareas en tu dispositivo"
+                >
+                  <Bell size={13} className="text-amber-400 animate-pulse" />
+                  <span>Activar Notificaciones</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-3 py-1.5 rounded-xl">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Notificaciones Activas</span>
+                </div>
+              )}
+
+              {/* Enlace a formulario público de reporte */}
+              <button
+                onClick={() => window.open(publicReportUrl, '_blank')}
+                className="text-xs text-amber-400 hover:underline font-bold flex items-center gap-1 bg-[#181920] border border-gray-800 px-3 py-1.5 rounded-xl hover:border-gray-700"
+              >
+                <span>Formulario QR</span>
+                <QrCode size={13} />
+              </button>
+            </div>
           </div>
 
           {/* ── SEMÁFORO Y MÉTRICAS DE CUMPLIMIENTO OPERATIVO ── */}
@@ -1003,16 +1092,18 @@ export function TasksView() {
                   title="Hora límite opcional"
                 />
 
-                {/* Recurrencia */}
+                {/* Recurrencia Totalmente Personalizable */}
                 <select
-                  value={recurrenceType}
-                  onChange={(e) => setRecurrenceType(e.target.value)}
-                  className="bg-[#22242e] border border-gray-700 text-purple-300 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  value={recurrenceMode}
+                  onChange={(e) => setRecurrenceMode(e.target.value)}
+                  className="bg-[#22242e] border border-gray-700 text-purple-300 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none cursor-pointer"
                   title="Repetición automática de la tarea"
                 >
                   <option value="NONE">⏱️ Sin Repetición (Una vez)</option>
-                  <option value="DAILY">🔁 Repetir Diario</option>
-                  <option value="WEEKLY">📅 Repetir Semanal</option>
+                  <option value="DAILY">🔁 Repetir Diario (Todos los días)</option>
+                  <option value="WEEKLY_CUSTOM">📅 Días Específicos de la Semana</option>
+                  <option value="MONTHLY_DAY">🗓️ Día Fijo del Mes</option>
+                  <option value="INTERVAL">⏳ Cada N Días (Intervalo)</option>
                 </select>
 
                 {/* Módulo / Destino en la App */}
@@ -1050,6 +1141,129 @@ export function TasksView() {
                   <span>📷 Requiere Foto</span>
                 </label>
               </div>
+
+              {/* Controles Expandidos de Recurrencia Personalizada */}
+              {recurrenceMode === 'WEEKLY_CUSTOM' && (
+                <div className="bg-[#14151b] border border-purple-500/40 rounded-2xl p-3.5 space-y-2.5 animate-fadeIn">
+                  <div className="flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                      <Repeat size={13} /> Días de la semana en que se repite la tarea:
+                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDaysOfWeek([1, 2, 3, 4, 5])}
+                        className="text-[10px] font-bold bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30 text-purple-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Lun - Vie
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDaysOfWeek([6, 0])}
+                        className="text-[10px] font-bold bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30 text-purple-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Fin de semana
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSelectedDaysOfWeek([1, 2, 3, 4, 5, 6, 0])}
+                        className="text-[10px] font-bold bg-purple-950/60 hover:bg-purple-900 border border-purple-500/30 text-purple-200 px-2 py-0.5 rounded-lg transition-colors cursor-pointer"
+                      >
+                        Todos
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-7 gap-1.5 pt-1">
+                    {[
+                      { day: 1, label: 'Lun' },
+                      { day: 2, label: 'Mar' },
+                      { day: 3, label: 'Mié' },
+                      { day: 4, label: 'Jue' },
+                      { day: 5, label: 'Vie' },
+                      { day: 6, label: 'Sáb' },
+                      { day: 0, label: 'Dom' },
+                    ].map(d => {
+                      const active = selectedDaysOfWeek.includes(d.day);
+                      return (
+                        <button
+                          key={d.day}
+                          type="button"
+                          onClick={() => {
+                            if (active) {
+                              if (selectedDaysOfWeek.length > 1) {
+                                setSelectedDaysOfWeek(selectedDaysOfWeek.filter(x => x !== d.day));
+                              }
+                            } else {
+                              setSelectedDaysOfWeek([...selectedDaysOfWeek, d.day]);
+                            }
+                          }}
+                          className={`py-1.5 text-xs font-black rounded-xl border transition-all cursor-pointer ${
+                            active
+                              ? 'bg-purple-600 border-purple-400 text-white shadow-md shadow-purple-900/30'
+                              : 'bg-[#22242e] border-gray-700 text-gray-400 hover:text-gray-200 hover:border-gray-600'
+                          }`}
+                        >
+                          {d.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {recurrenceMode === 'MONTHLY_DAY' && (
+                <div className="bg-[#14151b] border border-purple-500/40 rounded-2xl p-3.5 space-y-2 animate-fadeIn">
+                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <Calendar size={13} /> Repetir por día del mes:
+                  </span>
+                  <div className="flex items-center gap-3 flex-wrap pt-1">
+                    <label className={`flex items-center gap-2 text-xs font-bold ${isLastDayOfMonth ? 'text-gray-500 opacity-50' : 'text-gray-200'}`}>
+                      <span>El día</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="31"
+                        value={selectedDayOfMonth}
+                        disabled={isLastDayOfMonth}
+                        onChange={(e) => setSelectedDayOfMonth(Math.max(1, Math.min(31, parseInt(e.target.value, 10) || 1)))}
+                        className="w-16 bg-[#22242e] border border-purple-500/50 rounded-xl px-2.5 py-1 text-center font-mono font-bold text-purple-300 focus:outline-none"
+                      />
+                      <span>de cada mes</span>
+                    </label>
+
+                    <label className="flex items-center gap-1.5 bg-[#22242e] border border-gray-700 px-3 py-1 rounded-xl cursor-pointer text-xs font-bold text-purple-200">
+                      <input
+                        type="checkbox"
+                        checked={isLastDayOfMonth}
+                        onChange={(e) => setIsLastDayOfMonth(e.target.checked)}
+                        className="accent-purple-500 rounded"
+                      />
+                      <span>Último día del mes (ej: 28, 30 o 31)</span>
+                    </label>
+                  </div>
+                </div>
+              )}
+
+              {recurrenceMode === 'INTERVAL' && (
+                <div className="bg-[#14151b] border border-purple-500/40 rounded-2xl p-3.5 space-y-2 animate-fadeIn">
+                  <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                    <Clock size={13} /> Intervalo personalizado:
+                  </span>
+                  <div className="flex items-center gap-2 text-xs font-bold text-gray-200 pt-1">
+                    <span>Generar automáticamente cada</span>
+                    <input
+                      type="number"
+                      min="1"
+                      max="365"
+                      value={selectedIntervalDays}
+                      onChange={(e) => setSelectedIntervalDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                      className="w-16 bg-[#22242e] border border-purple-500/50 rounded-xl px-2.5 py-1 text-center font-mono font-bold text-purple-300 focus:outline-none"
+                    />
+                    <span>días (ej: cada 2 días, cada 15 días)</span>
+                  </div>
+                </div>
+              )}
 
               {/* Subtareas Checklist Form */}
               <div className="space-y-2 pt-2 border-t border-gray-800">
