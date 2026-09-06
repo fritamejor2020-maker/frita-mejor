@@ -512,13 +512,6 @@ export function PosView() {
     const interval = setInterval(() => checkAgent().then(r => setPrinterAgentOk(r.ok)), 30000);
     return () => clearInterval(interval);
   }, []);
-  
-  // Enforce customer selection via a mock hook that sets the default
-  useEffect(() => {
-    if (!selectedCustomer && customers?.length > 0) {
-      setSelectedCustomer(customers[0].id);
-    }
-  }, [customers, selectedCustomer]);
 
   // Auto-foco inteligente y captura global para escáner de códigos de barras (Electron / Web)
   useEffect(() => {
