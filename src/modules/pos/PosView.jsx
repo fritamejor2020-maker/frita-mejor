@@ -1704,29 +1704,6 @@ export function PosView() {
           )}
         </div>
 
-        {/* ── Botón Tareas del Turno (POS) ── */}
-        <button
-          className={`shrink-0 h-11 px-3 flex items-center justify-center gap-1.5 rounded-xl border active:scale-95 transition-all relative cursor-pointer ${
-            posPendingObligatory.length > 0
-              ? 'bg-red-950/80 border-red-500 text-red-200 animate-pulse shadow-lg shadow-red-950/50'
-              : posPendingCount > 0
-              ? 'bg-amber-950/50 border-amber-500/60 text-amber-300 hover:bg-amber-900/40'
-              : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
-          }`}
-          title="Tareas del Turno"
-          onClick={() => setDrawerOpen(true)}
-        >
-          <span className="text-base">📋</span>
-          <span className="text-xs font-bold hidden md:inline">Tareas</span>
-          {posPendingCount > 0 && (
-            <span className={`text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg ${
-              posPendingObligatory.length > 0 ? 'bg-red-500 text-white animate-bounce' : 'bg-amber-400 text-gray-950'
-            }`}>
-              {posPendingCount}
-            </span>
-          )}
-        </button>
-
         {/* ── Botón Hamburguesa ── */}
         <div className="relative shrink-0">
           <button
@@ -1741,9 +1718,11 @@ export function PosView() {
             <span className="w-5 h-[2px] bg-current rounded-full" />
             <span className="w-5 h-[2px] bg-current rounded-full" />
             <span className="w-5 h-[2px] bg-current rounded-full" />
-            {pendingOrdersCount > 0 && (
-              <span className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white text-[10px] font-black rounded-full flex items-center justify-center animate-badge-pulse shadow-md">
-                {pendingOrdersCount}
+            {(pendingOrdersCount > 0 || posPendingCount > 0) && (
+              <span className={`absolute -top-1.5 -right-1.5 w-5 h-5 text-white text-[10px] font-black rounded-full flex items-center justify-center shadow-md ${
+                posPendingObligatory.length > 0 ? 'bg-red-500 animate-bounce' : (pendingOrdersCount > 0 ? 'bg-red-500 animate-badge-pulse' : 'bg-amber-400 text-gray-950')
+              }`}>
+                {(pendingOrdersCount || 0) + (posPendingCount || 0)}
               </span>
             )}
           </button>
