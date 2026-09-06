@@ -1184,21 +1184,33 @@ export function PosView() {
         rewardConfig = branchRewardsConfig[selectedRegisterId] || branchRewardsConfig['ALL'];
 
         if (rewardConfig && rewardConfig.enabled) {
-          // 🛡️ REGLA SAGRADA: El monto mínimo NUNCA puede ser inferior a $20.000 COP
-          const minAmount = Math.max(20000, Number(rewardConfig.minPurchaseAmount) || 20000);
+          // 🛡️ REGLA: Respetar el monto mínimo configurado en Admin (por defecto $20.000 COP)
+          const minAmount = Math.max(1000, Number(rewardConfig.minPurchaseAmount) || 20000);
           if (total >= minAmount) {
             const now = new Date();
-            const hour = now.getHours();
-            const minute = now.getMinutes();
+            let hour = now.getHours();
+            let minute = now.getMinutes();
 
-            // Franjas horarias oficiales con probabilidades base calibradas al tráfico real
+            // Garantizar cálculo en zona horaria oficial de Colombia
+            try {
+              const colombiaParts = new Intl.DateTimeFormat('en-US', {
+                timeZone: 'America/Bogota',
+                hour: 'numeric',
+                minute: 'numeric',
+                hour12: false
+              }).formatToParts(now);
+              hour = parseInt(colombiaParts.find(p => p.type === 'hour')?.value ?? hour, 10);
+              minute = parseInt(colombiaParts.find(p => p.type === 'minute')?.value ?? minute, 10);
+            } catch (e) {}
+
+            // Franjas horarias oficiales con probabilidades base calibradas para 15 premios diarios
             const SLOTS = [
-              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15, baseProb: 0.11 },
-              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8,  baseProb: 0.09 },
+              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15, baseProb: 0.20 },
+              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8,  baseProb: 0.18 },
               { id: '12-14', jornada: '12-2 pm', start: 12, end: 14, defaultPct: 10, baseProb: 0.25 },
-              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7,  baseProb: 0.07 },
-              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45, baseProb: 0.12 },
-              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15, baseProb: 0.11 },
+              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7,  baseProb: 0.12 },
+              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45, baseProb: 0.14 },
+              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15, baseProb: 0.15 },
             ];
 
             // Identificar la franja por el turno activo o por la hora actual
@@ -1208,20 +1220,24 @@ export function PosView() {
 
             // Solo entregar premios dentro del horario comercial activo (6:00 AM a 9:00 PM)
             if (currentSlotObj) {
-              const dailyTotal = Number(rewardConfig.dailyPrizes) || 15;
+              const dailyTotal = Math.max(1, Number(rewardConfig.dailyPrizes) || 15);
 
-              // Helper para fecha local (YYYY-MM-DD)
-              const getLocalDateStr = (dInput) => {
+              // Helper para fecha en Colombia (YYYY-MM-DD)
+              const getColombiaDateStr = (dInput) => {
+                if (!dInput) return '';
                 const d = new Date(dInput);
                 if (isNaN(d.getTime())) return '';
-                const y = d.getFullYear();
-                const m = String(d.getMonth() + 1).padStart(2, '0');
-                const day = String(d.getDate()).padStart(2, '0');
-                return `${y}-${m}-${day}`;
+                try {
+                  return d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+                } catch (e) {
+                  const y = d.getFullYear();
+                  const m = String(d.getMonth() + 1).padStart(2, '0');
+                  const day = String(d.getDate()).padStart(2, '0');
+                  return `${y}-${m}-${day}`;
+                }
               };
 
-              const todayLocal = getLocalDateStr(now);
-              const todayUtc = now.toISOString().slice(0, 10);
+              const todayColombia = getColombiaDateStr(now);
 
               // 🔍 Recopilar todas las ventas de hoy (cobradas + suspendidas en espera)
               const allSales = [
@@ -1238,11 +1254,10 @@ export function PosView() {
                 const isWinner = s.isLuckyWinner === true || String(s.id).includes('LUCKY');
                 if (!isWinner) return;
 
-                const rawDate = s.timestamp || s.date || s.fecha || s.heldAt;
+                const rawDate = s.timestamp || s.date || s.fecha || s.heldAt || s.createdAt;
                 if (!rawDate) return;
-                const saleLocal = getLocalDateStr(rawDate);
-                const isToday = saleLocal === todayLocal || String(rawDate).slice(0, 10) === todayUtc;
-                if (!isToday) return;
+                const saleDate = getColombiaDateStr(rawDate);
+                if (saleDate !== todayColombia) return;
 
                 countedWinnerIds.add(s.id);
                 totalAwardedToday++;
@@ -1274,20 +1289,35 @@ export function PosView() {
                 const prizesAvailableNow = cumulativeTargetUntilNow - totalAwardedToday;
 
                 if (prizesAvailableNow > 0) {
+                  // 📈 ESCALA DINÁMICA: Ajusta la probabilidad base proporcionalmente si se cambia la meta total diaria en Admin (calibrada para 15)
+                  const dailyScale = Math.max(0.1, dailyTotal / 15);
+                  let shiftProb = (currentSlotObj.baseProb ?? 0.15) * dailyScale;
+
+                  // 🔄 ARRASTRE INTELIGENTE DE PREMIOS ATRASADOS:
+                  // Si turnos anteriores dejaron premios sin entregar, se incrementa proporcionalmente la probabilidad
+                  if (prizesAvailableNow > currentSlotQuota && currentSlotQuota > 0) {
+                    const backlogRatio = prizesAvailableNow / currentSlotQuota;
+                    shiftProb = Math.min(0.65, shiftProb * Math.max(1, backlogRatio));
+                  }
+
                   // Calcular minutos restantes para que termine este turno
                   const slotEndMinutes = currentSlotObj.end * 60;
                   const currentMinutes = (hour * 60) + minute;
                   const minutesLeftInShift = slotEndMinutes - currentMinutes;
 
-                  // ⚡ REGLA 3: FASE RUSH FINAL (ÚLTIMOS 20 MINUTOS DEL TURNO)
-                  // Si faltan 20 minutos o menos para terminar el turno y aún hay premios pendientes de la meta:
-                  // La probabilidad sube al 50% para empujar el cumplimiento de la meta del turno.
-                  if (minutesLeftInShift <= 20) {
-                    isLuckyWinner = Math.random() < 0.50;
-                  } else {
-                    // 🟢 FASE NORMAL: Probabilidad base calibrada según el flujo real de la franja horaria
-                    const shiftProb = currentSlotObj.baseProb ?? 0.11;
-                    isLuckyWinner = Math.random() < shiftProb;
+                  // 🚀 REGLA 3: FASE CIERRE DEL DÍA (8:00 PM a 9:00 PM)
+                  // Si estamos en la última hora y aún restan premios de la meta diaria total, asegurar su entrega
+                  if (hour >= 20) {
+                    isLuckyWinner = Math.random() < 0.85;
+                  }
+                  // ⚡ REGLA 4: FASE RUSH FINAL DE TURNO (ÚLTIMOS 20 MINUTOS)
+                  // Si faltan 20 minutos o menos para terminar el turno y aún hay premios pendientes
+                  else if (minutesLeftInShift <= 20) {
+                    isLuckyWinner = Math.random() < 0.55;
+                  }
+                  // 🟢 FASE NORMAL: Probabilidad base calibrada + escala de volumen + arrastre
+                  else {
+                    isLuckyWinner = Math.random() < Math.min(0.65, shiftProb);
                   }
                 }
                 // Si prizesAvailableNow <= 0: FRENO ESTRICTO (isLuckyWinner permanece false = 0% hasta el siguiente turno)

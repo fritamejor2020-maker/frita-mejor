@@ -35,8 +35,8 @@ export function LuckyRewardsConfigPanel() {
   const currentBranchConfig = currentConfigs[selectedBranchId] || {};
   const currentRegisterConfig = currentBranchConfig[selectedRegisterId] || {
     enabled: false,
-    dailyPrizes: 100,
-    minPurchaseAmount: 15000,
+    dailyPrizes: 15,
+    minPurchaseAmount: 20000,
     prizeType: 'RASPA_Y_GANA', // 'RASPA_Y_GANA' | 'DISCOUNT'
     discountPercentage: 10,
     hourlyDistribution: { ...defaultHourlyDist }
@@ -47,8 +47,8 @@ export function LuckyRewardsConfigPanel() {
   useEffect(() => {
     const loaded = currentConfigs[selectedBranchId]?.[selectedRegisterId] || {
       enabled: false,
-      dailyPrizes: 100,
-      minPurchaseAmount: 15000,
+      dailyPrizes: 15,
+      minPurchaseAmount: 20000,
       prizeType: 'RASPA_Y_GANA',
       discountPercentage: 10,
       hourlyDistribution: { ...defaultHourlyDist }
@@ -72,13 +72,26 @@ export function LuckyRewardsConfigPanel() {
   };
 
   const handleSave = async () => {
+    const baseConfigs = posSettings?.luckyRewardsConfig || {};
     const updated = {
-      ...(posSettings?.luckyRewardsConfig || {}),
+      ...baseConfigs,
       [selectedBranchId]: {
-        ...(posSettings?.luckyRewardsConfig?.[selectedBranchId] || {}),
+        ...(baseConfigs[selectedBranchId] || {}),
         [selectedRegisterId]: formData
       }
     };
+
+    // Si se guarda en GLOBAL, propagar también a las sedes registradas para mantener consistencia
+    if (selectedBranchId === 'GLOBAL') {
+      activeBranches.forEach(b => {
+        if (b.id !== 'GLOBAL') {
+          updated[b.id] = {
+            ...(updated[b.id] || {}),
+            [selectedRegisterId]: formData
+          };
+        }
+      });
+    }
 
     try {
       await updatePosSettings({ luckyRewardsConfig: updated });
