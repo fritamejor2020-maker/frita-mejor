@@ -58,8 +58,8 @@ export function AttendanceView() {
   const { terminals, syncTerminalEvents, fetchTerminalUsers, clearAllAttendanceLogs, loadFromRemote } = useAttendanceStore();
 
   React.useEffect(() => {
-    loadFromRemote();
-  }, [loadFromRemote]);
+    useAttendanceStore.getState().loadFromRemote();
+  }, []);
 
   const handleClearLogs = () => {
     if (window.confirm('¿Estás seguro de borrar todos los registros de asistencia mostrados? Se limpiará la pantalla.')) {
@@ -106,11 +106,6 @@ export function AttendanceView() {
       setIsSyncing(false);
     }
   };
-
-  // Auto-Sincronizar Biométrico de forma transparente al entrar al módulo Asistencia & Turnos
-  React.useEffect(() => {
-    handleSyncTerminal();
-  }, []);
 
   return (
     <div ref={containerRef} className="p-3 sm:p-6 max-w-[1700px] mx-auto min-h-screen bg-gray-50/60 font-sans">

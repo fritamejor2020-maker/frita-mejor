@@ -287,14 +287,14 @@ async function runBiometricSync() {
     });
 
     if (toAdd.length > 0) {
-      // Limitar la ventana histórica a los 300 registros más recientes (peso ultra-ligero de ~35 KB)
-      const updated = [...toAdd, ...currentLogs].slice(0, 300);
+      // Mantener una ventana histórica amplia de hasta 5.000 registros (~3-4 meses de historial completo)
+      const updated = [...toAdd, ...currentLogs].slice(0, 5000);
       await supabase.from('app_state').upsert({ key: 'attendance_logs', value: updated }, { onConflict: 'key' });
       await supabase.from('app_state').upsert({ key: 'attendance_logs_BRANCH-001', value: updated }, { onConflict: 'key' });
       console.log(`[Electron Sync Daemon] [${new Date().toLocaleTimeString()}] 🟢 Sincronizados ${toAdd.length} deltas de asistencia (total ventana: ${updated.length}).`);
     } else {
       if (currentLogs.length === 0 && mappedLogs.length > 0) {
-        const trimmed = mappedLogs.slice(0, 300);
+        const trimmed = mappedLogs.slice(0, 5000);
         await supabase.from('app_state').upsert({ key: 'attendance_logs', value: trimmed }, { onConflict: 'key' });
         await supabase.from('app_state').upsert({ key: 'attendance_logs_BRANCH-001', value: trimmed }, { onConflict: 'key' });
       }
