@@ -749,7 +749,7 @@ export function PosView() {
       const shiftSales = (posSales || []).filter(s => isShiftSale(s, activeShift));
       const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, activeShift));
       
-      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
+      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods, activeShiftDescargues);
       setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
     }
 
@@ -785,7 +785,8 @@ export function PosView() {
     };
     const shiftSales = (posSales || []).filter(s => isShiftSale(s, shift));
     const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, shift));
-    const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, '', posSettings?.paymentMethods);
+    const shiftDescargues = (posDescargues || []).filter(d => d.shiftId === shift?.id);
+    const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, '', posSettings?.paymentMethods, shiftDescargues);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };
 
@@ -2499,7 +2500,8 @@ export function PosView() {
               const shiftSales = (posSales || []).filter(isMatch);
               const shiftExpenses = (posExpenses || []).filter(isExpMatch);
               const drawerCode = posSettings?.cashDrawerCode || '27,112,48,55,121';
-              const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods);
+              const shiftDescargues = (posDescargues || []).filter(d => d.shiftId === updatedShift?.id);
+              const zReportHtml = generateZReportHTML(updatedShift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods, shiftDescargues);
               setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
               
               setShiftToCompleteCount(null);
