@@ -23,6 +23,7 @@ import { initLogisticsRealtime } from './lib/logisticsBroadcast';
 import { LoginView }      from './modules/auth/LoginView';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { QuickTaskDrawer } from './components/ui/QuickTaskDrawer';
+import { SignOutGuardModal } from './components/auth/SignOutGuardModal';
 
 // ── Code-Splitting: Carga diferida de vistas pesadas para ahorrar memoria en tablets ──
 const ProductionView = React.lazy(() => import('./modules/production/ProductionView').then(m => ({ default: m.ProductionView })));
@@ -428,6 +429,7 @@ function App() {
       <Toaster position="bottom-center" toastOptions={{ className: 'font-bold rounded-2xl shadow-chunky-lg text-sm', duration: 3000 }} />
       <BrowserRouter>
         <QuickTaskDrawer />
+        <SignOutGuardModal />
         <ErrorBoundary>
           <React.Suspense fallback={<LoadingFallback />}>
             <Routes>

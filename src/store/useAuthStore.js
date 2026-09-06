@@ -5,6 +5,7 @@ import { markLocalWrite } from '../lib/useRealtimeSync';
 import { supabase } from '../lib/supabase';
 import { useSellerSessionStore } from './useSellerSessionStore';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
+import { useTaskStore } from './useTaskStore';
 
 // =============================================================================
 // BASE DE USUARIOS LOCAL (mientras no está conectado a Supabase)
@@ -305,7 +306,20 @@ export const useAuthStore = create(
 
 
       // ─── Cerrar sesión ───────────────────────────────────────────
-      signOut: () => {
+      signOut: (force = false) => {
+        const currentUser = get().user;
+        if (!force && currentUser) {
+          try {
+            const pending = useTaskStore.getState().getPendingObligatoryTasks(currentUser);
+            if (pending && pending.length > 0) {
+              useTaskStore.getState().openSignOutGuard(pending);
+              return false;
+            }
+          } catch (e) {
+            console.warn('[signOut task check error]:', e);
+          }
+        }
+
         try {
           useSellerSessionStore.getState().endShift();
         } catch (_) {}
@@ -313,6 +327,7 @@ export const useAuthStore = create(
           useDejadorSessionStore.getState().endShift();
         } catch (_) {}
         set({ user: null, activeBranchId: null, error: null });
+        return true;
       },
 
       // ─── Limpiar error ───────────────────────────────────────────

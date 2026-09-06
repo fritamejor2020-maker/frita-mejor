@@ -1,25 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { useTaskStore } from '../../store/useTaskStore';
 import { useAuthStore } from '../../store/useAuthStore';
+import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { 
   CheckCircle2, Circle, Clock, AlertTriangle, Camera, Plus, ChevronRight, 
   ChevronDown, X, Sparkles, Filter, Lock, ShieldAlert, Tag, Calendar, 
   FolderPlus, Flag, CheckSquare, Layers, Trash2, Edit2, ArrowLeft,
-  QrCode, UserCheck, Phone, Video, Wrench
+  QrCode, UserCheck, Phone, Video, Wrench, ExternalLink, Repeat
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
-function TaskCard({ task, userId, userName, todayStr, proj, pBadge, onToggle, onDelete, onToggleSubtask, onReassign }) {
+const MODULE_ROUTES = {
+  pos: { route: '/pos', name: 'Punto de Venta (POS)', icon: '💻' },
+  bodega: { route: '/bodega', name: 'Bodega / Inventario', icon: '📦' },
+  produccion: { route: '/produccion', name: 'Producción', icon: '🏭' },
+  fritado: { route: '/fritado', name: 'Fritado / Cocina', icon: '🍳' },
+  tareas: { route: '/tareas', name: 'Gestión de Tareas', icon: '📋' },
+  asistencia: { route: '/asistencia', name: 'Asistencia y Turnos', icon: '⏱️' },
+  cierres: { route: '/cierres', name: 'Auditor de Cierres', icon: '🧾' },
+};
+
+function TaskCard({ 
+  task, userId, userName, todayStr, proj, pBadge, 
+  onToggle, onDelete, onToggleSubtask, onReassign, 
+  allAssignableEmployees = [], onNavigateModule 
+}) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showAssignDropdown, setShowAssignDropdown] = useState(false);
   const isOverdue = !task.completed && task.dueDate < todayStr;
   const completedSubtasks = task.subtasks ? task.subtasks.filter(s => s.completed).length : 0;
   const totalSubtasks = task.subtasks ? task.subtasks.length : 0;
 
   const handleSelfAssign = () => {
-    onReassign(task.id, userId, userName || 'Administrador');
-    setShowAssignModal(false);
+    onReassign(task.id, userId, userName || 'Administrador', null);
+    setShowAssignDropdown(false);
     toast.success('👤 Te has asignado esta tarea');
   };
 
@@ -39,7 +54,7 @@ function TaskCard({ task, userId, userName, todayStr, proj, pBadge, onToggle, on
         {/* Checkbox redonda Todoist */}
         <button
           onClick={() => onToggle(task.id)}
-          className="mt-0.5 shrink-0 text-gray-400 hover:text-amber-400 transition-colors"
+          className="mt-0.5 shrink-0 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
         >
           {task.completed ? (
             <CheckCircle2 className="text-emerald-400" size={24} />
@@ -81,19 +96,88 @@ function TaskCard({ task, userId, userName, todayStr, proj, pBadge, onToggle, on
             </div>
 
             <div className="flex items-center gap-2">
-              {/* Botón Asignar */}
-              <button
-                onClick={() => handleSelfAssign()}
-                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1"
-                title="Asignarme a mí mismo"
-              >
-                <UserCheck size={12} />
-                <span>{task.assignedToUserName ? `Asignado: ${task.assignedToUserName}` : 'Asignarme'}</span>
-              </button>
+              {/* Botón Asignar Interactivo */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowAssignDropdown(!showAssignDropdown)}
+                  className="text-[11px] font-bold text-amber-400 hover:text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  title="Cambiar persona o rol asignado"
+                >
+                  <UserCheck size={12} />
+                  <span>{task.assignedToUserName ? `Asignado: ${task.assignedToUserName}` : 'Sin Asignar'}</span>
+                  <ChevronDown size={11} />
+                </button>
+
+                {showAssignDropdown && (
+                  <div className="absolute right-0 mt-1.5 w-60 bg-[#1e202b] border border-gray-700 rounded-2xl p-2 shadow-2xl z-50 animate-fadeIn text-left">
+                    <p className="text-[10px] font-black uppercase tracking-wider text-gray-400 px-2 py-1">Reasignar a:</p>
+                    <div className="max-h-52 overflow-y-auto space-y-1 pr-1">
+                      <button
+                        onClick={handleSelfAssign}
+                        className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold text-amber-300 hover:bg-amber-500/20 flex items-center gap-2"
+                      >
+                        <span>👤 Asignarme a mí ({userName})</span>
+                      </button>
+                      <button
+                        onClick={() => { onReassign(task.id, null, 'Todos', null); setShowAssignDropdown(false); toast.success('👥 Asignada a todos en turno'); }}
+                        className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                      >
+                        <span>👥 Todos en turno (Sin asignar)</span>
+                      </button>
+
+                      <div className="h-px bg-gray-800 my-1"></div>
+                      <p className="text-[9px] font-bold text-gray-500 px-2">Cargos / Roles:</p>
+                      {[
+                        { key: 'pos', label: '💻 Cajero (POS)' },
+                        { key: 'fritado', label: '🍳 Cocina / Fritador' },
+                        { key: 'vendedor', label: '🛵 Vendedor Móvil' },
+                        { key: 'dejador', label: '📦 Dejador / Repartidor' },
+                        { key: 'bodeguero', label: '📦 Bodega' },
+                      ].map(r => (
+                        <button
+                          key={r.key}
+                          onClick={() => { onReassign(task.id, null, r.label.replace(/^[^\s]+\s/, ''), r.key); setShowAssignDropdown(false); toast.success(`Asignada a ${r.label}`); }}
+                          className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                        >
+                          <span>{r.label}</span>
+                        </button>
+                      ))}
+
+                      {allAssignableEmployees.length > 0 && (
+                        <React.Fragment>
+                          <div className="h-px bg-gray-800 my-1"></div>
+                          <p className="text-[9px] font-bold text-gray-500 px-2">Empleados:</p>
+                          {allAssignableEmployees.map(emp => (
+                            <button
+                              key={emp.id}
+                              onClick={() => { onReassign(task.id, emp.id, emp.name, emp.role); setShowAssignDropdown(false); toast.success(`Asignada a ${emp.name}`); }}
+                              className="w-full text-left px-2.5 py-1.5 rounded-xl text-xs font-bold text-gray-300 hover:bg-gray-800 flex items-center gap-2"
+                            >
+                              <span>👤 {emp.name}</span>
+                            </button>
+                          ))}
+                        </React.Fragment>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Botón Directo al Módulo si aplica */}
+              {task.targetModule && task.targetModule !== 'none' && MODULE_ROUTES[task.targetModule] && (
+                <button
+                  onClick={() => onNavigateModule && onNavigateModule(task.targetModule)}
+                  className="text-[11px] font-bold text-blue-400 hover:text-blue-300 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  title="Abrir módulo en la app para resolver la tarea"
+                >
+                  <ExternalLink size={12} />
+                  <span>{MODULE_ROUTES[task.targetModule].icon} {MODULE_ROUTES[task.targetModule].name}</span>
+                </button>
+              )}
 
               <button
                 onClick={() => onDelete(task.id)}
-                className="text-gray-600 hover:text-red-400 p-1 opacity-0 hover:opacity-100 transition-opacity"
+                className="text-gray-600 hover:text-red-400 p-1 opacity-0 hover:opacity-100 transition-opacity cursor-pointer"
                 title="Eliminar tarea"
               >
                 <Trash2 size={14} />
@@ -195,7 +279,8 @@ function TaskCard({ task, userId, userName, todayStr, proj, pBadge, onToggle, on
 
 export function TasksView() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, users } = useAuthStore();
+  const employeeContracts = useAttendanceStore((s) => s.employeeContracts) || [];
   const { 
     tasks, projects, addTask, toggleTaskCompleted, toggleSubtaskCompleted, 
     deleteTask, addProject, deleteProject, reassignTask, checkAndGenerateRecurrentTasks 
@@ -213,6 +298,9 @@ export function TasksView() {
   const [priority, setPriority] = useState('P3');
   const [dueDate, setDueDate] = useState(new Date().toISOString().split('T')[0]);
   const [dueTime, setDueTime] = useState('');
+  const [assigneeSelect, setAssigneeSelect] = useState('role:all');
+  const [targetModule, setTargetModule] = useState('none');
+  const [recurrenceType, setRecurrenceType] = useState('NONE'); // 'NONE' | 'DAILY' | 'WEEKLY'
   const [enforcementLevel, setEnforcementLevel] = useState('NORMAL');
   const [requirePhoto, setRequirePhoto] = useState(false);
   const [subtasksInput, setSubtasksInput] = useState(['']);
@@ -224,22 +312,80 @@ export function TasksView() {
 
   const userId = user?.id || null;
   const userName = user?.name || 'Administrador';
-  const userRole = user?.role || 'pos';
+  const userRole = (user?.role || 'pos').toLowerCase();
   const userBranchId = user?.branchId || null;
   const todayStr = new Date().toISOString().split('T')[0];
 
   const publicReportUrl = window.location.origin + '/reportar-dano';
   const qrUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=' + encodeURIComponent(publicReportUrl);
 
+  const ROLES_LIST = [
+    { key: 'all', label: '👥 Todos los roles (Cualquiera en turno)' },
+    { key: 'pos', label: '💻 Cajero (POS)' },
+    { key: 'fritado', label: '🍳 Cocina / Fritador' },
+    { key: 'vendedor', label: '🛵 Vendedor Móvil / Triciclo' },
+    { key: 'dejador', label: '📦 Dejador / Repartidor' },
+    { key: 'bodeguero', label: '📦 Bodega / Inventario' },
+    { key: 'gerente', label: '👔 Gerente' },
+    { key: 'admin', label: '👑 Administrador' },
+  ];
+
+  const MODULE_OPTIONS = [
+    { key: 'none', label: '🏠 Tarea Física / Local (Sin módulo)', icon: '🏠' },
+    { key: 'pos', label: '💻 Punto de Venta (POS)', icon: '💻' },
+    { key: 'bodega', label: '📦 Bodega / Inventario', icon: '📦' },
+    { key: 'produccion', label: '🏭 Producción', icon: '🏭' },
+    { key: 'fritado', label: '🍳 Fritado / Cocina', icon: '🍳' },
+    { key: 'tareas', label: '📋 Gestión de Tareas', icon: '📋' },
+    { key: 'asistencia', label: '⏱️ Asistencia y Turnos', icon: '⏱️' },
+    { key: 'cierres', label: '🧾 Auditor de Cierres', icon: '🧾' },
+  ];
+
+  const allAssignableEmployees = React.useMemo(() => {
+    const list = [];
+    const seen = new Set();
+
+    (users || []).forEach(u => {
+      if (u.name) {
+        list.push({
+          id: u.id,
+          name: u.name,
+          role: u.role,
+          label: `${u.name} (${u.role || 'Usuario'})`
+        });
+        seen.add(u.name.trim().toLowerCase());
+      }
+    });
+
+    (employeeContracts || []).forEach(c => {
+      const cleanName = String(c.fullName || '').trim();
+      if (cleanName && !seen.has(cleanName.toLowerCase()) && !cleanName.toLowerCase().startsWith('empleado #')) {
+        list.push({
+          id: c.employeeId || `EMP-${c.employeeNo}`,
+          name: cleanName,
+          role: null,
+          label: `${cleanName} (Personal)`
+        });
+        seen.add(cleanName.toLowerCase());
+      }
+    });
+
+    return list.sort((a, b) => a.name.localeCompare(b.name));
+  }, [users, employeeContracts]);
+
   useEffect(() => {
     checkAndGenerateRecurrentTasks();
   }, []);
 
-  // Filtrar mis tareas
+  // Filtrar mis tareas (Admins y Gerentes ven todo; otros ven lo asignado a ellos, a su rol o a todos)
   const myTasks = tasks.filter(t => {
+    if (userRole === 'admin' || userRole === 'gerente') return true;
+
     const matchesUser = (!t.assignedToUserId && !t.assignedToRole) ||
                         t.assignedToUserId === userId ||
-                        t.assignedToRole === userRole;
+                        t.assignedToUserName?.toLowerCase() === userName?.toLowerCase() ||
+                        t.assignedToRole === userRole ||
+                        (t.assignedToRole === 'pos' && (userRole === 'cajero' || userRole === 'pos'));
     const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
     return matchesUser && matchesBranch;
   });
@@ -283,26 +429,53 @@ export function TasksView() {
       .filter(s => s.trim().length > 0)
       .map(s => ({ title: s.trim() }));
 
+    let assignedRole = null;
+    let assignedUserId = null;
+    let assignedUserName = null;
+
+    if (assigneeSelect.startsWith('role:')) {
+      const r = assigneeSelect.replace('role:', '');
+      if (r !== 'all') {
+        assignedRole = r;
+        const matched = ROLES_LIST.find(x => x.key === r);
+        assignedUserName = matched ? matched.label.replace(/^[^\s]+\s/, '') : r;
+      } else {
+        assignedUserName = 'Todos';
+      }
+    } else if (assigneeSelect.startsWith('person:')) {
+      const personId = assigneeSelect.replace('person:', '');
+      const person = allAssignableEmployees.find(p => p.id === personId);
+      if (person) {
+        assignedUserId = person.id;
+        assignedUserName = person.name;
+        assignedRole = person.role || null;
+      }
+    }
+
     addTask({
       title: title.trim(),
       description: description.trim(),
       projectId,
       priority,
-      assignedToUserId: userId,
-      assignedToUserName: userName,
-      assignedToRole: userRole,
+      assignedToUserId: assignedUserId,
+      assignedToUserName: assignedUserName,
+      assignedToRole: assignedRole,
       branchId: userBranchId,
       dueDate,
       dueTime: dueTime || null,
+      targetModule,
       enforcementLevel,
       requirePhoto,
       subtasks: cleanSubtasks,
+      recurrence: recurrenceType !== 'NONE' ? { type: recurrenceType } : null,
     });
 
     setTitle('');
     setDescription('');
     setDueTime('');
     setRequirePhoto(false);
+    setRecurrenceType('NONE');
+    setTargetModule('none');
     setSubtasksInput(['']);
     setShowAddBox(false);
     toast.success('🎉 Tarea creada exitosamente');
@@ -329,6 +502,15 @@ export function TasksView() {
   };
 
   const getProject = (pId) => projects.find(p => p.id === pId) || { name: 'General', icon: '📁', color: '#6b7280' };
+
+  const handleNavigateModule = (modKey) => {
+    const target = MODULE_ROUTES[modKey];
+    if (!target) return;
+    if (user && user.access && !user.access.includes(modKey) && user.access.indexOf('*') === -1) {
+      user.access.push(modKey);
+    }
+    navigate(target.route);
+  };
 
   return (
     <div className="min-h-screen bg-[#0d0e12] text-gray-200 flex flex-col font-sans">
@@ -575,19 +757,97 @@ export function TasksView() {
                   <option value="P4">🚩 P4 (Normal)</option>
                 </select>
 
+                {/* Asignado A (Rol o Empleado) */}
+                <select
+                  value={assigneeSelect}
+                  onChange={(e) => setAssigneeSelect(e.target.value)}
+                  className="bg-[#22242e] border border-gray-700 text-amber-300 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  title="Asignar a un rol o a un empleado en específico"
+                >
+                  <optgroup label="Cargos / Roles">
+                    {ROLES_LIST.map(r => (
+                      <option key={r.key} value={`role:${r.key}`}>{r.label}</option>
+                    ))}
+                  </optgroup>
+                  {allAssignableEmployees.length > 0 && (
+                    <optgroup label="Personas / Empleados">
+                      {allAssignableEmployees.map(emp => (
+                        <option key={emp.id} value={`person:${emp.id}`}>👤 {emp.name}</option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+
+                {/* Fecha Límite */}
+                <div className="flex items-center gap-1 bg-[#22242e] border border-gray-700 rounded-xl px-2 py-1">
+                  <Calendar size={13} className="text-gray-400" />
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="bg-transparent text-gray-200 text-xs font-bold focus:outline-none"
+                  />
+                  <div className="flex items-center gap-1 ml-1 border-l border-gray-700 pl-1">
+                    <button
+                      type="button"
+                      onClick={() => setDueDate(todayStr)}
+                      className={`text-[10px] px-1.5 py-0.5 rounded font-bold transition-colors ${dueDate === todayStr ? 'bg-amber-500 text-gray-950' : 'text-gray-400 hover:text-white'}`}
+                    >
+                      Hoy
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const d = new Date();
+                        d.setDate(d.getDate() + 1);
+                        setDueDate(d.toISOString().split('T')[0]);
+                      }}
+                      className="text-[10px] px-1.5 py-0.5 rounded font-bold text-gray-400 hover:text-white transition-colors"
+                    >
+                      Mañana
+                    </button>
+                  </div>
+                </div>
+
                 {/* Hora Específica */}
                 <input
                   type="time"
                   value={dueTime}
                   onChange={(e) => setDueTime(e.target.value)}
                   className="bg-[#22242e] border border-gray-700 text-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  title="Hora límite opcional"
                 />
+
+                {/* Recurrencia */}
+                <select
+                  value={recurrenceType}
+                  onChange={(e) => setRecurrenceType(e.target.value)}
+                  className="bg-[#22242e] border border-gray-700 text-purple-300 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  title="Repetición automática de la tarea"
+                >
+                  <option value="NONE">⏱️ Sin Repetición (Una vez)</option>
+                  <option value="DAILY">🔁 Repetir Diario</option>
+                  <option value="WEEKLY">📅 Repetir Semanal</option>
+                </select>
+
+                {/* Módulo / Destino en la App */}
+                <select
+                  value={targetModule}
+                  onChange={(e) => setTargetModule(e.target.value)}
+                  className="bg-[#22242e] border border-gray-700 text-blue-300 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  title="Módulo de la app donde se resuelve esta tarea"
+                >
+                  {MODULE_OPTIONS.map(m => (
+                    <option key={m.key} value={m.key}>{m.label}</option>
+                  ))}
+                </select>
 
                 {/* Nivel de Exigencia */}
                 <select
                   value={enforcementLevel}
                   onChange={(e) => setEnforcementLevel(e.target.value)}
                   className="bg-[#22242e] border border-gray-700 text-gray-200 text-xs font-bold rounded-xl px-3 py-1.5 focus:outline-none"
+                  title="Nivel de exigencia al finalizar turno"
                 >
                   <option value="NORMAL">ℹ️ Exigencia Normal</option>
                   <option value="IMPORTANTE">🔑 Importante (PIN Admin)</option>
@@ -686,7 +946,9 @@ export function TasksView() {
                   onToggle={(tId) => toggleTaskCompleted(tId, userId)}
                   onDelete={(tId) => deleteTask(tId)}
                   onToggleSubtask={(tId, stId) => toggleSubtaskCompleted(tId, stId)}
-                  onReassign={(tId, uId, uName) => reassignTask(tId, uId, uName)}
+                  onReassign={(tId, uId, uName, uRole) => reassignTask(tId, uId, uName, uRole)}
+                  allAssignableEmployees={allAssignableEmployees}
+                  onNavigateModule={handleNavigateModule}
                 />
               ))
             )}

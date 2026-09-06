@@ -90,8 +90,12 @@ export const useTaskStore = create(
       taskTemplates: DEFAULT_TEMPLATES,
       lastRecurrenceCheckDate: null,
       isDrawerOpen: false,
+      isSignOutBlocked: false,
+      pendingBlockingTasks: [],
 
       setDrawerOpen: (isOpen) => set({ isDrawerOpen: isOpen }),
+      openSignOutGuard: (tasks) => set({ isSignOutBlocked: true, pendingBlockingTasks: tasks }),
+      closeSignOutGuard: () => set({ isSignOutBlocked: false, pendingBlockingTasks: [] }),
 
       // --- Carga remota ---
       loadFromRemote: async (remoteData = null) => {
@@ -209,10 +213,12 @@ export const useTaskStore = create(
           projectId: taskData.projectId || null,
           priority: taskData.priority || 'P3',
           assignedToUserId: taskData.assignedToUserId || null,
+          assignedToUserName: taskData.assignedToUserName || null,
           assignedToRole: taskData.assignedToRole || null,
           branchId: taskData.branchId || null,
           dueDate: taskData.dueDate || new Date().toISOString().split('T')[0],
           dueTime: taskData.dueTime || null,
+          targetModule: taskData.targetModule || 'none',
           enforcementLevel: taskData.enforcementLevel || 'NORMAL',
           requirePhoto: !!taskData.requirePhoto,
           requireNote: !!taskData.requireNote,
@@ -230,8 +236,37 @@ export const useTaskStore = create(
           createdAt: new Date().toISOString(),
         };
 
+        // Si se configuró recurrencia, registrar o mantener la plantilla para futuros días
+        let newTemplates = null;
+        if (taskData.recurrence && taskData.recurrence.type && taskData.recurrence.type !== 'NONE') {
+          const tpl = {
+            id: `TPL-${Date.now()}`,
+            title: taskData.title,
+            description: taskData.description || '',
+            projectId: taskData.projectId || 'PROJ-OPERACION',
+            priority: taskData.priority || 'P3',
+            assignedToUserId: taskData.assignedToUserId || null,
+            assignedToUserName: taskData.assignedToUserName || null,
+            assignedToRole: taskData.assignedToRole || null,
+            branchId: taskData.branchId || null,
+            dueTime: taskData.dueTime || null,
+            targetModule: taskData.targetModule || 'none',
+            enforcementLevel: taskData.enforcementLevel || 'NORMAL',
+            requirePhoto: !!taskData.requirePhoto,
+            requireNote: !!taskData.requireNote,
+            subtasks: taskData.subtasks || [],
+            recurrence: taskData.recurrence,
+            active: true,
+          };
+          newTask.templateId = tpl.id;
+          newTemplates = tpl;
+        }
+
         set(state => {
-          const updated = { tasks: [newTask, ...state.tasks] };
+          const updated = {
+            tasks: [newTask, ...state.tasks],
+            ...(newTemplates ? { taskTemplates: [...state.taskTemplates, newTemplates] } : {})
+          };
           syncTasks({ ...state, ...updated });
           return updated;
         });
@@ -248,13 +283,14 @@ export const useTaskStore = create(
         });
       },
 
-      reassignTask: (id, userId, userName = null) => {
+      reassignTask: (id, userId, userName = null, role = null) => {
         set(state => {
           const updated = {
             tasks: state.tasks.map(t => t.id === id ? { 
               ...t, 
-              assignedToUserId: userId,
-              assignedToUserName: userName || (userId ? 'Usuario' : 'Sin Asignar')
+              assignedToUserId: userId || null,
+              assignedToUserName: userName || (userId ? 'Usuario' : (role ? `Rol: ${role}` : 'Sin Asignar')),
+              assignedToRole: role !== undefined ? role : t.assignedToRole,
             } : t)
           };
           syncTasks({ ...state, ...updated });
@@ -431,6 +467,33 @@ export const useTaskStore = create(
                               t.assignedToRole === userRole;
           const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
           return matchesUser && matchesBranch;
+        });
+      },
+
+      getPendingObligatoryTasks: (user = null) => {
+        const todayStr = new Date().toISOString().split('T')[0];
+        const userId = user?.id || null;
+        const userRole = (user?.role || '').toLowerCase();
+        const userBranchId = user?.branchId || null;
+
+        return (get().tasks || []).filter(t => {
+          if (t.completed) return false;
+          if (t.enforcementLevel !== 'OBLIGATORIA') return false;
+          if (t.dueDate > todayStr) return false; // Solo hoy o atrasadas
+
+          // Coincidencia por sede
+          const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
+          if (!matchesBranch) return false;
+
+          // Si no tiene asignación específica, es obligatoria para cualquier operario de la sede
+          if (!t.assignedToUserId && !t.assignedToRole) return true;
+          if (userId && t.assignedToUserId === userId) return true;
+          if (user?.name && t.assignedToUserName && t.assignedToUserName.trim().toLowerCase() === user.name.trim().toLowerCase()) return true;
+          if (userRole && t.assignedToRole) {
+            const r = String(t.assignedToRole).toLowerCase();
+            if (r === userRole || (r === 'pos' && userRole === 'cajero') || (r === 'cajero' && userRole === 'pos')) return true;
+          }
+          return false;
         });
       },
     }),
