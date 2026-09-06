@@ -2013,7 +2013,29 @@ function ReportsPanel() {
                   <div key={sh.id} className="border border-gray-100 rounded-2xl p-4 flex flex-wrap items-center gap-4 hover:border-gray-200 transition-colors">
                     <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-xl border border-yellow-100 shrink-0">💰</div>
                     <div className="flex-1 min-w-[140px]">
-                      <span className="font-black text-chunky-dark block">Turno: {sh.jornada || sh.shift || sh.id?.slice(-6)}</span>
+                      <span className="font-black text-chunky-dark block">
+                        Turno: {(() => {
+                          if (sh.jornada && sh.jornada !== 'TD' && sh.jornada !== 'TODODIA') return sh.jornada;
+                          if (sh.shift && sh.shift !== 'TD' && sh.shift !== 'TODODIA') return sh.shift;
+                          const idStr = String(sh.id || '');
+                          const m = idStr.match(/(\d+-\d+)-(am|pm)/i);
+                          if (m) return `${m[1]} ${m[2].toLowerCase()}`;
+                          const m2 = idStr.match(/(\d+-\d+\s*(?:am|pm))/i);
+                          if (m2) return m2[1];
+                          if (sh.openedAt || sh.closedAt) {
+                            try {
+                              const hour = new Date(sh.openedAt || sh.closedAt).getHours();
+                              if (hour >= 6 && hour < 10) return '6-10 am';
+                              if (hour >= 10 && hour < 12) return '10-12 pm';
+                              if (hour >= 12 && hour < 14) return '12-2 pm';
+                              if (hour >= 14 && hour < 16) return '2-4 pm';
+                              if (hour >= 16 && hour < 19) return '4-7 pm';
+                              if (hour >= 19 && hour < 22) return '7-9 pm';
+                            } catch (e) {}
+                          }
+                          return 'Turno';
+                        })()}
+                      </span>
                       <span className="text-gray-400 font-bold text-xs">Cajero: {sh.userName || '—'}</span>
                     </div>
                     <span className="text-xs font-bold text-gray-500">{fmtDateTime(sh.openedAt)}</span>

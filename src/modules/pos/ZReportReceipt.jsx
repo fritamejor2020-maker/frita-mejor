@@ -54,15 +54,26 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   // Obtener el nombre del turno / jornada exactamente como fue seleccionado (ej: "6-10 am", "2-4 pm", etc.)
   const shiftTurno = (() => {
-    if (shift.jornada) return shift.jornada;
-    if (shift.shift) return shift.shift;
+    if (shift.jornada && shift.jornada !== 'TD' && shift.jornada !== 'TODODIA') return shift.jornada;
+    if (shift.shift && shift.shift !== 'TD' && shift.shift !== 'TODODIA') return shift.shift;
     const idStr = String(shift.id || '');
     const m = idStr.match(/(\d+-\d+)-(am|pm)/i);
     if (m) return `${m[1]} ${m[2].toLowerCase()}`;
     const m2 = idStr.match(/(\d+-\d+\s*(?:am|pm))/i);
     if (m2) return m2[1];
+    if (shift.openedAt || shift.closedAt) {
+      try {
+        const hour = new Date(shift.openedAt || shift.closedAt).getHours();
+        if (hour >= 6 && hour < 10) return '6-10 am';
+        if (hour >= 10 && hour < 12) return '10-12 pm';
+        if (hour >= 12 && hour < 14) return '12-2 pm';
+        if (hour >= 14 && hour < 16) return '2-4 pm';
+        if (hour >= 16 && hour < 19) return '4-7 pm';
+        if (hour >= 19 && hour < 22) return '7-9 pm';
+      } catch (e) {}
+    }
     const cleanId = idStr.replace(/^SHIFT-/, '');
-    return cleanId.length > 8 ? cleanId.slice(-8) : cleanId;
+    return cleanId.length > 8 ? cleanId.slice(-8) : (cleanId || 'Turno');
   })();
 
   // ── Clasificación Dinámica de Métodos de Pago ──────────────────────────────────

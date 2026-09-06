@@ -948,13 +948,41 @@ export const AdminFinancesTab = ({
 
      const posExtra = (s as any)._posExtra || {};
 
+     const resolveShift = () => {
+        if (s.jornada && s.jornada !== 'TD' && s.jornada !== 'TODODIA') return s.jornada;
+        if (s.shift && s.shift !== 'TD' && s.shift !== 'TODODIA') return s.shift;
+        const idStr = String(s.id || '');
+        const m = idStr.match(/(\d{1,2}-\d{1,2})-(am|pm)/i);
+        if (m) return `${m[1]} ${m[2].toLowerCase()}`;
+        const m2 = idStr.match(/(\d{1,2}-\d{1,2})\s*(am|pm)/i);
+        if (m2) return `${m2[1]} ${m2[2].toLowerCase()}`;
+        if (/-am$/i.test(idStr) || /-am-/i.test(idStr)) return 'AM';
+        if (/-pm$/i.test(idStr) || /-pm-/i.test(idStr)) return 'PM';
+        if (/-md$/i.test(idStr) || /-md-/i.test(idStr)) return 'MD';
+        if (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR') {
+          const t = s.openedAt || s.closedAt;
+          if (t) {
+            try {
+              const hour = new Date(t).getHours();
+              if (hour >= 6 && hour < 10) return '6-10 am';
+              if (hour >= 10 && hour < 12) return '10-12 pm';
+              if (hour >= 12 && hour < 14) return '12-2 pm';
+              if (hour >= 14 && hour < 16) return '2-4 pm';
+              if (hour >= 16 && hour < 19) return '4-7 pm';
+              if (hour >= 19 && hour < 22) return '7-9 pm';
+            } catch (e) {}
+          }
+        }
+        return s.type === 'VENDEDOR' ? 'AM' : 'Turno';
+      };
+
      return {
         id: s.id,
         _raw: s,
         pointName: vendorName,
         pointLabel,
         initials: (s.pointId || s.registerName || vendorName || 'CA').substring(0, 2).toUpperCase(),
-        shift: s.shift || 'TD',
+        shift: resolveShift(),
         date: shiftDate,
         type: s.type || '',
         anotadorName,
@@ -1042,7 +1070,11 @@ export const AdminFinancesTab = ({
 
   const filteredClosings = deduplicatedClosings.filter((c: any) => {
     if (filterDate && c.date !== filterDate) return false;
-    if (filterShift && c.shift !== filterShift) return false;
+    if (filterShift) {
+      const normFilter = String(filterShift).trim().toLowerCase().replace(/\s+/g, '-');
+      const normShift = String(c.shift || '').trim().toLowerCase().replace(/\s+/g, '-');
+      if (normShift !== normFilter && c.shift !== filterShift) return false;
+    }
 
     // Obtener la sede del cierre actual
     const register = (useInventoryStore.getState() as any).posRegisters?.find((r: any) => r.id === c._raw?.registerId);
@@ -1132,9 +1164,22 @@ export const AdminFinancesTab = ({
 style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2.5' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E")`, backgroundRepeat: 'no-repeat', backgroundPosition: 'right 0 center' }}
           >
             <option value="">Todas las Jornadas</option>
-            <option value="AM">AM</option>
-            <option value="MD">MD</option>
-            <option value="PM">PM</option>
+            {mode === 'POS' ? (
+              <>
+                <option value="6-10 am">6-10 am</option>
+                <option value="10-12 pm">10-12 pm</option>
+                <option value="12-2 pm">12-2 pm</option>
+                <option value="2-4 pm">2-4 pm</option>
+                <option value="4-7 pm">4-7 pm</option>
+                <option value="7-9 pm">7-9 pm</option>
+              </>
+            ) : (
+              <>
+                <option value="AM">AM</option>
+                <option value="MD">MD</option>
+                <option value="PM">PM</option>
+              </>
+            )}
           </select>
         </div>
         <button
@@ -1255,12 +1300,23 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                         {/* Fecha / Turno */}
                         <td className="py-3.5 px-4">
                           <div className="font-black text-gray-900 text-xs">{closing.date}</div>
-                          <div className="text-[10px] text-gray-400 font-bold uppercase">
-                            {closing.shift}
+                          <div className="text-[10px] text-gray-500 font-bold flex items-center gap-1.5 mt-0.5 flex-wrap">
+                            <span className="bg-amber-100 text-amber-800 text-[10px] font-black px-1.5 py-0.5 rounded uppercase">
+                              {closing.shift}
+                            </span>
                             {(() => {
                               const openT = formatShiftTime(closing._raw?.openedAt);
                               const closeT = formatShiftTime(closing._raw?.closedAt);
-                              return openT && closeT ? ` (${openT} → ${closeT})` : '';
+                              if (openT && closeT) {
+                                return <span className="text-gray-400 font-medium">({openT} → {closeT})</span>;
+                              }
+                              if (closeT) {
+                                return <span className="text-gray-400 font-medium">({closeT})</span>;
+                              }
+                              if (openT) {
+                                return <span className="text-gray-400 font-medium">({openT})</span>;
+                              }
+                              return null;
                             })()}
                           </div>
                         </td>

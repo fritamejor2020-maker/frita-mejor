@@ -1629,6 +1629,8 @@ export const useInventoryStore = create(
               return {
                 ...s,
                 ...shift,
+                shift: shift.shift || shift.jornada || s.shift || s.jornada || jornadaLabel,
+                jornada: shift.jornada || shift.shift || s.jornada || s.shift || jornadaLabel,
                 closedAt: shift.closedAt,
                 responsibleName: keptResponsibleName,
               };
@@ -1664,7 +1666,8 @@ export const useInventoryStore = create(
             date: dateStr,
             branchId: branch,
             registerId: reg,
-            jornada: jornadaLabel
+            jornada: jornadaLabel,
+            shift: shift.shift || jornadaLabel
           };
           set((s) => ({
             posShifts: [
@@ -1710,7 +1713,8 @@ export const useInventoryStore = create(
           date: dateStr, 
           branchId: branch, 
           registerId: reg, 
-          jornada: jornadaLabel 
+          jornada: jornadaLabel,
+          shift: shift.shift || jornadaLabel
         };
         set((s) => ({
           posShifts: [
