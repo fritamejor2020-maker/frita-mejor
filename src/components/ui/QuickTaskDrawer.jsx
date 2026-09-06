@@ -146,6 +146,7 @@ function QuickTaskCard({ task, userId, todayStr, proj, onToggleTask, toggleSubta
                     <input 
                       type="file" 
                       accept="image/*" 
+                      capture="environment"
                       className="hidden" 
                       onChange={(e) => handleFileUpload(task.id, e)}
                     />
@@ -189,9 +190,14 @@ export function QuickTaskDrawer() {
 
   // Filtrar tareas correspondientes al usuario
   const myTasks = tasks.filter(t => {
+    const r = (t.assignedToRole || '').toLowerCase();
+    const ur = (userRole || '').toLowerCase();
     const matchesUser = (!t.assignedToUserId && !t.assignedToRole) ||
                         t.assignedToUserId === userId ||
-                        t.assignedToRole === userRole;
+                        (user?.name && t.assignedToUserName && t.assignedToUserName.trim().toLowerCase() === user.name.trim().toLowerCase()) ||
+                        r === ur ||
+                        (r === 'pos' && ur === 'cajero') ||
+                        (r === 'cajero' && ur === 'pos');
     const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
     return matchesUser && matchesBranch;
   });

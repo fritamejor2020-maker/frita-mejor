@@ -69,6 +69,8 @@ export function PosView() {
     addPosSale, updatePosSale, deletePosSale, addPosShift, updatePosShift, addPosExpense 
   } = useInventoryStore();
 
+  const { tasks: allTasks = [], setDrawerOpen } = useTaskStore();
+
   // Multi-register: siempre elegir caja al entrar al POS
   const [selectedRegisterId, setSelectedRegisterId] = useState(null);
   const [showRegisterModal, setShowRegisterModal] = useState(true); // Siempre mostrar al inicio
@@ -78,6 +80,22 @@ export function PosView() {
   const isGlobal = user?.role === 'ADMIN' || !user?.branchId;
   const userBranchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
   const effectiveBranch = userBranchId;
+
+  // Tareas pendientes para el cajero en turno
+  const todayStrTasks = new Date().toISOString().split('T')[0];
+  const posPendingTasks = (allTasks || []).filter(t => {
+    if (t.completed) return false;
+    if (t.dueDate > todayStrTasks) return false;
+    const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
+    if (!matchesBranch) return false;
+    const r = (t.assignedToRole || '').toLowerCase();
+    const isForPos = !t.assignedToRole || r === 'pos' || r === 'cajero' || t.targetModule === 'pos';
+    const isForMe = t.assignedToUserId === user?.id || (user?.name && t.assignedToUserName?.toLowerCase() === user?.name?.toLowerCase());
+    return isForPos || isForMe;
+  });
+  const posPendingObligatory = posPendingTasks.filter(t => t.enforcementLevel === 'OBLIGATORIA');
+  const posPendingCount = posPendingTasks.length;
+
   const activeRegisters = (posRegisters || []).filter(r =>
     r.active !== false &&
     (r.branchId === userBranchId)
@@ -168,8 +186,8 @@ export function PosView() {
   };
 
   // ── Verificación de Tareas Pendientes para Cierre Z ──
-  const { tasks: currentPosTasks, setDrawerOpen } = useTaskStore();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const currentPosTasks = allTasks;
+  const todayStr = todayStrTasks;
 
   const pendingObligatoryTasks = (currentPosTasks || []).filter(t => {
     const matchesUser = (!t.assignedToUserId && !t.assignedToRole) ||
@@ -1598,6 +1616,29 @@ export function PosView() {
           )}
         </div>
 
+        {/* ── Botón Tareas del Turno (POS) ── */}
+        <button
+          className={`shrink-0 h-11 px-3 flex items-center justify-center gap-1.5 rounded-xl border active:scale-95 transition-all relative cursor-pointer ${
+            posPendingObligatory.length > 0
+              ? 'bg-red-950/80 border-red-500 text-red-200 animate-pulse shadow-lg shadow-red-950/50'
+              : posPendingCount > 0
+              ? 'bg-amber-950/50 border-amber-500/60 text-amber-300 hover:bg-amber-900/40'
+              : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+          }`}
+          title="Tareas del Turno"
+          onClick={() => setDrawerOpen(true)}
+        >
+          <span className="text-base">📋</span>
+          <span className="text-xs font-bold hidden md:inline">Tareas</span>
+          {posPendingCount > 0 && (
+            <span className={`text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg ${
+              posPendingObligatory.length > 0 ? 'bg-red-500 text-white animate-bounce' : 'bg-amber-400 text-gray-950'
+            }`}>
+              {posPendingCount}
+            </span>
+          )}
+        </button>
+
         {/* ── Botón Hamburguesa ── */}
         <div className="relative shrink-0">
           <button
@@ -1711,15 +1752,17 @@ export function PosView() {
 
               <div className="h-px bg-gray-800" />
               <button 
-                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-amber-300 hover:bg-amber-950/40 transition-colors" 
+                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" 
                 onClick={() => { setDrawerOpen(true); setShowHamburgerMenu(false); }}
               >
                 <span className="flex items-center gap-3">
-                  <span className="text-base">📋</span> Tareas del Día
+                  <span className="text-base">📋</span> Tareas del Turno
                 </span>
-                {((pendingObligatoryTasks?.length || 0) + (pendingImportantTasks?.length || 0)) > 0 && (
-                  <span className="bg-amber-500 text-gray-950 text-[10px] font-black px-2 py-0.5 rounded-full">
-                    {(pendingObligatoryTasks?.length || 0) + (pendingImportantTasks?.length || 0)}
+                {posPendingCount > 0 && (
+                  <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${
+                    posPendingObligatory.length > 0 ? 'bg-red-500 text-white' : 'bg-amber-400 text-gray-950'
+                  }`}>
+                    {posPendingCount}
                   </span>
                 )}
               </button>
@@ -2610,9 +2653,7 @@ export function PosView() {
         />
       )}
 
-      {/* Drawer y Badge Flotante de Tareas */}
-      <QuickTaskDrawer />
-
+      {/* Modal Historial Z */}
       {showZHistoryModal && (
         <ZHistoryModal
           shifts={(posShifts || []).filter(s => s.closedAt).sort((a, b) => new Date(b.closedAt) - new Date(a.closedAt))}

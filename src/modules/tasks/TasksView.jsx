@@ -6,10 +6,12 @@ import {
   CheckCircle2, Circle, Clock, AlertTriangle, Camera, Plus, ChevronRight, 
   ChevronDown, X, Sparkles, Filter, Lock, ShieldAlert, Tag, Calendar, 
   FolderPlus, Flag, CheckSquare, Layers, Trash2, Edit2, ArrowLeft,
-  QrCode, UserCheck, Phone, Video, Wrench, ExternalLink, Repeat
+  QrCode, UserCheck, Phone, Video, Wrench, ExternalLink, Repeat,
+  Thermometer, Droplets
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { TaskEvidenceModal } from './components/TaskEvidenceModal';
 
 const MODULE_ROUTES = {
   pos: { route: '/pos', name: 'Punto de Venta (POS)', icon: '💻' },
@@ -24,7 +26,7 @@ const MODULE_ROUTES = {
 function TaskCard({ 
   task, userId, userName, todayStr, proj, pBadge, 
   onToggle, onDelete, onToggleSubtask, onReassign, 
-  allAssignableEmployees = [], onNavigateModule 
+  allAssignableEmployees = [], onNavigateModule, onOpenEvidence 
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showAssignDropdown, setShowAssignDropdown] = useState(false);
@@ -53,7 +55,13 @@ function TaskCard({
       <div className="flex items-start gap-3">
         {/* Checkbox redonda Todoist */}
         <button
-          onClick={() => onToggle(task.id)}
+          onClick={() => {
+            if (!task.completed && task.requirePhoto && !task.photoUrl) {
+              onOpenEvidence && onOpenEvidence(task);
+            } else {
+              onToggle(task.id);
+            }
+          }}
           className="mt-0.5 shrink-0 text-gray-400 hover:text-amber-400 transition-colors cursor-pointer"
         >
           {task.completed ? (
@@ -163,6 +171,18 @@ function TaskCard({
                 )}
               </div>
 
+              {/* Botón de Evidencia */}
+              {(task.requirePhoto || task.photoUrl || task.evidence) && (
+                <button
+                  onClick={() => onOpenEvidence && onOpenEvidence(task)}
+                  className="text-[11px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 px-2.5 py-1 rounded-xl transition-all flex items-center gap-1 cursor-pointer"
+                  title="Ver o adjuntar evidencia fotográfica y BPM"
+                >
+                  <Camera size={12} />
+                  <span>{task.photoUrl ? 'Evidencia ✓' : 'Subir Foto'}</span>
+                </button>
+              )}
+
               {/* Botón Directo al Módulo si aplica */}
               {task.targetModule && task.targetModule !== 'none' && MODULE_ROUTES[task.targetModule] && (
                 <button
@@ -189,6 +209,35 @@ function TaskCard({
             <p className="text-xs text-gray-300 mt-1.5 leading-relaxed">
               {task.description}
             </p>
+          )}
+
+          {/* Evidencias BPM (Temperaturas y Aceite) */}
+          {task.evidence && (
+            <div className="flex items-center gap-2 mt-2 flex-wrap text-[11px] font-bold">
+              {task.evidence.fryerTemp && (
+                <span className="px-2 py-0.5 rounded-lg bg-orange-950/70 text-orange-300 border border-orange-500/40 flex items-center gap-1">
+                  <Thermometer size={11} /> Freidora: {task.evidence.fryerTemp}°C
+                </span>
+              )}
+              {task.evidence.freezerTemp && (
+                <span className="px-2 py-0.5 rounded-lg bg-cyan-950/70 text-cyan-300 border border-cyan-500/40 flex items-center gap-1">
+                  <Thermometer size={11} /> Nevera: {task.evidence.freezerTemp}°C
+                </span>
+              )}
+              {task.evidence.oilCondition && (
+                <span className="px-2 py-0.5 rounded-lg bg-yellow-950/70 text-yellow-300 border border-yellow-500/40 flex items-center gap-1">
+                  <Droplets size={11} /> Aceite: {task.evidence.oilCondition === 'OPTIMO' ? 'Óptimo' : task.evidence.oilCondition === 'NORMAL' ? 'Normal' : task.evidence.oilCondition === 'REQUIERE_FILTRADO' ? 'Requiere Filtrado' : 'Cambio Urgente'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Nota del operario */}
+          {task.note && (
+            <div className="mt-2 text-[11px] text-gray-300 bg-[#121318] p-2 rounded-xl border border-gray-800 flex items-start gap-2">
+              <span className="text-amber-400 font-bold shrink-0">📝 Nota:</span>
+              <span className="italic">{task.note}</span>
+            </div>
           )}
 
           {/* Información del Reportante si aplica */}
@@ -287,6 +336,8 @@ export function TasksView() {
   } = useTaskStore();
 
   const [activeNav, setActiveNav] = useState('HOY'); // 'HOY' | 'ATRASADAS' | 'PROXIMO' | 'DANOS' | projectId
+  const [activeAreaFilter, setActiveAreaFilter] = useState('ALL'); // 'ALL' | 'MINE' | 'pos' | 'fritado' | 'bodeguero' | 'dejador'
+  const [evidenceTask, setEvidenceTask] = useState(null);
   const [showAddBox, setShowAddBox] = useState(false);
   const [showAddProjectModal, setShowAddProjectModal] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
@@ -394,12 +445,55 @@ export function TasksView() {
   const overdueTasks = myTasks.filter(t => !t.completed && t.dueDate < todayStr);
   const todayTasks = myTasks.filter(t => t.dueDate === todayStr);
 
+  // Métricas de Cumplimiento Ejecutivo del Día (Semáforo de Cumplimiento)
+  const todayBaseTasks = tasks.filter(t => {
+    const matchesBranch = !t.branchId || t.branchId === 'GLOBAL' || t.branchId === userBranchId;
+    return matchesBranch && (t.dueDate === todayStr || (!t.completed && t.dueDate < todayStr));
+  });
+
+  const metricsTotal = todayBaseTasks.length;
+  const metricsCompleted = todayBaseTasks.filter(t => t.completed).length;
+  const metricsPending = metricsTotal - metricsCompleted;
+  const metricsObligatoryTotal = todayBaseTasks.filter(t => t.enforcementLevel === 'OBLIGATORIA').length;
+  const metricsObligatoryCompleted = todayBaseTasks.filter(t => t.enforcementLevel === 'OBLIGATORIA' && t.completed).length;
+  const metricsObligatoryPending = metricsObligatoryTotal - metricsObligatoryCompleted;
+  const metricsWithEvidence = todayBaseTasks.filter(t => t.photoUrl || t.mediaUrl || t.evidence?.fryerTemp || t.evidence?.freezerTemp || t.evidence?.oilCondition).length;
+  const completionRate = metricsTotal > 0 ? Math.round((metricsCompleted / metricsTotal) * 100) : 100;
+
   const getFilteredTasks = () => {
-    if (activeNav === 'ATRASADAS') return overdueTasks;
-    if (activeNav === 'HOY') return myTasks.filter(t => t.dueDate === todayStr || (!t.completed && t.dueDate < todayStr));
-    if (activeNav === 'PROXIMO') return myTasks.filter(t => t.dueDate > todayStr);
-    if (activeNav === 'DANOS') return damageTasks;
-    return myTasks.filter(t => t.projectId === activeNav);
+    let baseList = [];
+    if (activeNav === 'ATRASADAS') baseList = overdueTasks;
+    else if (activeNav === 'HOY') baseList = myTasks.filter(t => t.dueDate === todayStr || (!t.completed && t.dueDate < todayStr));
+    else if (activeNav === 'PROXIMO') baseList = myTasks.filter(t => t.dueDate > todayStr);
+    else if (activeNav === 'DANOS') baseList = damageTasks;
+    else baseList = myTasks.filter(t => t.projectId === activeNav);
+
+    if (activeAreaFilter === 'ALL') return baseList;
+    if (activeAreaFilter === 'MINE') {
+      return baseList.filter(t => {
+        return (!t.assignedToUserId && !t.assignedToRole) ||
+               t.assignedToUserId === userId ||
+               t.assignedToUserName?.toLowerCase() === userName?.toLowerCase() ||
+               t.assignedToRole === userRole;
+      });
+    }
+    return baseList.filter(t => {
+      const r = (t.assignedToRole || '').toLowerCase();
+      const m = (t.targetModule || '').toLowerCase();
+      if (activeAreaFilter === 'pos') {
+        return r === 'pos' || r === 'cajero' || m === 'pos';
+      }
+      if (activeAreaFilter === 'fritado') {
+        return r === 'fritado' || r === 'cocina' || m === 'fritado';
+      }
+      if (activeAreaFilter === 'bodeguero') {
+        return r === 'bodeguero' || r === 'bodega' || m === 'bodega';
+      }
+      if (activeAreaFilter === 'dejador') {
+        return r === 'dejador' || r === 'vendedor' || m === 'dejador' || m === 'vendedor';
+      }
+      return r === activeAreaFilter || m === activeAreaFilter;
+    });
   };
 
   const currentTaskList = getFilteredTasks();
@@ -710,6 +804,97 @@ export function TasksView() {
             </button>
           </div>
 
+          {/* ── SEMÁFORO Y MÉTRICAS DE CUMPLIMIENTO OPERATIVO ── */}
+          <div className="bg-[#16171e] border border-gray-800 rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-lg shadow-black/20">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2.5">
+                <span className="text-sm font-black text-white flex items-center gap-1.5">
+                  <span>📊</span> Cumplimiento Operativo del Día
+                </span>
+                <span className={`text-[10px] font-black px-2.5 py-0.5 rounded-full ${
+                  completionRate >= 80 
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-500/50' 
+                    : completionRate >= 50 
+                    ? 'bg-amber-950/80 text-amber-300 border border-amber-500/50' 
+                    : 'bg-red-950/80 text-red-300 border border-red-500/50'
+                }`}>
+                  {completionRate >= 80 ? '🟢 Excelente' : completionRate >= 50 ? '🟡 Regular' : '🔴 Crítico'}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-gray-400">Progreso diario:</span>
+                <span className="text-base font-black font-mono text-amber-400">
+                  {completionRate}%
+                </span>
+              </div>
+            </div>
+
+            {/* Barra de Progreso Visual */}
+            <div className="w-full bg-gray-900 rounded-full h-2.5 overflow-hidden p-0.5 border border-gray-800">
+              <div 
+                className={`h-full transition-all duration-500 rounded-full ${
+                  completionRate >= 80 
+                    ? 'bg-gradient-to-r from-emerald-500 to-green-400' 
+                    : completionRate >= 50 
+                    ? 'bg-gradient-to-r from-amber-500 to-yellow-400' 
+                    : 'bg-gradient-to-r from-red-600 to-orange-500'
+                }`}
+                style={{ width: `${Math.min(100, Math.max(0, completionRate))}%` }}
+              />
+            </div>
+
+            {/* Indicadores Clave en Grid */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-center">
+              <div className="bg-[#121318] p-2.5 rounded-2xl border border-gray-800/80">
+                <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Completadas</span>
+                <span className="text-sm font-black text-white font-mono mt-0.5 block">{metricsCompleted} / {metricsTotal}</span>
+              </div>
+              <div className="bg-[#121318] p-2.5 rounded-2xl border border-gray-800/80">
+                <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Pendientes</span>
+                <span className="text-sm font-black text-amber-400 font-mono mt-0.5 block">{metricsPending}</span>
+              </div>
+              <div className="bg-[#121318] p-2.5 rounded-2xl border border-gray-800/80">
+                <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Obligatorias</span>
+                <span className={`text-sm font-black font-mono mt-0.5 block ${metricsObligatoryPending > 0 ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {metricsObligatoryCompleted} / {metricsObligatoryTotal} {metricsObligatoryPending > 0 ? '⚠️' : '✓'}
+                </span>
+              </div>
+              <div className="bg-[#121318] p-2.5 rounded-2xl border border-gray-800/80">
+                <span className="text-[10px] text-gray-400 font-bold block uppercase tracking-wider">Con Evidencia</span>
+                <span className="text-sm font-black text-blue-400 font-mono mt-0.5 block">📷 {metricsWithEvidence}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* ── FILTROS RÁPIDOS POR ROL / ÁREA ── */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+            {[
+              { key: 'ALL', label: 'Todas las áreas', icon: '🌐' },
+              { key: 'MINE', label: 'Mis Tareas', icon: '👤' },
+              { key: 'pos', label: 'Caja (POS)', icon: '💻' },
+              { key: 'fritado', label: 'Cocina / Fritado', icon: '🍳' },
+              { key: 'bodeguero', label: 'Bodega', icon: '📦' },
+              { key: 'dejador', label: 'Reparto / Domicilios', icon: '🛵' },
+            ].map(f => {
+              const isSelected = activeAreaFilter === f.key;
+              return (
+                <button
+                  key={f.key}
+                  type="button"
+                  onClick={() => setActiveAreaFilter(f.key)}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                    isSelected
+                      ? 'bg-amber-500 text-gray-950 shadow-md font-black'
+                      : 'bg-[#181920] border border-gray-800 text-gray-400 hover:text-white hover:border-gray-700'
+                  }`}
+                >
+                  <span>{f.icon}</span>
+                  <span>{f.label}</span>
+                </button>
+              );
+            })}
+          </div>
+
           {/* ── CAJA DE CREACIÓN INLINE ESTILO TODOIST ── */}
           {showAddBox ? (
             <form onSubmit={handleCreateTask} className="bg-[#181920] border-2 border-amber-500 rounded-2xl p-5 space-y-4 shadow-xl">
@@ -949,6 +1134,7 @@ export function TasksView() {
                   onReassign={(tId, uId, uName, uRole) => reassignTask(tId, uId, uName, uRole)}
                   allAssignableEmployees={allAssignableEmployees}
                   onNavigateModule={handleNavigateModule}
+                  onOpenEvidence={(task) => setEvidenceTask(task)}
                 />
               ))
             )}
@@ -1058,6 +1244,17 @@ export function TasksView() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── MODAL EVIDENCIA Y BPM ── */}
+      {evidenceTask && (
+        <TaskEvidenceModal
+          task={evidenceTask}
+          onClose={() => setEvidenceTask(null)}
+          onComplete={(tId, evData) => {
+            toggleTaskCompleted(tId, userId, evData);
+          }}
+        />
       )}
 
     </div>

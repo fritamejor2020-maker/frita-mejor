@@ -350,15 +350,31 @@ export const useTaskStore = create(
         });
       },
 
-      toggleTaskCompleted: (id, userId = null, photoUrl = null, note = null) => {
+      toggleTaskCompleted: (id, userId = null, photoOrEvidence = null, note = null) => {
         const today = new Date().toISOString();
+        let photoUrl = null;
+        let finalNote = note;
+        let bpmData = {};
+
+        if (typeof photoOrEvidence === 'string') {
+          photoUrl = photoOrEvidence;
+        } else if (photoOrEvidence && typeof photoOrEvidence === 'object') {
+          photoUrl = photoOrEvidence.photoUrl || null;
+          finalNote = photoOrEvidence.note || note;
+          bpmData = {
+            fryerTemp: photoOrEvidence.fryerTemp || null,
+            freezerTemp: photoOrEvidence.freezerTemp || null,
+            oilCondition: photoOrEvidence.oilCondition || null,
+          };
+        }
+
         set(state => {
           const updatedTasks = state.tasks.map(task => {
             if (task.id !== id) return task;
             const willBeCompleted = !task.completed;
 
             // Verificar si todas las subtareas deben marcarse
-            const updatedSubtasks = task.subtasks.map(st => ({
+            const updatedSubtasks = (task.subtasks || []).map(st => ({
               ...st,
               completed: willBeCompleted
             }));
@@ -368,8 +384,9 @@ export const useTaskStore = create(
               completed: willBeCompleted,
               completedAt: willBeCompleted ? today : null,
               completedByUserId: willBeCompleted ? userId : null,
-              photoUrl: photoUrl || task.photoUrl,
-              note: note || task.note,
+              photoUrl: willBeCompleted ? (photoUrl || task.photoUrl) : task.photoUrl,
+              note: willBeCompleted ? (finalNote || task.note) : task.note,
+              evidence: willBeCompleted ? { ...(task.evidence || {}), ...bpmData } : task.evidence,
               subtasks: updatedSubtasks,
             };
           });
