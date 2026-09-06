@@ -13,65 +13,8 @@ const DEFAULT_PROJECTS = [
   { id: 'PROJ-MANTENIMIENTO', name: 'Mantenimiento', icon: '🛠️', color: '#ef4444' },
 ];
 
-// Plantillas de tareas recurrentes por defecto
-const DEFAULT_TEMPLATES = [
-  {
-    id: 'TPL-001',
-    title: 'Checklist de Apertura de Caja y Punto',
-    description: 'Verificar aseo, contar base de dinero e encender equipos',
-    projectId: 'PROJ-APERTURA',
-    priority: 'P1',
-    assignedToRole: 'pos',
-    dueTime: '07:00',
-    enforcementLevel: 'OBLIGATORIA',
-    requirePhoto: false,
-    requireNote: false,
-    subtasks: [
-      { id: 'ST-1', title: 'Verificar aseo del área de atención', completed: false },
-      { id: 'ST-2', title: 'Contar base de efectivo en caja', completed: false },
-      { id: 'ST-3', title: 'Encender freidoras y mostradores', completed: false },
-    ],
-    recurrence: { type: 'DAILY' },
-    active: true,
-  },
-  {
-    id: 'TPL-002',
-    title: 'Limpieza y Desinfección de Freidoras',
-    description: 'Filtrar aceite o cambiarlo, desengrasar tinas y secar',
-    projectId: 'PROJ-LIMPIEZA',
-    priority: 'P1',
-    assignedToRole: 'pos',
-    dueTime: '15:00',
-    enforcementLevel: 'OBLIGATORIA',
-    requirePhoto: true,
-    requireNote: false,
-    subtasks: [
-      { id: 'ST-10', title: 'Desocupar aceite en contenedor de reciclaje', completed: false },
-      { id: 'ST-11', title: 'Lavar tinas con desengrasante', completed: false },
-      { id: 'ST-12', title: 'Tomar foto de la freidora limpia y seca', completed: false },
-    ],
-    recurrence: { type: 'DAILY' },
-    active: true,
-  },
-  {
-    id: 'TPL-003',
-    title: 'Cierre Z y Arqueo de Caja Registradora',
-    description: 'Realizar cuadre en POS y guardar efectivo en sobre de recaudo',
-    projectId: 'PROJ-CIERRE',
-    priority: 'P1',
-    assignedToRole: 'pos',
-    dueTime: '21:00',
-    enforcementLevel: 'OBLIGATORIA',
-    requirePhoto: true,
-    requireNote: true,
-    subtasks: [
-      { id: 'ST-20', title: 'Realizar cuadre en POS', completed: false },
-      { id: 'ST-21', title: 'Guardar efectivo en sobre de recaudo', completed: false },
-    ],
-    recurrence: { type: 'DAILY' },
-    active: true,
-  }
-];
+// Plantillas de tareas recurrentes por defecto (vacio por defecto)
+const DEFAULT_TEMPLATES = [];
 
 function syncTasks(state) {
   markLocalWrite('tasks_data');
@@ -87,7 +30,7 @@ export const useTaskStore = create(
     (set, get) => ({
       tasks: [],
       projects: DEFAULT_PROJECTS,
-      taskTemplates: DEFAULT_TEMPLATES,
+      taskTemplates: [],
       lastRecurrenceCheckDate: null,
       isDrawerOpen: false,
       isSignOutBlocked: false,
@@ -112,9 +55,17 @@ export const useTaskStore = create(
         }
         if (!data) return;
         set({
-          tasks: data.tasks || get().tasks,
+          tasks: Array.isArray(data.tasks) ? data.tasks : [],
           projects: data.projects && data.projects.length > 0 ? data.projects : get().projects,
-          taskTemplates: data.taskTemplates && data.taskTemplates.length > 0 ? data.taskTemplates : get().taskTemplates,
+          taskTemplates: Array.isArray(data.taskTemplates) ? data.taskTemplates : [],
+        });
+      },
+
+      clearAllTasks: () => {
+        set(state => {
+          const updated = { tasks: [], taskTemplates: [] };
+          syncTasks({ ...state, ...updated });
+          return updated;
         });
       },
 
