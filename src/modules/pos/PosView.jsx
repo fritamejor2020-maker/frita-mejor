@@ -243,6 +243,19 @@ export function PosView() {
   const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showLogoutPromptModal, setShowLogoutPromptModal] = useState(false);
   const [showClientDropdown, setShowClientDropdown] = useState(false);
+  const clientDropdownRef = useRef(null);
+
+  useEffect(() => {
+    if (!showClientDropdown) return;
+    const handleClickOutside = (e) => {
+      if (clientDropdownRef.current && !clientDropdownRef.current.contains(e.target)) {
+        setShowClientDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showClientDropdown]);
+
   const [showZHistoryModal, setShowZHistoryModal] = useState(false);
   const [lastSale, setLastSale] = useState(null); // Used for printing the receipt
   const [lastClosedShift, setLastClosedShift] = useState(null); // Used for printing Z Report
@@ -1917,7 +1930,7 @@ export function PosView() {
           </div>
           
           <div className="flex gap-2">
-            <div className="flex-1 min-w-0 relative">
+            <div className="flex-1 min-w-0 relative" ref={clientDropdownRef}>
               <div 
                 className={`w-full bg-[#1e1f26] text-white border ${
                   showClientDropdown ? 'border-amber-500 ring-1 ring-amber-500/40' : 'border-gray-700 hover:border-gray-500'
@@ -1945,11 +1958,9 @@ export function PosView() {
                       ? (customers.find(x => x.id === selectedCustomer)?.name || 'Cliente') 
                       : 'Cliente General (escribir nombre...)'
                   }
-                  onFocus={() => setShowClientDropdown(true)}
                   onChange={(e) => {
                     const val = e.target.value;
                     setCustomCustomerName(val);
-                    setShowClientDropdown(true);
                     if (selectedCustomer) {
                       const c = customers.find(x => x.id === selectedCustomer);
                       if (c && c.name.toLowerCase() !== val.toLowerCase().trim()) {
@@ -1987,84 +1998,73 @@ export function PosView() {
               </div>
 
               {showClientDropdown && (
-                <>
-                  <div className="fixed inset-0 z-40" onClick={() => setShowClientDropdown(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#1a1b22] border border-gray-700 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden max-h-[260px] overflow-y-auto">
-                    {/* Opción Cliente General */}
-                    <button
-                      type="button"
-                      className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all ${
-                        !selectedCustomer && !customCustomerName ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
-                      }`}
-                      onClick={() => {
-                        setSelectedCustomer('');
-                        setCustomCustomerName('');
-                        setShowClientDropdown(false);
-                      }}
-                    >
-                      <span className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-xs">👤</span>
-                      <div className="flex-1 min-w-0">
-                        <span className="block leading-tight">Cliente General</span>
-                        <span className="text-[10px] text-gray-500 font-normal">Sin nombre asignado</span>
-                      </div>
-                      {!selectedCustomer && !customCustomerName && <span className="text-amber-400 text-xs">✓</span>}
-                    </button>
+                <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#1a1b22] border border-gray-700 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden max-h-[260px] overflow-y-auto">
+                  {/* Opción Cliente General */}
+                  <button
+                    type="button"
+                    className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all ${
+                      !selectedCustomer && !customCustomerName ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
+                    }`}
+                    onClick={() => {
+                      setSelectedCustomer('');
+                      setCustomCustomerName('');
+                      setShowClientDropdown(false);
+                    }}
+                  >
+                    <span className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-xs">👤</span>
+                    <div className="flex-1 min-w-0">
+                      <span className="block leading-tight">Cliente General</span>
+                      <span className="text-[10px] text-gray-500 font-normal">Sin nombre asignado</span>
+                    </div>
+                    {!selectedCustomer && !customCustomerName && <span className="text-amber-400 text-xs">✓</span>}
+                  </button>
 
-                    {/* Confirmación visual si escribió un nombre manual */}
-                    {customCustomerName && customCustomerName.trim().length > 0 && !selectedCustomer && (
-                      <div className="px-3.5 py-2 bg-amber-500/10 border-t border-b border-amber-500/20 text-xs font-bold text-amber-300 flex items-center justify-between">
-                        <span className="truncate">✏️ Nombre ingresado: <strong>{customCustomerName.trim()}</strong></span>
-                        <span className="text-[10px] bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-md shrink-0">Manual</span>
-                      </div>
-                    )}
-
-                    {/* Lista de Contratas y Clientes Registrados filtrados */}
-                    {customers
-                      .filter(c => c.typeId)
-                      .filter(c => {
-                        if (!customCustomerName) return true;
-                        return (c.name || '').toLowerCase().includes(customCustomerName.toLowerCase().trim());
-                      })
-                      .map(c => {
-                        const type = customerTypes.find(t => t.id === c.typeId);
-                        const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
-                        const isActive = selectedCustomer === c.id;
-                        return (
-                          <button
-                            type="button"
-                            key={c.id}
-                            className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all border-t border-gray-800/50 ${
-                              isActive ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
-                            }`}
-                            onClick={() => {
-                              setSelectedCustomer(c.id);
-                              setCustomCustomerName(c.name);
-                              setShowClientDropdown(false);
-                            }}
-                          >
-                            <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>
-                              {c.name.charAt(0)}
+                  {/* Lista de Contratas y Clientes Registrados filtrados */}
+                  {customers
+                    .filter(c => c.typeId)
+                    .filter(c => {
+                      if (!customCustomerName) return true;
+                      return (c.name || '').toLowerCase().includes(customCustomerName.toLowerCase().trim());
+                    })
+                    .map(c => {
+                      const type = customerTypes.find(t => t.id === c.typeId);
+                      const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
+                      const isActive = selectedCustomer === c.id;
+                      return (
+                        <button
+                          type="button"
+                          key={c.id}
+                          className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all border-t border-gray-800/50 ${
+                            isActive ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
+                          }`}
+                          onClick={() => {
+                            setSelectedCustomer(c.id);
+                            setCustomCustomerName(c.name);
+                            setShowClientDropdown(false);
+                          }}
+                        >
+                          <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>
+                            {c.name.charAt(0)}
+                          </span>
+                          <div className="flex-1 min-w-0 truncate">
+                            <span className="block truncate leading-tight">{c.name}</span>
+                            <span className="text-[10px] text-gray-400 font-normal">{type?.name || 'Cliente'}</span>
+                          </div>
+                          {bal > 0 ? (
+                            <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-500/30 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                              Debe
                             </span>
-                            <div className="flex-1 min-w-0 truncate">
-                              <span className="block truncate leading-tight">{c.name}</span>
-                              <span className="text-[10px] text-gray-400 font-normal">{type?.name || 'Cliente'}</span>
-                            </div>
-                            {bal > 0 ? (
-                              <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-500/30 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap">
-                                Debe
-                              </span>
-                            ) : (
-                              <span className="text-[10px] font-bold text-emerald-400 shrink-0">✓</span>
-                            )}
-                          </button>
-                        );
-                      })}
+                          ) : (
+                            <span className="text-[10px] font-bold text-emerald-400 shrink-0">✓</span>
+                          )}
+                        </button>
+                      );
+                    })}
 
-                    {customers.filter(c => c.typeId).length === 0 && (
-                      <div className="text-center py-4 text-gray-500 text-xs">Sin contratas registradas</div>
-                    )}
-                  </div>
-                </>
+                  {customers.filter(c => c.typeId).length === 0 && (
+                    <div className="text-center py-4 text-gray-500 text-xs">Sin contratas registradas</div>
+                  )}
+                </div>
               )}
             </div>
             <button
