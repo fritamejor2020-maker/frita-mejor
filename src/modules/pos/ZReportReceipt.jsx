@@ -52,6 +52,19 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   const initial = shift.initialAmount || 0;
 
+  // Obtener el nombre del turno / jornada exactamente como fue seleccionado (ej: "6-10 am", "2-4 pm", etc.)
+  const shiftTurno = (() => {
+    if (shift.jornada) return shift.jornada;
+    if (shift.shift) return shift.shift;
+    const idStr = String(shift.id || '');
+    const m = idStr.match(/(\d+-\d+)-(am|pm)/i);
+    if (m) return `${m[1]} ${m[2].toLowerCase()}`;
+    const m2 = idStr.match(/(\d+-\d+\s*(?:am|pm))/i);
+    if (m2) return m2[1];
+    const cleanId = idStr.replace(/^SHIFT-/, '');
+    return cleanId.length > 8 ? cleanId.slice(-8) : cleanId;
+  })();
+
   // ── Clasificación Dinámica de Métodos de Pago ──────────────────────────────────
   const configuredMethods = (paymentMethods && paymentMethods.length > 0) ? paymentMethods : (ticketConfig?.paymentMethods || [
     { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false, isTransfer: false },
@@ -298,10 +311,10 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
           ${tc.showPhone && tc.phone ? `Tel: ${tc.phone}` : ''} ${tc.showAddress && tc.address ? `· ${tc.address}` : ''}
         </p>
         <div style="border-bottom: 1px dashed black; margin: 3px 0;"></div>
-        <div style="font-size: 10px; font-weight: 900; display: flex; justify-content: space-between;">
-          ${shift.registerName ? `<span>Caja: ${shift.registerName}</span>` : ''}
-          ${tc.zShowShiftId !== false ? `<span>Turno: ${shift.id.slice(-6)}</span>` : ''}
-          ${tc.zShowCashier !== false ? `<span>Cajero: ${shift.userName || 'PRINCIPAL'}</span>` : ''}
+        <div style="font-size: 10px; font-weight: 900; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 2px 6px;">
+          ${shift.registerName ? `<span style="white-space: nowrap;">Caja: ${shift.registerName}</span>` : ''}
+          ${tc.zShowShiftId !== false ? `<span style="white-space: nowrap;">Turno: ${shiftTurno}</span>` : ''}
+          ${tc.zShowCashier !== false ? `<span style="white-space: nowrap;">Cajero: ${shift.userName || 'PRINCIPAL'}</span>` : ''}
         </div>
         <div style="font-size: 9.5px; margin-top: 1px;">
           ${tc.zShowOpenDate !== false ? `Apertura: ${dateStrOpened}` : ''} ${tc.zShowCloseDate !== false ? `· Cierre: ${dateStrClosed}` : ''}

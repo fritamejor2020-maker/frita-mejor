@@ -5132,6 +5132,11 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney, onCo
                         {shift.registerName && (
                           <span className="bg-purple-500/20 text-purple-300 text-xs font-bold px-2 py-0.5 rounded-lg">{shift.registerName}</span>
                         )}
+                        {(shift.jornada || shift.shift) && (
+                          <span className="bg-amber-500/20 text-amber-300 text-xs font-black px-2 py-0.5 rounded-lg">
+                            Turno: {shift.jornada || shift.shift}
+                          </span>
+                        )}
                         {isPending && (
                           <span className="bg-amber-500/20 text-amber-400 border border-amber-500/30 text-[10px] font-black px-2 py-0.5 rounded-lg">
                             ⚠️ Conteo Pendiente

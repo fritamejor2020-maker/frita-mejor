@@ -2013,7 +2013,7 @@ function ReportsPanel() {
                   <div key={sh.id} className="border border-gray-100 rounded-2xl p-4 flex flex-wrap items-center gap-4 hover:border-gray-200 transition-colors">
                     <div className="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center text-xl border border-yellow-100 shrink-0">💰</div>
                     <div className="flex-1 min-w-[140px]">
-                      <span className="font-black text-chunky-dark block">Turno {sh.id?.slice(-6)}</span>
+                      <span className="font-black text-chunky-dark block">Turno: {sh.jornada || sh.shift || sh.id?.slice(-6)}</span>
                       <span className="text-gray-400 font-bold text-xs">Cajero: {sh.userName || '—'}</span>
                     </div>
                     <span className="text-xs font-bold text-gray-500">{fmtDateTime(sh.openedAt)}</span>

@@ -141,7 +141,7 @@ export function PosDescarguesModal({ activeShift, onClose }) {
             <div>
               <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider block">Turno en Curso</span>
               <span className="text-xs font-bold text-gray-300">
-                Turno #{activeShift.id.slice(-6)} · {activeShift.userName || 'Cajero'}
+                Turno: {activeShift.jornada || activeShift.shift || activeShift.id.slice(-6)} · {activeShift.userName || 'Cajero'}
               </span>
             </div>
             <div className="text-right">
