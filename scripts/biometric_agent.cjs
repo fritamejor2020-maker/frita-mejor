@@ -162,6 +162,6 @@ async function runSyncCycle() {
   }
 }
 
-console.log('🚀 Agente de Sincronización Biométrico -> Supabase Nube iniciado (Ejecutándose cada 30s)...');
+console.log('🚀 Agente de Sincronización Biométrico -> Supabase Nube iniciado (Ejecutándose cada 10 min)...');
 runSyncCycle();
-setInterval(runSyncCycle, 30000);
+setInterval(runSyncCycle, 10 * 60 * 1000);

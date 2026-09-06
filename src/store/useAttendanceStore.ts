@@ -176,7 +176,7 @@ const INITIAL_TERMINALS: BiometricTerminal[] = [
     username: 'admin',
     password: 'Control.1',
     status: 'ONLINE',
-    autoSyncMinutes: 5,
+    autoSyncMinutes: 10,
   },
 ];
 

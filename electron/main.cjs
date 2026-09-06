@@ -767,9 +767,9 @@ app.whenReady().then(() => {
   createMainWindow();
   createTray();
 
-  // Iniciar sincronización nativa en segundo plano cada 30 segundos
+  // Iniciar sincronización nativa en segundo plano cada 10 minutos (600.000 ms)
   runBiometricSync();
-  syncInterval = setInterval(runBiometricSync, 30000);
+  syncInterval = setInterval(runBiometricSync, 10 * 60 * 1000);
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
