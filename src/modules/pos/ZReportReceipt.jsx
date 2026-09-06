@@ -192,7 +192,20 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
     shiftDescargues = shift.descargues;
   } else {
     try {
-      shiftDescargues = useInventoryStore.getState().getPosDescarguesByShift(shift.id) || [];
+      const allDesc = useInventoryStore.getState().posDescargues || [];
+      shiftDescargues = allDesc.filter(d => {
+        if (!d) return false;
+        if (d.shiftId && shift.id && d.shiftId === shift.id) return true;
+        const dReg = d.registerId || d.registerName;
+        const sReg = shift.registerId || shift.registerName;
+        if (!dReg || !sReg || dReg === sReg) {
+          const dTime = new Date(d.createdAt || d.timestamp || 0).getTime();
+          const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+          const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+          return dTime >= (openTime - 60000) && dTime <= (closeTime + 60000);
+        }
+        return false;
+      });
     } catch (_) {
       shiftDescargues = [];
     }

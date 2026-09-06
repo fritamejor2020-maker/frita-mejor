@@ -52,6 +52,7 @@ export function PosDescarguesModal({ activeShift, onClose }) {
     setIsSubmitting(true);
     try {
       const descNumber = nextDescargueNumber;
+      const nowIso = new Date().toISOString();
       const newDesc = addPosDescargue({
         shiftId: activeShift.id,
         number: descNumber,
@@ -60,8 +61,14 @@ export function PosDescarguesModal({ activeShift, onClose }) {
         photoBase64: photoBase64 || null,
         cashierId: user?.id,
         cashierName: user?.name || activeShift.userName || 'Cajero',
+        registerId: activeShift.registerId || 'REG-001',
         registerName: activeShift.registerName || 'Caja Principal',
         branchId: activeShift.branchId || 'BRANCH-001',
+        jornada: activeShift.jornada || activeShift.shift || null,
+        shift: activeShift.shift || activeShift.jornada || null,
+        date: activeShift.date || nowIso.slice(0, 10),
+        timestamp: nowIso,
+        createdAt: nowIso,
       });
 
       try {

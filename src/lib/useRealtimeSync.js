@@ -215,6 +215,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     const merged = mergeArrays(localShifts, remote, 'posShifts');
     useInventoryStore.setState({ posShifts: merged });
   };
+  applicators['posDescargues']     = (v) => {
+    const state = useInventoryStore.getState();
+    const merged = mergeArrays(state.posDescargues || [], v || [], 'posDescargues');
+    useInventoryStore.setState({ posDescargues: merged });
+  };
 
   // ── Locales por sede ──
   // Si es Admin (branchId=null), suscribe a TODAS las sedes.
@@ -254,6 +259,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const state = useInventoryStore.getState();
       const merged = mergeArrays(state.posExpenses || [], v || [], 'posExpenses');
       useInventoryStore.setState({ posExpenses: merged });
+    };
+    applicators[`posDescargues_${bid}`]    = (v) => {
+      const state = useInventoryStore.getState();
+      const merged = mergeArrays(state.posDescargues || [], v || [], 'posDescargues');
+      useInventoryStore.setState({ posDescargues: merged });
     };
     applicators[`attendance_logs_${bid}`] = (v) => {
       if (Array.isArray(v)) {

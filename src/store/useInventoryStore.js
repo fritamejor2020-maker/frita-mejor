@@ -1755,9 +1755,35 @@ export const useInventoryStore = create(
         syncKey('posDescargues', useInventoryStore.getState().posDescargues);
       },
 
-      getPosDescarguesByShift: (shiftId) => {
-        if (!shiftId) return [];
-        return (get().posDescargues || []).filter(d => d.shiftId === shiftId);
+      getPosDescarguesByShift: (shiftId, shiftObj = null) => {
+        if (!shiftId && !shiftObj) return [];
+        // 1. Check if shiftObj itself has embedded descargues
+        if (shiftObj && Array.isArray(shiftObj.descargues) && shiftObj.descargues.length > 0) {
+          return shiftObj.descargues;
+        }
+        const state = get();
+        // 2. Check if shift in posShifts has embedded descargues
+        const foundShift = shiftObj || (state.posShifts || []).find(s => s.id === shiftId);
+        if (foundShift && Array.isArray(foundShift.descargues) && foundShift.descargues.length > 0) {
+          return foundShift.descargues;
+        }
+        const allDesc = state.posDescargues || [];
+        // 3. Match by shiftId
+        const byId = allDesc.filter(d => d.shiftId === shiftId);
+        if (byId.length > 0) return byId;
+
+        // 4. Fallback: match by register and time window
+        if (foundShift && foundShift.openedAt) {
+          const shiftOpen = new Date(foundShift.openedAt).getTime();
+          const shiftClose = foundShift.closedAt ? new Date(foundShift.closedAt).getTime() : Date.now();
+          const byWindow = allDesc.filter(d => {
+            const dTime = new Date(d.createdAt || d.timestamp || d.date || 0).getTime();
+            const sameRegister = !d.registerId || !foundShift.registerId || d.registerId === foundShift.registerId;
+            return sameRegister && dTime >= (shiftOpen - 120000) && dTime <= (shiftClose + 120000);
+          });
+          if (byWindow.length > 0) return byWindow;
+        }
+        return [];
       },
 
       // ─── CONTRATAS: Pagos / Abonos ───────────────────────────────────────────

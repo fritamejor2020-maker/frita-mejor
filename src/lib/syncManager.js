@@ -122,7 +122,7 @@ export const BRANCH_KEYS = [
   // Inventario y bodega
   'inventory', 'movements', 'warehouses',
   // POS
-  'posShifts', 'posSales', 'posExpenses', 'posSettings',
+  'posShifts', 'posSales', 'posExpenses', 'posDescargues', 'posSettings',
   'contrataPayments', 'deletedShiftIds', 'deletedPosSaleIds',
   // Logística (Dejador / Vendedor) — por sede
   'pendingRequests', 'completedRequests', 'rejectedRequests', 'loadHistory',

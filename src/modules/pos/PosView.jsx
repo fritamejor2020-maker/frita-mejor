@@ -783,17 +783,39 @@ export function PosView() {
     const closedDate = new Date().toISOString();
     const bonusFields = bonusData || {};
     
+    // Obtener y blindar descargues del turno para que queden incrustados permanentemente en el turno
+    const currentShiftDescargues = (posDescargues || []).filter(d => {
+      if (!d) return false;
+      if (d.shiftId && d.shiftId === activeShift.id) return true;
+      const dReg = d.registerId || d.registerName;
+      const sReg = activeShift.registerId || activeShift.registerName;
+      if (!dReg || !sReg || dReg === sReg) {
+        const dTime = new Date(d.createdAt || d.timestamp || 0).getTime();
+        const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
+        const closeTime = new Date(closedDate).getTime();
+        if (dTime && openTime && dTime >= (openTime - 60000) && dTime <= (closeTime + 60000)) {
+          return true;
+        }
+      }
+      return false;
+    });
+    const currentTotalDescargues = currentShiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
+
     const closedShiftData = { 
       ...activeShift, 
       closedAt: closedDate, 
       realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
       pendingCount: isPostponed ? true : false,
+      descargues: currentShiftDescargues,
+      totalDescargues: currentTotalDescargues,
       ...bonusFields
     };
     updatePosShift(activeShift.id, {
       closedAt: closedDate,
       realAmount: isPostponed ? null : (parseFloat(realCount) || 0),
       pendingCount: isPostponed ? true : false,
+      descargues: currentShiftDescargues,
+      totalDescargues: currentTotalDescargues,
       ...bonusFields
     });
     
@@ -841,7 +863,7 @@ export function PosView() {
       const shiftSales = (posSales || []).filter(s => isShiftSale(s, activeShift));
       const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, activeShift));
       
-      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods, activeShiftDescargues);
+      const zReportHtml = generateZReportHTML(closedShiftData, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, drawerCode, posSettings?.paymentMethods, currentShiftDescargues);
       setTimeout(() => printHTML(zReportHtml, 'Reporte Z'), 200);
     }
 
@@ -877,7 +899,21 @@ export function PosView() {
     };
     const shiftSales = (posSales || []).filter(s => isShiftSale(s, shift));
     const shiftExpenses = (posExpenses || []).filter(e => isShiftExpense(e, shift));
-    const shiftDescargues = (posDescargues || []).filter(d => d.shiftId === shift?.id);
+    const shiftDescargues = (Array.isArray(shift.descargues) && shift.descargues.length > 0)
+      ? shift.descargues
+      : (posDescargues || []).filter(d => {
+          if (!d) return false;
+          if (d.shiftId && shift.id && d.shiftId === shift.id) return true;
+          const dReg = d.registerId || d.registerName;
+          const sReg = shift.registerId || shift.registerName;
+          if (!dReg || !sReg || dReg === sReg) {
+            const dTime = new Date(d.createdAt || d.timestamp || 0).getTime();
+            const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+            const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+            return dTime >= (openTime - 60000) && dTime <= (closeTime + 60000);
+          }
+          return false;
+        });
     const zReportHtml = generateZReportHTML(shift, shiftSales, shiftExpenses, customers, customerTypes, posSettings?.ticketConfig, '', posSettings?.paymentMethods, shiftDescargues);
     setTimeout(() => printHTML(zReportHtml, 'Reporte Z (Copia)'), 100);
   };

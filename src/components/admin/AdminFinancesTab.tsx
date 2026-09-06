@@ -364,7 +364,7 @@ export const AdminFinancesTab = ({
   allowDelete = true,
   mode = 'VENDEDOR'
 } = {}) => {
-  const { posShifts, posSales, posExpenses, posDescargues, updatePosShift, deletePosShift, posSettings, customers = [] } = useInventoryStore();
+  const { posShifts, posSales, posExpenses, posDescargues, addPosDescargue, deletePosDescargue, updatePosShift, deletePosShift, posSettings, customers = [] } = useInventoryStore();
   const { loadHistory, completedRequests, updateLoadEntry, updateCompletedRequestItems } = useLogisticsStore();
   const user = useAuthStore((s: any) => s.user);
   const vehicles = useVehicleStore((s: any) => s.vehicles);
@@ -394,7 +394,11 @@ export const AdminFinancesTab = ({
   const [editDetails, setEditDetails] = useState<any[]>([]);
   const [editLogistics, setEditLogistics] = useState<any[]>([]); // historial editable
   const [expensesDescModal, setExpensesDescModal] = useState<{ desc: string; amount: number; name: string; items?: any[] } | null>(null);
-  const [descarguesModal, setDescarguesModal] = useState<{ descargues: any[]; amount: number; pointName: string } | null>(null);
+  const [descarguesModal, setDescarguesModal] = useState<{ descargues: any[]; amount: number; pointName: string; shiftId?: string; shift?: any } | null>(null);
+  const [showAddDescForm, setShowAddDescForm] = useState(false);
+  const [newDescAmount, setNewDescAmount] = useState('');
+  const [newDescNote, setNewDescNote] = useState('');
+  const [newDescCashier, setNewDescCashier] = useState('');
   const [transfersModal, setTransfersModal] = useState<{ transfers: any[]; pointName: string } | null>(null);
   const [fullscreenPhoto, setFullscreenPhoto] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -851,9 +855,17 @@ export const AdminFinancesTab = ({
 
          const shiftSales = (posSales || []).filter(isShiftSale);
          const shiftExpenses = (posExpenses || []).filter(isShiftExpense);
-         const shiftDescargues = (posDescargues || []).filter(isShiftDescargue);
+         // Check embedded descargues on the shift first, or combine them
+         const embeddedDescargues = Array.isArray(s.descargues) && s.descargues.length > 0 ? s.descargues : [];
+         const matchedDescargues = (posDescargues || []).filter(isShiftDescargue);
+         const descMap = new Map<string, any>();
+         embeddedDescargues.forEach((d: any) => { if (d) descMap.set(d.id || JSON.stringify(d), d); });
+         matchedDescargues.forEach((d: any) => { if (d) descMap.set(d.id || JSON.stringify(d), d); });
+         const shiftDescargues = Array.from(descMap.values());
          
-         const totalDescargues = shiftDescargues.reduce((acc: number, d: any) => acc + (Number(d.amount) || 0), 0);
+         const totalDescargues = s.totalDescargues !== undefined && Number(s.totalDescargues) > 0
+           ? Number(s.totalDescargues)
+           : shiftDescargues.reduce((acc: number, d: any) => acc + (Number(d.amount) || 0), 0);
          theoretical = shiftSales.reduce((acc: number, sale: any) => acc + sale.total, 0);
          expenses = shiftExpenses.filter((e: any) => e.type !== 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0); 
          const totalDeposits = shiftExpenses.filter((e: any) => e.type === 'deposito').reduce((acc: number, e: any) => acc + e.amount, 0);
@@ -889,9 +901,15 @@ export const AdminFinancesTab = ({
          const totalCash = localCash + contrataCash;
          const totalTransfers = localTransfers + contrataTransfers;
 
+         const isShiftClosed = Boolean(s.closedAt || (s.realAmount !== null && s.realAmount !== undefined));
          const posCash = s.cashAmount !== undefined ? s.cashAmount : (s.realAmount !== null && s.realAmount !== undefined ? s.realAmount : totalCash);
          const posTransfer = s.transferAmount !== undefined ? s.transferAmount : totalTransfers;
-         real = posCash + posTransfer + contrataCredit;
+         
+         // Dinero total justificado al cerrar el turno:
+         // efectivo contado en cajón + descargues entregados a caja fuerte + salidas/gastos en efectivo + transferencias + créditos de contrata
+         real = isShiftClosed 
+           ? (posCash + totalDescargues + expenses + posTransfer + contrataCredit)
+           : (posCash + posTransfer + contrataCredit);
          
          const baseAmount = Number(s.initialAmount || s.base || 0);
          const expectedCashInDrawer = baseAmount + totalCash - expenses + totalDeposits - totalDescargues;
@@ -1383,17 +1401,38 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                           {(closing.totalDescargues || 0) > 0 ? (
                             <button
                               className="font-black text-amber-700 hover:underline text-xs bg-amber-50 px-2.5 py-1 rounded-lg border border-amber-200 shadow-2xs hover:bg-amber-100 transition-all"
-                              onClick={() => setDescarguesModal({ 
-                                descargues: closing.shiftDescargues || [], 
-                                amount: closing.totalDescargues, 
-                                pointName: closing.pointName 
-                              })}
+                              onClick={() => {
+                                setShowAddDescForm(false);
+                                setDescarguesModal({ 
+                                  descargues: closing.shiftDescargues || [], 
+                                  amount: closing.totalDescargues, 
+                                  pointName: closing.pointName,
+                                  shiftId: closing.id,
+                                  shift: closing._raw || closing
+                                });
+                              }}
                               title="Ver descargues a caja fuerte"
                             >
                               📦 {fmt(closing.totalDescargues)}
                             </button>
                           ) : (
-                            <span className="text-gray-300 font-normal">—</span>
+                            <button
+                              className="text-gray-400 hover:text-amber-700 text-xs px-2 py-1 rounded hover:bg-amber-50 border border-transparent hover:border-amber-200 transition-all font-medium inline-flex items-center gap-1"
+                              onClick={() => {
+                                setShowAddDescForm(false);
+                                setDescarguesModal({ 
+                                  descargues: closing.shiftDescargues || [], 
+                                  amount: 0, 
+                                  pointName: closing.pointName,
+                                  shiftId: closing.id,
+                                  shift: closing._raw || closing
+                                });
+                              }}
+                              title="Ver o registrar descargues a caja fuerte"
+                            >
+                              <span>—</span>
+                              <span className="text-[10px] text-amber-700 font-bold bg-amber-100/80 px-1.5 py-0.5 rounded border border-amber-300 shadow-2xs hover:bg-amber-200">+</span>
+                            </button>
                           )}
                         </td>
 
@@ -2456,10 +2495,10 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
       {descarguesModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
-          onClick={() => setDescarguesModal(null)}
+          onClick={() => { setDescarguesModal(null); setShowAddDescForm(false); }}
         >
           <div
-            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-md animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[85vh]"
+            className="bg-white rounded-[28px] p-7 shadow-2xl w-full max-w-lg animate-[fadeIn_0.2s_ease-out] flex flex-col max-h-[88vh]"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center gap-3 mb-4">
@@ -2469,7 +2508,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                 <p className="text-xs font-bold text-gray-400">{descarguesModal.pointName}</p>
               </div>
               <button
-                onClick={() => setDescarguesModal(null)}
+                onClick={() => { setDescarguesModal(null); setShowAddDescForm(false); }}
                 className="ml-auto w-8 h-8 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center text-gray-500 font-black transition-colors"
               >
                 ✕
@@ -2481,10 +2520,118 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                 <p className="text-[10px] font-bold text-amber-700 uppercase tracking-widest mb-0.5">Total Entregado</p>
                 <p className="text-2xl font-black text-amber-900">{fmt(descarguesModal.amount)}</p>
               </div>
-              <span className="bg-amber-200/60 text-amber-900 font-black text-xs px-3 py-1 rounded-full">
-                {descarguesModal.descargues.length} descargues
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="bg-amber-200/60 text-amber-900 font-black text-xs px-3 py-1 rounded-full">
+                  {descarguesModal.descargues.length} {descarguesModal.descargues.length === 1 ? 'descargue' : 'descargues'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setShowAddDescForm(!showAddDescForm)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs px-3 py-1.5 rounded-xl shadow-xs active:scale-95 transition-all flex items-center gap-1"
+                >
+                  {showAddDescForm ? '✕ Cancelar' : '+ Agregar Descargue'}
+                </button>
+              </div>
             </div>
+
+            {/* Formulario de agregar descargue */}
+            {showAddDescForm && (
+              <div className="mb-4 p-4 rounded-2xl border-2 border-dashed border-amber-300 bg-amber-50/60 space-y-3">
+                <h4 className="font-black text-amber-950 text-xs uppercase tracking-wider">
+                  Registrar Descargue en este Turno
+                </h4>
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-600 mb-1">Monto Entregado (COP)*</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 font-bold">$</span>
+                    <input
+                      type="text"
+                      className="w-full pl-8 pr-3 py-2 bg-white border border-gray-300 rounded-xl text-sm font-black text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="0"
+                      value={newDescAmount ? Number(newDescAmount.replace(/\D/g, '')).toLocaleString('es-CO') : ''}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/\D/g, '');
+                        setNewDescAmount(raw);
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 mb-1">Cajero / Entregó</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="Nombre del cajero"
+                      value={newDescCashier}
+                      onChange={(e) => setNewDescCashier(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold text-gray-600 mb-1">Nota / Observación</label>
+                    <input
+                      type="text"
+                      className="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-800 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      placeholder="Ej: Descargue a caja fuerte"
+                      value={newDescNote}
+                      onChange={(e) => setNewDescNote(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  disabled={!newDescAmount || Number(newDescAmount) <= 0}
+                  onClick={() => {
+                    const amt = Number(newDescAmount.replace(/\D/g, ''));
+                    if (!amt || amt <= 0 || !descarguesModal) return;
+                    const shift = descarguesModal.shift;
+                    const sId = descarguesModal.shiftId || shift?.id;
+                    const newDesc = {
+                      id: `DESC-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+                      shiftId: sId,
+                      amount: amt,
+                      note: newDescNote.trim() || 'Descargue registrado desde administración',
+                      cashierName: newDescCashier.trim() || shift?.userName || user?.name || 'Administrador',
+                      registerId: shift?.registerId || 'REG-001',
+                      registerName: shift?.registerName || shift?.pointId || 'Caja Principal',
+                      branchId: shift?.branchId || user?.branchId || 'BRANCH-001',
+                      jornada: shift?.jornada || shift?.shift || 'Turno',
+                      shift: shift?.shift || shift?.jornada || 'Turno',
+                      date: shift?.date || (shift?.openedAt ? shift.openedAt.split('T')[0] : new Date().toISOString().split('T')[0]),
+                      timestamp: new Date().toISOString(),
+                      createdAt: new Date().toISOString(),
+                    };
+
+                    addPosDescargue(newDesc);
+
+                    const currentEmbedded = Array.isArray(shift?.descargues) ? [...shift.descargues] : [...descarguesModal.descargues];
+                    const updatedDescargues = [...currentEmbedded, newDesc];
+                    const updatedTotal = updatedDescargues.reduce((sum: number, d: any) => sum + (Number(d.amount) || 0), 0);
+
+                    if (sId) {
+                      updatePosShift(sId, {
+                        descargues: updatedDescargues,
+                        totalDescargues: updatedTotal,
+                      });
+                    }
+
+                    setDescarguesModal({
+                      ...descarguesModal,
+                      descargues: updatedDescargues,
+                      amount: updatedTotal,
+                    });
+
+                    setNewDescAmount('');
+                    setNewDescNote('');
+                    setNewDescCashier('');
+                    setShowAddDescForm(false);
+                  }}
+                  className="w-full py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-40 text-white font-black text-xs shadow-xs active:scale-95 transition-all"
+                >
+                  ✓ Guardar Descargue
+                </button>
+              </div>
+            )}
 
             <div className="flex-1 overflow-y-auto space-y-2.5 pr-1" style={{ scrollbarWidth: 'thin' }}>
               {descarguesModal.descargues.length === 0 ? (
@@ -2496,7 +2643,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                   const dTime = d.createdAt || d.timestamp;
                   const timeStr = dTime ? new Date(dTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '';
                   return (
-                    <div key={d.id || idx} className="p-3 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-start justify-between text-xs">
+                    <div key={d.id || idx} className="p-3 rounded-2xl border border-amber-200 bg-amber-50/40 flex items-start justify-between text-xs group hover:bg-amber-50 transition-all">
                       <div>
                         <div className="flex items-center gap-2">
                           <span className="font-black text-amber-950">Descargue #{d.number || idx + 1}</span>
@@ -2509,7 +2656,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                           <p className="text-xs text-gray-700 italic mt-1 bg-white/80 p-2 rounded-xl border border-amber-100">"{d.note}"</p>
                         )}
                       </div>
-                      <div className="text-right shrink-0 ml-3">
+                      <div className="text-right shrink-0 ml-3 flex flex-col items-end">
                         <span className="font-black text-amber-900 text-sm block">{fmt(d.amount)}</span>
                         {d.photoBase64 && (
                           <button
@@ -2519,6 +2666,30 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                             📷 Foto
                           </button>
                         )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!window.confirm('¿Está seguro de eliminar este descargue?')) return;
+                            deletePosDescargue(d.id);
+                            const updated = (descarguesModal.descargues || []).filter((item: any) => item.id !== d.id);
+                            const updatedTotal = updated.reduce((sum: number, item: any) => sum + (Number(item.amount) || 0), 0);
+                            const sId = descarguesModal.shiftId || descarguesModal.shift?.id;
+                            if (sId) {
+                              updatePosShift(sId, {
+                                descargues: updated,
+                                totalDescargues: updatedTotal,
+                              });
+                            }
+                            setDescarguesModal({
+                              ...descarguesModal,
+                              descargues: updated,
+                              amount: updatedTotal,
+                            });
+                          }}
+                          className="mt-1.5 opacity-0 group-hover:opacity-100 text-[10px] text-red-500 hover:text-red-700 font-bold hover:underline transition-opacity"
+                        >
+                          Eliminar
+                        </button>
                       </div>
                     </div>
                   );
@@ -2527,7 +2698,7 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
             </div>
 
             <button
-              onClick={() => setDescarguesModal(null)}
+              onClick={() => { setDescarguesModal(null); setShowAddDescForm(false); }}
               className="mt-5 w-full py-3 rounded-2xl bg-gray-900 text-white font-black text-sm hover:bg-gray-700 transition-colors active:scale-95"
             >
               Cerrar
