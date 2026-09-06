@@ -38,7 +38,7 @@ export const generateReceiptHTML = (sale, customer, ticketConfig = {}, customerT
     dateStyle: 'short', timeStyle: 'short'
   });
 
-  const customerName = customer?.name || 'Cliente General';
+  const customerName = customer?.name || sale?.customerName || 'Cliente General';
   const customerDocStr = (tc.showCustomerDoc && customer?.document) ? ` · CC/NIT: ${customer.document}` : '';
   const customerAddrStr = (tc.showCustomerAddress && customer?.address) ? ` · Dir: ${customer.address}` : '';
   const customerPhoneStr = (tc.showCustomerPhone && customer?.phone) ? ` · Tel: ${customer.phone}` : '';

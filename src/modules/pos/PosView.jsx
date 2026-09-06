@@ -230,6 +230,7 @@ export function PosView() {
   // Ticket states
   const [ticketItems, setTicketItems]     = useState([]);
   const [selectedCustomer, setSelectedCustomer] = useState('');
+  const [customCustomerName, setCustomCustomerName] = useState('');
   const [activeSuspendedId, setActiveSuspendedId] = useState(null);
   const [isLuckyWinnerSession, setIsLuckyWinnerSession] = useState(false);
   const [manualDiscountPercent, setManualDiscountPercent] = useState(0);
@@ -946,13 +947,14 @@ export function PosView() {
     setActiveSuspendedId(null);
     setPendingDeliveryInfo(null);
     setSelectedCustomer('');
+    setCustomCustomerName('');
     try { usePosStore.getState().clearCart(); } catch (_) {}
 
     // 2. Guardar la venta en espera en el store / Supabase
     try {
       const saleData = {
         customerId: currentCustomer || null,
-        customerName: c?.name || pendingDeliveryInfo?.customerName || 'Venta Pausada',
+        customerName: (currentCustomer ? c?.name : null) || (customCustomerName?.trim() ? customCustomerName.trim() : null) || c?.name || pendingDeliveryInfo?.customerName || 'Venta Pausada',
         customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
         deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
         serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
@@ -1028,7 +1030,7 @@ export function PosView() {
       const saleData = {
         id: targetId,
         customerId: currentCustomer || null,
-        customerName: c?.name || pendingDeliveryInfo?.customerName || (selectedCustomer ? 'Cliente' : 'Venta Pausada'),
+        customerName: (currentCustomer ? c?.name : null) || (customCustomerName?.trim() ? customCustomerName.trim() : null) || c?.name || pendingDeliveryInfo?.customerName || (selectedCustomer ? 'Cliente' : 'Venta Pausada'),
         customerPhone: c?.phone || pendingDeliveryInfo?.customerPhone || '',
         deliveryAddress: c?.address || pendingDeliveryInfo?.deliveryAddress || '',
         serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
@@ -1075,7 +1077,7 @@ export function PosView() {
         const autoSavedSale = {
           id: currentSaleId,
           customerId: selectedCustomer || null,
-          customerName: currentCustomerObj?.name || pendingDeliveryInfo?.customerName || (isLuckyWinnerSession ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Venta Pausada')),
+          customerName: (selectedCustomer ? currentCustomerObj?.name : null) || (customCustomerName?.trim() ? customCustomerName.trim() : null) || currentCustomerObj?.name || pendingDeliveryInfo?.customerName || (isLuckyWinnerSession ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Venta Pausada')),
           customerPhone: currentCustomerObj?.phone || pendingDeliveryInfo?.customerPhone || '',
           deliveryAddress: currentCustomerObj?.address || pendingDeliveryInfo?.deliveryAddress || '',
           serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
@@ -1109,6 +1111,13 @@ export function PosView() {
       setIsLuckyWinnerSession(isLucky);
       setTicketItems((freshSale.items || []).map(i => ({ ...i })));
       setSelectedCustomer(freshSale.customerId || '');
+      const resumeCustName = freshSale.customerName;
+      if (resumeCustName && resumeCustName !== 'Cliente General' && resumeCustName !== 'Venta Pausada' && resumeCustName !== 'Cliente Ganador Raspa y Gana') {
+        setCustomCustomerName(resumeCustName);
+      } else {
+        const foundC = (customers || []).find(c => c.id === freshSale.customerId);
+        setCustomCustomerName(foundC ? foundC.name : '');
+      }
       setActiveSuspendedId(freshSale.id);
       setManualDiscountPercent(freshSale.discountPercent || (freshSale.isLuckyWinner && freshSale.prizeType === 'DISCOUNT' ? (freshSale.discountPercentage || 0) : 0));
       const resolvedOlaId = freshSale.originalOlaClickId || (freshSale.id && String(freshSale.id).startsWith('HELD-OLA-') ? String(freshSale.id).replace('HELD-OLA-', '') : null);
@@ -1163,7 +1172,11 @@ export function PosView() {
       originalHeldId: activeSuspendedId || null,
       originalOlaClickId: resolvedOlaClickId || null,
       customerId: selectedCustomer || null,
-      customerName: saleCustomer?.name || (activeSuspendedId ? pendingDeliveryInfo?.customerName : null) || (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : (selectedCustomer ? 'Cliente' : 'Cliente General')),
+      customerName: (selectedCustomer ? saleCustomer?.name : null) || 
+                    (customCustomerName?.trim() ? customCustomerName.trim() : null) || 
+                    saleCustomer?.name || 
+                    (activeSuspendedId ? pendingDeliveryInfo?.customerName : null) || 
+                    (isLuckyTicket ? 'Cliente Ganador Raspa y Gana' : 'Cliente General'),
       customerPhone: saleCustomer?.phone || (activeSuspendedId ? pendingDeliveryInfo?.customerPhone : '') || '',
       deliveryAddress: saleCustomer?.address || (activeSuspendedId ? pendingDeliveryInfo?.deliveryAddress : '') || '',
       serviceType: (activeSuspendedId ? pendingDeliveryInfo?.serviceType : null) || 'DELIVERY',
@@ -1356,7 +1369,7 @@ export function PosView() {
       const suspendedWinnerSale = {
         id: `HELD-LUCKY-${Date.now()}`,
         customerId: selectedCustomer || null,
-        customerName: saleCustomer?.name || (selectedCustomer ? 'Cliente' : 'Cliente Ganador Raspa y Gana'),
+        customerName: (selectedCustomer ? saleCustomer?.name : null) || (customCustomerName?.trim() ? customCustomerName.trim() : null) || saleCustomer?.name || (selectedCustomer ? 'Cliente' : 'Cliente Ganador Raspa y Gana'),
         customerPhone: saleCustomer?.phone || pendingDeliveryInfo?.customerPhone || '',
         deliveryAddress: saleCustomer?.address || pendingDeliveryInfo?.deliveryAddress || '',
         serviceType: pendingDeliveryInfo?.serviceType || 'DELIVERY',
@@ -1383,7 +1396,7 @@ export function PosView() {
       setWinnerInfo({
         prizeType: rewardConfig?.prizeType || 'RASPA_Y_GANA',
         discountPercentage: rewardConfig?.discountPercentage || 10,
-        customerName: saleCustomer?.name || 'Cliente',
+        customerName: (selectedCustomer ? saleCustomer?.name : null) || (customCustomerName?.trim() ? customCustomerName.trim() : null) || saleCustomer?.name || 'Cliente',
         amount: total
       });
       setShowLuckyWinnerModal(true);
@@ -1392,6 +1405,7 @@ export function PosView() {
       setTicketItems([]);
       setActiveSuspendedId(null);
       setSelectedCustomer('');
+      setCustomCustomerName('');
       setPendingDeliveryInfo(null);
       return;
     }
@@ -1425,6 +1439,7 @@ export function PosView() {
     setActiveSuspendedId(null);
     setPendingDeliveryInfo(null);
     setSelectedCustomer('');
+    setCustomCustomerName('');
     setManualDiscountPercent(0);
     setIsLuckyWinnerSession(false);
     
@@ -1836,52 +1851,148 @@ export function PosView() {
           
           <div className="flex gap-2">
             <div className="flex-1 min-w-0 relative">
-              <button
-                type="button"
-                className="w-full bg-[#1e1f26] text-white border border-gray-700 rounded-lg px-3 py-2 text-sm font-bold outline-none text-left flex items-center justify-between gap-2 hover:border-gray-500 transition-all"
-                onClick={() => setShowClientDropdown(!showClientDropdown)}
+              <div 
+                className={`w-full bg-[#1e1f26] text-white border ${
+                  showClientDropdown ? 'border-amber-500 ring-1 ring-amber-500/40' : 'border-gray-700 hover:border-gray-500'
+                } rounded-xl px-2.5 py-1.5 flex items-center gap-2 transition-all`}
               >
-                <span className="truncate flex items-center gap-2">
+                {/* Avatar / Indicador */}
+                <span className="shrink-0 flex items-center justify-center">
                   {(() => {
-                    if (!selectedCustomer) return <><span className="text-gray-400">👤</span> Cliente General</>;
+                    if (!selectedCustomer) {
+                      return <span className="text-gray-400 text-sm">👤</span>;
+                    }
                     const c = customers.find(x => x.id === selectedCustomer);
-                    if (!c) return 'Cliente General';
+                    if (!c) return <span className="text-gray-400 text-sm">👤</span>;
                     const t = customerTypes.find(x => x.id === c.typeId);
-                    return <><span className={`w-2.5 h-2.5 rounded-full shrink-0 ${t?.color || 'bg-gray-500'}`} />{c.name}</>;
+                    return <span className={`w-3 h-3 rounded-full shrink-0 ${t?.color || 'bg-gray-500'}`} />;
                   })()}
                 </span>
-                <span className="text-gray-500 text-[10px]">{showClientDropdown ? '▲' : '▼'}</span>
-              </button>
+
+                {/* Input editable para escribir libremente el nombre del cliente */}
+                <input
+                  type="text"
+                  value={customCustomerName}
+                  placeholder={
+                    selectedCustomer 
+                      ? (customers.find(x => x.id === selectedCustomer)?.name || 'Cliente') 
+                      : 'Cliente General (escribir nombre...)'
+                  }
+                  onFocus={() => setShowClientDropdown(true)}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setCustomCustomerName(val);
+                    setShowClientDropdown(true);
+                    if (selectedCustomer) {
+                      const c = customers.find(x => x.id === selectedCustomer);
+                      if (c && c.name.toLowerCase() !== val.toLowerCase().trim()) {
+                        setSelectedCustomer('');
+                      }
+                    }
+                  }}
+                  className="flex-1 bg-transparent text-white font-bold text-sm outline-none placeholder-gray-500 min-w-0"
+                />
+
+                {/* Botón para limpiar nombre y volver a Cliente General */}
+                {(customCustomerName || selectedCustomer) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomCustomerName('');
+                      setSelectedCustomer('');
+                    }}
+                    className="text-gray-400 hover:text-white text-xs px-1 py-0.5 rounded hover:bg-gray-800 transition-colors"
+                    title="Restablecer a Cliente General"
+                  >
+                    ✕
+                  </button>
+                )}
+
+                {/* Flecha desplegable */}
+                <button
+                  type="button"
+                  onClick={() => setShowClientDropdown(!showClientDropdown)}
+                  className="text-gray-400 hover:text-white text-[10px] p-1 transition-colors"
+                  title="Ver clientes y contratas registradas"
+                >
+                  {showClientDropdown ? '▲' : '▼'}
+                </button>
+              </div>
+
               {showClientDropdown && (
                 <>
                   <div className="fixed inset-0 z-40" onClick={() => setShowClientDropdown(false)} />
-                  <div className="absolute left-0 right-0 top-full mt-1 z-50 bg-[#1a1b22] border border-gray-700 rounded-xl shadow-2xl shadow-black/50 overflow-hidden max-h-[240px] overflow-y-auto">
+                  <div className="absolute left-0 right-0 top-full mt-1.5 z-50 bg-[#1a1b22] border border-gray-700 rounded-2xl shadow-2xl shadow-black/80 overflow-hidden max-h-[260px] overflow-y-auto">
+                    {/* Opción Cliente General */}
                     <button
-                      className={`w-full text-left px-3 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all ${!selectedCustomer ? 'bg-yellow-400/10 text-yellow-300' : 'text-gray-300 hover:bg-gray-800'}`}
-                      onClick={() => { setSelectedCustomer(''); setShowClientDropdown(false); }}
+                      type="button"
+                      className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all ${
+                        !selectedCustomer && !customCustomerName ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
+                      }`}
+                      onClick={() => {
+                        setSelectedCustomer('');
+                        setCustomCustomerName('');
+                        setShowClientDropdown(false);
+                      }}
                     >
                       <span className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-xs">👤</span>
-                      <span>Cliente General</span>
+                      <div className="flex-1 min-w-0">
+                        <span className="block leading-tight">Cliente General</span>
+                        <span className="text-[10px] text-gray-500 font-normal">Sin nombre asignado</span>
+                      </div>
+                      {!selectedCustomer && !customCustomerName && <span className="text-amber-400 text-xs">✓</span>}
                     </button>
-                    {customers.filter(c => c.typeId).map(c => {
-                      const type = customerTypes.find(t => t.id === c.typeId);
-                      const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
-                      const isActive = selectedCustomer === c.id;
-                      return (
-                        <button
-                          key={c.id}
-                          className={`w-full text-left px-3 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all border-t border-gray-800/50 ${isActive ? 'bg-yellow-400/10 text-yellow-300' : 'text-gray-300 hover:bg-gray-800'}`}
-                          onClick={() => { setSelectedCustomer(c.id); setShowClientDropdown(false); }}
-                        >
-                          <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>{c.name.charAt(0)}</span>
-                          <span className="flex-1 min-w-0 truncate">{c.name}</span>
-                          {bal > 0
-                            ? <span className="text-[10px] font-black text-red-400 bg-red-950/50 px-1.5 py-0.5 rounded-full shrink-0 whitespace-nowrap">Debe</span>
-                            : <span className="text-[10px] font-bold text-green-500 shrink-0">✓</span>
-                          }
-                        </button>
-                      );
-                    })}
+
+                    {/* Confirmación visual si escribió un nombre manual */}
+                    {customCustomerName && customCustomerName.trim().length > 0 && !selectedCustomer && (
+                      <div className="px-3.5 py-2 bg-amber-500/10 border-t border-b border-amber-500/20 text-xs font-bold text-amber-300 flex items-center justify-between">
+                        <span className="truncate">✏️ Nombre ingresado: <strong>{customCustomerName.trim()}</strong></span>
+                        <span className="text-[10px] bg-amber-500/20 text-amber-200 px-2 py-0.5 rounded-md shrink-0">Manual</span>
+                      </div>
+                    )}
+
+                    {/* Lista de Contratas y Clientes Registrados filtrados */}
+                    {customers
+                      .filter(c => c.typeId)
+                      .filter(c => {
+                        if (!customCustomerName) return true;
+                        return (c.name || '').toLowerCase().includes(customCustomerName.toLowerCase().trim());
+                      })
+                      .map(c => {
+                        const type = customerTypes.find(t => t.id === c.typeId);
+                        const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
+                        const isActive = selectedCustomer === c.id;
+                        return (
+                          <button
+                            type="button"
+                            key={c.id}
+                            className={`w-full text-left px-3.5 py-2.5 text-sm font-bold flex items-center gap-2.5 transition-all border-t border-gray-800/50 ${
+                              isActive ? 'bg-amber-400/15 text-amber-300' : 'text-gray-300 hover:bg-gray-800'
+                            }`}
+                            onClick={() => {
+                              setSelectedCustomer(c.id);
+                              setCustomCustomerName(c.name);
+                              setShowClientDropdown(false);
+                            }}
+                          >
+                            <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>
+                              {c.name.charAt(0)}
+                            </span>
+                            <div className="flex-1 min-w-0 truncate">
+                              <span className="block truncate leading-tight">{c.name}</span>
+                              <span className="text-[10px] text-gray-400 font-normal">{type?.name || 'Cliente'}</span>
+                            </div>
+                            {bal > 0 ? (
+                              <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-500/30 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap">
+                                Debe
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-emerald-400 shrink-0">✓</span>
+                            )}
+                          </button>
+                        );
+                      })}
+
                     {customers.filter(c => c.typeId).length === 0 && (
                       <div className="text-center py-4 text-gray-500 text-xs">Sin contratas registradas</div>
                     )}
@@ -2066,6 +2177,7 @@ export function PosView() {
               setIsLuckyWinnerSession(false);
               setPendingDeliveryInfo(null);
               setSelectedCustomer('');
+              setCustomCustomerName('');
               setManualDiscountPercent(0);
               try { usePosStore.getState().clearCart(); } catch(_) {}
             }}>
