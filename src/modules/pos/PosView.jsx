@@ -1923,7 +1923,7 @@ export function PosView() {
         </div>
         
         {/* Ticket Header & Customer */}
-        <div className="p-4 border-b border-gray-800 flex flex-col gap-3">
+        <div className="p-4 border-b border-gray-800 flex flex-col gap-3 relative z-20">
           <div className="flex justify-between items-center">
             <h2 className="font-black text-xl text-chunky-main">Nueva Venta</h2>
             <span className="text-gray-500 text-xs">{new Date().toLocaleDateString('es-CO')}</span>
@@ -1945,7 +1945,7 @@ export function PosView() {
                     const c = customers.find(x => x.id === selectedCustomer);
                     if (!c) return <span className="text-gray-400 text-sm">👤</span>;
                     const t = customerTypes.find(x => x.id === c.typeId);
-                    return <span className={`w-3 h-3 rounded-full shrink-0 ${t?.color || 'bg-gray-500'}`} />;
+                    return <span className={`w-3 h-3 rounded-full shrink-0 ${t?.color || 'bg-amber-500'}`} />;
                   })()}
                 </span>
 
@@ -1958,14 +1958,21 @@ export function PosView() {
                       ? (customers.find(x => x.id === selectedCustomer)?.name || 'Cliente') 
                       : 'Cliente General (escribir nombre...)'
                   }
+                  onFocus={() => setShowClientDropdown(true)}
                   onChange={(e) => {
                     const val = e.target.value;
                     setCustomCustomerName(val);
+                    setShowClientDropdown(true);
                     if (selectedCustomer) {
                       const c = customers.find(x => x.id === selectedCustomer);
-                      if (c && c.name.toLowerCase() !== val.toLowerCase().trim()) {
+                      if (!c || c.name.toLowerCase().trim() !== val.toLowerCase().trim()) {
                         setSelectedCustomer('');
                       }
+                    }
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === 'Escape') {
+                      setShowClientDropdown(false);
                     }
                   }}
                   className="flex-1 bg-transparent text-white font-bold text-sm outline-none placeholder-gray-500 min-w-0"
@@ -2014,19 +2021,47 @@ export function PosView() {
                     <span className="w-7 h-7 rounded-lg bg-gray-700 flex items-center justify-center text-xs">👤</span>
                     <div className="flex-1 min-w-0">
                       <span className="block leading-tight">Cliente General</span>
-                      <span className="text-[10px] text-gray-500 font-normal">Sin nombre asignado</span>
+                      <span className="text-[10px] text-gray-500 font-normal">Venta rápida sin nombre</span>
                     </div>
                     {!selectedCustomer && !customCustomerName && <span className="text-amber-400 text-xs">✓</span>}
                   </button>
 
-                  {/* Lista de Contratas y Clientes Registrados filtrados */}
-                  {customers
-                    .filter(c => c.typeId)
-                    .filter(c => {
-                      if (!customCustomerName) return true;
-                      return (c.name || '').toLowerCase().includes(customCustomerName.toLowerCase().trim());
-                    })
-                    .map(c => {
+                  {/* Si escribió un nombre y no coincide con un cliente registrado seleccionado */}
+                  {customCustomerName && customCustomerName.trim().length > 0 && !selectedCustomer && (
+                    <div
+                      className="px-3.5 py-2 bg-gray-800/80 border-t border-b border-gray-700/60 text-xs text-gray-300 flex items-center justify-between cursor-pointer hover:bg-gray-700/80 transition-colors"
+                      onClick={() => setShowClientDropdown(false)}
+                      title="Confirmar este nombre para la venta"
+                    >
+                      <span className="truncate">👤 Vender a: <strong className="text-white">{customCustomerName.trim()}</strong></span>
+                      <span className="text-[10px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono shrink-0">Enter ↵</span>
+                    </div>
+                  )}
+
+                  {/* Lista de Contratas y Clientes Registrados filtrados por búsqueda */}
+                  {(() => {
+                    const searchVal = (customCustomerName || '').toLowerCase().trim();
+                    const filtered = customers.filter(c => {
+                      if (!searchVal) return true;
+                      const name = (c.name || '').toLowerCase();
+                      const phone = (c.phone || '').toLowerCase();
+                      const doc = (c.documentNumber || c.id || '').toLowerCase();
+                      return name.includes(searchVal) || phone.includes(searchVal) || doc.includes(searchVal);
+                    });
+
+                    if (filtered.length === 0) {
+                      return (
+                        <div className="text-center py-4 px-3 text-gray-500 text-xs">
+                          {searchVal ? (
+                            <span>No hay clientes registrados con "<strong>{searchVal}</strong>"</span>
+                          ) : (
+                            <span>Sin clientes registrados</span>
+                          )}
+                        </div>
+                      );
+                    }
+
+                    return filtered.map(c => {
                       const type = customerTypes.find(t => t.id === c.typeId);
                       const bal = getContrataBalance ? getContrataBalance(c.id) : 0;
                       const isActive = selectedCustomer === c.id;
@@ -2044,26 +2079,25 @@ export function PosView() {
                           }}
                         >
                           <span className={`w-7 h-7 rounded-lg ${type?.color || 'bg-gray-600'} flex items-center justify-center text-white text-xs font-black shrink-0`}>
-                            {c.name.charAt(0)}
+                            {c.name ? c.name.charAt(0).toUpperCase() : 'C'}
                           </span>
                           <div className="flex-1 min-w-0 truncate">
                             <span className="block truncate leading-tight">{c.name}</span>
-                            <span className="text-[10px] text-gray-400 font-normal">{type?.name || 'Cliente'}</span>
+                            <span className="text-[10px] text-gray-400 font-normal">
+                              {type?.name ? `Contrata: ${type.name}` : (c.phone ? `Tel: ${c.phone}` : 'Cliente')}
+                            </span>
                           </div>
                           {bal > 0 ? (
                             <span className="text-[10px] font-black text-red-400 bg-red-950/50 border border-red-500/30 px-1.5 py-0.5 rounded-md shrink-0 whitespace-nowrap">
                               Debe
                             </span>
                           ) : (
-                            <span className="text-[10px] font-bold text-emerald-400 shrink-0">✓</span>
+                            isActive && <span className="text-[10px] font-bold text-emerald-400 shrink-0">✓</span>
                           )}
                         </button>
                       );
-                    })}
-
-                  {customers.filter(c => c.typeId).length === 0 && (
-                    <div className="text-center py-4 text-gray-500 text-xs">Sin contratas registradas</div>
-                  )}
+                    });
+                  })()}
                 </div>
               )}
             </div>
