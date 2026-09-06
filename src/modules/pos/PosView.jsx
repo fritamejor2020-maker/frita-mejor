@@ -510,6 +510,16 @@ export function PosView() {
   // Auto-foco inteligente y captura global para escáner de códigos de barras (Electron / Web)
   useEffect(() => {
     const handleKeyDown = (e) => {
+      // 1. Si hay alguna ventana emergente, modal o overlay activo en pantalla, NO enviar teclas al buscador
+      const isModalOrOverlayOpen = !!(
+        document.querySelector('.fixed.inset-0') ||
+        document.querySelector('[role="dialog"]') ||
+        document.querySelector('.backdrop-blur-sm')
+      );
+      if (isModalOrOverlayOpen) {
+        return;
+      }
+
       const activeEl = document.activeElement;
       const activeTag = activeEl?.tagName;
 
@@ -532,6 +542,63 @@ export function PosView() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Soporte directo de teclado físico para el modal de Precio Variable (Hueso, etc.)
+  useEffect(() => {
+    if (!variablePriceProduct) return;
+
+    const handleVariablePriceKey = (e) => {
+      // Escape -> Cancelar y cerrar
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        setVariablePriceProduct(null);
+        setVariablePriceInput('');
+        return;
+      }
+
+      // Enter -> Confirmar
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        const price = parseInt(variablePriceInput);
+        if (!isNaN(price) && price > 0) {
+          handleItemAdd(variablePriceProduct, price);
+          setVariablePriceProduct(null);
+          setVariablePriceInput('');
+        }
+        return;
+      }
+
+      // Backspace -> borrar último dígito
+      if (e.key === 'Backspace') {
+        e.preventDefault();
+        setVariablePriceInput(v => v.slice(0, -1));
+        setIsPriceEdited(true);
+        return;
+      }
+
+      // Tecla C o Delete -> Limpiar campo
+      if (e.key.toLowerCase() === 'c' || e.key === 'Delete') {
+        e.preventDefault();
+        setVariablePriceInput('');
+        setIsPriceEdited(true);
+        return;
+      }
+
+      // Teclas numéricas 0-9 (teclado principal o numpad)
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        if (!isPriceEdited) {
+          setVariablePriceInput(e.key);
+          setIsPriceEdited(true);
+        } else {
+          setVariablePriceInput(v => (v === '0' ? e.key : v + e.key));
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleVariablePriceKey);
+    return () => window.removeEventListener('keydown', handleVariablePriceKey);
+  }, [variablePriceProduct, variablePriceInput, isPriceEdited]);
 
   // -- CALCULATIONS --
   const customer = customers?.find(c => c.id === selectedCustomer);
@@ -2380,11 +2447,15 @@ export function PosView() {
              <p className="text-gray-400 font-bold mb-4 text-center text-xs">Ingresa el precio de venta (Precio Variable).</p>
              
              {/* Display of typed value */}
-             <div className="bg-[#0c0d11] border-2 border-gray-700 rounded-[24px] py-4 w-full flex items-center justify-center mb-4">
-                <span className="text-4xl font-black text-chunky-main">
+             <div className="bg-[#0c0d11] border-2 border-amber-500/60 ring-2 ring-amber-500/20 rounded-[24px] py-4 px-4 w-full flex items-center justify-center mb-2 shadow-inner">
+                <span className="text-4xl font-black text-chunky-main tracking-tight">
                   {formatMoney(parseInt(variablePriceInput) || 0)}
                 </span>
              </div>
+             <p className="text-[11px] text-gray-400 font-bold mb-4 text-center flex items-center gap-1.5">
+               <span className="bg-gray-800 border border-gray-700 text-amber-400 px-1.5 py-0.5 rounded text-[10px] font-mono">0-9 / Enter</span>
+               <span>Escribe con el teclado o usa la botonera</span>
+             </p>
 
              {/* Touch Keypad */}
              <div className="grid grid-cols-3 gap-1.5 w-full mb-5">
