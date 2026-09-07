@@ -273,18 +273,10 @@ export function PosView() {
   const [syncReady, setSyncReady] = useState(false);
   const [hasInitialCheckDone, setHasInitialCheckDone] = useState(false);
 
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(() => {
-    try {
-      const cached = localStorage.getItem('olaclick_orders_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(o => o.status === 'PENDING').length;
-        }
-      }
-    } catch (e) {}
-    return 0;
-  });
+  const olaclickOrders = usePosStore(s => s.olaclickOrders || []);
+  const pendingOrdersCount = useMemo(() => {
+    return olaclickOrders.filter(o => String(o?.status || '').trim().toUpperCase() === 'PENDING').length;
+  }, [olaclickOrders]);
   const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
   const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
   const [pendingDeliveryInfo, setPendingDeliveryInfo] = useState(null);
@@ -397,21 +389,11 @@ export function PosView() {
 
   const loadPendingCount = async (triggerAlert = false) => {
     try {
-      // Considerar pedidos pendientes de las últimas 48 horas para alertar de pedidos del día / turno activo
-      const sinceDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from('olaclick_orders')
-        .select('id, customer_name, total_amount, created_at')
-        .eq('status', 'PENDING')
-        .gte('created_at', sinceDate);
-      
-      if (!error && Array.isArray(data)) {
-        const newCount = data.length;
-        setPendingOrdersCount(newCount);
-
+      const data = await usePosStore.getState().fetchOlaClickOrders();
+      if (Array.isArray(data)) {
+        const pendingOrders = data.filter(o => String(o?.status || '').trim().toUpperCase() === 'PENDING');
         if (triggerAlert) {
-          // Solo alertar y sonar si hay un ID genuinamente nuevo no notificado antes
-          const unnotified = data.filter(o => o.id && !notifiedOlaClickIdsRef.current.has(o.id));
+          const unnotified = pendingOrders.filter(o => o.id && !notifiedOlaClickIdsRef.current.has(o.id));
           if (unnotified.length > 0) {
             unnotified.forEach(o => notifiedOlaClickIdsRef.current.add(o.id));
             playChime();
@@ -423,12 +405,11 @@ export function PosView() {
             });
           }
         } else {
-          // Al inicio o recarga silenciosa, registrar los IDs existentes para que nunca suenen en bucle
-          data.forEach(o => o.id && notifiedOlaClickIdsRef.current.add(o.id));
+          pendingOrders.forEach(o => o.id && notifiedOlaClickIdsRef.current.add(o.id));
         }
       }
     } catch (err) {
-      console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
+      console.warn('[POS] Error al sincronizar pedidos OlaClick:', err.message);
     }
   };
 
@@ -446,17 +427,24 @@ export function PosView() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'olaclick_orders' },
         (payload) => {
-          const newId = payload?.new?.id;
-          if (payload?.eventType === 'INSERT' && newId && !notifiedOlaClickIdsRef.current.has(newId)) {
-            notifiedOlaClickIdsRef.current.add(newId);
-            playChime();
-            toast.success('📱 ¡Nuevo pedido OlaClick recibido!', {
-              duration: 8000,
-              icon: '🔔',
-              className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
-            });
+          const { eventType, new: newRecord, old: oldRecord } = payload;
+          if (eventType === 'INSERT' && newRecord) {
+            usePosStore.getState().upsertOlaClickOrder(newRecord);
+            const isPending = String(newRecord.status || '').trim().toUpperCase() === 'PENDING';
+            if (isPending && !notifiedOlaClickIdsRef.current.has(newRecord.id)) {
+              notifiedOlaClickIdsRef.current.add(newRecord.id);
+              playChime();
+              toast.success(`📱 ¡Nuevo pedido OlaClick recibido! ${newRecord.customer_name ? `(${newRecord.customer_name})` : ''}`, {
+                duration: 8000,
+                icon: '🔔',
+                className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
+              });
+            }
+          } else if (eventType === 'UPDATE' && newRecord) {
+            usePosStore.getState().upsertOlaClickOrder(newRecord);
+          } else if (eventType === 'DELETE' && oldRecord) {
+            usePosStore.getState().removeOlaClickOrder(oldRecord.id);
           }
-          loadPendingCount(false);
         }
       )
       .subscribe();
@@ -2935,16 +2923,7 @@ export function PosView() {
                 onClose={() => {
                   stopChime();
                   setShowOlaClickOrdersModal(false);
-                  loadPendingCount(false);
                 }}
-                onOrderProcessed={(cnt) => {
-                  if (typeof cnt === 'number') {
-                    setPendingOrdersCount(cnt);
-                  } else {
-                    loadPendingCount(false);
-                  }
-                }}
-                onPendingCountChange={setPendingOrdersCount}
               />
             </div>
           </div>

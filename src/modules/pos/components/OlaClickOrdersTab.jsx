@@ -58,23 +58,8 @@ export const playChime = () => {
 };
 
 export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney, onClose, onOrderProcessed, onPendingCountChange }) {
-  const [orders, setOrders] = useState(() => {
-    try {
-      const cached = localStorage.getItem('olaclick_orders_cache');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (Array.isArray(parsed)) return parsed;
-      }
-    } catch (e) {}
-    return [];
-  });
-  const [loading, setLoading] = useState(() => {
-    try {
-      const cached = localStorage.getItem('olaclick_orders_cache');
-      if (cached && JSON.parse(cached).length > 0) return false;
-    } catch (e) {}
-    return true;
-  });
+  const orders = usePosStore(s => s.olaclickOrders || []);
+  const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('PENDING'); // 'PENDING' | 'ACCEPTED' | 'REJECTED'
@@ -83,34 +68,13 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   const parkOlaClickOrder = usePosStore(s => s.parkOlaClickOrder);
   const posSettings = useInventoryStore(s => s.posSettings);
 
-  // 1. Cargar pedidos iniciales desde Supabase con timeout de seguridad y almacenamiento en caché local
-  const fetchOrders = useCallback(async (isBackground = false) => {
+  // 1. Refrescar pedidos desde Supabase hacia el store global
+  const refreshOrders = useCallback(async (isBackground = false) => {
     try {
       if (!isBackground) {
         setIsRefreshing(true);
       }
-
-      // Consulta directa y rápida a olaclick_orders con límite de 40 pedidos
-      const fetchPromise = supabase
-        .from('olaclick_orders')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(40);
-
-      // Timeout de seguridad a 6 segundos para evitar spinners congelados
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('TIMEOUT_OLACLICK')), 6000)
-      );
-
-      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
-
-      if (error) throw error;
-      if (data) {
-        setOrders(data);
-        try {
-          localStorage.setItem('olaclick_orders_cache', JSON.stringify(data));
-        } catch (e) {}
-      }
+      await usePosStore.getState().fetchOlaClickOrders();
     } catch (err) {
       console.warn('[OlaClickTab] Error al cargar pedidos:', err.message);
     } finally {
@@ -119,90 +83,25 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         setIsRefreshing(false);
       }
     }
-  }, []); // Dependencias vacías para evitar bucles de re-montado
+  }, []);
 
   useEffect(() => {
-    fetchOrders(false);
-    const interval = setInterval(() => fetchOrders(true), 10000);
+    refreshOrders(false);
+    const interval = setInterval(() => refreshOrders(true), 10000);
     return () => {
       clearInterval(interval);
       stopChime();
     };
-  }, [fetchOrders]);
+  }, [refreshOrders]);
 
-  // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)
-  useEffect(() => {
-    const channelId = `olaclick_realtime_${Date.now()}`;
-    const channel = supabase
-      .channel(channelId)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'olaclick_orders' },
-        (payload) => {
-          const { eventType, new: newRecord, old: oldRecord } = payload;
-          console.log('[OlaClickTab] Realtime update:', eventType, newRecord);
-
-          setOrders((prev) => {
-            let nextOrders = [...prev];
-            if (eventType === 'INSERT' && newRecord) {
-              if (newRecord.status === 'PENDING') {
-                if (soundEnabled) playChime();
-                toast(`📱 ¡Nuevo pedido en línea de ${newRecord.customer_name || 'Cliente'}!`, {
-                  icon: '🔔',
-                  duration: 5000,
-                  className: 'bg-yellow-50 text-yellow-800 border-2 border-yellow-400 font-black rounded-2xl shadow-chunky-lg'
-                });
-              }
-              nextOrders = [newRecord, ...prev.filter(o => o.id !== newRecord.id)];
-            } else if (eventType === 'UPDATE' && newRecord) {
-              const oldMatch = prev.find(o => o.id === newRecord.id);
-              if (newRecord.status === 'PENDING' && (!oldMatch || oldMatch.status !== 'PENDING')) {
-                if (soundEnabled) playChime();
-                toast('📱 Pedido actualizado disponible', { icon: '🔔' });
-              }
-              nextOrders = prev.map((o) => (o.id === newRecord.id ? newRecord : o));
-            } else if (eventType === 'DELETE' && oldRecord) {
-              nextOrders = prev.filter((o) => o.id !== oldRecord.id);
-            }
-
-            try {
-              localStorage.setItem('olaclick_orders_cache', JSON.stringify(nextOrders));
-            } catch (e) {}
-
-            return nextOrders;
-          });
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [soundEnabled]);
-
-  // 3. Aceptar e importar pedido a Ventas en Espera
+  // 2. Aceptar e importar pedido a Ventas en Espera
   const handleAcceptOrder = async (order) => {
     try {
-      // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
-      setOrders((prev) => {
-        const next = prev.map((o) => (o.id === order.id ? { ...o, status: 'ACCEPTED' } : o));
-        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
-
-      // Notificar al POS inmediatamente
-      const remainingPending = orders.filter(o => o.id !== order.id && o.status === 'PENDING').length;
-      if (typeof onPendingCountChange === 'function') {
-        onPendingCountChange(remainingPending);
-      }
-      if (typeof onOrderProcessed === 'function') {
-        onOrderProcessed(remainingPending);
-      }
-
-      // 2. Guardar directamente en Ventas en Espera del POS
+      // 1. Actualizar estado en store central e insertar en ventas en espera
+      usePosStore.getState().updateOlaClickOrderStatus(order.id, 'ACCEPTED');
       parkOlaClickOrder(order);
 
-      // 3. Cambiar estado a ACEPTADO en Supabase
+      // 2. Cambiar estado a ACCEPTED en Supabase
       const { error } = await supabase
         .from('olaclick_orders')
         .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
@@ -212,22 +111,19 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         console.error('[OlaClickTab] Error DB:', error.message);
       }
 
-      // 4. Sincronizar estado 'ACCEPTED' con OlaClick API
+      // 3. Sincronizar estado 'ACCEPTED' con OlaClick API
       try {
         const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
         const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
         if (apiToken) {
-          const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+          fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
             method: 'PATCH',
             headers: {
               'Authorization': `Bearer ${apiToken}`,
               'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ status: 'ACCEPTED' }) // Dependiendo de la versión puede ser ACCEPTED o PREPARING
-          });
-          if (!res.ok) {
-            console.warn('[OlaClickTab] La API de OlaClick no actualizó el estado a ACCEPTED', await res.text());
-          }
+            body: JSON.stringify({ status: 'ACCEPTED' })
+          }).catch(apiErr => console.warn('[OlaClickTab] Error API OlaClick:', apiErr));
         }
       } catch (apiErr) {
         console.error('[OlaClickTab] Error al sincronizar con OlaClick:', apiErr);
@@ -244,7 +140,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     }
   };
 
-  // 4. Rechazar pedido con confirmación nativa
+  // 3. Rechazar pedido con confirmación nativa
   const handleRejectOrder = async (e, order) => {
     if (e) {
       e.preventDefault();
@@ -254,21 +150,8 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     try {
       const rejectionReason = 'OTHER';
 
-      // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
-      setOrders((prev) => {
-        const next = prev.map((o) => (o.id === order.id ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o));
-        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
-
-      // Notificar al POS inmediatamente
-      const remainingPending = orders.filter(o => o.id !== order.id && o.status === 'PENDING').length;
-      if (typeof onPendingCountChange === 'function') {
-        onPendingCountChange(remainingPending);
-      }
-      if (typeof onOrderProcessed === 'function') {
-        onOrderProcessed(remainingPending);
-      }
+      // 1. Actualizar estado en store central
+      usePosStore.getState().updateOlaClickOrderStatus(order.id, 'REJECTED', { rejection_reason: rejectionReason });
 
       // 2. Cambiar estado a REJECTED en Supabase DB
       const { error } = await supabase
@@ -289,63 +172,43 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
         const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
         if (apiToken) {
-          const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+          fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
             method: 'PATCH',
             headers: {
               'Authorization': `Bearer ${apiToken}`,
               'Content-Type': 'application/json'
             },
             body: JSON.stringify({ status: 'REJECTED', reason: rejectionReason })
-          });
-          if (!res.ok) {
-            console.warn('[OlaClickTab] La API de OlaClick no actualizó el estado a REJECTED', await res.text());
-          }
+          }).catch(apiErr => console.warn('[OlaClickTab] Error API OlaClick:', apiErr));
         }
       } catch (apiErr) {
-        console.error('[OlaClickTab] Error al sincronizar con OlaClick:', apiErr);
+        console.error('[OlaClickTab] Error al sincronizar rechazo con OlaClick:', apiErr);
       }
 
-      toast.error(`❌ Pedido rechazado exitosamente`, {
+      toast.error(`❌ Pedido de ${order.customer_name || 'Cliente'} rechazado`, {
         className: 'bg-red-600 text-white font-black rounded-2xl shadow-chunky-lg'
       });
 
       if (onOrderProcessed) onOrderProcessed();
     } catch (err) {
       console.error('[OlaClickTab] Error al rechazar pedido:', err.message);
-      toast.error('No se pudo rechazar el pedido');
+      toast.error('No se pudo procesar el rechazo del pedido');
     }
   };
 
+  // 4. Aceptar todos los pedidos pendientes
   const handleAcceptAll = async () => {
-    const pendingOrders = orders.filter(o => o.status === 'PENDING');
+    const pendingOrders = orders.filter(o => isPending(o.status));
     if (pendingOrders.length === 0) return;
-    
-    if (!confirm(`¿Estás seguro de aceptar los ${pendingOrders.length} pedidos pendientes de una vez?`)) {
-      return;
-    }
 
     try {
-      // 1. Update state local
-      setOrders(prev => {
-        const next = prev.map(o => o.status === 'PENDING' ? { ...o, status: 'ACCEPTED' } : o);
-        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
+      const ids = pendingOrders.map(o => o.id);
+      usePosStore.getState().updateManyOlaClickOrderStatus(ids, 'ACCEPTED');
 
-      if (typeof onPendingCountChange === 'function') {
-        onPendingCountChange(0);
-      }
-      if (typeof onOrderProcessed === 'function') {
-        onOrderProcessed(0);
-      }
-
-      // 2. Park each order in Ventas en Espera
       for (const order of pendingOrders) {
         parkOlaClickOrder(order);
       }
 
-      // 3. Update DB
-      const ids = pendingOrders.map(o => o.id);
       const { error } = await supabase
         .from('olaclick_orders')
         .update({ status: 'ACCEPTED', updated_at: new Date().toISOString() })
@@ -355,22 +218,16 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         console.error('[OlaClickTab] Error al actualizar estado masivo en DB:', error.message);
       }
 
-      // 4. Sync with OlaClick API asynchronously
       const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
       const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
       if (apiToken) {
-        Promise.all(
-          pendingOrders.map(order => 
-            fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bearer ${apiToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ status: 'ACCEPTED' })
-            }).catch(e => console.warn(`[OlaClickTab] Error al notificar OlaClick para orden ${order.id}:`, e))
-          )
-        );
+        pendingOrders.forEach(order => {
+          fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'ACCEPTED' })
+          }).catch(() => {});
+        });
       }
 
       toast.success(`📱 ${pendingOrders.length} pedidos aceptados y guardados en Ventas en Espera`, {
@@ -384,8 +241,9 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     }
   };
 
+  // 5. Rechazar todos los pedidos pendientes
   const handleRejectAll = async () => {
-    const pendingOrders = orders.filter(o => o.status === 'PENDING');
+    const pendingOrders = orders.filter(o => isPending(o.status));
     if (pendingOrders.length === 0) return;
     
     if (!confirm(`¿Estás seguro de RECHAZAR los ${pendingOrders.length} pedidos pendientes?`)) {
@@ -394,23 +252,9 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
     try {
       const rejectionReason = 'OTHER';
-
-      // 1. Update state local
-      setOrders(prev => {
-        const next = prev.map(o => o.status === 'PENDING' ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o);
-        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
-        return next;
-      });
-
-      if (typeof onPendingCountChange === 'function') {
-        onPendingCountChange(0);
-      }
-      if (typeof onOrderProcessed === 'function') {
-        onOrderProcessed(0);
-      }
-
-      // 2. Update DB
       const ids = pendingOrders.map(o => o.id);
+      usePosStore.getState().updateManyOlaClickOrderStatus(ids, 'REJECTED', { rejection_reason: rejectionReason });
+
       const { error } = await supabase
         .from('olaclick_orders')
         .update({ 
@@ -424,22 +268,16 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         console.error('[OlaClickTab] Error al rechazar masivo en DB:', error.message);
       }
 
-      // 3. Sync with OlaClick API asynchronously
       const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
       const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
       if (apiToken) {
-        Promise.all(
-          pendingOrders.map(order => 
-            fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
-              method: 'PATCH',
-              headers: {
-                'Authorization': `Bearer ${apiToken}`,
-                'Content-Type': 'application/json'
-              },
-              body: JSON.stringify({ status: 'REJECTED', reason: rejectionReason })
-            }).catch(e => console.warn(`[OlaClickTab] Error al notificar rechazo a OlaClick para orden ${order.id}:`, e))
-          )
-        );
+        pendingOrders.forEach(order => {
+          fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
+            method: 'PATCH',
+            headers: { 'Authorization': `Bearer ${apiToken}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'REJECTED', reason: rejectionReason })
+          }).catch(() => {});
+        });
       }
 
       toast.error(`❌ ${pendingOrders.length} pedidos rechazados exitosamente`, {
@@ -453,16 +291,19 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     }
   };
 
-  // Filtrar pedidos según pestaña seleccionada
-  const filteredOrders = orders.filter((o) => o.status === activeTab);
-  const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
+  // Verificadores de estado robustos (insensibles a mayúsculas/minúsculas)
+  const isPending = (status) => String(status || '').trim().toUpperCase() === 'PENDING';
+  const isAccepted = (status) => ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED', 'COMPLETED'].includes(String(status || '').trim().toUpperCase());
+  const isRejected = (status) => ['REJECTED', 'CANCELED', 'CANCELLED'].includes(String(status || '').trim().toUpperCase());
 
-  // Sincronizar inmediatamente el contador con el POS (sin borrar el badge durante la carga inicial)
-  useEffect(() => {
-    if ((!loading || orders.length > 0) && typeof onPendingCountChange === 'function') {
-      onPendingCountChange(pendingCount);
-    }
-  }, [pendingCount, loading, orders.length, onPendingCountChange]);
+  // Filtrar pedidos según pestaña seleccionada
+  const filteredOrders = orders.filter((o) => {
+    if (activeTab === 'PENDING') return isPending(o.status);
+    if (activeTab === 'ACCEPTED') return isAccepted(o.status);
+    if (activeTab === 'REJECTED') return isRejected(o.status);
+    return false;
+  });
+  const pendingCount = orders.filter((o) => isPending(o.status)).length;
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0d0e12] rounded-[32px] border border-gray-900 overflow-hidden shadow-chunky-xl">
@@ -482,7 +323,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         <div className="flex items-center gap-3 mr-12">
           {/* Botón de Refrescar Manual */}
           <button
-            onClick={() => fetchOrders(false)}
+            onClick={() => refreshOrders(false)}
             disabled={isRefreshing}
             className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-gray-800/40 text-gray-400 hover:text-white hover:bg-gray-800 ${
               isRefreshing ? 'text-yellow-500' : ''
@@ -568,7 +409,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
             </p>
             {activeTab === 'PENDING' && (
               <button
-                onClick={() => fetchOrders(false)}
+                onClick={() => refreshOrders(false)}
                 disabled={isRefreshing}
                 className="mt-2 text-xs font-black text-yellow-500 hover:text-yellow-400 flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 px-4 py-2 rounded-xl border border-yellow-500/20 transition-all active:scale-95"
               >

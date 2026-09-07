@@ -9,6 +9,93 @@ export const usePosStore = create((set, get) => ({
   cart: [], 
   total: 0,
 
+  // Pedidos de OlaClick sincronizados globalmente
+  olaclickOrders: (() => {
+    try {
+      const cached = localStorage.getItem('olaclick_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  })(),
+
+  setOlaClickOrders: (orders) => {
+    const safeOrders = Array.isArray(orders) ? orders : [];
+    try {
+      localStorage.setItem('olaclick_orders_cache', JSON.stringify(safeOrders));
+    } catch (e) {}
+    set({ olaclickOrders: safeOrders });
+  },
+
+  upsertOlaClickOrder: (order) => {
+    if (!order || !order.id) return;
+    set((state) => {
+      const prev = state.olaclickOrders || [];
+      const exists = prev.some(o => o.id === order.id);
+      const next = exists 
+        ? prev.map(o => o.id === order.id ? { ...o, ...order } : o)
+        : [order, ...prev];
+      try {
+        localStorage.setItem('olaclick_orders_cache', JSON.stringify(next));
+      } catch (e) {}
+      return { olaclickOrders: next };
+    });
+  },
+
+  removeOlaClickOrder: (orderId) => {
+    set((state) => {
+      const next = (state.olaclickOrders || []).filter(o => o.id !== orderId);
+      try {
+        localStorage.setItem('olaclick_orders_cache', JSON.stringify(next));
+      } catch (e) {}
+      return { olaclickOrders: next };
+    });
+  },
+
+  updateOlaClickOrderStatus: (orderId, status, extra = {}) => {
+    set((state) => {
+      const next = (state.olaclickOrders || []).map(o => 
+        o.id === orderId ? { ...o, status, ...extra, updated_at: new Date().toISOString() } : o
+      );
+      try {
+        localStorage.setItem('olaclick_orders_cache', JSON.stringify(next));
+      } catch (e) {}
+      return { olaclickOrders: next };
+    });
+  },
+
+  updateManyOlaClickOrderStatus: (orderIds, status, extra = {}) => {
+    const idSet = new Set(orderIds);
+    set((state) => {
+      const next = (state.olaclickOrders || []).map(o => 
+        idSet.has(o.id) ? { ...o, status, ...extra, updated_at: new Date().toISOString() } : o
+      );
+      try {
+        localStorage.setItem('olaclick_orders_cache', JSON.stringify(next));
+      } catch (e) {}
+      return { olaclickOrders: next };
+    });
+  },
+
+  fetchOlaClickOrders: async () => {
+    try {
+      const { data, error } = await supabase
+        .from('olaclick_orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(40);
+      if (!error && Array.isArray(data)) {
+        get().setOlaClickOrders(data);
+        return data;
+      }
+    } catch (e) {
+      console.warn('[usePosStore] Error al cargar olaclick_orders:', e);
+    }
+    return get().olaclickOrders || [];
+  },
+
   /**
    * Añade un producto al carrito
    */
@@ -228,7 +315,12 @@ export const usePosStore = create((set, get) => ({
       heldSales: [newHeldSale, ...state.heldSales.filter(h => h.originalOlaClickId !== order.id)]
     }));
 
-    // 2. Persistir en posSales para sincronización con Supabase y localStorage
+    // 2. Marcar pedido como ACCEPTED en el listado global de OlaClick
+    try {
+      get().updateOlaClickOrderStatus(order.id, 'ACCEPTED');
+    } catch (_) {}
+
+    // 3. Persistir en posSales para sincronización con Supabase y localStorage
     try {
       useInventoryStore.getState().addPosSale(newHeldSale);
     } catch (e) {
