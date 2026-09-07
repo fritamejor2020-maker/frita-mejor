@@ -318,6 +318,7 @@ export function PosView() {
       if (Math.abs((s.total || 0) - (p.total || 0)) > 1) continue;
       const pTime = new Date(p.timestamp || p.createdAt || 0).getTime();
       if (isNaN(pTime) || pTime === 0) continue;
+      const diffMs = pTime - sTime;
       // Pago ocurrió dentro de las 8 horas posteriores a la comanda/borrador
       if (diffMs < -10000 || diffMs > (8 * 60 * 60 * 1000)) continue;
 
