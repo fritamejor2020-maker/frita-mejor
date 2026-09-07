@@ -3200,6 +3200,18 @@ function PosConfigPanel() {
     updatePosSettings({ ...posSettings, paymentMethods: updated, cashDrawerCode, printerName, supervisorPin, gridSize });
   };
 
+  const handleMoveMethod = (id, direction) => {
+    const idx = methods.findIndex(m => m.id === id);
+    if (idx === -1) return;
+    const newIdx = idx + direction;
+    if (newIdx < 0 || newIdx >= methods.length) return;
+    const updated = [...methods];
+    [updated[idx], updated[newIdx]] = [updated[newIdx], updated[idx]];
+    setMethods(updated);
+    updatePosSettings({ ...posSettings, paymentMethods: updated, cashDrawerCode, printerName, supervisorPin, gridSize });
+  };
+
+
   return (
     <div className="max-w-3xl">
       <h3 className="font-black text-chunky-dark text-lg mb-6">⚙️ Hardware y Métodos de Pago</h3>
@@ -3215,16 +3227,33 @@ function PosConfigPanel() {
             <table className="w-full text-left text-sm whitespace-nowrap">
               <thead className="bg-gray-100 text-gray-500 font-bold border-b border-gray-200">
                 <tr>
+                  <th className="py-3 px-2 w-16 text-center">Orden</th>
                   <th className="py-3 px-4">Nombre del Método (ej. EFECTIVO)</th>
                   <th className="py-3 px-4 text-center">¿Abre Cajón?</th>
                   <th className="py-3 px-4 text-center">¿Imprime Ticket?</th>
                   <th className="py-3 px-4 text-center">¿Es Transferencia / Digital?</th>
-                  <th className="py-3 px-4 w-12 text-center"></th>
+                  <th className="py-3 px-4 w-12 text-center">Eliminar</th>
                 </tr>
               </thead>
               <tbody>
-                {methods.map(method => (
+                {methods.map((method, idx) => (
                   <tr key={method.id} className="border-b border-gray-200/50 hover:bg-white transition-colors">
+                    <td className="py-2 px-2 text-center">
+                      <div className="flex flex-col items-center gap-0.5">
+                        <button
+                          disabled={idx === 0}
+                          className="text-gray-400 hover:text-chunky-dark disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                          onClick={() => handleMoveMethod(method.id, -1)}
+                          title="Mover arriba"
+                        >▲</button>
+                        <button
+                          disabled={idx === methods.length - 1}
+                          className="text-gray-400 hover:text-chunky-dark disabled:opacity-20 disabled:cursor-not-allowed leading-none"
+                          onClick={() => handleMoveMethod(method.id, 1)}
+                          title="Mover abajo"
+                        >▼</button>
+                      </div>
+                    </td>
                     <td className="py-2 px-4">
                       <input 
                         className="w-full bg-white border border-gray-200 rounded-lg px-3 py-1.5 font-bold outline-none focus:border-chunky-main uppercase"
@@ -3257,8 +3286,12 @@ function PosConfigPanel() {
                       />
                     </td>
                     <td className="py-2 px-4 text-center">
-                      <button className="text-gray-400 hover:text-red-500" onClick={() => handleRemoveMethod(method.id)}>
-                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
+                      <button
+                        className="text-gray-400 hover:text-red-500 transition-colors p-1 rounded hover:bg-red-50"
+                        onClick={() => handleRemoveMethod(method.id)}
+                        title="Eliminar método"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="3 6 5 6 21 6"/><path d="m19 6-.867 14.142A2 2 0 0 1 16.138 22H7.862a2 2 0 0 1-1.995-1.858L5 6m5 0V4a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v2"/></svg>
                       </button>
                     </td>
                   </tr>
@@ -3266,6 +3299,7 @@ function PosConfigPanel() {
               </tbody>
             </table>
           </div>
+
         </div>
 
         <div>
