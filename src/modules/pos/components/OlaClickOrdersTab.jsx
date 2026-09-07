@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '../../../lib/supabase';
 import { usePosStore } from '../../../store/usePosStore';
 import { useInventoryStore } from '../../../store/useInventoryStore';
-import { ShoppingBag, Check, X, Phone, MapPin, AlertCircle, Volume2, VolumeX } from 'lucide-react';
+import { useAuthStore } from '../../../store/useAuthStore';
+import { ShoppingBag, Check, X, Phone, MapPin, AlertCircle, Volume2, VolumeX, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
 // Web Audio API Synthesizer for a premium register/bell sound
@@ -39,8 +40,24 @@ export const playChime = () => {
 };
 
 export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney, onClose, onOrderProcessed }) {
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [orders, setOrders] = useState(() => {
+    try {
+      const cached = localStorage.getItem('olaclick_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch (e) {}
+    return [];
+  });
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem('olaclick_orders_cache');
+      if (cached && JSON.parse(cached).length > 0) return false;
+    } catch (e) {}
+    return true;
+  });
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [activeTab, setActiveTab] = useState('PENDING'); // 'PENDING' | 'ACCEPTED' | 'REJECTED'
   const loadExternalOrder = usePosStore(s => s.loadExternalOrder);
@@ -48,43 +65,59 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   const parkOlaClickOrder = usePosStore(s => s.parkOlaClickOrder);
   const posSettings = useInventoryStore(s => s.posSettings);
 
-  // 1. Cargar pedidos iniciales desde Supabase y refrescar periódicamente
-  useEffect(() => {
-    async function fetchOrders(isBackground = false) {
-      try {
-        if (!isBackground) setLoading(true);
-        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
-        const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[userBranch]?.merchantId || 'frita-mejor';
+  // 1. Cargar pedidos iniciales desde Supabase con timeout de seguridad y almacenamiento en caché local
+  const fetchOrders = useCallback(async (isBackground = false) => {
+    try {
+      if (!isBackground) {
+        setIsRefreshing(true);
+        if (orders.length === 0) setLoading(true);
+      }
 
-        const { data, error } = await supabase
-          .from('olaclick_orders')
-          .select('*')
-          .or(`store_id.eq.${merchantId},store_id.eq.frita-mejor,store_id.is.null,store_id.eq.""`)
-          .order('created_at', { ascending: false })
-          .limit(50);
+      // Consulta directa y rápida a olaclick_orders con límite de 40 pedidos
+      const fetchPromise = supabase
+        .from('olaclick_orders')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(40);
 
-        if (error) throw error;
-        setOrders(data || []);
-      } catch (err) {
-        console.error('[OlaClickTab] Error al cargar pedidos:', err.message);
-        if (!isBackground) toast.error('No se pudieron cargar los pedidos en línea');
-      } finally {
-        if (!isBackground) setLoading(false);
+      // Timeout de seguridad a 6 segundos para evitar spinners congelados
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('TIMEOUT_OLACLICK')), 6000)
+      );
+
+      const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
+
+      if (error) throw error;
+      if (data) {
+        setOrders(data);
+        try {
+          localStorage.setItem('olaclick_orders_cache', JSON.stringify(data));
+        } catch (e) {}
+      }
+    } catch (err) {
+      console.warn('[OlaClickTab] Error al cargar pedidos:', err.message);
+      if (!isBackground && orders.length === 0) {
+        toast.error('No se pudieron actualizar los pedidos en línea');
+      }
+    } finally {
+      if (!isBackground) {
+        setLoading(false);
+        setIsRefreshing(false);
       }
     }
+  }, [orders.length]);
 
+  useEffect(() => {
     fetchOrders(false);
     const interval = setInterval(() => fetchOrders(true), 10000);
     return () => clearInterval(interval);
-  }, [posSettings?.olaclickMerchantId]);
+  }, [fetchOrders]);
 
   // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)
   useEffect(() => {
-    const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
-    const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[userBranch]?.merchantId || 'frita-mejor';
-    
+    const channelId = `olaclick_realtime_${Date.now()}`;
     const channel = supabase
-      .channel('olaclick_realtime')
+      .channel(channelId)
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'olaclick_orders' },
@@ -92,36 +125,34 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
           const { eventType, new: newRecord, old: oldRecord } = payload;
           console.log('[OlaClickTab] Realtime update:', eventType, newRecord);
 
-          // Si es un evento de creación o actualización, validar comercio/sede
-          if ((eventType === 'INSERT' || eventType === 'UPDATE') && newRecord) {
-            const isOurStore = !newRecord.store_id || newRecord.store_id === merchantId || newRecord.store_id === 'frita-mejor';
-            if (!isOurStore) return;
-          }
-
           setOrders((prev) => {
-            if (eventType === 'INSERT') {
+            let nextOrders = [...prev];
+            if (eventType === 'INSERT' && newRecord) {
               if (newRecord.status === 'PENDING') {
                 if (soundEnabled) playChime();
-                toast(`📱 ¡Nuevo pedido en línea de ${newRecord.customer_name}!`, {
+                toast(`📱 ¡Nuevo pedido en línea de ${newRecord.customer_name || 'Cliente'}!`, {
                   icon: '🔔',
                   duration: 5000,
                   className: 'bg-yellow-50 text-yellow-800 border-2 border-yellow-400 font-black rounded-2xl shadow-chunky-lg'
                 });
               }
-              return [newRecord, ...prev];
-            }
-            if (eventType === 'UPDATE') {
+              nextOrders = [newRecord, ...prev.filter(o => o.id !== newRecord.id)];
+            } else if (eventType === 'UPDATE' && newRecord) {
               const oldMatch = prev.find(o => o.id === newRecord.id);
               if (newRecord.status === 'PENDING' && (!oldMatch || oldMatch.status !== 'PENDING')) {
                 if (soundEnabled) playChime();
                 toast('📱 Pedido actualizado disponible', { icon: '🔔' });
               }
-              return prev.map((o) => (o.id === newRecord.id ? newRecord : o));
+              nextOrders = prev.map((o) => (o.id === newRecord.id ? newRecord : o));
+            } else if (eventType === 'DELETE' && oldRecord) {
+              nextOrders = prev.filter((o) => o.id !== oldRecord.id);
             }
-            if (eventType === 'DELETE') {
-              return prev.filter((o) => o.id !== oldRecord.id);
-            }
-            return prev;
+
+            try {
+              localStorage.setItem('olaclick_orders_cache', JSON.stringify(nextOrders));
+            } catch (e) {}
+
+            return nextOrders;
           });
         }
       )
@@ -130,13 +161,17 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [soundEnabled, posSettings?.olaclickMerchantId]);
+  }, [soundEnabled]);
 
   // 3. Aceptar e importar pedido a Ventas en Espera
   const handleAcceptOrder = async (order) => {
     try {
       // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
-      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'ACCEPTED' } : o)));
+      setOrders((prev) => {
+        const next = prev.map((o) => (o.id === order.id ? { ...o, status: 'ACCEPTED' } : o));
+        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
 
       // 2. Guardar directamente en Ventas en Espera del POS
       parkOlaClickOrder(order);
@@ -153,7 +188,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
       // 4. Sincronizar estado 'ACCEPTED' con OlaClick API
       try {
-        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+        const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
         const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
         if (apiToken) {
           const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
@@ -194,7 +229,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       const rejectionReason = 'OTHER';
 
       // 1. Actualizar estado local inmediatamente para remover la tarjeta de "PENDING"
-      setOrders((prev) => prev.map((o) => (o.id === order.id ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o)));
+      setOrders((prev) => {
+        const next = prev.map((o) => (o.id === order.id ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o));
+        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
 
       // 2. Cambiar estado a REJECTED en Supabase DB
       const { error } = await supabase
@@ -212,7 +251,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
       // 3. Sincronizar estado con OlaClick API
       try {
-        const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+        const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
         const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
         if (apiToken) {
           const res = await fetch(`https://public-api.olaclick.app/v1/orders/${order.id}`, {
@@ -252,7 +291,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
     try {
       // 1. Update state local
-      setOrders(prev => prev.map(o => o.status === 'PENDING' ? { ...o, status: 'ACCEPTED' } : o));
+      setOrders(prev => {
+        const next = prev.map(o => o.status === 'PENDING' ? { ...o, status: 'ACCEPTED' } : o);
+        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
 
       // 2. Park each order in Ventas en Espera
       for (const order of pendingOrders) {
@@ -271,7 +314,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       }
 
       // 4. Sync with OlaClick API asynchronously
-      const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+      const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
       const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
       if (apiToken) {
         Promise.all(
@@ -311,7 +354,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       const rejectionReason = 'OTHER';
 
       // 1. Update state local
-      setOrders(prev => prev.map(o => o.status === 'PENDING' ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o));
+      setOrders(prev => {
+        const next = prev.map(o => o.status === 'PENDING' ? { ...o, status: 'REJECTED', rejection_reason: rejectionReason } : o);
+        try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
 
       // 2. Update DB
       const ids = pendingOrders.map(o => o.id);
@@ -329,7 +376,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       }
 
       // 3. Sync with OlaClick API asynchronously
-      const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
+      const userBranch = useAuthStore.getState().user?.branchId || 'GLOBAL';
       const apiToken = posSettings?.olaclickByBranch?.[userBranch]?.apiToken || posSettings?.olaclickToken;
       if (apiToken) {
         Promise.all(
@@ -377,6 +424,18 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
         {/* Control de sonido & Filtros */}
         <div className="flex items-center gap-3 mr-12">
+          {/* Botón de Refrescar Manual */}
+          <button
+            onClick={() => fetchOrders(false)}
+            disabled={isRefreshing}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-gray-800/40 text-gray-400 hover:text-white hover:bg-gray-800 ${
+              isRefreshing ? 'text-yellow-500' : ''
+            }`}
+            title="Actualizar pedidos"
+          >
+            <RefreshCw size={18} className={isRefreshing ? 'animate-spin' : ''} />
+          </button>
+
           {/* Botón de Sonido Mute/Unmute */}
           <button
             onClick={() => setSoundEnabled(!soundEnabled)}
@@ -443,12 +502,24 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         ) : filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center gap-3">
             <span className="text-4xl">📬</span>
-            <p className="font-black text-gray-500 text-sm">No hay pedidos en esta sección</p>
-            <p className="text-xs text-gray-600 max-w-xs leading-normal">
+            <p className="font-black text-gray-400 text-sm">
+              {activeTab === 'PENDING' ? 'No hay pedidos pendientes' : 'No hay pedidos en esta sección'}
+            </p>
+            <p className="text-xs text-gray-500 max-w-xs leading-normal">
               {activeTab === 'PENDING' 
-                ? 'Los pedidos que hagan tus clientes desde OlaClick aparecerán aquí instantáneamente.' 
+                ? 'Los pedidos que hagan tus clientes desde OlaClick aparecerán aquí en tiempo real.' 
                 : 'Historial de pedidos procesados durante la jornada.'}
             </p>
+            {activeTab === 'PENDING' && (
+              <button
+                onClick={() => fetchOrders(false)}
+                disabled={isRefreshing}
+                className="mt-2 text-xs font-black text-yellow-500 hover:text-yellow-400 flex items-center gap-1.5 bg-yellow-500/10 hover:bg-yellow-500/20 px-4 py-2 rounded-xl border border-yellow-500/20 transition-all active:scale-95"
+              >
+                <RefreshCw size={14} className={isRefreshing ? 'animate-spin' : ''} />
+                Actualizar pedidos ahora
+              </button>
+            )}
           </div>
         ) : (
           <>

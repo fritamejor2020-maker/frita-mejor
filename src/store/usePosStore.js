@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from '../lib/supabase';
 import { calculateCartTotal } from '../utils/financeUtils';
 import { useInventoryStore } from './useInventoryStore';
+import { useAuthStore } from './useAuthStore';
 
 export const usePosStore = create((set, get) => ({
   // Array de items [{ productId, name, price, qty, isExternal }]
@@ -139,7 +140,7 @@ export const usePosStore = create((set, get) => ({
     const posSettings = useInventoryStore.getState().posSettings || {};
     // Asumimos que el cajero está en una sede y los pedidos llegan a su sede actual (o global)
     // En una implementación final, se buscaría el webhook secret o store_id del pedido para saber la sede
-    const authUser = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user || {};
+    const authUser = useAuthStore.getState().user || {};
     const branchId = authUser.branchId || 'GLOBAL';
     const branchMappings = posSettings.olaclickByBranch?.[branchId]?.productMappings || {};
 

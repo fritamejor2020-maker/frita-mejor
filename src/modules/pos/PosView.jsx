@@ -384,15 +384,13 @@ export function PosView() {
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const loadPendingCount = async (triggerAlert = false) => {
     try {
-      const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[effectiveBranch]?.merchantId || 'frita-mejor';
       // Considerar pedidos pendientes de las últimas 48 horas para alertar de pedidos del día / turno activo
       const sinceDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       const { data, count, error } = await supabase
         .from('olaclick_orders')
         .select('id, customer_name, total_amount', { count: 'exact' })
         .eq('status', 'PENDING')
-        .gte('created_at', sinceDate)
-        .or(`store_id.eq.${merchantId},store_id.eq.frita-mejor,store_id.is.null,store_id.eq.""`);
+        .gte('created_at', sinceDate);
       
       if (!error) {
         const newCount = count ?? (data ? data.length : 0);
@@ -1901,22 +1899,6 @@ export function PosView() {
         </div>
 
       </div>
-
-      {/* ── Banner de Alerta para Pedidos OlaClick Pendientes ── */}
-      {pendingOrdersCount > 0 && (
-        <div 
-          onClick={() => setShowOlaClickOrdersModal(true)}
-          className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 text-gray-950 px-4 py-2.5 flex items-center justify-between cursor-pointer font-black text-xs shadow-lg hover:brightness-105 transition-all border-b border-yellow-300 shrink-0 animate-pulse"
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-base animate-bounce">🔔</span>
-            <span>¡Tienes <strong className="underline text-sm">{pendingOrdersCount} pedido{pendingOrdersCount > 1 ? 's' : ''}</strong> de OlaClick pendiente{pendingOrdersCount > 1 ? 's' : ''} de confirmación!</span>
-          </div>
-          <span className="bg-gray-950 text-yellow-400 px-3 py-1 rounded-xl text-[11px] font-black flex items-center gap-1 shadow-md hover:scale-105 transition-all">
-            Ver y Aceptar Pedido ➔
-          </span>
-        </div>
-      )}
 
       {/* ══════ CONTENIDO: Ticket + Productos ══════ */}
       <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
