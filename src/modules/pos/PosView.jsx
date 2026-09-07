@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useAuthStore }      from '../../store/useAuthStore';
 import { useBranchStore }    from '../../store/useBranchStore';
@@ -305,6 +305,15 @@ export function PosView() {
     }
   });
 
+  // Pedidos OlaClick en estado terminal (rechazados, cancelados, entregados)
+  const terminalOlaClickIds = new Set();
+  (olaclickOrders || []).forEach(o => {
+    const st = String(o?.status || '').trim().toUpperCase();
+    if (['REJECTED', 'CANCELLED', 'CANCELED', 'DELIVERED', 'COMPLETED'].includes(st)) {
+      if (o.id) terminalOlaClickIds.add(String(o.id));
+    }
+  });
+
   const isStaleSuspended = (sale) => {
     if (!sale) return true;
     const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
@@ -327,6 +336,24 @@ export function PosView() {
     if (s.originalOlaClickId && paidOlaClickIds.has(s.originalOlaClickId)) return true;
     if (s.publicId && paidPublicIds.has(s.publicId)) return true;
     if (sId.startsWith('HELD-OLA-') && paidOlaClickIds.has(sId.replace('HELD-OLA-', ''))) return true;
+
+    // 🛡️ Si proviene de un pedido OlaClick que ya fue rechazado, cancelado o entregado
+    const olaId = s.originalOlaClickId || (sId.startsWith('HELD-OLA-') ? sId.replace('HELD-OLA-', '') : null);
+    if (olaId && terminalOlaClickIds.has(olaId)) return true;
+
+    // 🛡️ Detección de coincidencia inteligente: si ya existe una venta pagada en esta jornada con el mismo monto exacto e items
+    if (s.items && Array.isArray(s.items) && s.items.length > 0 && s.total > 0) {
+      const sItemKeys = s.items.map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
+      const hasMatchingPaid = paidSalesList.some(ps => {
+        if (ps.total !== s.total) return false;
+        const pItemKeys = (ps.items || []).map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
+        if (sItemKeys !== pItemKeys) return false;
+        const psTime = new Date(ps.timestamp || ps.createdAt || 0).getTime();
+        const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
+        return Math.abs(psTime - sTime) < (8 * 60 * 60 * 1000);
+      });
+      if (hasMatchingPaid) return true;
+    }
 
     return false;
   };
@@ -1062,6 +1089,7 @@ export function PosView() {
         discountAmount,
         total,
         status: 'SUSPENDED',
+        heldAt: new Date().toISOString(),
         timestamp: new Date().toISOString()
       };
 
@@ -1254,6 +1282,13 @@ export function PosView() {
     const methodConfig = isCredit
       ? (creditMethod || { name: 'CRÉDITO', openDrawer: false, printReceipt: false })
       : (foundMethod || { name: methodName, openDrawer: false, printReceipt: false });
+
+    // 🔓 APERTURA INSTANTÁNEA DEL CAJÓN (0ms de retraso):
+    // Disparar en paralelo inmediatamente al confirmar el pago sin esperar renders ni red
+    const shouldOpenDrawer = !isCredit && !!methodConfig.openDrawer;
+    if (shouldOpenDrawer) {
+      agentOpenDrawer(posSettings?.cashDrawerCode || '27,112,48,55,121').catch(() => {});
+    }
 
     // Check if this is a contrata client
     const saleCustomer = customers?.find(c => c.id === selectedCustomer);
@@ -1526,8 +1561,9 @@ export function PosView() {
     }
 
     if (resolvedOlaClickId) {
-      // Marcar orden en Supabase como DELIVERED
+      // Marcar orden en Supabase y store local como DELIVERED
       supabase.from('olaclick_orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', resolvedOlaClickId).catch(() => {});
+      try { usePosStore.getState().updateOlaClickOrderStatus(resolvedOlaClickId, 'DELIVERED'); } catch(_) {}
     }
     
     // Clear ticket
@@ -1544,23 +1580,23 @@ export function PosView() {
     let autoDrawer = !!methodConfig.openDrawer;
 
     if (autoPrint || autoDrawer) {
-      handlePrintReceipt(saleData, autoDrawer, autoPrint);
+      handlePrintReceipt(saleData, autoDrawer, autoPrint, shouldOpenDrawer);
     } else {
       toast.success(`Venta registrada con éxito (${methodConfig.name})`, { icon: '✅' });
     }
   };
 
-  const handlePrintReceipt = (sale, openDrawer = true, printReceipt = true) => {
+  const handlePrintReceipt = (sale, openDrawer = true, printReceipt = true, alreadyOpened = false) => {
     setLastSale(sale);
     
-    // Si hay agente, abrir cajón vía agente (silencioso)
-    if (openDrawer && printerAgentOk) {
-      agentOpenDrawer(posSettings?.cashDrawerCode || '27,112,48,55,121');
+    // Si hay agente y no se abrió ya al iniciar el cobro, abrir cajón vía agente (silencioso)
+    if (openDrawer && !alreadyOpened && printerAgentOk) {
+      agentOpenDrawer(posSettings?.cashDrawerCode || '27,112,48,55,121').catch(() => {});
     }
     
     if (printReceipt) {
-      // Si NO hay agente y openDrawer, incluir comando en el ticket
-      const drawerCode = (openDrawer && !printerAgentOk) ? (posSettings?.cashDrawerCode || '27,112,48,55,121') : '';
+      // Si NO hay agente, openDrawer activo y no se abrió ya, incluir comando en el ticket
+      const drawerCode = (openDrawer && !alreadyOpened && !printerAgentOk) ? (posSettings?.cashDrawerCode || '27,112,48,55,121') : '';
       const saleCustomer = customers?.find(c => c.id === sale.customerId);
       const receiptHtml = generateReceiptHTML(sale, saleCustomer, posSettings?.ticketConfig, customerTypes, drawerCode);
       setTimeout(() => {
@@ -1634,7 +1670,7 @@ export function PosView() {
   const totalPages = Math.ceil(displayedItems.length / itemsPerPage);
   const paginatedItems = displayedItems.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage);
 
-  const suspendedCount = (posSales || []).filter(s => s.status === 'SUSPENDED').length;
+  const suspendedCount = allHeldAndSuspended.length;
 
   return (
     <div 
@@ -2594,7 +2630,7 @@ export function PosView() {
 
       {showSuspendedModal && (
         <SuspendedSalesModal
-          sales={(posSales || []).filter(s => s.status === 'SUSPENDED')}
+          sales={allHeldAndSuspended}
           customers={customers}
           activeSuspendedId={activeSuspendedId}
           onClose={() => setShowSuspendedModal(false)}

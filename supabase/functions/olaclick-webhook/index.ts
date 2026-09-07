@@ -127,9 +127,9 @@ serve(async (req: Request) => {
       const orderStatusRaw = String(orderRaw.status || '').toUpperCase();
       let localStatus = 'PENDING';
       
-      if (orderStatusRaw === 'CANCELLED' || orderStatusRaw === 'REJECTED') {
+      if (orderStatusRaw === 'CANCELLED' || orderStatusRaw === 'REJECTED' || orderStatusRaw === 'CANCELED') {
         localStatus = 'REJECTED';
-      } else if (orderStatusRaw === 'PREPARING' || orderStatusRaw === 'COMPLETED' || orderStatusRaw === 'CONFIRMED' || orderStatusRaw === 'ACCEPTED') {
+      } else if (orderStatusRaw === 'PREPARING' || orderStatusRaw === 'COMPLETED' || orderStatusRaw === 'CONFIRMED' || orderStatusRaw === 'ACCEPTED' || orderStatusRaw === 'FINALIZED' || orderStatusRaw === 'DELIVERED') {
         localStatus = 'ACCEPTED';
       }
 

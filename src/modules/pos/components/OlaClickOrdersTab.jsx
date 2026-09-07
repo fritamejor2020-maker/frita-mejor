@@ -68,6 +68,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   const parkOlaClickOrder = usePosStore(s => s.parkOlaClickOrder);
   const posSettings = useInventoryStore(s => s.posSettings);
 
+  // Verificadores de estado robustos (insensibles a mayúsculas/minúsculas)
+  const isPending = (status) => String(status || '').trim().toUpperCase() === 'PENDING';
+  const isAccepted = (status) => ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED', 'COMPLETED', 'FINALIZED'].includes(String(status || '').trim().toUpperCase());
+  const isRejected = (status) => ['REJECTED', 'CANCELED', 'CANCELLED'].includes(String(status || '').trim().toUpperCase());
+
   // 1. Refrescar pedidos desde Supabase hacia el store global
   const refreshOrders = useCallback(async (isBackground = false) => {
     try {
@@ -291,10 +296,6 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     }
   };
 
-  // Verificadores de estado robustos (insensibles a mayúsculas/minúsculas)
-  const isPending = (status) => String(status || '').trim().toUpperCase() === 'PENDING';
-  const isAccepted = (status) => ['ACCEPTED', 'PREPARING', 'READY', 'DELIVERED', 'COMPLETED'].includes(String(status || '').trim().toUpperCase());
-  const isRejected = (status) => ['REJECTED', 'CANCELED', 'CANCELLED'].includes(String(status || '').trim().toUpperCase());
 
   // Filtrar pedidos según pestaña seleccionada
   const filteredOrders = orders.filter((o) => {
@@ -549,7 +550,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                   </div>
 
                   {/* Acciones */}
-                  {order.status === 'PENDING' && (
+                  {isPending(order.status) && (
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
@@ -568,12 +569,12 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                       </button>
                     </div>
                   )}
-                  {order.status === 'ACCEPTED' && (
+                  {isAccepted(order.status) && (
                     <span className="text-[11px] font-black text-green-500 bg-green-500/10 px-3 py-1.5 rounded-full flex items-center gap-1">
                       <Check size={12} /> Aceptado
                     </span>
                   )}
-                  {order.status === 'REJECTED' && (
+                  {isRejected(order.status) && (
                     <span className="text-[11px] font-black text-red-500 bg-red-500/10 px-3 py-1.5 rounded-full flex items-center gap-1">
                       <X size={12} /> Rechazado
                     </span>
