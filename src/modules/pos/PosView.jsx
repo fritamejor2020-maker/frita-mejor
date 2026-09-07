@@ -273,7 +273,18 @@ export function PosView() {
   const [syncReady, setSyncReady] = useState(false);
   const [hasInitialCheckDone, setHasInitialCheckDone] = useState(false);
 
-  const [pendingOrdersCount, setPendingOrdersCount] = useState(0);
+  const [pendingOrdersCount, setPendingOrdersCount] = useState(() => {
+    try {
+      const cached = localStorage.getItem('olaclick_orders_cache');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(o => o.status === 'PENDING').length;
+        }
+      }
+    } catch (e) {}
+    return 0;
+  });
   const [showOlaClickOrdersModal, setShowOlaClickOrdersModal] = useState(false);
   const [showHeldSalesModal, setShowHeldSalesModal] = useState(false);
   const [pendingDeliveryInfo, setPendingDeliveryInfo] = useState(null);
@@ -1674,7 +1685,10 @@ export function PosView() {
                   : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
               }`} 
               title="Pedidos en Línea OlaClick" 
-              onClick={() => setShowOlaClickOrdersModal(true)}
+              onClick={() => {
+                setShowOlaClickOrdersModal(true);
+                loadPendingCount();
+              }}
             >
               <span className="text-base">📱</span>
               <span className="text-xs font-bold hidden sm:inline">OlaClick</span>
@@ -1796,7 +1810,7 @@ export function PosView() {
               <div className="h-px bg-gray-800" />
               <button 
                 className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-yellow-300 hover:bg-yellow-950/40 transition-colors" 
-                onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); }}
+                onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); loadPendingCount(); }}
               >
                 <span className="flex items-center gap-3">
                   <span className="text-base">📱</span> Pedidos OlaClick
@@ -2891,7 +2905,10 @@ export function PosView() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-overlay-in">
           <div className="bg-[#12131a] rounded-[32px] border border-gray-800 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden relative animate-modal-in">
             <button 
-              onClick={() => setShowOlaClickOrdersModal(false)}
+              onClick={() => {
+                setShowOlaClickOrdersModal(false);
+                loadPendingCount();
+              }}
               className="absolute top-4 right-4 z-[55] w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold active:scale-95 transition-all shadow-md"
             >
               ✕
@@ -2905,7 +2922,14 @@ export function PosView() {
                   setShowOlaClickOrdersModal(false);
                   loadPendingCount();
                 }}
-                onOrderProcessed={loadPendingCount}
+                onOrderProcessed={(cnt) => {
+                  if (typeof cnt === 'number') {
+                    setPendingOrdersCount(cnt);
+                  } else {
+                    loadPendingCount();
+                  }
+                }}
+                onPendingCountChange={setPendingOrdersCount}
               />
             </div>
           </div>

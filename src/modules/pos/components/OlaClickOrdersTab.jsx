@@ -39,7 +39,7 @@ export const playChime = () => {
   }
 };
 
-export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney, onClose, onOrderProcessed }) {
+export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMoney, onClose, onOrderProcessed, onPendingCountChange }) {
   const [orders, setOrders] = useState(() => {
     try {
       const cached = localStorage.getItem('olaclick_orders_cache');
@@ -173,6 +173,15 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         return next;
       });
 
+      // Notificar al POS inmediatamente
+      const remainingPending = orders.filter(o => o.id !== order.id && o.status === 'PENDING').length;
+      if (typeof onPendingCountChange === 'function') {
+        onPendingCountChange(remainingPending);
+      }
+      if (typeof onOrderProcessed === 'function') {
+        onOrderProcessed(remainingPending);
+      }
+
       // 2. Guardar directamente en Ventas en Espera del POS
       parkOlaClickOrder(order);
 
@@ -235,6 +244,15 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         return next;
       });
 
+      // Notificar al POS inmediatamente
+      const remainingPending = orders.filter(o => o.id !== order.id && o.status === 'PENDING').length;
+      if (typeof onPendingCountChange === 'function') {
+        onPendingCountChange(remainingPending);
+      }
+      if (typeof onOrderProcessed === 'function') {
+        onOrderProcessed(remainingPending);
+      }
+
       // 2. Cambiar estado a REJECTED en Supabase DB
       const { error } = await supabase
         .from('olaclick_orders')
@@ -296,6 +314,13 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         try { localStorage.setItem('olaclick_orders_cache', JSON.stringify(next)); } catch (e) {}
         return next;
       });
+
+      if (typeof onPendingCountChange === 'function') {
+        onPendingCountChange(0);
+      }
+      if (typeof onOrderProcessed === 'function') {
+        onOrderProcessed(0);
+      }
 
       // 2. Park each order in Ventas en Espera
       for (const order of pendingOrders) {
@@ -360,6 +385,13 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         return next;
       });
 
+      if (typeof onPendingCountChange === 'function') {
+        onPendingCountChange(0);
+      }
+      if (typeof onOrderProcessed === 'function') {
+        onOrderProcessed(0);
+      }
+
       // 2. Update DB
       const ids = pendingOrders.map(o => o.id);
       const { error } = await supabase
@@ -407,6 +439,13 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   // Filtrar pedidos según pestaña seleccionada
   const filteredOrders = orders.filter((o) => o.status === activeTab);
   const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
+
+  // Sincronizar inmediatamente el contador con el POS
+  useEffect(() => {
+    if (typeof onPendingCountChange === 'function') {
+      onPendingCountChange(pendingCount);
+    }
+  }, [pendingCount, onPendingCountChange]);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0d0e12] rounded-[32px] border border-gray-900 overflow-hidden shadow-chunky-xl">
