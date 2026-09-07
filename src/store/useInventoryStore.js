@@ -1396,16 +1396,35 @@ export const useInventoryStore = create(
       updatePosSettings: (data) => { set((s) => ({ posSettings: { ...(s.posSettings || INITIAL_POS_SETTINGS), ...data, _updatedAt: new Date().toISOString() } })); syncKey('posSettings', useInventoryStore.getState().posSettings); },
 
       // Registros de Caja (Multi-Caja)
-      addPosRegister: (reg) => { set((s) => ({ posRegisters: [...(s.posRegisters || INITIAL_POS_REGISTERS), { ...reg, id: `REG-${Date.now()}`, active: true }] })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
-      updatePosRegister: (id, data) => { set((s) => ({ posRegisters: (s.posRegisters || []).map(r => r.id === id ? { ...r, ...data } : r) })); syncKey('posRegisters', useInventoryStore.getState().posRegisters); },
+      addPosRegister: (reg) => {
+        set((s) => ({ posRegisters: [...(s.posRegisters || INITIAL_POS_REGISTERS), { ...reg, id: `REG-${Date.now()}`, active: true }] }));
+        const regs = useInventoryStore.getState().posRegisters;
+        syncKey('posRegisters', regs);
+        // Propagar a todas las sedes para que el POS de cada sede vea la caja nueva
+        const branches = useBranchStore.getState().branches || [];
+        const allBranchIds = new Set(['BRANCH-001', ...branches.map(b => b.id)]);
+        allBranchIds.forEach(bId => { push('posRegisters', regs, bId).catch(() => {}); });
+      },
+      updatePosRegister: (id, data) => {
+        set((s) => ({ posRegisters: (s.posRegisters || []).map(r => r.id === id ? { ...r, ...data } : r) }));
+        const regs = useInventoryStore.getState().posRegisters;
+        syncKey('posRegisters', regs);
+        const branches = useBranchStore.getState().branches || [];
+        const allBranchIds = new Set(['BRANCH-001', ...branches.map(b => b.id)]);
+        allBranchIds.forEach(bId => { push('posRegisters', regs, bId).catch(() => {}); });
+      },
       deletePosRegister: (id) => {
         set((s) => {
           const updatedRegisters = (s.posRegisters || []).filter(r => r.id !== id);
           const newDeleted = [...new Set([...(s.deletedPosRegisterIds || []), id])];
           return { posRegisters: updatedRegisters, deletedPosRegisterIds: newDeleted };
         });
-        syncKey('posRegisters', useInventoryStore.getState().posRegisters);
+        const regs = useInventoryStore.getState().posRegisters;
+        syncKey('posRegisters', regs);
         syncKey('deletedPosRegisterIds', useInventoryStore.getState().deletedPosRegisterIds);
+        const branches = useBranchStore.getState().branches || [];
+        const allBranchIds = new Set(['BRANCH-001', ...branches.map(b => b.id)]);
+        allBranchIds.forEach(bId => { push('posRegisters', regs, bId).catch(() => {}); });
       },
 
       // Fritado Recipes
