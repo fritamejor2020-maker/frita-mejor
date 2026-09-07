@@ -302,62 +302,13 @@ export function PosView() {
     }
   });
 
-  // 🛡️ Auto-reconciliación inteligente: si un borrador coincide en productos, total y ventana de tiempo
-  // con una venta cobrada en el mismo turno, vincular su ID a paidSaleIds para extinguir ventas fantasma
-  const matchedPaidSaleIds = new Set();
-  (posSales || []).forEach(s => {
-    if (!s || s.status !== 'SUSPENDED') return;
-    if (paidSaleIds.has(s.id)) return;
-    const sItems = s.items || [];
-    if (sItems.length === 0) return;
-    const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
-    if (isNaN(sTime) || sTime === 0) return;
-
-    for (const p of paidSalesList) {
-      if (matchedPaidSaleIds.has(p.id)) continue;
-      if (Math.abs((s.total || 0) - (p.total || 0)) > 1) continue;
-      const pTime = new Date(p.timestamp || p.createdAt || 0).getTime();
-      if (isNaN(pTime) || pTime === 0) continue;
-      const diffMs = pTime - sTime;
-      // Pago ocurrió dentro de las 8 horas posteriores a la comanda/borrador
-      if (diffMs < -10000 || diffMs > (8 * 60 * 60 * 1000)) continue;
-
-      const pItems = p.items || [];
-      if (sItems.length !== pItems.length) continue;
-
-      // Comparar ítems por cantidad y coincidencia
-      let allMatch = true;
-      for (let i = 0; i < sItems.length; i++) {
-        const sIt = sItems[i];
-        const pIt = pItems.find(x => 
-          (x.productId && sIt.productId && String(x.productId) === String(sIt.productId)) ||
-          (x.id && sIt.id && String(x.id) === String(sIt.id)) ||
-          (x.name && sIt.name && String(x.name).trim().toLowerCase() === String(sIt.name).trim().toLowerCase())
-        );
-        if (!pIt || Math.abs(Number(pIt.qty || 1) - Number(sIt.qty || 1)) > 0.001) {
-          allMatch = false;
-          break;
-        }
-      }
-
-      if (allMatch) {
-        paidSaleIds.add(s.id);
-        matchedPaidSaleIds.add(p.id);
-        break;
-      }
-    }
-  });
-
   const isStaleSuspended = (sale) => {
     if (!sale) return true;
     const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
     if (isNaN(saleTime) || saleTime === 0) return true;
-    // Ventas suspendidas de más de 6 horas o de fechas anteriores son obsoletas
-    const maxAgeMs = 6 * 60 * 60 * 1000;
-    const isOld = (Date.now() - saleTime) > maxAgeMs;
-    const saleDate = new Date(saleTime).toISOString().slice(0, 10);
-    const today = new Date().toISOString().slice(0, 10);
-    return isOld || saleDate < today;
+    // Ventas suspendidas de más de 12 horas son obsoletas
+    const maxAgeMs = 12 * 60 * 60 * 1000;
+    return (Date.now() - saleTime) > maxAgeMs;
   };
 
   const isSalePaidOrDeleted = (s) => {
@@ -2279,8 +2230,11 @@ export function PosView() {
           <div className="grid grid-cols-3 gap-2 mt-4">
             <button className="flex flex-col items-center justify-center gap-1 py-3 rounded-2xl bg-red-500/20 text-red-300 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all" onClick={() => {
               if (activeSuspendedId) {
-                try { deleteHeldSale(activeSuspendedId); } catch(_) {}
-                try { deletePosSale(activeSuspendedId); } catch(_) {}
+                const shouldDelete = confirm('Esta venta está guardada en espera.\n\n¿Deseas ELIMINARLA definitivamente de la lista de espera?\n\n• Aceptar: Eliminar de espera\n• Cancelar: Conservar en espera y solo limpiar pantalla');
+                if (shouldDelete) {
+                  try { deleteHeldSale(activeSuspendedId); } catch(_) {}
+                  try { deletePosSale(activeSuspendedId); } catch(_) {}
+                }
               }
               setTicketItems([]);
               setActiveSuspendedId(null);

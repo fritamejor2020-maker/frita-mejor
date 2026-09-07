@@ -194,8 +194,10 @@ export function mergeArrays(localArr, remoteArr, key) {
                 (localItem.originalHeldId && allPaidSaleIds.has(localItem.originalHeldId)) ||
                 (localItem.originalOlaClickId && allPaidOlaClickIds.has(localItem.originalOlaClickId));
               const hasItems = localItem.items && localItem.items.length > 0;
-              // 🛡️ Ventas locales SUSPENDED no en remoto SOLO se conservan si están en cola offline pendiente de envío
-              if (!isAlreadyPaid && hasItems && isQueuedOffline) {
+              const saleTime = new Date(localItem.heldAt || localItem.timestamp || localItem.createdAt || 0).getTime();
+              const isRecent = !isNaN(saleTime) && (Date.now() - saleTime) < (12 * 60 * 60 * 1000);
+              // 🛡️ Ventas locales SUSPENDED no en remoto se conservan si son de la jornada actual (< 12h) o están en cola offline
+              if (!isAlreadyPaid && hasItems && (isQueuedOffline || isRecent)) {
                 merged.push(localItem);
                 addedIds.add(localItem.id);
               }
