@@ -6,36 +6,54 @@ import { useAuthStore } from '../../../store/useAuthStore';
 import { ShoppingBag, Check, X, Phone, MapPin, AlertCircle, Volume2, VolumeX, RefreshCw } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 
-// Web Audio API Synthesizer for a premium register/bell sound
-export const playChime = () => {
+let activeAudio = null;
+let lastChimeTime = 0;
+
+export const stopChime = () => {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    
-    const playNote = (freq, time, duration) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      
-      // Use triangle wave for a softer, bell-like quality
-      osc.type = 'sine';
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      
-      osc.frequency.setValueAtTime(freq, time);
-      gain.gain.setValueAtTime(0.2, time);
-      gain.gain.exponentialRampToValueAtTime(0.0001, time + duration);
-      
-      osc.start(time);
-      osc.stop(time + duration);
-    };
-    
-    const now = ctx.currentTime;
-    // Pleasant double ding chime (bright chord)
-    playNote(659.25, now, 0.3);        // E5
-    playNote(987.77, now + 0.1, 0.5);   // B5
+    if (activeAudio) {
+      activeAudio.pause();
+      activeAudio.currentTime = 0;
+      activeAudio = null;
+    }
+  } catch (_) {}
+};
+
+// Audio sintetizado seguro y throttleado (Cero bucles infinitos)
+export const playChime = () => {
+  const now = Date.now();
+  // Throttle: máximo 1 vez cada 4 segundos
+  if (now - lastChimeTime < 4000) return;
+  lastChimeTime = now;
+
+  try {
+    stopChime();
+    const audio = new Audio('/sounds/mixkit_bell.wav');
+    audio.volume = 0.75;
+    activeAudio = audio;
+    audio.play().catch(() => {
+      // Fallback a Web Audio API cerrado de forma segura garantizada
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+        const ctx = new AudioContext();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, ctx.currentTime);
+        gain.gain.setValueAtTime(0.15, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.35);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.35);
+        osc.onended = () => {
+          try { ctx.close(); } catch (_) {}
+        };
+      } catch (_) {}
+    });
   } catch (e) {
-    console.warn("Audio synthesis block:", e.message);
+    console.warn("Audio block:", e.message);
   }
 };
 
@@ -70,7 +88,6 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
     try {
       if (!isBackground) {
         setIsRefreshing(true);
-        if (orders.length === 0) setLoading(true);
       }
 
       // Consulta directa y rápida a olaclick_orders con límite de 40 pedidos
@@ -96,21 +113,21 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
       }
     } catch (err) {
       console.warn('[OlaClickTab] Error al cargar pedidos:', err.message);
-      if (!isBackground && orders.length === 0) {
-        toast.error('No se pudieron actualizar los pedidos en línea');
-      }
     } finally {
+      setLoading(false);
       if (!isBackground) {
-        setLoading(false);
         setIsRefreshing(false);
       }
     }
-  }, [orders.length]);
+  }, []); // Dependencias vacías para evitar bucles de re-montado
 
   useEffect(() => {
     fetchOrders(false);
     const interval = setInterval(() => fetchOrders(true), 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      stopChime();
+    };
   }, [fetchOrders]);
 
   // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)
@@ -440,12 +457,12 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   const filteredOrders = orders.filter((o) => o.status === activeTab);
   const pendingCount = orders.filter((o) => o.status === 'PENDING').length;
 
-  // Sincronizar inmediatamente el contador con el POS
+  // Sincronizar inmediatamente el contador con el POS (sin borrar el badge durante la carga inicial)
   useEffect(() => {
-    if (typeof onPendingCountChange === 'function') {
+    if ((!loading || orders.length > 0) && typeof onPendingCountChange === 'function') {
       onPendingCountChange(pendingCount);
     }
-  }, [pendingCount, onPendingCountChange]);
+  }, [pendingCount, loading, orders.length, onPendingCountChange]);
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#0d0e12] rounded-[32px] border border-gray-900 overflow-hidden shadow-chunky-xl">

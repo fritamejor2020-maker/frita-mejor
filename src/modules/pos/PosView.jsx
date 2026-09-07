@@ -13,7 +13,7 @@ import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
 import { useSupplierStore }      from '../../store/useSupplierStore';
 import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printerAgent';
-import { OlaClickOrdersTab, playChime } from './components/OlaClickOrdersTab';
+import { OlaClickOrdersTab, playChime, stopChime } from './components/OlaClickOrdersTab';
 import { supabase } from '../../lib/supabase';
 import { usePosStore } from '../../store/usePosStore';
 import { useTaskStore } from '../../store/useTaskStore';
@@ -393,30 +393,39 @@ export function PosView() {
   }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
 
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
+  const notifiedOlaClickIdsRef = useRef(new Set());
+
   const loadPendingCount = async (triggerAlert = false) => {
     try {
       // Considerar pedidos pendientes de las últimas 48 horas para alertar de pedidos del día / turno activo
       const sinceDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-      const { data, count, error } = await supabase
+      const { data, error } = await supabase
         .from('olaclick_orders')
-        .select('id, customer_name, total_amount', { count: 'exact' })
+        .select('id, customer_name, total_amount, created_at')
         .eq('status', 'PENDING')
         .gte('created_at', sinceDate);
       
-      if (!error) {
-        const newCount = count ?? (data ? data.length : 0);
-        setPendingOrdersCount(prevCount => {
-          if (newCount > prevCount && triggerAlert) {
+      if (!error && Array.isArray(data)) {
+        const newCount = data.length;
+        setPendingOrdersCount(newCount);
+
+        if (triggerAlert) {
+          // Solo alertar y sonar si hay un ID genuinamente nuevo no notificado antes
+          const unnotified = data.filter(o => o.id && !notifiedOlaClickIdsRef.current.has(o.id));
+          if (unnotified.length > 0) {
+            unnotified.forEach(o => notifiedOlaClickIdsRef.current.add(o.id));
             playChime();
-            const latest = data && data[0];
+            const latest = unnotified[0];
             toast.success(`📱 ¡Nuevo pedido OlaClick recibido! ${latest?.customer_name ? `(${latest.customer_name})` : ''}`, {
               duration: 8000,
               icon: '🔔',
               className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
             });
           }
-          return newCount;
-        });
+        } else {
+          // Al inicio o recarga silenciosa, registrar los IDs existentes para que nunca suenen en bucle
+          data.forEach(o => o.id && notifiedOlaClickIdsRef.current.add(o.id));
+        }
       }
     } catch (err) {
       console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
@@ -426,10 +435,10 @@ export function PosView() {
   useEffect(() => {
     loadPendingCount(false);
 
-    // Sondeo de respaldo cada 10 segundos para garantizar recepción inmediata
+    // Sondeo de respaldo cada 12 segundos para garantizar recepción inmediata sin saturar
     const pollInterval = setInterval(() => {
       loadPendingCount(true);
-    }, 10000);
+    }, 12000);
 
     const channel = supabase
       .channel('olaclick_pos_count')
@@ -437,7 +446,9 @@ export function PosView() {
         'postgres_changes',
         { event: '*', schema: 'public', table: 'olaclick_orders' },
         (payload) => {
-          if (payload?.eventType === 'INSERT') {
+          const newId = payload?.new?.id;
+          if (payload?.eventType === 'INSERT' && newId && !notifiedOlaClickIdsRef.current.has(newId)) {
+            notifiedOlaClickIdsRef.current.add(newId);
             playChime();
             toast.success('📱 ¡Nuevo pedido OlaClick recibido!', {
               duration: 8000,
@@ -445,7 +456,7 @@ export function PosView() {
               className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
             });
           }
-          loadPendingCount(true);
+          loadPendingCount(false);
         }
       )
       .subscribe();
@@ -453,6 +464,7 @@ export function PosView() {
     return () => {
       clearInterval(pollInterval);
       supabase.removeChannel(channel);
+      stopChime();
     };
   }, [posSettings?.olaclickMerchantId, effectiveBranch]);
 
@@ -1686,8 +1698,9 @@ export function PosView() {
               }`} 
               title="Pedidos en Línea OlaClick" 
               onClick={() => {
+                stopChime();
                 setShowOlaClickOrdersModal(true);
-                loadPendingCount();
+                loadPendingCount(false);
               }}
             >
               <span className="text-base">📱</span>
@@ -1810,7 +1823,7 @@ export function PosView() {
               <div className="h-px bg-gray-800" />
               <button 
                 className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-yellow-300 hover:bg-yellow-950/40 transition-colors" 
-                onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); loadPendingCount(); }}
+                onClick={() => { stopChime(); setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); loadPendingCount(false); }}
               >
                 <span className="flex items-center gap-3">
                   <span className="text-base">📱</span> Pedidos OlaClick
@@ -2906,8 +2919,9 @@ export function PosView() {
           <div className="bg-[#12131a] rounded-[32px] border border-gray-800 shadow-2xl max-w-4xl w-full h-[85vh] flex flex-col overflow-hidden relative animate-modal-in">
             <button 
               onClick={() => {
+                stopChime();
                 setShowOlaClickOrdersModal(false);
-                loadPendingCount();
+                loadPendingCount(false);
               }}
               className="absolute top-4 right-4 z-[55] w-10 h-10 rounded-full bg-gray-800 text-gray-400 hover:bg-gray-700 hover:text-white flex items-center justify-center font-bold active:scale-95 transition-all shadow-md"
             >
@@ -2919,14 +2933,15 @@ export function PosView() {
                 selectedRegisterId={selectedRegisterId}
                 formatMoney={formatMoney}
                 onClose={() => {
+                  stopChime();
                   setShowOlaClickOrdersModal(false);
-                  loadPendingCount();
+                  loadPendingCount(false);
                 }}
                 onOrderProcessed={(cnt) => {
                   if (typeof cnt === 'number') {
                     setPendingOrdersCount(cnt);
                   } else {
-                    loadPendingCount();
+                    loadPendingCount(false);
                   }
                 }}
                 onPendingCountChange={setPendingOrdersCount}

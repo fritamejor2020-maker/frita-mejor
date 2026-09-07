@@ -180,6 +180,7 @@ export const usePosStore = create((set, get) => ({
 
       if (match) {
         normalizedCartItems.push({
+          id: match.id,
           productId: match.id,
           cartItemId: match.id,
           name: match.name,
@@ -189,6 +190,7 @@ export const usePosStore = create((set, get) => ({
       } else {
         const genericId = productId || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         normalizedCartItems.push({
+          id: genericId,
           productId: genericId,
           cartItemId: genericId,
           name: `${rawName} (OlaClick)`,
