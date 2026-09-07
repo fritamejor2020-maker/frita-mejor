@@ -6,7 +6,7 @@ import { ShoppingBag, Check, X, Phone, MapPin, AlertCircle, Volume2, VolumeX } f
 import { toast } from 'react-hot-toast';
 
 // Web Audio API Synthesizer for a premium register/bell sound
-const playChime = () => {
+export const playChime = () => {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -48,11 +48,11 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
   const parkOlaClickOrder = usePosStore(s => s.parkOlaClickOrder);
   const posSettings = useInventoryStore(s => s.posSettings);
 
-  // 1. Cargar pedidos iniciales desde Supabase
+  // 1. Cargar pedidos iniciales desde Supabase y refrescar periódicamente
   useEffect(() => {
-    async function fetchOrders() {
+    async function fetchOrders(isBackground = false) {
       try {
-        setLoading(true);
+        if (!isBackground) setLoading(true);
         const userBranch = JSON.parse(localStorage.getItem('auth-storage'))?.state?.user?.branchId || 'GLOBAL';
         const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[userBranch]?.merchantId || 'frita-mejor';
 
@@ -67,13 +67,15 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
         setOrders(data || []);
       } catch (err) {
         console.error('[OlaClickTab] Error al cargar pedidos:', err.message);
-        toast.error('No se pudieron cargar los pedidos en línea');
+        if (!isBackground) toast.error('No se pudieron cargar los pedidos en línea');
       } finally {
-        setLoading(false);
+        if (!isBackground) setLoading(false);
       }
     }
 
-    fetchOrders();
+    fetchOrders(false);
+    const interval = setInterval(() => fetchOrders(true), 10000);
+    return () => clearInterval(interval);
   }, [posSettings?.olaclickMerchantId]);
 
   // 2. Suscribirse a cambios en tiempo real (Supabase Realtime)

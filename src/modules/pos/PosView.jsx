@@ -13,7 +13,7 @@ import { formatMoney }           from '../../utils/formatUtils';
 import { useFinanceStore }       from '../../store/useFinanceStore';
 import { useSupplierStore }      from '../../store/useSupplierStore';
 import { checkAgent, openDrawer as agentOpenDrawer } from '../../services/printerAgent';
-import { OlaClickOrdersTab } from './components/OlaClickOrdersTab';
+import { OlaClickOrdersTab, playChime } from './components/OlaClickOrdersTab';
 import { supabase } from '../../lib/supabase';
 import { usePosStore } from '../../store/usePosStore';
 import { useTaskStore } from '../../store/useTaskStore';
@@ -382,20 +382,32 @@ export function PosView() {
   }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
 
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
-  const loadPendingCount = async () => {
+  const loadPendingCount = async (triggerAlert = false) => {
     try {
       const merchantId = posSettings?.olaclickMerchantId || posSettings?.olaclickByBranch?.[effectiveBranch]?.merchantId || 'frita-mejor';
       // Considerar pedidos pendientes de las últimas 48 horas para alertar de pedidos del día / turno activo
       const sinceDate = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       const { data, count, error } = await supabase
         .from('olaclick_orders')
-        .select('id', { count: 'exact' })
+        .select('id, customer_name, total_amount', { count: 'exact' })
         .eq('status', 'PENDING')
         .gte('created_at', sinceDate)
         .or(`store_id.eq.${merchantId},store_id.eq.frita-mejor,store_id.is.null,store_id.eq.""`);
       
       if (!error) {
-        setPendingOrdersCount(count ?? (data ? data.length : 0));
+        const newCount = count ?? (data ? data.length : 0);
+        setPendingOrdersCount(prevCount => {
+          if (newCount > prevCount && triggerAlert) {
+            playChime();
+            const latest = data && data[0];
+            toast.success(`📱 ¡Nuevo pedido OlaClick recibido! ${latest?.customer_name ? `(${latest.customer_name})` : ''}`, {
+              duration: 8000,
+              icon: '🔔',
+              className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
+            });
+          }
+          return newCount;
+        });
       }
     } catch (err) {
       console.warn('[POS] Error al cargar conteo de pedidos OlaClick:', err.message);
@@ -403,20 +415,34 @@ export function PosView() {
   };
 
   useEffect(() => {
-    loadPendingCount();
+    loadPendingCount(false);
+
+    // Sondeo de respaldo cada 10 segundos para garantizar recepción inmediata
+    const pollInterval = setInterval(() => {
+      loadPendingCount(true);
+    }, 10000);
 
     const channel = supabase
       .channel('olaclick_pos_count')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'olaclick_orders' },
-        () => {
-          loadPendingCount();
+        (payload) => {
+          if (payload?.eventType === 'INSERT') {
+            playChime();
+            toast.success('📱 ¡Nuevo pedido OlaClick recibido!', {
+              duration: 8000,
+              icon: '🔔',
+              className: 'bg-yellow-50 text-yellow-900 border-2 border-yellow-400 font-black rounded-2xl shadow-2xl'
+            });
+          }
+          loadPendingCount(true);
         }
       )
       .subscribe();
 
     return () => {
+      clearInterval(pollInterval);
       supabase.removeChannel(channel);
     };
   }, [posSettings?.olaclickMerchantId, effectiveBranch]);
@@ -1643,6 +1669,23 @@ export function PosView() {
               <span className="text-xs font-bold hidden sm:inline">En Espera</span>
               {allHeldAndSuspended.length > 0 && <span className="bg-amber-500 text-gray-950 text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-lg animate-pulse">{allHeldAndSuspended.length}</span>}
             </button>
+            <button 
+              className={`shrink-0 h-11 px-3 flex items-center justify-center gap-1.5 rounded-xl border transition-all active:scale-95 relative ${
+                pendingOrdersCount > 0 
+                  ? 'bg-yellow-500 text-gray-950 border-yellow-400 font-black shadow-[0_0_20px_rgba(234,179,8,0.4)] animate-pulse' 
+                  : 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700'
+              }`} 
+              title="Pedidos en Línea OlaClick" 
+              onClick={() => setShowOlaClickOrdersModal(true)}
+            >
+              <span className="text-base">📱</span>
+              <span className="text-xs font-bold hidden sm:inline">OlaClick</span>
+              {pendingOrdersCount > 0 && (
+                <span className="bg-red-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full shadow animate-bounce">
+                  {pendingOrdersCount}
+                </span>
+              )}
+            </button>
           </>
         )}
 
@@ -1748,26 +1791,24 @@ export function PosView() {
                   <span className="text-base">⚠️</span> Abrir Caja
                 </button>
               ) : (
-                <>
-                  <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={handleAttemptShiftClose}>
-                    <span className="text-base">🔴</span> Cierre Z
-                  </button>
-                  <div className="h-px bg-gray-800" />
-                  <button 
-                    className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-yellow-300 hover:bg-yellow-950/40 transition-colors" 
-                    onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); }}
-                  >
-                    <span className="flex items-center gap-3">
-                      <span className="text-base">📱</span> Pedidos OlaClick
-                    </span>
-                    {pendingOrdersCount > 0 && (
-                      <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
-                        {pendingOrdersCount}
-                      </span>
-                    )}
-                  </button>
-                </>
+                <button className="w-full flex items-center gap-3 px-4 py-3.5 text-sm font-bold text-gray-200 hover:bg-gray-800 transition-colors" onClick={handleAttemptShiftClose}>
+                  <span className="text-base">🔴</span> Cierre Z
+                </button>
               )}
+              <div className="h-px bg-gray-800" />
+              <button 
+                className="w-full flex items-center justify-between px-4 py-3.5 text-sm font-bold text-yellow-300 hover:bg-yellow-950/40 transition-colors" 
+                onClick={() => { setShowOlaClickOrdersModal(true); setShowHamburgerMenu(false); }}
+              >
+                <span className="flex items-center gap-3">
+                  <span className="text-base">📱</span> Pedidos OlaClick
+                </span>
+                {pendingOrdersCount > 0 && (
+                  <span className="bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shrink-0">
+                    {pendingOrdersCount}
+                  </span>
+                )}
+              </button>
 
               {activeShift && (
                 <>
@@ -1860,6 +1901,22 @@ export function PosView() {
         </div>
 
       </div>
+
+      {/* ── Banner de Alerta para Pedidos OlaClick Pendientes ── */}
+      {pendingOrdersCount > 0 && (
+        <div 
+          onClick={() => setShowOlaClickOrdersModal(true)}
+          className="bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 text-gray-950 px-4 py-2.5 flex items-center justify-between cursor-pointer font-black text-xs shadow-lg hover:brightness-105 transition-all border-b border-yellow-300 shrink-0 animate-pulse"
+        >
+          <div className="flex items-center gap-2">
+            <span className="text-base animate-bounce">🔔</span>
+            <span>¡Tienes <strong className="underline text-sm">{pendingOrdersCount} pedido{pendingOrdersCount > 1 ? 's' : ''}</strong> de OlaClick pendiente{pendingOrdersCount > 1 ? 's' : ''} de confirmación!</span>
+          </div>
+          <span className="bg-gray-950 text-yellow-400 px-3 py-1 rounded-xl text-[11px] font-black flex items-center gap-1 shadow-md hover:scale-105 transition-all">
+            Ver y Aceptar Pedido ➔
+          </span>
+        </div>
+      )}
 
       {/* ══════ CONTENIDO: Ticket + Productos ══════ */}
       <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
