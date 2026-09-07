@@ -378,6 +378,18 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
       const merged = mergeArrays(state.payrollRecords || [], v || [], 'payrollRecords');
       usePayrollStore.setState({ payrollRecords: merged });
     };
+    applicators[`attendance_logs_${bid}`]   = () => {
+      useAttendanceStore.getState().loadFromRemote().catch(() => {});
+    };
+    applicators[`attendance_contracts_${bid}`] = () => {
+      useAttendanceStore.getState().loadFromRemote().catch(() => {});
+    };
+    applicators[`attendance_shifts_${bid}`] = () => {
+      useAttendanceStore.getState().loadFromRemote().catch(() => {});
+    };
+    applicators[`attendance_groups_${bid}`] = () => {
+      useAttendanceStore.getState().loadFromRemote().catch(() => {});
+    };
     applicators[`movements_${bid}`]         = (v) => {
       const state = useInventoryStore.getState();
       const merged = mergeArrays(state.movements || [], v || [], 'movements');

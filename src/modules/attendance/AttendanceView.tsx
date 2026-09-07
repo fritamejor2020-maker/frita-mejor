@@ -81,11 +81,14 @@ export function AttendanceView() {
     setIsSyncing(true);
 
     try {
-      // 0. Si se ejecuta dentro de la app de escritorio Electron, ejecutar extracción nativa IPC y finalizar de inmediato
-      if ((window as any).cajeroAPI?.syncBiometric) {
-        console.log('[AttendanceView] Invocando extracción nativa de biométrico vía cajeroAPI IPC...');
-        const res = await (window as any).cajeroAPI.syncBiometric();
+      // 0. Si se ejecuta dentro de la app de escritorio Electron, ejecutar extracción nativa IPC y refrescar desde Supabase
+      const electronBridge = (window as any).electronAPI || (window as any).cajeroAPI;
+      const syncFn = electronBridge?.syncBiometric || electronBridge?.syncBiometricManual;
+      if (typeof syncFn === 'function') {
+        console.log('[AttendanceView] Invocando extracción nativa de biométrico vía IPC...');
+        const res = await syncFn();
         console.log('[AttendanceView IPC Result]', res);
+        await useAttendanceStore.getState().loadFromRemote();
         setIsSyncing(false);
         return;
       }
