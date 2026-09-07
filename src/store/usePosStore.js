@@ -81,11 +81,13 @@ export const usePosStore = create((set, get) => ({
 
   fetchOlaClickOrders: async () => {
     try {
+      const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from('olaclick_orders')
-        .select('*')
+        .select('id,customer_name,customer_phone,delivery_address,items,total_amount,payment_method,status,rejection_reason,store_id,created_at,updated_at,public_id,delivery_price,service_type')
+        .gte('created_at', since48h)
         .order('created_at', { ascending: false })
-        .limit(40);
+        .limit(30);
       if (!error && Array.isArray(data)) {
         get().setOlaClickOrders(data);
         return data;

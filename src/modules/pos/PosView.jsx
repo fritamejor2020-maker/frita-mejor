@@ -443,10 +443,10 @@ export function PosView() {
   useEffect(() => {
     loadPendingCount(false);
 
-    // Sondeo de respaldo cada 12 segundos para garantizar recepción inmediata sin saturar
+    // Sondeo de respaldo cada 5 segundos para garantizar recepción si el canal realtime falla
     const pollInterval = setInterval(() => {
       loadPendingCount(true);
-    }, 12000);
+    }, 5000);
 
     const channel = supabase
       .channel('olaclick_pos_count')
@@ -474,7 +474,13 @@ export function PosView() {
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('[Realtime] Canal status:', status);
+        if (status === 'TIMED_OUT' || status === 'CHANNEL_ERROR') {
+          // Canal caído: hacer fetch inmediato como respaldo
+          loadPendingCount(true);
+        }
+      });
 
     return () => {
       clearInterval(pollInterval);

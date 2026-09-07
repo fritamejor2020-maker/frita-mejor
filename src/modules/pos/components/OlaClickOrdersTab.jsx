@@ -92,7 +92,7 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
 
   useEffect(() => {
     refreshOrders(false);
-    const interval = setInterval(() => refreshOrders(true), 10000);
+    const interval = setInterval(() => refreshOrders(true), 5000);
     return () => {
       clearInterval(interval);
       stopChime();
