@@ -2393,7 +2393,7 @@ export function PosView() {
                           className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" 
                           onError={(e) => {
                             const fallback = getProductLocalFallback(item);
-                            if (fallback && !e.target.src.endsWith(fallback)) {
+                            if (fallback && e.target.src !== fallback) {
                               e.target.src = fallback;
                             } else {
                               e.target.style.display = 'none';

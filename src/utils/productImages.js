@@ -56,32 +56,62 @@ function normalizeText(text) {
     .trim();
 }
 
+export function resolveAssetPath(path) {
+  if (!path) return '';
+  if (path.startsWith('http://') || path.startsWith('https://') || path.startsWith('data:')) {
+    return path;
+  }
+  if (typeof window !== 'undefined' && window.location.protocol === 'file:') {
+    const cleanPath = path.startsWith('/') ? path.slice(1) : path;
+    const basePath = window.location.href.split('index.html')[0];
+    return basePath + cleanPath;
+  }
+  return path;
+}
+
 export function getProductLocalFallback(item) {
   if (!item) return null;
+  let rawPath = null;
   if (item.id && LOCAL_PRODUCT_IMAGES_BY_ID[item.id]) {
-    return LOCAL_PRODUCT_IMAGES_BY_ID[item.id];
-  }
-  const normName = normalizeText(item.name);
-  if (normName && LOCAL_PRODUCT_IMAGES_BY_NAME[normName]) {
-    return LOCAL_PRODUCT_IMAGES_BY_NAME[normName];
-  }
-  for (const [key, path] of Object.entries(LOCAL_PRODUCT_IMAGES_BY_NAME)) {
-    if (normName.includes(key)) {
-      return path;
+    rawPath = LOCAL_PRODUCT_IMAGES_BY_ID[item.id];
+  } else {
+    const normName = normalizeText(item.name);
+    if (normName && LOCAL_PRODUCT_IMAGES_BY_NAME[normName]) {
+      rawPath = LOCAL_PRODUCT_IMAGES_BY_NAME[normName];
+    } else {
+      for (const [key, path] of Object.entries(LOCAL_PRODUCT_IMAGES_BY_NAME)) {
+        if (normName.includes(key)) {
+          rawPath = path;
+          break;
+        }
+      }
     }
   }
-  return null;
+  return rawPath ? resolveAssetPath(rawPath) : null;
 }
 
 export function getProductImageUrl(item) {
   if (!item) return null;
+
+  // 1. Prioridad: URL autoritativa en la nube (Supabase Storage) o URL directa
+  if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0) {
+    const trimmed = item.imageUrl.trim();
+    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
+      return trimmed;
+    }
+  }
+
+  // 2. Respaldo local empaquetado (Offline / Fallback adaptativo Electron + Web)
   const localAsset = getProductLocalFallback(item);
   if (localAsset) {
     return localAsset;
   }
+
+  // 3. Fallback de compatibilidad
   if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0) {
-    return item.imageUrl.trim();
+    return resolveAssetPath(item.imageUrl.trim());
   }
+
   return null;
 }
 
