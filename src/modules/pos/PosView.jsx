@@ -1662,11 +1662,10 @@ export function PosView() {
     }
 
     if (resolvedOlaClickId) {
-      // Marcar orden en Supabase y store local como DELIVERED
-      supabase.from('olaclick_orders').update({ status: 'DELIVERED', updated_at: new Date().toISOString() }).eq('id', resolvedOlaClickId).catch(() => {});
+      // Marcar el pedido como DELIVERED en el store local (síncrono, sin red)
       try { usePosStore.getState().updateOlaClickOrderStatus(resolvedOlaClickId, 'DELIVERED'); } catch(_) {}
     }
-    
+
     // Clear ticket & store cart
     setTicketItems([]);
     setActiveSuspendedId(null);
@@ -1676,7 +1675,18 @@ export function PosView() {
     setManualDiscountPercent(0);
     setIsLuckyWinnerSession(false);
     try { usePosStore.getState().clearCart(); } catch(_) {}
-    
+
+    // Marcar el pedido como DELIVERED en Supabase (después de cerrar la venta,
+    // para que un fallo de red en este PATCH jamás bloquee la facturación).
+    // NOTA: el builder de supabase-js v2 solo implementa .then(), no .catch().
+    if (resolvedOlaClickId) {
+      Promise.resolve(
+        supabase.from('olaclick_orders')
+          .update({ status: 'DELIVERED', updated_at: new Date().toISOString() })
+          .eq('id', resolvedOlaClickId)
+      ).catch(() => {});
+    }
+
     // Print trigger logic strictly based on hardware configuration
     let autoPrint = !!methodConfig.printReceipt;
     let autoDrawer = !!methodConfig.openDrawer;
