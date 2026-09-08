@@ -67,16 +67,20 @@ export function sanitizeSaleItems(items) {
   return items.map(item => {
     if (!item) return item;
     return {
-      id: item.id || item.realId,
+      id: item.id || item.realId || item.productId,
+      productId: item.productId || item.id || item.realId,
+      cartItemId: item.cartItemId || item.id,
       name: item.name || '',
       qty: item.qty || 1,
       price: item.price || 0,
       subtotal: item.subtotal || (Number(item.qty || 1) * Number(item.price || 0)),
       ...(item.isCustomPrice ? { isCustomPrice: true, originalPrice: item.originalPrice } : {}),
+      ...(item.isExternal ? { isExternal: true } : {}),
       ...(item.tipo ? { tipo: item.tipo } : {}),
       ...(item.type ? { type: item.type } : {}),
       ...(item.unit ? { unit: item.unit } : {}),
       ...(item.notes ? { notes: item.notes } : {}),
+      ...(item.comment ? { notes: item.comment } : {}),
     };
   });
 }

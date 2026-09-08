@@ -570,9 +570,25 @@ export function OlaClickOrdersTab({ activeShiftId, selectedRegisterId, formatMon
                     </div>
                   )}
                   {isAccepted(order.status) && (
-                    <span className="text-[11px] font-black text-green-500 bg-green-500/10 px-3 py-1.5 rounded-full flex items-center gap-1">
-                      <Check size={12} /> Aceptado
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[11px] font-black text-green-500 bg-green-500/10 px-3 py-1.5 rounded-full flex items-center gap-1">
+                        <Check size={12} /> Aceptado
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          parkOlaClickOrder(order);
+                          toast.success(`📱 Pedido de ${order.customer_name || 'OlaClick'} guardado en Ventas en Espera`, {
+                            className: 'bg-green-500 text-white font-black rounded-2xl shadow-chunky-lg'
+                          });
+                          if (onOrderProcessed) onOrderProcessed();
+                        }}
+                        className="bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 text-xs font-black px-3 py-1.5 rounded-xl border border-yellow-500/20 transition-all active:scale-95 flex items-center gap-1 cursor-pointer"
+                        title="Guardar nuevamente en Ventas en Espera"
+                      >
+                        📥 Enviar a Ventas en Espera
+                      </button>
+                    </div>
                   )}
                   {isRejected(order.status) && (
                     <span className="text-[11px] font-black text-red-500 bg-red-500/10 px-3 py-1.5 rounded-full flex items-center gap-1">

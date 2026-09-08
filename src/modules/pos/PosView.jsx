@@ -423,8 +423,12 @@ export function PosView() {
     const olaId = s.originalOlaClickId || (sId.startsWith('HELD-OLA-') ? sId.replace('HELD-OLA-', '') : null);
     if (olaId && terminalOlaClickIds.has(olaId)) return true;
 
-    // 🛡️ Detección de coincidencia inteligente: si ya existe una venta pagada en esta jornada con el mismo monto exacto e items
-    if (s.items && Array.isArray(s.items) && s.items.length > 0 && s.total > 0) {
+    // 🛡️ Detección de coincidencia inteligente para EVITAR ventas fantasma:
+    // NUNCA aplicar esta heurística a pedidos de OlaClick (tienen ID único originalOlaClickId).
+    // Para ventas suspendidas manuales, SOLO coincide si la venta pagada ocurrió DESPUÉS de pausar la venta (psTime >= sTime - 5000) 
+    // y dentro de un margen máximo de 2 horas.
+    const isOlaClickSale = !!s.isOlaClick || !!s.originalOlaClickId || sId.startsWith('HELD-OLA-');
+    if (!isOlaClickSale && s.items && Array.isArray(s.items) && s.items.length > 0 && s.total > 0) {
       const sItemKeys = s.items.map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
       const hasMatchingPaid = paidSalesList.some(ps => {
         if (ps.total !== s.total) return false;
@@ -432,7 +436,7 @@ export function PosView() {
         if (sItemKeys !== pItemKeys) return false;
         const psTime = new Date(ps.timestamp || ps.createdAt || 0).getTime();
         const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
-        return Math.abs(psTime - sTime) < (8 * 60 * 60 * 1000);
+        return psTime >= (sTime - 5000) && (psTime - sTime) < (2 * 60 * 60 * 1000);
       });
       if (hasMatchingPaid) return true;
     }
