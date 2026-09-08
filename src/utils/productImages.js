@@ -93,23 +93,17 @@ export function getProductLocalFallback(item) {
 export function getProductImageUrl(item) {
   if (!item) return null;
 
-  // 1. Prioridad: URL autoritativa en la nube (Supabase Storage) o URL directa
-  if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0) {
-    const trimmed = item.imageUrl.trim();
-    if (trimmed.startsWith('http://') || trimmed.startsWith('https://') || trimmed.startsWith('data:')) {
-      return trimmed;
-    }
-  }
-
-  // 2. Respaldo local empaquetado (Offline / Fallback adaptativo Electron + Web)
+  // 1. Prioridad principal para POS (Instantáneo 0ms / Offline / Electron & Web):
+  // Si el producto tiene un asset local empaquetado en public/products/, usarlo directamente.
   const localAsset = getProductLocalFallback(item);
   if (localAsset) {
     return localAsset;
   }
 
-  // 3. Fallback de compatibilidad
+  // 2. URL autoritativa en la nube o asset relativo configurado en el producto
   if (item.imageUrl && typeof item.imageUrl === 'string' && item.imageUrl.trim().length > 0) {
-    return resolveAssetPath(item.imageUrl.trim());
+    const trimmed = item.imageUrl.trim();
+    return resolveAssetPath(trimmed);
   }
 
   return null;

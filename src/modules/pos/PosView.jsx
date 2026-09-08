@@ -36,6 +36,7 @@ function PosProductGridCard({ item, customer, customerTypes, posSettings, format
     const fallback = getProductLocalFallback(item);
     if (fallback && imgSrc !== fallback) {
       setImgSrc(fallback);
+      setHasImageError(false);
     } else {
       setHasImageError(true);
     }
@@ -53,6 +54,7 @@ function PosProductGridCard({ item, customer, customerTypes, posSettings, format
         <>
           <div className="absolute top-0 left-0 right-0 bottom-1/3 overflow-hidden rounded-t-[32px]">
             <img 
+              key={imgSrc}
               src={imgSrc} 
               alt={item.name} 
               loading="eager"
