@@ -382,7 +382,10 @@ export function PosView() {
         }
       }
       if (s.originalHeldId) paidSaleIds.add(s.originalHeldId);
-      if (s.originalOlaClickId) paidOlaClickIds.add(s.originalOlaClickId);
+      if (s.originalOlaClickId) {
+        paidOlaClickIds.add(s.originalOlaClickId);
+        paidSaleIds.add(`HELD-OLA-${s.originalOlaClickId}`);
+      }
       if (s.publicId) paidPublicIds.add(s.publicId);
     }
   });
@@ -415,13 +418,13 @@ export function PosView() {
 
     if (paidSaleIds.has(sId)) return true;
     if (s.originalHeldId && paidSaleIds.has(s.originalHeldId)) return true;
-    if (s.originalOlaClickId && paidOlaClickIds.has(s.originalOlaClickId)) return true;
+    if (s.originalOlaClickId && (paidOlaClickIds.has(s.originalOlaClickId) || paidSaleIds.has(`HELD-OLA-${s.originalOlaClickId}`))) return true;
     if (s.publicId && paidPublicIds.has(s.publicId)) return true;
     if (sId.startsWith('HELD-OLA-') && paidOlaClickIds.has(sId.replace('HELD-OLA-', ''))) return true;
 
-    // 🛡️ Si proviene de un pedido OlaClick que ya fue rechazado, cancelado o entregado
+    // 🛡️ Si proviene de un pedido OlaClick que ya fue cobrado o está en estado terminal
     const olaId = s.originalOlaClickId || (sId.startsWith('HELD-OLA-') ? sId.replace('HELD-OLA-', '') : null);
-    if (olaId && terminalOlaClickIds.has(olaId)) return true;
+    if (olaId && (paidOlaClickIds.has(olaId) || terminalOlaClickIds.has(olaId))) return true;
 
     // 🛡️ Detección de coincidencia inteligente para EVITAR ventas fantasma:
     // NUNCA aplicar esta heurística a pedidos de OlaClick (tienen ID único originalOlaClickId).
@@ -1633,14 +1636,19 @@ export function PosView() {
       return;
     }
 
-    if (activeSuspendedId) {
-      try { deleteHeldSale(activeSuspendedId, false); } catch(e) {}
-      if (resolvedOlaClickId) {
-        try { deleteHeldSale(`HELD-OLA-${resolvedOlaClickId}`, false); } catch(e) {}
-        try { deleteHeldSale(resolvedOlaClickId, false); } catch(e) {}
-      }
+    if (activeSuspendedId || resolvedOlaClickId) {
+      const targetOlaId = resolvedOlaClickId || (activeSuspendedId && activeSuspendedId.startsWith('HELD-OLA-') ? activeSuspendedId.replace('HELD-OLA-', '') : null);
 
-      // Actualizar la venta suspendida a PAID en posSales usando el ID suspendido o el ID original
+      // Limpiar de heldSales en usePosStore por cualquier variante de ID
+      usePosStore.setState((state) => ({
+        heldSales: (state.heldSales || []).filter(h => {
+          if (!h) return false;
+          if (h.id === activeSuspendedId || h.id === saleData.id) return false;
+          if (targetOlaId && (h.id === targetOlaId || h.originalOlaClickId === targetOlaId || h.id === `HELD-OLA-${targetOlaId}`)) return false;
+          return true;
+        })
+      }));
+
       const targetId = activeSuspendedId || (resolvedOlaClickId ? `HELD-OLA-${resolvedOlaClickId}` : null);
       if (targetId) {
         updatePosSale(targetId, saleData);

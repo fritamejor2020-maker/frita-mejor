@@ -1597,6 +1597,18 @@ export const useInventoryStore = create(
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
         syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
+
+        try {
+          const targetOlaId = data.originalOlaClickId || (data.id && data.id.startsWith('HELD-OLA-') ? data.id.replace('HELD-OLA-', '') : null) || (typeof id === 'string' && id.startsWith('HELD-OLA-') ? id.replace('HELD-OLA-', '') : id);
+          usePosStore.setState((state) => ({
+            heldSales: (state.heldSales || []).filter(h => {
+              if (!h) return false;
+              if (h.id === id || h.id === data.id) return false;
+              if (targetOlaId && (h.id === targetOlaId || h.originalOlaClickId === targetOlaId || h.id === `HELD-OLA-${targetOlaId}`)) return false;
+              return true;
+            })
+          }));
+        } catch (_) {}
       },
       deletePosSale: (id) => {
         set((s) => {
