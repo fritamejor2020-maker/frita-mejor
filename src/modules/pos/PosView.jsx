@@ -1657,7 +1657,7 @@ export function PosView() {
       try { usePosStore.getState().updateOlaClickOrderStatus(resolvedOlaClickId, 'DELIVERED'); } catch(_) {}
     }
     
-    // Clear ticket
+    // Clear ticket & store cart
     setTicketItems([]);
     setActiveSuspendedId(null);
     setPendingDeliveryInfo(null);
@@ -1665,6 +1665,7 @@ export function PosView() {
     setCustomCustomerName('');
     setManualDiscountPercent(0);
     setIsLuckyWinnerSession(false);
+    try { usePosStore.getState().clearCart(); } catch(_) {}
     
     // Print trigger logic strictly based on hardware configuration
     let autoPrint = !!methodConfig.printReceipt;
@@ -4867,13 +4868,13 @@ function SalesHistoryModal({ sales, customers, onClose, onReprint, onEditSale, o
               </tr>
             </thead>
             <tbody>
-              {sorted.map(sale => {
+              {sorted.map((sale, idx) => {
                 const customerName = customers?.find(c => c.id === sale.customerId)?.name || 'Consumidor Final';
                 const isExpanded = expandedId === sale.id;
                 const totalItems = sale.items.reduce((sum, item) => sum + item.qty, 0);
 
                 return (
-                  <React.Fragment key={sale.id}>
+                  <React.Fragment key={sale.id ? `${sale.id}-${idx}` : `sale-${idx}`}>
                     <tr
                       className={`border-b border-gray-800/50 transition-colors cursor-pointer ${isExpanded ? 'bg-[#1e1f26]' : 'hover:bg-[#16171d]'}`}
                       onClick={() => setExpandedId(isExpanded ? null : sale.id)}

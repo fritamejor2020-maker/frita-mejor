@@ -1486,101 +1486,104 @@ export const useInventoryStore = create(
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           let newInventory = s.inventory;
 
-          const isMatch = (sale) => {
-            if (!sale) return false;
-            if (sale.id === id || sale.id === data.id) return true;
-            if (sale.originalOlaClickId && (sale.originalOlaClickId === id || sale.originalOlaClickId === data.originalOlaClickId || `HELD-OLA-${sale.originalOlaClickId}` === id)) return true;
-            if (sale.originalHeldId && (sale.originalHeldId === id || sale.originalHeldId === data.originalHeldId || sale.id === sale.originalHeldId)) return true;
-            if (typeof id === 'string' && id.startsWith('HELD-OLA-') && (sale.id === id.replace('HELD-OLA-', '') || sale.originalOlaClickId === id.replace('HELD-OLA-', ''))) return true;
-            if (typeof sale.id === 'string' && sale.id.startsWith('HELD-OLA-') && (sale.id.replace('HELD-OLA-', '') === id || sale.id.replace('HELD-OLA-', '') === data.id)) return true;
-            return false;
-          };
+          const currentSales = s.posSales || [];
 
-          let found = false;
-          const updatedSales = (s.posSales || []).map((sale) => {
-            if (isMatch(sale)) {
-              found = true;
-              const wasPaid = sale.status === 'PAID';
-              const isPaid = (cleanData.status || sale.status) === 'PAID';
+          // 1. Prioridad máxima: Coincidencia exacta por ID de la venta
+          let targetIndex = currentSales.findIndex(sale => sale && (sale.id === id || sale.id === cleanData.id));
 
-              if (linkSales) {
-                // Caso A: De suspendida a pagada (descontar inventario)
-                if (!wasPaid && isPaid) {
-                  const saleItems = cleanData.items || sale.items || [];
-                  newInventory = newInventory.map(invItem => {
-                    const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
-                    if (soldItem) {
-                      return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
-                    }
-                    return invItem;
-                  });
-                } 
-                // Caso B: Venta ya pagada que se edita (revertir cantidades viejas y descontar las nuevas)
-                else if (wasPaid && isPaid && data.items) {
-                  // 1. Devolver items viejos
-                  let tempInv = newInventory.map(invItem => {
-                    const oldSoldItem = (sale.items || []).find(i => String(i.productId || i.id) === String(invItem.id));
-                    if (oldSoldItem) {
-                      return { ...invItem, qty: +(invItem.qty + (oldSoldItem.qty || 0)).toFixed(3) };
-                    }
-                    return invItem;
-                  });
-                  // 2. Restar items nuevos
-                  newInventory = tempInv.map(invItem => {
-                    const newSoldItem = data.items.find(i => String(i.productId || i.id) === String(invItem.id));
-                    if (newSoldItem) {
-                      return { ...invItem, qty: Math.max(0, +(invItem.qty - (newSoldItem.qty || 0)).toFixed(3)) };
-                    }
-                    return invItem;
-                  });
-                }
-              }
-              let updatedSale = { ...sale, ...cleanData };
-              if (sale.contrataPaymentMethod === 'credit' && cleanData.total !== undefined && cleanData.creditAmount === undefined) {
-                updatedSale.creditAmount = cleanData.total;
-              }
+          // 2. Segunda prioridad: Coincidencia por originalOlaClickId u originalHeldId SOLO para ventas en estado SUSPENDED
+          if (targetIndex === -1) {
+            targetIndex = currentSales.findIndex(sale => {
+              if (!sale || sale.status !== 'SUSPENDED') return false;
+              if (sale.originalOlaClickId && (sale.originalOlaClickId === id || sale.originalOlaClickId === cleanData.originalOlaClickId || `HELD-OLA-${sale.originalOlaClickId}` === id)) return true;
+              if (sale.originalHeldId && (sale.originalHeldId === id || sale.originalHeldId === cleanData.originalHeldId || sale.id === sale.originalHeldId)) return true;
+              if (typeof id === 'string' && id.startsWith('HELD-OLA-') && (sale.id === id.replace('HELD-OLA-', '') || sale.originalOlaClickId === id.replace('HELD-OLA-', ''))) return true;
+              if (typeof sale.id === 'string' && sale.id.startsWith('HELD-OLA-') && (sale.id.replace('HELD-OLA-', '') === id || sale.id.replace('HELD-OLA-', '') === cleanData.id)) return true;
+              return false;
+            });
+          }
 
-              // Registrar historial de modificaciones (cambios)
-              const oldItems = sale.items || [];
-              const oldTotal = sale.total || 0;
-              const oldPaymentMethod = sale.paymentMethod || '';
-              const oldDiscount = sale.discountAmount || 0;
-              const oldCustomerId = sale.customerId || null;
+          let updatedSales = [...currentSales];
 
-              const hasItemsChanged = cleanData.items && JSON.stringify(oldItems) !== JSON.stringify(cleanData.items);
-              const hasTotalChanged = cleanData.total !== undefined && oldTotal !== cleanData.total;
-              const hasPaymentMethodChanged = cleanData.paymentMethod !== undefined && oldPaymentMethod !== cleanData.paymentMethod;
-              const hasDiscountChanged = cleanData.discountAmount !== undefined && oldDiscount !== cleanData.discountAmount;
-              const hasCustomerChanged = cleanData.customerId !== undefined && oldCustomerId !== cleanData.customerId;
+          if (targetIndex !== -1) {
+            const sale = currentSales[targetIndex];
+            const wasPaid = sale.status === 'PAID';
+            const isPaid = (cleanData.status || sale.status) === 'PAID';
 
-              if (hasItemsChanged || hasTotalChanged || hasPaymentMethodChanged || hasDiscountChanged || hasCustomerChanged) {
-                const editRecord = {
-                  editedAt: new Date().toISOString(),
-                  before: {
-                    items: oldItems.map(i => ({ ...i })),
-                    total: oldTotal,
-                    paymentMethod: oldPaymentMethod,
-                    discountAmount: oldDiscount,
-                    customerId: oldCustomerId
-                  },
-                  after: {
-                    items: (cleanData.items || oldItems).map(i => ({ ...i })),
-                    total: cleanData.total !== undefined ? cleanData.total : oldTotal,
-                    paymentMethod: cleanData.paymentMethod || oldPaymentMethod,
-                    discountAmount: cleanData.discountAmount !== undefined ? cleanData.discountAmount : oldDiscount,
-                    customerId: cleanData.customerId !== undefined ? cleanData.customerId : oldCustomerId
+            if (linkSales) {
+              // Caso A: De suspendida a pagada (descontar inventario)
+              if (!wasPaid && isPaid) {
+                const saleItems = cleanData.items || sale.items || [];
+                newInventory = newInventory.map(invItem => {
+                  const soldItem = saleItems.find(i => String(i.productId || i.id) === String(invItem.id));
+                  if (soldItem) {
+                    return { ...invItem, qty: Math.max(0, +(invItem.qty - (soldItem.qty || 1)).toFixed(3)) };
                   }
-                };
-                updatedSale.editHistory = [...(sale.editHistory || []), editRecord];
+                  return invItem;
+                });
+              } 
+              // Caso B: Venta ya pagada que se edita (revertir cantidades viejas y descontar las nuevas)
+              else if (wasPaid && isPaid && data.items) {
+                let tempInv = newInventory.map(invItem => {
+                  const oldSoldItem = (sale.items || []).find(i => String(i.productId || i.id) === String(invItem.id));
+                  if (oldSoldItem) {
+                    return { ...invItem, qty: +(invItem.qty + (oldSoldItem.qty || 0)).toFixed(3) };
+                  }
+                  return invItem;
+                });
+                newInventory = tempInv.map(invItem => {
+                  const newSoldItem = data.items.find(i => String(i.productId || i.id) === String(invItem.id));
+                  if (newSoldItem) {
+                    return { ...invItem, qty: Math.max(0, +(invItem.qty - (newSoldItem.qty || 0)).toFixed(3)) };
+                  }
+                  return invItem;
+                });
               }
-
-              return updatedSale;
             }
-            return sale;
-          });
+            let updatedSale = { ...sale, ...cleanData };
+            if (sale.contrataPaymentMethod === 'credit' && cleanData.total !== undefined && cleanData.creditAmount === undefined) {
+              updatedSale.creditAmount = cleanData.total;
+            }
 
-          // Si la venta no existía previamente en posSales, la insertamos al inicio
-          const finalSales = found ? updatedSales : [cleanData, ...updatedSales];
+            // Registrar historial de modificaciones
+            const oldItems = sale.items || [];
+            const oldTotal = sale.total || 0;
+            const oldPaymentMethod = sale.paymentMethod || '';
+            const oldDiscount = sale.discountAmount || 0;
+            const oldCustomerId = sale.customerId || null;
+
+            const hasItemsChanged = cleanData.items && JSON.stringify(oldItems) !== JSON.stringify(cleanData.items);
+            const hasTotalChanged = cleanData.total !== undefined && oldTotal !== cleanData.total;
+            const hasPaymentMethodChanged = cleanData.paymentMethod !== undefined && oldPaymentMethod !== cleanData.paymentMethod;
+            const hasDiscountChanged = cleanData.discountAmount !== undefined && oldDiscount !== cleanData.discountAmount;
+            const hasCustomerChanged = cleanData.customerId !== undefined && oldCustomerId !== cleanData.customerId;
+
+            if (hasItemsChanged || hasTotalChanged || hasPaymentMethodChanged || hasDiscountChanged || hasCustomerChanged) {
+              const editRecord = {
+                editedAt: new Date().toISOString(),
+                before: {
+                  items: oldItems.map(i => ({ ...i })),
+                  total: oldTotal,
+                  paymentMethod: oldPaymentMethod,
+                  discountAmount: oldDiscount,
+                  customerId: oldCustomerId
+                },
+                after: {
+                  items: (cleanData.items || oldItems).map(i => ({ ...i })),
+                  total: cleanData.total !== undefined ? cleanData.total : oldTotal,
+                  paymentMethod: cleanData.paymentMethod || oldPaymentMethod,
+                  discountAmount: cleanData.discountAmount !== undefined ? cleanData.discountAmount : oldDiscount,
+                  customerId: cleanData.customerId !== undefined ? cleanData.customerId : oldCustomerId
+                }
+              };
+              updatedSale.editHistory = [...(sale.editHistory || []), editRecord];
+            }
+
+            updatedSales[targetIndex] = updatedSale;
+          } else {
+            // Si la venta no existía previamente en posSales, la agregamos como nueva venta
+            updatedSales = [cleanData, ...currentSales];
+          }
 
           const newDeleted = (s.deletedPosSaleIds || []).filter(dId => 
             dId !== id && 
@@ -1589,7 +1592,7 @@ export const useInventoryStore = create(
             dId !== data.publicId &&
             (!data.originalHeldId || dId !== data.originalHeldId)
           );
-          return { posSales: finalSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
+          return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
