@@ -1480,12 +1480,26 @@ export const useInventoryStore = create(
         set((s) => {
           const cleanData = {
             ...data,
+            id: data.id || id,
             ...(data.items ? { items: sanitizeSaleItems(data.items) } : {})
           };
           const linkSales = s.posSettings?.inventoryControl?.linkSalesToInventory ?? false;
           let newInventory = s.inventory;
+
+          const isMatch = (sale) => {
+            if (!sale) return false;
+            if (sale.id === id || sale.id === data.id) return true;
+            if (sale.originalOlaClickId && (sale.originalOlaClickId === id || sale.originalOlaClickId === data.originalOlaClickId || `HELD-OLA-${sale.originalOlaClickId}` === id)) return true;
+            if (sale.originalHeldId && (sale.originalHeldId === id || sale.originalHeldId === data.originalHeldId || sale.id === sale.originalHeldId)) return true;
+            if (typeof id === 'string' && id.startsWith('HELD-OLA-') && (sale.id === id.replace('HELD-OLA-', '') || sale.originalOlaClickId === id.replace('HELD-OLA-', ''))) return true;
+            if (typeof sale.id === 'string' && sale.id.startsWith('HELD-OLA-') && (sale.id.replace('HELD-OLA-', '') === id || sale.id.replace('HELD-OLA-', '') === data.id)) return true;
+            return false;
+          };
+
+          let found = false;
           const updatedSales = (s.posSales || []).map((sale) => {
-            if (sale.id === id) {
+            if (isMatch(sale)) {
+              found = true;
               const wasPaid = sale.status === 'PAID';
               const isPaid = (cleanData.status || sale.status) === 'PAID';
 
@@ -1564,13 +1578,18 @@ export const useInventoryStore = create(
             }
             return sale;
           });
+
+          // Si la venta no existía previamente en posSales, la insertamos al inicio
+          const finalSales = found ? updatedSales : [cleanData, ...updatedSales];
+
           const newDeleted = (s.deletedPosSaleIds || []).filter(dId => 
             dId !== id && 
+            dId !== data.id &&
             dId !== data.originalOlaClickId && 
             dId !== data.publicId &&
             (!data.originalHeldId || dId !== data.originalHeldId)
           );
-          return { posSales: updatedSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
+          return { posSales: finalSales, inventory: newInventory, deletedPosSaleIds: newDeleted };
         });
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);

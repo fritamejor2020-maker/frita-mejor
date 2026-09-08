@@ -1640,11 +1640,10 @@ export function PosView() {
         try { deleteHeldSale(resolvedOlaClickId, false); } catch(e) {}
       }
 
-      // Si la venta ya existía en posSales como SUSPENDED, actualizarla a PAID directamente
-      // para evitar condiciones de carrera entre borrado y agregado simultáneo
-      const existsInPos = (posSales || []).some(s => s.id === activeSuspendedId);
-      if (existsInPos) {
-        updatePosSale(activeSuspendedId, saleData);
+      // Actualizar la venta suspendida a PAID en posSales usando el ID suspendido o el ID original
+      const targetId = activeSuspendedId || (resolvedOlaClickId ? `HELD-OLA-${resolvedOlaClickId}` : null);
+      if (targetId) {
+        updatePosSale(targetId, saleData);
       } else {
         addPosSale(saleData);
       }
