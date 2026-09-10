@@ -31,7 +31,10 @@ let _ignoreRemoteKeys = new Set();
 export function markLocalWrite(key, branchId = null) {
   const supabaseKey = getBranchKey(key, branchId);
   _ignoreRemoteKeys.add(supabaseKey);
-  setTimeout(() => _ignoreRemoteKeys.delete(supabaseKey), 300);
+  // Realtime de Supabase suele tardar 0.5-2s en devolver el eco de nuestra propia
+  // escritura; con 300ms el eco se re-aplicaba y podía revertir un cambio local
+  // posterior (venta duplicada / carrito sin vaciar). 2.5s cubre el peor caso.
+  setTimeout(() => _ignoreRemoteKeys.delete(supabaseKey), 2500);
 }
 
 // ─── Applicators dinámicos ────────────────────────────────────────────────────
@@ -167,8 +170,11 @@ function getApplicators(branchId, allBranchIds = ['BRANCH-001']) {
     });
   };
   applicators['users']             = (v) => {
+    // No permitir que un `users: []` remoto (durante una carga parcial) borre
+    // todos los usuarios locales.
+    if (!Array.isArray(v) || v.length === 0) return;
     const deletedSet = new Set(useAuthStore.getState().deletedUserIds || []);
-    const filtered = (v || []).filter(u => u?.id && !deletedSet.has(u.id));
+    const filtered = v.filter(u => u?.id && !deletedSet.has(u.id));
     useAuthStore.setState({ users: filtered });
   };
   applicators['payrollEmployees']  = (v) => usePayrollStore.setState({ payrollEmployees: v });

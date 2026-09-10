@@ -432,13 +432,13 @@ export const SellerSetupView = () => {
     // 6. Sincronizar con Supabase en segundo plano sin congelar la pantalla
     (async () => {
       try {
+        // push() pasa por _writeToSupabaseImpl, que hace merge con el remoto y tiene
+        // guarda anti-truncado. Se quitaron los upsert directos de `allShifts` (array
+        // LOCAL, posiblemente parcial en el dispositivo del vendedor) que podían
+        // sobrescribir posShifts / posShifts_master_history con una lista incompleta.
         await Promise.allSettled([
           push('posShifts', allShifts, effectiveBranchId),
           push('posShifts', allShifts, null),
-          supabase.from('app_state').upsert({ key: 'posShifts', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: `posShifts_${effectiveBranchId}`, value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
-          supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: allShifts, updated_at: openedAt }, { onConflict: 'key' }),
         ]);
       } catch (_) {}
     })();

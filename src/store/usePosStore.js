@@ -4,6 +4,65 @@ import { calculateCartTotal } from '../utils/financeUtils';
 import { useInventoryStore } from './useInventoryStore';
 import { useAuthStore } from './useAuthStore';
 
+/**
+ * Resuelve un ítem de un pedido OlaClick contra el inventario del POS.
+ * Orden: mapeo manual por sede -> ID/nombre exacto -> coincidencia parcial (>=4 chars) -> genérico.
+ * Devuelve siempre un objeto de carrito listo para usar.
+ */
+function matchOlaClickItem(item, inventory, branchMappings = {}) {
+  const rawName = item.product_name || item.name || 'Producto';
+  const normalizedItemName = rawName.toLowerCase().trim();
+  const qty = Number(item.quantity || item.qty || 1);
+  const price = Number(item.combo_price || item.variant_price || item.price || 0);
+  const productId = item.product_id || item.productId;
+
+  let match = null;
+
+  const mappedPosId = branchMappings[productId];
+  if (mappedPosId) match = inventory.find(i => i.id === mappedPosId);
+
+  if (!match) {
+    match = inventory.find(i =>
+      (i.id === productId || (i.name && i.name.toLowerCase().trim() === normalizedItemName)) &&
+      i.inTricycles === true
+    );
+  }
+
+  // Coincidencia parcial: solo si el término más corto tiene >=4 caracteres,
+  // para no mapear "Té" dentro de "Tostada" ni "L" dentro de "Limonada".
+  if (!match && normalizedItemName.length >= 4) {
+    match = inventory.find(i => {
+      if (!i.name || i.inTricycles !== true) return false;
+      const invName = i.name.toLowerCase().trim();
+      const shorter = invName.length <= normalizedItemName.length ? invName : normalizedItemName;
+      if (shorter.length < 4) return false;
+      return invName.includes(normalizedItemName) || normalizedItemName.includes(invName);
+    });
+  }
+
+  if (match) {
+    return {
+      id: match.id,
+      productId: match.id,
+      cartItemId: match.id,
+      name: match.name,
+      price: match.price || price,
+      qty,
+    };
+  }
+
+  const genericId = productId || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
+  return {
+    id: genericId,
+    productId: genericId,
+    cartItemId: genericId,
+    name: `${rawName} (OlaClick)`,
+    price,
+    qty,
+    isExternal: true,
+  };
+}
+
 export const usePosStore = create((set, get) => ({
   // Array de items [{ productId, name, price, qty, isExternal }]
   cart: [], 
@@ -79,13 +138,17 @@ export const usePosStore = create((set, get) => ({
     });
   },
 
-  fetchOlaClickOrders: async () => {
+  // storeId: id de comercio OlaClick de la sede (olaclick_orders.store_id). Si se pasa,
+  // solo trae los pedidos de esa sede. Si es null/undefined trae todos (retrocompatible).
+  fetchOlaClickOrders: async (storeId = null) => {
     try {
       const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
+      let query = supabase
         .from('olaclick_orders')
         .select('id,customer_name,customer_phone,delivery_address,items,total_amount,payment_method,status,rejection_reason,store_id,created_at,updated_at,public_id,delivery_price,service_type')
-        .gte('created_at', since48h)
+        .gte('created_at', since48h);
+      if (storeId) query = query.eq('store_id', storeId);
+      const { data, error } = await query
         .order('created_at', { ascending: false })
         .limit(30);
       if (!error && Array.isArray(data)) {
@@ -169,52 +232,7 @@ export const usePosStore = create((set, get) => ({
    */
   loadExternalOrder: (items) => {
     const inventory = useInventoryStore.getState().inventory || [];
-    const newCart = [];
-
-    (items || []).forEach(item => {
-      const rawName = item.product_name || item.name || 'Producto';
-      const normalizedItemName = rawName.toLowerCase().trim();
-      const qty = Number(item.quantity || item.qty || 1);
-      const price = Number(item.combo_price || item.variant_price || item.price || 0);
-      const productId = item.product_id || item.productId;
-
-      // 1. Buscar coincidencia por ID de producto o por nombre exacto
-      let match = inventory.find(i => 
-        (i.id === productId || (i.name && i.name.toLowerCase().trim() === normalizedItemName)) &&
-        i.inTricycles === true
-      );
-
-      // 2. Si no hay coincidencia exacta por nombre/ID, intentar búsqueda por coincidencia parcial (p. ej. "Empanada")
-      if (!match) {
-        match = inventory.find(i => 
-          i.name && 
-          i.inTricycles === true && 
-          (i.name.toLowerCase().includes(normalizedItemName) || normalizedItemName.includes(i.name.toLowerCase()))
-        );
-      }
-
-      if (match) {
-        newCart.push({
-          productId: match.id,
-          cartItemId: match.id,
-          name: match.name,
-          price: match.price || price,
-          qty: qty
-        });
-      } else {
-        // Fallback: Cargar como ítem externo genérico para no truncar la venta
-        const genericId = productId || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        newCart.push({
-          productId: genericId,
-          cartItemId: genericId,
-          name: `${rawName} (OlaClick)`,
-          price: price,
-          qty: qty,
-          isExternal: true
-        });
-      }
-    });
-
+    const newCart = (items || []).map(item => matchOlaClickItem(item, inventory));
     set({ cart: newCart, total: calculateCartTotal(newCart) });
   },
 
@@ -233,62 +251,7 @@ export const usePosStore = create((set, get) => ({
     const branchId = authUser.branchId || 'GLOBAL';
     const branchMappings = posSettings.olaclickByBranch?.[branchId]?.productMappings || {};
 
-    const normalizedCartItems = [];
-
-    (order.items || []).forEach(item => {
-      const rawName = item.product_name || item.name || 'Producto';
-      const normalizedItemName = rawName.toLowerCase().trim();
-      const qty = Number(item.quantity || item.qty || 1);
-      const price = Number(item.combo_price || item.variant_price || item.price || 0);
-      const productId = item.product_id || item.productId;
-
-      // 1. Revisar si hay un mapeo manual configurado
-      const mappedPosId = branchMappings[productId];
-
-      let match = null;
-      
-      if (mappedPosId) {
-        match = inventory.find(i => i.id === mappedPosId);
-      }
-
-      // 2. Fallback a búsqueda por ID o nombre
-      if (!match) {
-        match = inventory.find(i => 
-          (i.id === productId || (i.name && i.name.toLowerCase().trim() === normalizedItemName)) &&
-          i.inTricycles === true
-        );
-      }
-
-      if (!match) {
-        match = inventory.find(i => 
-          i.name && 
-          i.inTricycles === true && 
-          (i.name.toLowerCase().includes(normalizedItemName) || normalizedItemName.includes(i.name.toLowerCase()))
-        );
-      }
-
-      if (match) {
-        normalizedCartItems.push({
-          id: match.id,
-          productId: match.id,
-          cartItemId: match.id,
-          name: match.name,
-          price: match.price || price,
-          qty: qty
-        });
-      } else {
-        const genericId = productId || `GEN-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
-        normalizedCartItems.push({
-          id: genericId,
-          productId: genericId,
-          cartItemId: genericId,
-          name: `${rawName} (OlaClick)`,
-          price: price,
-          qty: qty,
-          isExternal: true
-        });
-      }
-    });
+    const normalizedCartItems = (order.items || []).map(item => matchOlaClickItem(item, inventory, branchMappings));
 
     const customerPhone = order.customer_phone || order.raw_payload?.data?.client?.phone_number || order.raw_payload?.client?.phone_number || '';
     const rawAddr = order.raw_payload?.data?.address || order.raw_payload?.address;
@@ -404,19 +367,24 @@ export const usePosStore = create((set, get) => ({
   },
 
   /**
-   * checkout: Acción Compleja
-   * 1. Toma el carrito actual, calcula el total.
-   * 2. UPDATE Supabase inventory_snapshots restando cantidades para el pointId actual.
-   * 3. Retorna un error si no hay stock.
+   * checkout — botón "COBRAR" del VendedorDashboard.
+   *
+   * ⚠️ INTENCIONAL (2026-09): por ahora el vendedor solo lo usa como CALCULADORA.
+   * Las ventas del vendedor se cuadran por inventario (carga + surtido − sobrante),
+   * NO por transacción, así que aquí NO se registra venta ni se descuenta stock —
+   * solo se valida y se vacía el carrito.
+   *
+   * TODO (futuro): cuando se pase a facturación real, registrar la venta con
+   * addPosSale + descuento de inventario, y quitar el cálculo por inventario para
+   * ese vendedor para no duplicar el conteo.
    */
   checkout: async (pointId) => {
     const { cart, total } = get();
     if (cart.length === 0) throw new Error("Carrito vacío");
     if (!pointId) throw new Error("El candado (pointId) es requerido");
 
-    // Simulador de venta guardada exitosamente (bypass a Supabase)
-    console.log(`Venta exitosa en ${pointId}:`, cart, `Total: $${total}`);
-    
+    console.log(`[checkout calculadora] ${pointId}:`, cart, `Total: $${total}`);
+
     // Limpia el carrito
     get().clearCart();
     return total;

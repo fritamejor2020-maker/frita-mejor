@@ -12,6 +12,8 @@ import { useChatStore, getMessageDate, getMessageJornada, getCurrentDate, getCur
  */
 
 let _audioCtx = null;
+let _unlockInstalled = false;
+let _htmlAudioUnlocked = false;
 
 export function getAudioCtx() {
   if (typeof window === 'undefined') return null;
@@ -38,6 +40,56 @@ export function resumeAudioContext() {
   } catch (_) {}
 }
 
+// Desbloqueo persistente del audio en móvil/tablet: el SO suspende el AudioContext
+// cuando la pantalla está inactiva o la app en segundo plano, y sin un gesto reciente
+// resume() no completa -> los bips de chat "a veces no suenan". Se re-desbloquea en
+// CADA gesto (no {once:true}) y al volver a primer plano.
+export function installAudioUnlock() {
+  if (_unlockInstalled || typeof window === 'undefined') return;
+  _unlockInstalled = true;
+
+  const unlock = () => {
+    try {
+      const ctx = getAudioCtx();
+      if (ctx && ctx.state === 'suspended') ctx.resume().catch(() => {});
+      if (!_htmlAudioUnlocked) {
+        // Un play/pause silencioso desbloquea HTMLAudio en iOS/Android
+        const a = new Audio('/sounds/mixkit_notify.wav');
+        a.volume = 0;
+        a.play().then(() => { a.pause(); a.currentTime = 0; _htmlAudioUnlocked = true; }).catch(() => {});
+      }
+    } catch (_) {}
+  };
+
+  ['pointerdown', 'touchstart', 'keydown', 'click'].forEach((ev) => {
+    window.addEventListener(ev, unlock, { capture: true, passive: true });
+  });
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') resumeAudioContext();
+  });
+}
+
+// Reproductor de sonido de mensaje resiliente: HTMLAudio (más confiable tras un
+// gesto y sobrevive mejor al backgrounding) y, si falla, oscilador WebAudio.
+let _msgAudioEl = null;
+export function playMessageSound() {
+  // 1. HTMLAudio
+  try {
+    if (!_msgAudioEl) {
+      _msgAudioEl = new Audio('/sounds/mixkit_notify.wav');
+      _msgAudioEl.volume = 0.9;
+    }
+    _msgAudioEl.currentTime = 0;
+    const p = _msgAudioEl.play();
+    if (p && typeof p.then === 'function') {
+      p.catch(() => playRadioChime());
+    }
+    return;
+  } catch (_) {}
+  // 2. Fallback WebAudio
+  playRadioChime();
+}
+
 /**
  * Tono característico de walkie-talkie / intercomunicador (doble bip fuerte)
  */
@@ -45,6 +97,21 @@ export function playRadioChime() {
   try {
     const ctx = getAudioCtx();
     if (!ctx) return;
+    // Si sigue suspendido, esperar a que resuma y reintentar una vez.
+    if (ctx.state === 'suspended') {
+      ctx.resume().then(() => {
+        if (ctx.state === 'running') _emitRadioChime(ctx);
+      }).catch(() => {});
+      return;
+    }
+    _emitRadioChime(ctx);
+  } catch (e) {
+    console.warn('Audio chime error:', e);
+  }
+}
+
+function _emitRadioChime(ctx) {
+  try {
     const now = ctx.currentTime;
 
     // Bip 1: 880Hz
@@ -120,30 +187,46 @@ function startRepeatingOutgoingTone() {
  */
 export function useChatSoundNotifier(currentUserId) {
   const ringtoneStopRef = useRef(null);
-  const prevMsgCountRef = useRef(0);
+  const lastSeenMsgIdRef = useRef(null);
+  const initializedRef = useRef(false);
 
   const activeCall = useChatStore(state => state.activeCall);
   const messages = useChatStore(state => state.messages);
 
-  // 🔔 Sonido automático al recibir mensajes nuevos en el Zustand store
+  // Desbloqueo de audio en cada gesto (móvil suspende el AudioContext al inactivar)
+  useEffect(() => { installAudioUnlock(); }, []);
+
+  // 🔔 Sonido automático al recibir mensajes nuevos en el Zustand store.
+  // Se rastrea por ID del mensaje más nuevo, NO por longitud del array: al llegar
+  // al tope de 50, un mensaje nuevo reemplaza a uno viejo y length no cambia ->
+  // antes NO sonaba.
   useEffect(() => {
     if (!currentUserId || !messages) return;
 
-    if (prevMsgCountRef.current > 0 && messages.length > prevMsgCountRef.current) {
-      const latestMsg = messages[0];
+    const latestMsg = messages[0];
+    const latestId = latestMsg?.id || latestMsg?.createdAt || null;
+
+    // Primera pasada tras montar: registrar el estado actual sin sonar
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      lastSeenMsgIdRef.current = latestId;
+      return;
+    }
+
+    if (latestId && latestId !== lastSeenMsgIdRef.current) {
+      lastSeenMsgIdRef.current = latestId;
       if (latestMsg) {
-        // 🛡️ REGLA ESTRICTA: Ignorar mensajes de jornadas o días anteriores
+        // Ignorar mensajes de días anteriores (no de jornadas: uno recién enviado
+        // justo al cambiar de jornada debe sonar igual).
         const msgDate = latestMsg.date || getMessageDate(latestMsg.createdAt);
-        const msgJornada = latestMsg.jornada || getMessageJornada(latestMsg.createdAt);
-        if (msgDate !== getCurrentDate() || msgJornada !== getCurrentJornada()) {
-          prevMsgCountRef.current = messages.length;
+        if (msgDate && msgDate !== getCurrentDate()) {
           return;
         }
 
-        // Solo sonar si el mensaje fue enviado en tiempo real (< 2 minutos)
+        // Solo sonar si el mensaje es reciente (< 5 min — cubre latencia de realtime
+        // y sondeos, y tolera desfase de reloj entre dispositivos).
         const msgAgeMs = Date.now() - new Date(latestMsg.createdAt || 0).getTime();
-        if (msgAgeMs > 2 * 60 * 1000) {
-          prevMsgCountRef.current = messages.length;
+        if (msgAgeMs > 5 * 60 * 1000) {
           return;
         }
 
@@ -171,7 +254,7 @@ export function useChatSoundNotifier(currentUserId) {
             // 📩 REGLA DEJADORES:
             // Debe sonar siempre que un VENDEDOR le escriba a los dejadores
             if (!isSenderDejador) {
-              playRadioChime();
+              playMessageSound();
             }
           } else {
             // 📩 REGLA VENDEDORES:
@@ -185,14 +268,13 @@ export function useChatSoundNotifier(currentUserId) {
                 (cleanReceiverId && cleanMyId && cleanReceiverId.includes(cleanMyId));
 
               if (isTargetedToMe) {
-                playRadioChime();
+                playMessageSound();
               }
             }
           }
         }
       }
     }
-    prevMsgCountRef.current = messages.length;
   }, [messages, currentUserId]);
 
   // 📞 Timbres diferenciados para Receptor (Llamada Entrante) vs Llamador (Salida)

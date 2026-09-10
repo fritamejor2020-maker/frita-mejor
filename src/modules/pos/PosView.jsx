@@ -165,6 +165,13 @@ export function PosView() {
   const userBranchId = isGlobal ? (activeBranchId || 'BRANCH-001') : (user?.branchId || 'BRANCH-001');
   const effectiveBranch = userBranchId;
 
+  // ID de comercio OlaClick (olaclick_orders.store_id) de ESTA sede. Se usa para que
+  // cada POS solo reciba/escuche los pedidos de su propia sede.
+  const olaclickStoreId = posSettings?.olaclickByBranch?.[effectiveBranch]?.merchantId
+    || posSettings?.olaclickByBranch?.GLOBAL?.merchantId
+    || posSettings?.olaclickMerchantId
+    || null;
+
   // Tareas pendientes para el cajero en turno
   const todayStrTasks = new Date().toISOString().split('T')[0];
   const posPendingTasks = (allTasks || []).filter(t => {
@@ -494,6 +501,7 @@ export function PosView() {
       discountAmount: s.discountAmount || 0,
       total: s.total || 0,
       heldAt: s.heldAt || s.timestamp || new Date().toISOString(),
+      shiftId: s.shiftId || null,
       isOlaClick: !!s.isOlaClick,
       isLuckyWinner: !!s.isLuckyWinner,
       prizeType: s.prizeType || 'RASPA_Y_GANA',
@@ -507,7 +515,7 @@ export function PosView() {
 
   const loadPendingCount = async (triggerAlert = false) => {
     try {
-      const data = await usePosStore.getState().fetchOlaClickOrders();
+      const data = await usePosStore.getState().fetchOlaClickOrders(olaclickStoreId);
       if (Array.isArray(data)) {
         const pendingOrders = data.filter(o => String(o?.status || '').trim().toUpperCase() === 'PENDING');
         if (triggerAlert) {
@@ -539,13 +547,19 @@ export function PosView() {
       loadPendingCount(true);
     }, 5000);
 
+    // Filtrar el canal por sede si hay un store_id configurado para esta sede.
+    const pgChangesCfg = { event: '*', schema: 'public', table: 'olaclick_orders' };
+    if (olaclickStoreId) pgChangesCfg.filter = `store_id=eq.${olaclickStoreId}`;
+
     const channel = supabase
-      .channel('olaclick_pos_count')
+      .channel(`olaclick_pos_count_${olaclickStoreId || 'all'}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'olaclick_orders' },
+        pgChangesCfg,
         (payload) => {
           const { eventType, new: newRecord, old: oldRecord } = payload;
+          // Refuerzo en cliente por si el filtro del canal no aplica (registros ya cacheados, etc.)
+          if (olaclickStoreId && newRecord && String(newRecord.store_id || '') !== String(olaclickStoreId)) return;
           if (eventType === 'INSERT' && newRecord) {
             usePosStore.getState().upsertOlaClickOrder(newRecord);
             const isPending = String(newRecord.status || '').trim().toUpperCase() === 'PENDING';
@@ -578,7 +592,7 @@ export function PosView() {
       supabase.removeChannel(channel);
       stopChime();
     };
-  }, [posSettings?.olaclickMerchantId, effectiveBranch]);
+  }, [posSettings?.olaclickMerchantId, effectiveBranch, olaclickStoreId]);
 
   // Reset check when register changes
   useEffect(() => {
@@ -932,18 +946,37 @@ export function PosView() {
     
     setShowClosingModal(false);
 
-    // Limpiar ventas en espera residuales que hayan quedado abiertas durante este turno
+    // Limpiar SOLO las ventas en espera de ESTE turno o las ya obsoletas (>12h).
+    // Los pedidos OlaClick y ventas pausadas de otros turnos pertenecen a la tienda,
+    // no al turno, y deben sobrevivir al cierre de caja.
     try {
+      const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
       allHeldAndSuspended.forEach(hs => {
-        deleteHeldSale(hs.id);
-        deletePosSale(hs.id);
+        const belongsToThisShift = hs.shiftId
+          ? hs.shiftId === activeShift.id
+          : (() => {
+              const t = new Date(hs.heldAt || hs.timestamp || hs.createdAt || 0).getTime();
+              return t > 0 && openTime > 0 && t >= (openTime - 60000);
+            })();
+        const isStale = isStaleSuspended(hs);
+        if (belongsToThisShift || isStale) {
+          deleteHeldSale(hs.id);
+          deletePosSale(hs.id);
+        }
       });
-      usePosStore.setState({ heldSales: [] });
+      usePosStore.setState((state) => ({
+        heldSales: (state.heldSales || []).filter(h => {
+          if (!h) return false;
+          if (isStaleSuspended(h)) return false;
+          const belongs = h.shiftId ? h.shiftId === activeShift.id : false;
+          return !belongs;
+        })
+      }));
     } catch (_) {}
     
     const isShiftSale = (sale, targetShift) => {
       if (!sale || !targetShift || sale.status !== 'PAID') return false;
-      if (sale.shiftId && targetShift.id && sale.shiftId === targetShift.id) return true;
+      if (sale.shiftId && targetShift.id) return sale.shiftId === targetShift.id;
       if (sale.registerId && targetShift.registerId && sale.registerId === targetShift.registerId) {
         const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
         const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
@@ -955,7 +988,7 @@ export function PosView() {
 
     const isShiftExpense = (exp, targetShift) => {
       if (!exp || !targetShift) return false;
-      if (exp.shiftId && targetShift.id && exp.shiftId === targetShift.id) return true;
+      if (exp.shiftId && targetShift.id) return exp.shiftId === targetShift.id;
       if (exp.registerId && targetShift.registerId && exp.registerId === targetShift.registerId) {
         const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
         const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
@@ -988,7 +1021,7 @@ export function PosView() {
   const handleReprintZReport = (shift) => {
     const isShiftSale = (sale, targetShift) => {
       if (!sale || !targetShift || sale.status !== 'PAID') return false;
-      if (sale.shiftId && targetShift.id && sale.shiftId === targetShift.id) return true;
+      if (sale.shiftId && targetShift.id) return sale.shiftId === targetShift.id;
       if (sale.registerId && targetShift.registerId && sale.registerId === targetShift.registerId) {
         const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
         const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
@@ -999,7 +1032,7 @@ export function PosView() {
     };
     const isShiftExpense = (exp, targetShift) => {
       if (!exp || !targetShift) return false;
-      if (exp.shiftId && targetShift.id && exp.shiftId === targetShift.id) return true;
+      if (exp.shiftId && targetShift.id) return exp.shiftId === targetShift.id;
       if (exp.registerId && targetShift.registerId && exp.registerId === targetShift.registerId) {
         const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
         const openTime = new Date(targetShift.openedAt || targetShift.createdAt || 0).getTime();
@@ -1014,7 +1047,7 @@ export function PosView() {
       ? shift.descargues
       : (posDescargues || []).filter(d => {
           if (!d) return false;
-          if (d.shiftId && shift.id && d.shiftId === shift.id) return true;
+          if (d.shiftId && shift.id) return d.shiftId === shift.id;
           const dReg = d.registerId || d.registerName;
           const sReg = shift.registerId || shift.registerName;
           if (!dReg || !sReg || dReg === sReg) {
@@ -1662,10 +1695,17 @@ export function PosView() {
     }
 
     if (resolvedOlaClickId) {
-      // Marcar el pedido como DELIVERED en el store local (síncrono, sin red)
+      // Marcar orden en Supabase y store local como DELIVERED (fire-and-forget).
+      // NOTA: el builder de supabase-js v2 solo implementa .then(), no .catch() — hay que
+      // envolverlo en Promise.resolve() o el TypeError aborta la facturación (carrito sin vaciar).
+      Promise.resolve(
+        supabase.from('olaclick_orders')
+          .update({ status: 'DELIVERED', updated_at: new Date().toISOString() })
+          .eq('id', resolvedOlaClickId)
+      ).catch(() => {});
       try { usePosStore.getState().updateOlaClickOrderStatus(resolvedOlaClickId, 'DELIVERED'); } catch(_) {}
     }
-
+    
     // Clear ticket & store cart
     setTicketItems([]);
     setActiveSuspendedId(null);
@@ -1675,18 +1715,7 @@ export function PosView() {
     setManualDiscountPercent(0);
     setIsLuckyWinnerSession(false);
     try { usePosStore.getState().clearCart(); } catch(_) {}
-
-    // Marcar el pedido como DELIVERED en Supabase (después de cerrar la venta,
-    // para que un fallo de red en este PATCH jamás bloquee la facturación).
-    // NOTA: el builder de supabase-js v2 solo implementa .then(), no .catch().
-    if (resolvedOlaClickId) {
-      Promise.resolve(
-        supabase.from('olaclick_orders')
-          .update({ status: 'DELIVERED', updated_at: new Date().toISOString() })
-          .eq('id', resolvedOlaClickId)
-      ).catch(() => {});
-    }
-
+    
     // Print trigger logic strictly based on hardware configuration
     let autoPrint = !!methodConfig.printReceipt;
     let autoDrawer = !!methodConfig.openDrawer;
@@ -2784,7 +2813,7 @@ export function PosView() {
           shift={activeShift} 
           sales={(posSales || []).filter(s => {
             if (!s || s.status !== 'PAID') return false;
-            if (s.shiftId && activeShift.id && s.shiftId === activeShift.id) return true;
+            if (s.shiftId && activeShift.id) return s.shiftId === activeShift.id;
             if (s.registerId && activeShift.registerId && s.registerId === activeShift.registerId) {
               const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
               const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
@@ -2795,7 +2824,7 @@ export function PosView() {
           })} 
           expenses={(posExpenses || []).filter(e => {
             if (!e) return false;
-            if (e.shiftId && activeShift.id && e.shiftId === activeShift.id) return true;
+            if (e.shiftId && activeShift.id) return e.shiftId === activeShift.id;
             if (e.registerId && activeShift.registerId && e.registerId === activeShift.registerId) {
               const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
               const openTime = new Date(activeShift.openedAt || activeShift.createdAt || 0).getTime();
@@ -2814,7 +2843,7 @@ export function PosView() {
           shift={shiftToCompleteCount}
           sales={(posSales || []).filter(s => {
             if (!s || s.status !== 'PAID') return false;
-            if (s.shiftId && shiftToCompleteCount.id && s.shiftId === shiftToCompleteCount.id) return true;
+            if (s.shiftId && shiftToCompleteCount.id) return s.shiftId === shiftToCompleteCount.id;
             if (s.registerId && shiftToCompleteCount.registerId && s.registerId === shiftToCompleteCount.registerId) {
               const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
               const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
@@ -2825,7 +2854,7 @@ export function PosView() {
           })}
           expenses={(posExpenses || []).filter(e => {
             if (!e) return false;
-            if (e.shiftId && shiftToCompleteCount.id && e.shiftId === shiftToCompleteCount.id) return true;
+            if (e.shiftId && shiftToCompleteCount.id) return e.shiftId === shiftToCompleteCount.id;
             if (e.registerId && shiftToCompleteCount.registerId && e.registerId === shiftToCompleteCount.registerId) {
               const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
               const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
@@ -2847,7 +2876,7 @@ export function PosView() {
               // Print Z Report
               const isMatch = (s) => {
                 if (!s || s.status !== 'PAID') return false;
-                if (s.shiftId && shiftToCompleteCount.id && s.shiftId === shiftToCompleteCount.id) return true;
+                if (s.shiftId && shiftToCompleteCount.id) return s.shiftId === shiftToCompleteCount.id;
                 if (s.registerId && shiftToCompleteCount.registerId && s.registerId === shiftToCompleteCount.registerId) {
                   const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
                   const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
@@ -2858,7 +2887,7 @@ export function PosView() {
               };
               const isExpMatch = (e) => {
                 if (!e) return false;
-                if (e.shiftId && shiftToCompleteCount.id && e.shiftId === shiftToCompleteCount.id) return true;
+                if (e.shiftId && shiftToCompleteCount.id) return e.shiftId === shiftToCompleteCount.id;
                 if (e.registerId && shiftToCompleteCount.registerId && e.registerId === shiftToCompleteCount.registerId) {
                   const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
                   const openTime = new Date(shiftToCompleteCount.openedAt || shiftToCompleteCount.createdAt || 0).getTime();
@@ -5247,7 +5276,7 @@ function ZHistoryModal({ shifts, posSales, onReprint, onClose, formatMoney, onCo
             filteredShifts.map(shift => {
               const shiftSales = (posSales || []).filter(s => {
                 if (!s || s.status !== 'PAID') return false;
-                if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
+                if (s.shiftId && shift.id) return s.shiftId === shift.id;
                 if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
                   const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
                   const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
