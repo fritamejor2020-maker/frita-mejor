@@ -1448,139 +1448,124 @@ export function PosView() {
           const minAmount = Math.max(1000, Number(rewardConfig.minPurchaseAmount) || 20000);
           if (total >= minAmount) {
             const now = new Date();
-            let hour = now.getHours();
-            let minute = now.getMinutes();
+            // Helper para obtener timestamp exacto de una venta (incluyendo ID con timestamp)
+            const getSaleTs = (s) => {
+              if (!s) return 0;
+              const raw = s.timestamp || s.date || s.fecha || s.heldAt || s.createdAt || s.created_at;
+              if (raw) {
+                const t = new Date(raw).getTime();
+                if (!isNaN(t) && t > 0) return t;
+              }
+              const match = String(s.id || '').match(/\d{13}/);
+              if (match) {
+                const t = parseInt(match[0], 10);
+                if (!isNaN(t) && t > 0) return t;
+              }
+              return 0;
+            };
 
-            // Garantizar cálculo en zona horaria oficial de Colombia
-            try {
-              const colombiaParts = new Intl.DateTimeFormat('en-US', {
-                timeZone: 'America/Bogota',
-                hour: 'numeric',
-                minute: 'numeric',
-                hour12: false
-              }).formatToParts(now);
-              hour = parseInt(colombiaParts.find(p => p.type === 'hour')?.value ?? hour, 10);
-              minute = parseInt(colombiaParts.find(p => p.type === 'minute')?.value ?? minute, 10);
-            } catch (e) {}
+            // Helper para fecha oficial en Colombia (YYYY-MM-DD)
+            const getColombiaDateStr = (ts) => {
+              if (!ts) return '';
+              try {
+                return new Intl.DateTimeFormat('en-CA', {
+                  timeZone: 'America/Bogota',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit'
+                }).format(new Date(ts));
+              } catch (e) {
+                return new Date(ts - 5 * 3600 * 1000).toISOString().slice(0, 10);
+              }
+            };
 
-            // Franjas horarias oficiales con probabilidades base calibradas para 15 premios diarios
-            const SLOTS = [
-              { id: '06-10', jornada: '6-10 am', start: 6,  end: 10, defaultPct: 15, baseProb: 0.20 },
-              { id: '10-12', jornada: '10-12 pm', start: 10, end: 12, defaultPct: 8,  baseProb: 0.18 },
-              { id: '12-14', jornada: '12-2 pm', start: 12, end: 14, defaultPct: 10, baseProb: 0.25 },
-              { id: '14-16', jornada: '2-4 pm', start: 14, end: 16, defaultPct: 7,  baseProb: 0.12 },
-              { id: '16-19', jornada: '4-7 pm', start: 16, end: 19, defaultPct: 45, baseProb: 0.14 },
-              { id: '19-21', jornada: '7-9 pm', start: 19, end: 21, defaultPct: 15, baseProb: 0.15 },
-            ];
+            // Helper para hora oficial en Colombia (0-23)
+            const getColombiaHour = (ts) => {
+              try {
+                const parts = new Intl.DateTimeFormat('en-US', {
+                  timeZone: 'America/Bogota',
+                  hour: 'numeric',
+                  hour12: false
+                }).formatToParts(new Date(ts));
+                return parseInt(parts.find(p => p.type === 'hour')?.value ?? new Date(ts).getHours(), 10);
+              } catch (e) {
+                return new Date(ts - 5 * 3600 * 1000).getUTCHours();
+              }
+            };
 
-            // Identificar la franja por el turno activo o por la hora actual
-            const shiftJornada = activeShift?.jornada;
-            const currentSlotObj = SLOTS.find(s => (shiftJornada && s.jornada === shiftJornada)) ||
-                                   SLOTS.find(s => hour >= s.start && hour < s.end);
+            // Franjas horarias
+            const getSlotForHour = (h) => {
+              if (h >= 6 && h < 10) return '06-10';
+              if (h >= 10 && h < 12) return '10-12';
+              if (h >= 12 && h < 14) return '12-14';
+              if (h >= 14 && h < 16) return '14-16';
+              if (h >= 16 && h < 19) return '16-19';
+              if (h >= 19 && h < 21) return '19-21';
+              return null; // Fuera de horario
+            };
 
-            // Solo entregar premios dentro del horario comercial activo (6:00 AM a 9:00 PM)
-            if (currentSlotObj) {
+            const nowTs = Date.now();
+            const todayColombia = getColombiaDateStr(nowTs);
+            const currentHour = getColombiaHour(nowTs);
+            const currentSlot = getSlotForHour(currentHour);
+
+            if (currentSlot) {
               const dailyTotal = Math.max(1, Number(rewardConfig.dailyPrizes) || 15);
-
-              // Helper para fecha en Colombia (YYYY-MM-DD)
-              const getColombiaDateStr = (dInput) => {
-                if (!dInput) return '';
-                const d = new Date(dInput);
-                if (isNaN(d.getTime())) return '';
-                try {
-                  return d.toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
-                } catch (e) {
-                  const y = d.getFullYear();
-                  const m = String(d.getMonth() + 1).padStart(2, '0');
-                  const day = String(d.getDate()).padStart(2, '0');
-                  return `${y}-${m}-${day}`;
-                }
+              const hourlyDist = rewardConfig.hourlyDistribution || {
+                '06-10': 15,
+                '10-12': 8,
+                '12-14': 10,
+                '14-16': 7,
+                '16-19': 45,
+                '19-21': 15
               };
+              const slotPct = hourlyDist[currentSlot] ?? 15;
+              const slotQuota = Math.max(1, Math.round((dailyTotal * slotPct) / 100));
 
-              const todayColombia = getColombiaDateStr(now);
-
-              // 🔍 Recopilar todas las ventas de hoy (cobradas + suspendidas en espera)
+              // Recopilar todas las ventas de la sesión y posSales
               const allSales = [
                 ...(posSales || []),
-                ...(usePosStore.getState().heldSales || [])
+                ...(usePosStore?.getState?.()?.heldSales || [])
               ];
 
               const countedWinnerIds = new Set();
-              let totalAwardedToday = 0;
+              let todayTotalWinners = 0;
+              let currentSlotWinners = 0;
 
               allSales.forEach(s => {
                 if (!s || !s.id || countedWinnerIds.has(s.id)) return;
                 if (s.status === 'REJECTED' || s.status === 'CANCELLED') return;
-                const isWinner = s.isLuckyWinner === true || String(s.id).includes('LUCKY');
+                const isWinner = s.isLuckyWinner === true || String(s.id).includes('LUCKY') || s.prizeType === 'RASPA_Y_GANA';
                 if (!isWinner) return;
 
-                const rawDate = s.timestamp || s.date || s.fecha || s.heldAt || s.createdAt;
-                if (!rawDate) return;
-                const saleDate = getColombiaDateStr(rawDate);
+                if (userBranch !== 'GLOBAL' && s.branchId && s.branchId !== userBranch) return false;
+
+                const ts = getSaleTs(s);
+                if (!ts) return;
+                const saleDate = getColombiaDateStr(ts);
                 if (saleDate !== todayColombia) return;
 
                 countedWinnerIds.add(s.id);
-                totalAwardedToday++;
+                todayTotalWinners++;
+
+                const saleHour = getColombiaHour(ts);
+                if (getSlotForHour(saleHour) === currentSlot) {
+                  currentSlotWinners++;
+                }
               });
 
-              // 🛡️ REGLA 1: FRENO TOPE DIARIO ESTRICTO (No sobrepasar dailyTotal fijado en Admin)
-              if (totalAwardedToday < dailyTotal) {
-                const hourlyDist = rewardConfig.hourlyDistribution || {};
+              // 🛑 VALIDACIÓN DE TOPES ESTRICTOS:
+              const dailyLimitReached = todayTotalWinners >= dailyTotal;
+              const slotLimitReached = currentSlotWinners >= slotQuota;
 
-                // 🎯 REGLA 2: META ACUMULADA POR TURNO CON ARRASTRE
-                // Sumamos la cuota de cada turno transcurrido hasta el actual.
-                // Si un turno anterior no cumplió su objetivo, su cuota pendiente se acumula automáticamente.
-                let cumulativeTargetUntilNow = 0;
-                let currentSlotQuota = 0;
-
-                for (const slot of SLOTS) {
-                  const pct = hourlyDist[slot.id] ?? slot.defaultPct;
-                  const quota = Math.max(1, Math.round((dailyTotal * pct) / 100));
-                  cumulativeTargetUntilNow += quota;
-                  if (slot.id === currentSlotObj.id) {
-                    currentSlotQuota = quota;
-                    break;
-                  }
-                }
-
-                cumulativeTargetUntilNow = Math.min(dailyTotal, cumulativeTargetUntilNow);
-
-                // ¿Cuántos premios están pendientes y disponibles para este turno (incluyendo acumulados)?
-                const prizesAvailableNow = cumulativeTargetUntilNow - totalAwardedToday;
-
-                if (prizesAvailableNow > 0) {
-                  // 📈 ESCALA DINÁMICA: Ajusta la probabilidad base proporcionalmente si se cambia la meta total diaria en Admin (calibrada para 15)
-                  const dailyScale = Math.max(0.1, dailyTotal / 15);
-                  let shiftProb = (currentSlotObj.baseProb ?? 0.15) * dailyScale;
-
-                  // 🔄 ARRASTRE INTELIGENTE DE PREMIOS ATRASADOS:
-                  // Si turnos anteriores dejaron premios sin entregar, se incrementa proporcionalmente la probabilidad
-                  if (prizesAvailableNow > currentSlotQuota && currentSlotQuota > 0) {
-                    const backlogRatio = prizesAvailableNow / currentSlotQuota;
-                    shiftProb = Math.min(0.65, shiftProb * Math.max(1, backlogRatio));
-                  }
-
-                  // Calcular minutos restantes para que termine este turno
-                  const slotEndMinutes = currentSlotObj.end * 60;
-                  const currentMinutes = (hour * 60) + minute;
-                  const minutesLeftInShift = slotEndMinutes - currentMinutes;
-
-                  // 🚀 REGLA 3: FASE CIERRE DEL DÍA (8:00 PM a 9:00 PM)
-                  // Si estamos en la última hora y aún restan premios de la meta diaria total, asegurar su entrega
-                  if (hour >= 20) {
-                    isLuckyWinner = Math.random() < 0.85;
-                  }
-                  // ⚡ REGLA 4: FASE RUSH FINAL DE TURNO (ÚLTIMOS 20 MINUTOS)
-                  // Si faltan 20 minutos o menos para terminar el turno y aún hay premios pendientes
-                  else if (minutesLeftInShift <= 20) {
-                    isLuckyWinner = Math.random() < 0.55;
-                  }
-                  // 🟢 FASE NORMAL: Probabilidad base calibrada + escala de volumen + arrastre
-                  else {
-                    isLuckyWinner = Math.random() < Math.min(0.65, shiftProb);
-                  }
-                }
-                // Si prizesAvailableNow <= 0: FRENO ESTRICTO (isLuckyWinner permanece false = 0% hasta el siguiente turno)
+              if (!dailyLimitReached && !slotLimitReached) {
+                const remainingInSlot = slotQuota - currentSlotWinners;
+                // Probabilidad balanceada y controlada
+                const probability = Math.min(0.25, Math.max(0.05, remainingInSlot / 20));
+                isLuckyWinner = Math.random() < probability;
+              } else {
+                isLuckyWinner = false;
+                console.log(`[LuckyRewards] 🛑 Límite alcanzado: Hoy: ${todayTotalWinners}/${dailyTotal} | Franja ${currentSlot}: ${currentSlotWinners}/${slotQuota}`);
               }
             }
           }
