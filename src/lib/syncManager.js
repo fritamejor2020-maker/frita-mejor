@@ -1,6 +1,5 @@
 import { supabase } from './supabase';
 import { safeLocalStorage } from '../utils/safeStorage';
-import { useBranchStore } from '../store/useBranchStore';
 
 // ==============================================================================
 // SYNC MANAGER — Motor de sincronización Offline-First (Multisede)
@@ -26,60 +25,31 @@ export async function withWriteLock(key, fn) {
   try { return await promise; } finally { _writeLocks.delete(key); }
 }
 
-// Si la RPC atómica no está desplegada en Supabase, se recuerda para no reintentarla
-// en cada escritura (y usar directamente el fallback read-modify-write).
-let _rpcAtomicMissing = false;
-
-function _rpcLooksMissing(err) {
-  const m = String(err?.message || err?.hint || err?.code || '').toLowerCase();
-  return m.includes('does not exist') || m.includes('not find') || m.includes('pgrst202') || m.includes('42883') || m.includes('function public.app_state');
-}
-
-// Fallback: SELECT -> merge en JS -> UPSERT del array completo (comportamiento previo).
-async function _fallbackWholeArray(supabaseKey, transform) {
-  const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
-  const existing = Array.isArray(data?.value) ? data.value : [];
-  const merged = transform(existing);
-  await supabase.from('app_state').upsert(
-    { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
-    { onConflict: 'key' }
-  );
-}
-
 /**
- * Actualiza atómicamente un solo ítem por ID dentro de una llave de app_state.
- * Usa la RPC app_state_upsert_item (merge server-side bajo FOR UPDATE) y, si no
- * está desplegada, cae al read-modify-write anterior.
+ * Actualiza atómicamente un solo ítem por ID dentro de una llave de Supabase.
+ * Evita pisar cambios de otros dispositivos y protege la integridad de los datos.
  */
 export async function atomicUpdateItem(key, branchId, itemId, patch) {
   const supabaseKey = getBranchKey(key, branchId);
   return withWriteLock(supabaseKey, async () => {
     try {
-      // Para la RPC necesitamos el ítem completo: leer el actual y aplicar el patch.
-      let fullItem = { id: itemId, ...(patch || {}) };
-      if (!_rpcAtomicMissing) {
-        try {
-          const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
-          const existing = Array.isArray(data?.value) ? data.value : [];
-          const cur = existing.find(i => i?.id === itemId);
-          if (cur) fullItem = { ...cur, ...patch };
-          const { error } = await supabase.rpc('app_state_upsert_item', { p_key: supabaseKey, p_item: fullItem });
-          if (error) throw error;
-          return;
-        } catch (e) {
-          if (_rpcLooksMissing(e)) { _rpcAtomicMissing = true; }
-          else throw e;
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      let updated = false;
+      const merged = existing.map(item => {
+        if (item?.id === itemId) {
+          updated = true;
+          return { ...item, ...patch };
         }
-      }
-      await _fallbackWholeArray(supabaseKey, (existing) => {
-        let updated = false;
-        const merged = existing.map(item => {
-          if (item?.id === itemId) { updated = true; return { ...item, ...patch }; }
-          return item;
-        });
-        if (!updated && patch) merged.unshift({ id: itemId, ...patch });
-        return merged;
+        return item;
       });
+      if (!updated && patch) {
+        merged.unshift({ id: itemId, ...patch });
+      }
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
     } catch (e) {
       console.warn(`[SyncManager] atomicUpdateItem error (${supabaseKey}):`, e?.message);
     }
@@ -87,24 +57,21 @@ export async function atomicUpdateItem(key, branchId, itemId, patch) {
 }
 
 /**
- * Agrega/reemplaza un ítem completo atómicamente al inicio del arreglo remoto.
+ * Agrega un nuevo ítem atómicamente al inicio del arreglo remoto.
  */
 export async function atomicAppendItem(key, branchId, newItem) {
   if (!newItem?.id) return;
   const supabaseKey = getBranchKey(key, branchId);
   return withWriteLock(supabaseKey, async () => {
     try {
-      if (!_rpcAtomicMissing) {
-        try {
-          const { error } = await supabase.rpc('app_state_upsert_item', { p_key: supabaseKey, p_item: newItem });
-          if (error) throw error;
-          return;
-        } catch (e) {
-          if (_rpcLooksMissing(e)) { _rpcAtomicMissing = true; }
-          else throw e;
-        }
-      }
-      await _fallbackWholeArray(supabaseKey, (existing) => [newItem, ...existing.filter(i => i?.id !== newItem.id)]);
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const filtered = existing.filter(i => i?.id !== newItem.id);
+      const merged = [newItem, ...filtered];
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
     } catch (e) {
       console.warn(`[SyncManager] atomicAppendItem error (${supabaseKey}):`, e?.message);
     }
@@ -119,17 +86,13 @@ export async function atomicRemoveItem(key, branchId, itemId) {
   const supabaseKey = getBranchKey(key, branchId);
   return withWriteLock(supabaseKey, async () => {
     try {
-      if (!_rpcAtomicMissing) {
-        try {
-          const { error } = await supabase.rpc('app_state_remove_item', { p_key: supabaseKey, p_item_id: String(itemId) });
-          if (error) throw error;
-          return;
-        } catch (e) {
-          if (_rpcLooksMissing(e)) { _rpcAtomicMissing = true; }
-          else throw e;
-        }
-      }
-      await _fallbackWholeArray(supabaseKey, (existing) => existing.filter(i => i?.id !== itemId));
+      const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+      const existing = Array.isArray(data?.value) ? data.value : [];
+      const merged = existing.filter(i => i?.id !== itemId);
+      await supabase.from('app_state').upsert(
+        { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+        { onConflict: 'key' }
+      );
     } catch (e) {
       console.warn(`[SyncManager] atomicRemoveItem error (${supabaseKey}):`, e?.message);
     }
@@ -203,9 +166,6 @@ export function getBaseKey(fullKey) {
 
 let isSyncing = false;
 let isOnline = true;
-
-// firma de la última escritura por clave, para saltar re-escrituras idénticas inmediatas
-const _lastPushSig = new Map();
 
 // ─── Listeners de estado ──────────────────────────────────────────────────────
 
@@ -383,13 +343,6 @@ async function _writeToSupabaseImpl(key, value) {
   }
 
   // 🛡️ Ventas POS (posSales): NUNCA permitir que una escritura sobreescriba ventas concurrentes NI resucite ventas eliminadas
-  //
-  // LIMITACIÓN CONOCIDA (#7): este SELECT→merge→UPSERT no es atómico entre DISPOSITIVOS.
-  // withWriteLock serializa solo dentro de una pestaña. Si dos cajas escriben posSales en
-  // el mismo milisegundo, la que leyó primero puede no ver la venta de la otra. La ventana
-  // es de pocos ms y el merge por id (con PAID-gana) lo hace raro, pero no imposible.
-  // Fix real pendiente: RPC en Postgres (p. ej. app_state_append_sale) que haga el append
-  // server-side en una sola sentencia.
   if ((key === 'posSales' || key.startsWith('posSales_')) && Array.isArray(value)) {
     try {
       const branchSuffix = key.includes('_') ? key.split('_')[1] : 'BRANCH-001';
@@ -512,29 +465,6 @@ async function _writeToSupabaseImpl(key, value) {
     }
   }
 
-  // 🛡️ Fichajes (attendance_logs), descargues y pagos a contrata: fusión por id con el
-  // remoto para que dos dispositivos escribiendo a la vez no pierdan registros.
-  // (attendance_logs recibe punches del biométrico Y del web al mismo tiempo.)
-  if (
-    (key === 'attendance_logs' || key.startsWith('attendance_logs_') ||
-     key === 'posDescargues' || key.startsWith('posDescargues_') ||
-     key === 'contrataPayments' || key.startsWith('contrataPayments_') ||
-     key === 'movements' || key.startsWith('movements_')) &&
-    Array.isArray(value)
-  ) {
-    try {
-      const { data } = await supabase.from('app_state').select('value').eq('key', key).maybeSingle();
-      if (data && Array.isArray(data.value) && data.value.length > 0) {
-        const m = new Map();
-        data.value.forEach(item => { if (item?.id) m.set(item.id, item); });
-        value.forEach(item => { if (item?.id) m.set(item.id, item); });
-        value = Array.from(m.values());
-      }
-    } catch (e) {
-      console.warn(`[SyncManager] Error merging ${key} before write:`, e);
-    }
-  }
-
   // 🛡️ Asistencias y Turnos (Contratos, Plantillas, Horarios Maestro): Propagar a todas las sedes y a la clave global
   const isAttendanceConfig = key.startsWith('attendance_contracts') || key.startsWith('attendance_shifts') || key.startsWith('attendance_groups') || key.startsWith('attendance_terminals');
   if (isAttendanceConfig && Array.isArray(value)) {
@@ -642,30 +572,6 @@ export async function push(key, value, branchId = null) {
     return;
   }
 
-  // Dedupe: muchas acciones llaman push(key, x, branchId) Y push(key, x, null),
-  // que para BRANCH-001 resuelven a la MISMA supabaseKey con el MISMO valor.
-  // Se salta la 2ª escritura idéntica si llega en < 3s.
-  // EXCEPTO en claves con merge especial en _writeToSupabaseImpl, donde re-ejecutar
-  // el merge sí puede recoger un cambio remoto concurrente.
-  const hasSpecialMerge = (
-    supabaseKey.startsWith('posShifts') || supabaseKey.startsWith('posSales') ||
-    supabaseKey.startsWith('posExpenses') || supabaseKey.startsWith('posDescargues') ||
-    supabaseKey.startsWith('pendingRequests') || supabaseKey.startsWith('completedRequests') ||
-    supabaseKey.startsWith('rejectedRequests') || supabaseKey.startsWith('loadHistory') ||
-    supabaseKey.startsWith('attendance_') || supabaseKey.startsWith('contrataPayments') ||
-    supabaseKey.startsWith('movements')
-  );
-  if (!hasSpecialMerge) {
-    try {
-      const sig = JSON.stringify(value);
-      const last = _lastPushSig.get(supabaseKey);
-      if (last && last.sig === sig && (Date.now() - last.t) < 3000) {
-        return;
-      }
-      _lastPushSig.set(supabaseKey, { sig, t: Date.now() });
-    } catch (_) {}
-  }
-
   try {
     await writeToSupabase(supabaseKey, value);
     notifyListeners({ online: true, pendingCount: getQueue().length, syncing: false });
@@ -730,39 +636,23 @@ export async function pullAll(branchId = null, allBranchIds = ['BRANCH-001']) {
     }
   }
 
-  const uniqueKeys = [...new Set(keysToFetch)];
+  // 🛡️ Blindaje de Resiliencia: Timeout de 8s para que una desconexión o lentitud en Supabase jamás congele la app
+  const fetchPromise = supabase
+    .from('app_state')
+    .select('key, value')
+    .in('key', keysToFetch);
 
-  // 🛡️ Un solo .in() con 100+ claves es lento y disparaba timeouts en Supabase.
-  // Se trocea en lotes en paralelo: cada lote tiene su propio timeout y un lote
-  // lento nunca bloquea a los demás -> se devuelve lo que sí llegó (parcial > nada).
-  const CHUNK_SIZE = 40;
-  const CHUNK_TIMEOUT_MS = 10000;
-  const chunks = [];
-  for (let i = 0; i < uniqueKeys.length; i += CHUNK_SIZE) {
-    chunks.push(uniqueKeys.slice(i, i + CHUNK_SIZE));
-  }
+  const timeoutPromise = new Promise((resolve) =>
+    setTimeout(() => {
+      console.warn('[SyncManager] ⏱️ Timeout en pullAll (8s) — resolviendo con respaldo local');
+      resolve({ data: null, error: new Error('pullAll timeout') });
+    }, 8000)
+  );
 
-  const fetchChunk = (chunk, idx) => Promise.race([
-    supabase.from('app_state').select('key, value').in('key', chunk),
-    new Promise((resolve) => setTimeout(() => {
-      console.warn(`[SyncManager] ⏱️ Timeout en pullAll lote ${idx + 1}/${chunks.length} (${CHUNK_TIMEOUT_MS}ms)`);
-      resolve({ data: null, error: new Error('chunk timeout') });
-    }, CHUNK_TIMEOUT_MS)),
-  ]);
+  const { data, error } = await Promise.race([fetchPromise, timeoutPromise]);
 
-  const settled = await Promise.allSettled(chunks.map(fetchChunk));
-
-  const out = {};
-  let anyOk = false;
-  for (const r of settled) {
-    const rows = r.status === 'fulfilled' ? r.value?.data : null;
-    if (Array.isArray(rows)) {
-      anyOk = true;
-      for (const row of rows) out[row.key] = row.value;
-    }
-  }
-  if (!anyOk) console.warn('[SyncManager] pullAll: ningún lote respondió — se usa respaldo local');
-  return out;
+  if (error || !data) return {};
+  return Object.fromEntries(data.map(row => [row.key, row.value]));
 }
 
 // ─── Inicialización de listeners de red ──────────────────────────────────────

@@ -1443,8 +1443,8 @@ export const useInventoryStore = create(
 
       // Ventas / Caja
       addPosSale: (sale) => {
-        const saleId = sale.id || `SALE-${Date.now()}`;
         set((s) => {
+          const saleId = sale.id || `SALE-${Date.now()}`;
           const cleanSale = {
             ...sale,
             id: saleId,
@@ -1475,14 +1475,6 @@ export const useInventoryStore = create(
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
         syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
-        // Escritura atómica por ítem (evita carreras entre cajas — ver #7 / rpc_app_state_atomic.sql)
-        try {
-          const addedSale = (useInventoryStore.getState().posSales || []).find(x => x && x.id === saleId);
-          if (addedSale) {
-            const bId = useAuthStore.getState().getActiveBranchId?.() || null;
-            atomicAppendItem('posSales', bId, addedSale);
-          }
-        } catch (_) {}
       },
       updatePosSale: (id, data) => {
         set((s) => {
@@ -1605,14 +1597,6 @@ export const useInventoryStore = create(
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
         syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
-        // Escritura atómica por ítem (ver #7 / rpc_app_state_atomic.sql)
-        try {
-          const finalSale = (useInventoryStore.getState().posSales || []).find(x => x && (x.id === id || x.id === data.id));
-          if (finalSale) {
-            const bId = useAuthStore.getState().getActiveBranchId?.() || null;
-            atomicUpdateItem('posSales', bId, finalSale.id, finalSale);
-          }
-        } catch (_) {}
 
         try {
           const targetOlaId = data.originalOlaClickId || (data.id && data.id.startsWith('HELD-OLA-') ? data.id.replace('HELD-OLA-', '') : null) || (typeof id === 'string' && id.startsWith('HELD-OLA-') ? id.replace('HELD-OLA-', '') : id);
@@ -1654,11 +1638,6 @@ export const useInventoryStore = create(
         syncKey('deletedPosSaleIds', useInventoryStore.getState().deletedPosSaleIds);
         syncKey('posSales', useInventoryStore.getState().posSales);
         syncKey('inventory', useInventoryStore.getState().inventory);
-        // Borrado atómico por ítem (ver #7 / rpc_app_state_atomic.sql)
-        try {
-          const bId = useAuthStore.getState().getActiveBranchId?.() || null;
-          atomicRemoveItem('posSales', bId, id);
-        } catch (_) {}
       },
 
       addPosShift: (shift) => {

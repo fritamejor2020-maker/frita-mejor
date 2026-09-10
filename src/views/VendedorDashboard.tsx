@@ -793,10 +793,7 @@ export const VendedorDashboard = () => {
     }
   };
 
-  const sendingRestockRef = useRef(false);
   const handleSendRestock = async () => {
-    if (sendingRestockRef.current) return; // anti-doble-toque
-    sendingRestockRef.current = true;
     try {
       await sendRestockRequest(pointId as string, responsibleName as string, observacion);
       toast.success("Solicitud de surtido enviada exitosamente");
@@ -805,8 +802,6 @@ export const VendedorDashboard = () => {
       setObservacion('');
     } catch (err: any) {
       toast.error("Error al pedir surtido: " + err.message);
-    } finally {
-      setTimeout(() => { sendingRestockRef.current = false; }, 2000);
     }
   };
 
@@ -1040,14 +1035,11 @@ export const VendedorDashboard = () => {
             return Promise.resolve();
           });
 
-          // Solo estrategias con merge seguro:
-          //  - upsertPromises: cierra el turno dentro del array remoto real de cada clave.
-          //  - push(): pasa por _writeToSupabaseImpl, que tiene guarda anti-truncado.
-          // Se quitaron los upsert directos de `updatedShifts` (array LOCAL): si el
-          // dispositivo del vendedor no tenía todos los turnos cargados, ese upsert
-          // truncaba el histórico remoto de turnos de otras cajas/vendedores.
           await Promise.allSettled([
             ...upsertPromises,
+            supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: `posShifts_${activeBranchId || 'BRANCH-001'}`, value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: closeTime }, { onConflict: 'key' }),
             push('posShifts', updatedShifts, activeBranchId),
             push('posShifts', updatedShifts, null),
           ]);

@@ -6,7 +6,6 @@ import { useVehicleStore } from '../../store/useVehicleStore';
 import { useAttendanceStore } from '../../store/useAttendanceStore';
 import { usePayrollStore } from '../../store/usePayrollStore';
 import { supabase } from '../../lib/supabase';
-import { push } from '../../lib/syncManager';
 import { ChevronDown, ChevronUp, Package, RefreshCw, RotateCcw, AlertTriangle } from 'lucide-react';
 
 import { matchVehicleId } from '../../utils/vehicleUtils';
@@ -894,10 +893,11 @@ export function AdminVehicleInventoryTab() {
 
                 // 2. Persistir directamente en Supabase (todas las llaves para sincronización inmediata)
                 try {
-                  // push() -> _writeToSupabaseImpl hace merge con el remoto + guarda anti-truncado.
+                  const nowIso = new Date().toISOString();
                   await Promise.allSettled([
-                    push('posShifts', updatedShifts, null),
-                    push('posShifts', updatedShifts, 'BRANCH-001'),
+                    supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+                    supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+                    supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
                   ]);
                 } catch (e) {
                   console.warn('[ForzarCierre] Error sincronizando posShifts en Supabase:', e);
@@ -1138,9 +1138,13 @@ export function VehicleShiftCard({
           useInventoryStore.setState({ posShifts: updatedShifts });
           useInventoryStore.getState().clearVendorLocation(targetPointId);
 
+          const nowIso = new Date().toISOString();
           await Promise.allSettled([
-            push('posShifts', updatedShifts, null),
-            push('posShifts', updatedShifts, 'BRANCH-001'),
+            supabase.from('app_state').upsert({ key: 'posShifts', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_BRANCH-001', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'posShifts_master_history', value: updatedShifts, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'vendorLocations', value: {}, updated_at: nowIso }, { onConflict: 'key' }),
+            supabase.from('app_state').upsert({ key: 'vendorLocations_BRANCH-001', value: {}, updated_at: nowIso }, { onConflict: 'key' }),
           ]);
           toast.success(`Turno ${targetPointId} cerrado forzosamente`);
         } : undefined}

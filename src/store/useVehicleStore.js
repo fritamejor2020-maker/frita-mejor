@@ -12,11 +12,10 @@ function syncVehicles(statePayload) {
     dejadorViewEnabled: statePayload.dejadorViewEnabled ?? true,
     enabledPointTypes: statePayload.enabledPointTypes || { Triciclo: true, Carrito: true, Local: false },
   };
-  // 'vehicles' es una clave GLOBAL. El push extra a 'vehicles_BRANCH-001' pasaba
-  // por getBranchKey() y terminaba escribiendo 'vehicles_BRANCH-001_BRANCH-001'
-  // (doble sufijo, clave basura). Se elimina — con la global basta.
   markLocalWrite('vehicles');
+  markLocalWrite('vehicles_BRANCH-001');
   push('vehicles', payload).catch(err => console.warn('[Sync] vehicles:', err.message));
+  push('vehicles_BRANCH-001', payload).catch(err => console.warn('[Sync] vehicles_BRANCH-001:', err.message));
 }
 
 /**

@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { supabase } from '../lib/supabase';
-import { push, getBranchKey, atomicAppendItem, atomicRemoveItem } from '../lib/syncManager';
+import { push, getBranchKey } from '../lib/syncManager';
 import { markLocalWrite } from '../lib/useRealtimeSync';
 import { useDejadorSessionStore } from './useDejadorSessionStore';
 import { useSellerSessionStore } from './useSellerSessionStore';
@@ -9,41 +9,47 @@ import { useAuthStore } from './useAuthStore';
 import { useBranchStore } from './useBranchStore';
 import { useVehicleStore } from './useVehicleStore';
 import { safeJSONStorage } from '../utils/safeStorage';
-import { broadcastLogisticsDelta } from '../lib/logisticsBroadcast';
-import { matchVehicleId } from '../utils/vehicleUtils';
+import { broadcastLogisticsUpdate } from '../lib/logisticsBroadcast';
 
-// ID único aunque se generen dos en el mismo milisegundo (evita colisiones
-// REQ-<ts> / LOAD-<ts> en doble-toque o alta concurrencia).
-let _idSeq = 0;
-function newId(prefix) {
-  _idSeq = (_idSeq + 1) % 100000;
-  return `${prefix}-${Date.now()}-${_idSeq}-${Math.floor(Math.random() * 1000)}`;
-}
-
-// Append/upsert atómico por ítem. Usa la RPC app_state_upsert_item (merge
-// server-side bajo FOR UPDATE) con fallback automático. Escribe en la clave
-// global y en la de la sede.
-function atomicAppend(key, branchId, newItem) {
-  if (!newItem?.id) return;
-  atomicAppendItem(key, null, newItem);
-  if (branchId) atomicAppendItem(key, branchId, newItem);
-}
-
-// Mueve un ítem de una clave a otra atómicamente (quita del origen, agrega al destino).
-function atomicMove(removeKey, appendKey, branchId, itemId, movedItem) {
-  atomicRemoveItem(removeKey, null, itemId);
-  if (branchId) atomicRemoveItem(removeKey, branchId, itemId);
-  if (movedItem?.id) {
-    atomicAppendItem(appendKey, null, movedItem);
-    if (branchId) atomicAppendItem(appendKey, branchId, movedItem);
+// Helper: append atómico que lee el array remoto, agrega/actualiza el item, y escribe de vuelta
+// Evita el problema de sobrescribir todo el array cuando 2 dispositivos escriben al mismo tiempo
+async function atomicAppend(key, branchId, newItem, removeIds = []) {
+  const supabaseKey = getBranchKey(key, branchId);
+  try {
+    const { data } = await supabase.from('app_state').select('value').eq('key', supabaseKey).maybeSingle();
+    const existing = Array.isArray(data?.value) ? data.value : [];
+    // Filtrar items a remover y el propio item (para no duplicar)
+    const filtered = existing.filter(r => r?.id && !removeIds.includes(r.id) && r.id !== newItem?.id);
+    const merged = newItem ? [newItem, ...filtered] : filtered;
+    await supabase.from('app_state').upsert(
+      { key: supabaseKey, value: merged, updated_at: new Date().toISOString() },
+      { onConflict: 'key' }
+    );
+  } catch (e) {
+    console.warn(`[LogisticsStore] atomicAppend failed for ${supabaseKey}:`, e?.message);
   }
 }
 
-// Quita un ítem de una clave atómicamente (global + sede).
-function atomicRemove(key, branchId, itemId) {
-  if (!itemId) return;
-  atomicRemoveItem(key, null, itemId);
-  if (branchId) atomicRemoveItem(key, branchId, itemId);
+async function atomicRemoveAndAppend(removeKey, appendKey, branchId, itemId, completedItem) {
+  try {
+    // 1. Remove from source key
+    const srcKey = getBranchKey(removeKey, branchId);
+    const { data: srcData } = await supabase.from('app_state').select('value').eq('key', srcKey).maybeSingle();
+    const srcList = Array.isArray(srcData?.value) ? srcData.value.filter(r => r?.id !== itemId) : [];
+    const nowIso = new Date().toISOString();
+    await supabase.from('app_state').upsert({ key: srcKey, value: srcList, updated_at: nowIso }, { onConflict: 'key' });
+    
+    // 2. Append to destination key  
+    if (completedItem) {
+      const dstKey = getBranchKey(appendKey, branchId);
+      const { data: dstData } = await supabase.from('app_state').select('value').eq('key', dstKey).maybeSingle();
+      const dstList = Array.isArray(dstData?.value) ? dstData.value : [];
+      const merged = [completedItem, ...dstList.filter(r => r?.id && r.id !== completedItem?.id)];
+      await supabase.from('app_state').upsert({ key: dstKey, value: merged, updated_at: nowIso }, { onConflict: 'key' });
+    }
+  } catch (e) {
+    console.warn(`[LogisticsStore] atomicRemoveAndAppend failed:`, e?.message);
+  }
 }
 
 // Acceso lazy a useInventoryStore para evitar import circular
@@ -126,10 +132,8 @@ function syncLogisticsPartition(
  * Usado por Dejador para saber a qué partición escribir loadHistory.
  */
 function getVehicleBranchId(vehicleId) {
-  const vehicles = useVehicleStore.getState().vehicles || [];
-  const vehicle =
-    vehicles.find(v => (v.abbreviation || v.name) === vehicleId) ||
-    vehicles.find(v => matchVehicleId(v.abbreviation || v.name || v.id, vehicleId));
+  const vehicle = useVehicleStore.getState().vehicles
+    .find(v => (v.abbreviation || v.name) === vehicleId);
   return vehicle?.branchId || 'BRANCH-001';
 }
 
@@ -231,7 +235,7 @@ export const useLogisticsStore = create(
     const activeShiftJornada = sellerSession.isSetupComplete ? (sellerSession.shift || null) : null;
 
     const newRequest = {
-      id: newId('REQ'),
+      id: `REQ-${Date.now()}`,
       requester_point_id: pointId,
       requester_name: requesterName || 'Desconocido',
       shiftId: activeShiftId,
@@ -247,7 +251,7 @@ export const useLogisticsStore = create(
     const updated = [...pendingRequests, newRequest];
     set({ pendingRequests: updated });
     get().clearRestockCart();
-    broadcastLogisticsDelta({ upserts: { pendingRequests: [newRequest] } });
+    broadcastLogisticsUpdate({ pendingRequests: updated });
 
     const branchSlice = updated.filter(r => (r.branchId || 'BRANCH-001') === (senderBranchId || 'BRANCH-001'));
     markLocalWrite('pendingRequests', senderBranchId);
@@ -258,7 +262,8 @@ export const useLogisticsStore = create(
       push('pendingRequests', branchSlice, senderBranchId),
     ]).catch(() => {});
 
-    // Escritura atómica por ítem (RPC server-side, sin carrera entre dispositivos)
+    // Backup atómico para evitar pérdida por race condition
+    atomicAppend('pendingRequests', null, newRequest);
     atomicAppend('pendingRequests', senderBranchId, newRequest);
 
     // Notificar a los Dejadores via Web Push (funciona aunque tengan el celular bloqueado)
@@ -289,15 +294,7 @@ export const useLogisticsStore = create(
       const user = useAuthStore.getState().user;
       const userBranchId = user?.branchId || 'BRANCH-001';
       const userAccess = user?.access || [];
-      const FIELD_ACCESS = ['dejador', 'vendedor', 'dejador-setup', 'vendedor-setup'];
-      // Tablet de campo = rol de campo, O acceso vacío/solo-campo (no Admin).
-      // Antes, access:[] daba isFieldRole=false y la tablet descargaba TODAS las
-      // sedes -> riesgo de OOM.
-      const isAdminLike = ['ADMIN', 'SUPER_ADMIN', 'MANAGER'].includes(String(user?.role || '').toUpperCase());
-      const isFieldRole = !isAdminLike && (
-        userAccess.length === 0 ||
-        userAccess.every(a => FIELD_ACCESS.includes(a))
-      );
+      const isFieldRole = userAccess.length > 0 && userAccess.every(a => a === 'dejador' || a === 'vendedor' || a === 'dejador-setup' || a === 'vendedor-setup');
 
       // 🛡️ En tablets de campo (Dejador/Vendedor): descargar SOLO la sede activa para no saturar RAM
       const branchIds = isFieldRole
@@ -366,18 +363,10 @@ export const useLogisticsStore = create(
         }
       });
 
-      // Dejador/Vendedor: 4 días en memoria (cubre turnos que cruzan medianoche y cargas
-      // tempranas). Se ordena por fecha DESC y se recorta a los MÁS RECIENTES — antes se
-      // hacía .slice(-40) sin ordenar, quedándose con 40 ítems arbitrarios y perdiendo
-      // surtidos/cargas del turno actual -> venta teórica del vendedor incompleta.
-      const daysToKeep = isFieldRole ? 4 : 60;
-      const byDateDesc = (getT) => (a, b) => getT(b) - getT(a);
-      const tComp = (x) => new Date(x.completed_at || x.created_at || 0).getTime();
-      const tRej = (x) => new Date(x.rejected_at || x.created_at || 0).getTime();
-      const tHist = (x) => new Date(x.timestamp || 0).getTime();
-      const freshCompletedRaw = Array.from(completedMap.values()).filter(x => isRecentItem(x, daysToKeep)).sort(byDateDesc(tComp)).slice(0, 250);
-      const freshRejectedRaw = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, daysToKeep)).sort(byDateDesc(tRej)).slice(0, 80);
-      const freshHistory = Array.from(historyMap.values()).filter(x => isRecentItem(x, daysToKeep)).sort(byDateDesc(tHist)).slice(0, 250);
+      const daysToKeep = isFieldRole ? 2 : 60; // Para Dejador / Vendedor: solo 48 horas en memoria RAM
+      const freshCompletedRaw = Array.from(completedMap.values()).filter(x => isRecentItem(x, daysToKeep)).slice(-40);
+      const freshRejectedRaw = Array.from(rejectedMap.values()).filter(x => isRecentItem(x, daysToKeep)).slice(-20);
+      const freshHistory = Array.from(historyMap.values()).filter(x => isRecentItem(x, daysToKeep)).sort((a, b) => new Date(b.timestamp || 0).getTime() - new Date(a.timestamp || 0).getTime()).slice(-40);
 
       // 🛡️ PRESERVAR los ítems completados o rechazados localmente en los últimos 15 minutos
       // Esto evita que la latencia de red de Supabase los resucite temporalmente como pendientes (flicker)
@@ -418,9 +407,9 @@ export const useLogisticsStore = create(
 
       set({
         pendingRequests: freshPending,
-        completedRequests: freshCompleted.slice(0, 250),
-        rejectedRequests: freshRejected.slice(0, 80),
-        loadHistory: freshHistory.slice(0, 250)
+        completedRequests: freshCompleted.slice(0, 150),
+        rejectedRequests: freshRejected.slice(0, 50),
+        loadHistory: freshHistory.slice(0, 150)
       });
     } catch (err) {
       console.warn('[LogisticsStore] Error in loadFromRemote:', err);
@@ -459,14 +448,12 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...completedRequests];
     set({ pendingRequests: newPending, completedRequests: newCompleted });
-    broadcastLogisticsDelta({
-      upserts: { completedRequests: [newCompleted[0]] },
-      removedIds: { pendingRequests: [requestId] },
-    });
+    broadcastLogisticsUpdate({ pendingRequests: newPending, completedRequests: newCompleted });
     syncLogisticsPartition(affectedBranchId, newPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
 
-    // Mover de pending a completed atómicamente (quita del origen, no solo unión)
-    atomicMove('pendingRequests', 'completedRequests', affectedBranchId, requestId, newCompleted[0]);
+    // Backup atómico para mover de pending a completed sin sobreescribir arrays
+    atomicRemoveAndAppend('pendingRequests', 'completedRequests', null, requestId, newCompleted[0]);
+    atomicRemoveAndAppend('pendingRequests', 'completedRequests', affectedBranchId, requestId, newCompleted[0]);
   },
 
   /**
@@ -510,7 +497,7 @@ export const useLogisticsStore = create(
     let finalPending = newPending;
     if (postponedItems.length > 0) {
       const postponedRequest = {
-        id: newId('REQ-POST'),
+        id: `REQ-POST-${Date.now()}`,
         requester_point_id: req.requester_point_id,
         requester_name: req.requester_name,
         shiftId: req.shiftId || activeShift?.id || null,
@@ -528,18 +515,8 @@ export const useLogisticsStore = create(
     }
 
     set({ pendingRequests: finalPending, completedRequests: newCompleted });
-    const postponed = finalPending.find(r => r.original_request_id === requestId && r.isPostponed);
-    broadcastLogisticsDelta({
-      upserts: {
-        completedRequests: [newCompleted[0]],
-        ...(postponed ? { pendingRequests: [postponed] } : {}),
-      },
-      removedIds: { pendingRequests: [requestId] },
-    });
+    broadcastLogisticsUpdate({ pendingRequests: finalPending, completedRequests: newCompleted });
     syncLogisticsPartition(affectedBranchId, finalPending, newCompleted, get().rejectedRequests, { syncCompleted: true });
-
-    atomicMove('pendingRequests', 'completedRequests', affectedBranchId, requestId, newCompleted[0]);
-    if (postponed) atomicAppend('pendingRequests', affectedBranchId, postponed);
   },
 
   rejectRequest: (requestId) => {
@@ -558,13 +535,8 @@ export const useLogisticsStore = create(
       dejadorName: dejadorName || null,
     }, ...rejectedRequests];
     set({ pendingRequests: newPending, rejectedRequests: newRejected });
-    broadcastLogisticsDelta({
-      upserts: { rejectedRequests: [newRejected[0]] },
-      removedIds: { pendingRequests: [requestId] },
-    });
+    broadcastLogisticsUpdate({ pendingRequests: newPending, rejectedRequests: newRejected });
     syncLogisticsPartition(affectedBranchId, newPending, get().completedRequests, newRejected, { syncRejected: true });
-
-    atomicMove('pendingRequests', 'rejectedRequests', affectedBranchId, requestId, newRejected[0]);
   },
 
   /**
@@ -585,10 +557,7 @@ export const useLogisticsStore = create(
         : r
     );
     set({ pendingRequests: updated });
-    const readReq = updated.find(r => r.id === requestId);
-    broadcastLogisticsDelta({ upserts: { pendingRequests: [readReq] } });
     syncLogisticsPartition(affectedBranchId, updated, get().completedRequests, get().rejectedRequests);
-    atomicAppend('pendingRequests', affectedBranchId, readReq);
   },
 
   /**
@@ -604,7 +573,7 @@ export const useLogisticsStore = create(
     const newPending = pendingRequests.filter(r => r.id !== requestId);
     const postponedRequest = {
       ...req,
-      id: newId('REQ-POST'),
+      id: `REQ-POST-${Date.now()}`,
       branchId: affectedBranchId,  // ← propagar branchId al pedido pospuesto
       isPostponed: true,
       created_at: new Date().toISOString(),
@@ -612,13 +581,7 @@ export const useLogisticsStore = create(
     };
     const finalPending = [...newPending, postponedRequest];
     set({ pendingRequests: finalPending });
-    broadcastLogisticsDelta({
-      upserts: { pendingRequests: [postponedRequest] },
-      removedIds: { pendingRequests: [requestId] },
-    });
     syncLogisticsPartition(affectedBranchId, finalPending, get().completedRequests, get().rejectedRequests);
-    atomicRemove('pendingRequests', affectedBranchId, requestId);
-    atomicAppend('pendingRequests', affectedBranchId, postponedRequest);
   },
 
   updatePendingRequest: (requestId, newPayload) => {
@@ -629,10 +592,7 @@ export const useLogisticsStore = create(
       r.id === requestId ? { ...r, items_payload: newPayload } : r
     );
     set({ pendingRequests: updated });
-    const upd = updated.find(r => r.id === requestId);
-    if (upd) broadcastLogisticsDelta({ upserts: { pendingRequests: [upd] } });
     syncLogisticsPartition(affectedBranchId, updated, get().completedRequests, get().rejectedRequests);
-    if (upd) atomicAppend('pendingRequests', affectedBranchId, upd);
   },
 
   // Editar items de una entrada del historial de cargas/recepciones
@@ -692,15 +652,8 @@ export const useLogisticsStore = create(
       const cleanPoint = String(s.pointId || s.vehicle || s.point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
       const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
-      if (!pointMatches) return false;
-      // Turno de hoy, O turno abierto que empezó en las últimas 18h (cubre cargas
-      // tempranas de un turno que cruzó la medianoche).
       const sDate = (s.fecha || s.openedAt || s.closedAt || s.createdAt || '').slice(0, 10);
-      if (!sDate || sDate === today) return true;
-      if (!s.closedAt && s.openedAt) {
-        return (Date.now() - new Date(s.openedAt).getTime()) < 18 * 60 * 60 * 1000;
-      }
-      return false;
+      return pointMatches && (!sDate || sDate === today);
     });
 
     // Prioridad: 1. Turno abierto actualmente. 2. Turno más reciente de hoy
@@ -708,7 +661,7 @@ export const useLogisticsStore = create(
       vehicleShiftsToday.sort((a, b) => new Date(b.closedAt || b.openedAt || 0).getTime() - new Date(a.closedAt || a.openedAt || 0).getTime())[0];
 
     const entry = {
-      id: newId('LOAD'),
+      id: `LOAD-${now}`,
       type: 'carga',
       vehicleId,
       branchId: affectedBranchId,
@@ -721,7 +674,7 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
-    broadcastLogisticsDelta({ upserts: { loadHistory: [entry] } });
+    broadcastLogisticsUpdate({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     markLocalWrite('loadHistory', affectedBranchId);
     markLocalWrite('loadHistory', null);
@@ -732,6 +685,7 @@ export const useLogisticsStore = create(
 
     // Backup atómico para evitar pérdida por race condition
     atomicAppend('loadHistory', affectedBranchId, entry);
+    atomicAppend('loadHistory', null, entry);
     return true;
   },
 
@@ -763,23 +717,16 @@ export const useLogisticsStore = create(
       const cleanPoint = String(s.pointId || s.vehicle || s.point_id || '').toLowerCase().replace(/[^a-z0-9]/g, '');
       if (!cleanPoint || !cleanVehicle) return false;
       const pointMatches = cleanPoint === cleanVehicle || cleanPoint.includes(cleanVehicle) || cleanVehicle.includes(cleanPoint);
-      if (!pointMatches) return false;
-      // Turno de hoy, O turno abierto que empezó en las últimas 18h (cubre cargas
-      // tempranas de un turno que cruzó la medianoche).
       const sDate = (s.fecha || s.openedAt || s.closedAt || s.createdAt || '').slice(0, 10);
-      if (!sDate || sDate === today) return true;
-      if (!s.closedAt && s.openedAt) {
-        return (Date.now() - new Date(s.openedAt).getTime()) < 18 * 60 * 60 * 1000;
-      }
-      return false;
+      return pointMatches && (!sDate || sDate === today);
     });
 
     // Prioridad: 1. Turno abierto actualmente. 2. Turno más reciente de hoy (aunque esté recién cerrado)
     const activeShift = vehicleShiftsToday.find(s => !s.closedAt) ||
       vehicleShiftsToday.sort((a, b) => new Date(b.closedAt || b.openedAt || 0).getTime() - new Date(a.closedAt || a.openedAt || 0).getTime())[0];
 
-    // Sincronizar sobrantes acumulados dentro del turno (local + Supabase, no solo local)
-    if (activeShift?.id) {
+    // Sincronizar sobrantes directamente en el turno si existe
+    if (activeShift) {
       try {
         const invStore = globalThis.__inventoryStore__;
         if (invStore && typeof invStore.getState === 'function') {
@@ -790,10 +737,6 @@ export const useLogisticsStore = create(
           const allShifts = invStore.getState().posShifts || [];
           const updatedShifts = allShifts.map(s => s.id === activeShift.id ? { ...s, sobrantes: currentSobrantes } : s);
           invStore.setState({ posShifts: updatedShifts });
-          // Persistir el turno con sus sobrantes (antes solo se hacía setState local)
-          if (typeof invStore.getState().updatePosShift === 'function') {
-            invStore.getState().updatePosShift(activeShift.id, { sobrantes: currentSobrantes });
-          }
         }
       } catch (err) {
         console.warn('[commitReception] Sync shift sobrantes error:', err);
@@ -801,7 +744,7 @@ export const useLogisticsStore = create(
     }
 
     const entry = {
-      id: newId('RECV'),
+      id: `RECV-${now}`,
       type: 'recepcion',
       vehicleId,
       branchId: affectedBranchId,
@@ -814,7 +757,7 @@ export const useLogisticsStore = create(
     };
     const newHistory = [entry, ...get().loadHistory];
     set({ loadHistory: newHistory });
-    broadcastLogisticsDelta({ upserts: { loadHistory: [entry] } });
+    broadcastLogisticsUpdate({ loadHistory: newHistory });
     const loadSlice = newHistory.filter(e => (e.branchId || 'BRANCH-001') === affectedBranchId);
     markLocalWrite('loadHistory', affectedBranchId);
     markLocalWrite('loadHistory', null);
@@ -825,6 +768,7 @@ export const useLogisticsStore = create(
 
     // Backup atómico para evitar pérdida por race condition
     atomicAppend('loadHistory', affectedBranchId, entry);
+    atomicAppend('loadHistory', null, entry);
     return true;
   },
 

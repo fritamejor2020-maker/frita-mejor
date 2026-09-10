@@ -3,7 +3,6 @@ import { useDashboardFilters } from './useDashboardFilters';
 import { useFinanceStore } from '../store/useFinanceStore';
 import { usePayrollStore } from '../store/usePayrollStore';
 import { useInventoryStore } from '../store/useInventoryStore';
-import { isVendorOriginSale } from '../utils/financeUtils';
 
 function parseDate(dateStr: any): Date | null {
   if (!dateStr) return null;
@@ -48,8 +47,7 @@ export function useDashboardData() {
     const allIncomes = [
       ...incomes,
       ...posSales
-        // Excluir pedidos de vendedores móviles: se cuadran por inventario, no por transacción.
-        .filter((s: any) => s.status === 'PAID' && !isVendorOriginSale(s))
+        .filter((s: any) => s.status === 'PAID')
         .map((s: any) => ({
           fecha: s.timestamp || s.date,
           created_at: s.timestamp || s.date,
