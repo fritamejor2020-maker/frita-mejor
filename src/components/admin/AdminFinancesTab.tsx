@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useFinanceStore } from '../../store/useFinanceStore';
 import { useInventoryStore } from '../../store/useInventoryStore';
 import { useLogisticsStore } from '../../store/useLogisticsStore';
@@ -613,6 +613,12 @@ export const AdminFinancesTab = ({
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   };
 
+  // 🛡️ Memoizado: esta construcción recorre TODAS las ventas por cada turno cerrado
+  // (O(turnos × ventas)). Con miles de ventas históricas acumuladas esto congelaba
+  // la pestaña de Cierres en cada render (y useInventoryStore() sin selector se
+  // re-renderiza con cualquier cambio del store). Ahora solo se recalcula cuando
+  // cambian los datos reales de los que depende — mismo resultado, no se toca la lógica.
+  const mappedShifts = useMemo(() => {
   // Pre-computar ventanas de tiempo por vehículo+fecha para separar turnos del mismo día
   // Ej: AM cierra a las 14h, MD cierra a las 20h → cada uno solo ve su logística
   const shiftsByVehicleDate: Record<string, any[]> = {};
@@ -631,7 +637,7 @@ export const AdminFinancesTab = ({
   );
 
   // Solo VENDEDOR y POS tienen cierre de finanzas. Los DEJADORES no.
-  const mappedShifts = (posShifts || [])
+  return (posShifts || [])
     .filter((s: any) => s.closedAt && (mode === 'POS'
       ? (!s.type || (s.type !== 'VENDEDOR' && s.type !== 'DEJADOR'))
       : (s.type === 'VENDEDOR' || (s.pointId && String(s.pointId).toLowerCase().startsWith('t')) || s.vehicle)))
@@ -1051,6 +1057,7 @@ export const AdminFinancesTab = ({
         })()
       };
    });
+  }, [posShifts, posSales, posExpenses, posDescargues, mode, customers, posSettings, vendorTransfers, loadHistory, completedRequests]);
 
   // Deduplicar: en VENDEDOR si hay 2 registros cerrados para el mismo vehículo+turno+fecha.
   // En POS cada cierre Z es único e independiente por su ID de turno para no borrar turnos del mismo día.
