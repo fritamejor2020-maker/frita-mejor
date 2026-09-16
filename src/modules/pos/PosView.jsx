@@ -366,141 +366,150 @@ export function PosView() {
   const [pendingDeliveryInfo, setPendingDeliveryInfo] = useState(null);
 
   const deletedPosSaleIds = useInventoryStore(s => s.deletedPosSaleIds || []);
-  const deletedSaleSet = new Set(deletedPosSaleIds);
-
-  // Conjuntos de ventas ya PAGADAS para no mostrar jamás una venta suspendida que ya fue cobrada
-  const paidSaleIds = new Set();
-  const paidOlaClickIds = new Set();
-  const paidPublicIds = new Set();
-  const paidSalesList = [];
-
-  (posSales || []).forEach(s => {
-    if (s && s.status === 'PAID') {
-      paidSalesList.push(s);
-      if (s.id) {
-        paidSaleIds.add(s.id);
-        if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
-          paidOlaClickIds.add(s.id.replace('HELD-OLA-', ''));
-        }
-      }
-      if (s.originalHeldId) paidSaleIds.add(s.originalHeldId);
-      if (s.originalOlaClickId) {
-        paidOlaClickIds.add(s.originalOlaClickId);
-        paidSaleIds.add(`HELD-OLA-${s.originalOlaClickId}`);
-      }
-      if (s.publicId) paidPublicIds.add(s.publicId);
-    }
-  });
-
-  // Pedidos OlaClick en estado terminal (rechazados, cancelados, entregados)
-  const terminalOlaClickIds = new Set();
-  (olaclickOrders || []).forEach(o => {
-    const st = String(o?.status || '').trim().toUpperCase();
-    if (['REJECTED', 'CANCELLED', 'CANCELED', 'DELIVERED', 'COMPLETED'].includes(st)) {
-      if (o.id) terminalOlaClickIds.add(String(o.id));
-    }
-  });
-
-  const isStaleSuspended = (sale) => {
-    if (!sale) return true;
-    const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
-    if (isNaN(saleTime) || saleTime === 0) return true;
-    // Ventas suspendidas de más de 12 horas son obsoletas
-    const maxAgeMs = 12 * 60 * 60 * 1000;
-    return (Date.now() - saleTime) > maxAgeMs;
-  };
-
-  const isSalePaidOrDeleted = (s) => {
-    if (!s) return true;
-    const sId = String(s.id || '');
-    if (deletedSaleSet.has(sId)) return true;
-    if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return true;
-    if (s.publicId && deletedSaleSet.has(s.publicId)) return true;
-    if (s.originalHeldId && deletedSaleSet.has(s.originalHeldId)) return true;
-
-    if (paidSaleIds.has(sId)) return true;
-    if (s.originalHeldId && paidSaleIds.has(s.originalHeldId)) return true;
-    if (s.originalOlaClickId && (paidOlaClickIds.has(s.originalOlaClickId) || paidSaleIds.has(`HELD-OLA-${s.originalOlaClickId}`))) return true;
-    if (s.publicId && paidPublicIds.has(s.publicId)) return true;
-    if (sId.startsWith('HELD-OLA-') && paidOlaClickIds.has(sId.replace('HELD-OLA-', ''))) return true;
-
-    // 🛡️ Si proviene de un pedido OlaClick que ya fue cobrado o está en estado terminal
-    const olaId = s.originalOlaClickId || (sId.startsWith('HELD-OLA-') ? sId.replace('HELD-OLA-', '') : null);
-    if (olaId && (paidOlaClickIds.has(olaId) || terminalOlaClickIds.has(olaId))) return true;
-
-    // 🛡️ Detección de coincidencia inteligente para EVITAR ventas fantasma:
-    // NUNCA aplicar esta heurística a pedidos de OlaClick (tienen ID único originalOlaClickId).
-    // Para ventas suspendidas manuales, SOLO coincide si la venta pagada ocurrió DESPUÉS de pausar la venta (psTime >= sTime - 5000) 
-    // y dentro de un margen máximo de 2 horas.
-    const isOlaClickSale = !!s.isOlaClick || !!s.originalOlaClickId || sId.startsWith('HELD-OLA-');
-    if (!isOlaClickSale && s.items && Array.isArray(s.items) && s.items.length > 0 && s.total > 0) {
-      const sItemKeys = s.items.map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
-      const hasMatchingPaid = paidSalesList.some(ps => {
-        if (ps.total !== s.total) return false;
-        const pItemKeys = (ps.items || []).map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
-        if (sItemKeys !== pItemKeys) return false;
-        const psTime = new Date(ps.timestamp || ps.createdAt || 0).getTime();
-        const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
-        return psTime >= (sTime - 5000) && (psTime - sTime) < (2 * 60 * 60 * 1000);
-      });
-      if (hasMatchingPaid) return true;
-    }
-
-    return false;
-  };
-
-  const heldSales = (usePosStore(s => s.heldSales || [])).filter(h => {
-    if (!h || h.status !== 'SUSPENDED') return false;
-    if (isStaleSuspended(h)) return false;
-    if (isSalePaidOrDeleted(h)) return false;
-    if (!h.items || !Array.isArray(h.items) || h.items.length === 0) return false;
-    return true;
-  });
+  const heldSalesRaw = usePosStore(s => s.heldSales || []);
   const loadHeldSaleToCart = usePosStore(s => s.loadHeldSaleToCart);
   const deleteHeldSale = usePosStore(s => s.deleteHeldSale);
 
-  const suspendedSales = (posSales || []).filter(s => {
-    if (!s || s.status !== 'SUSPENDED') return false;
-    if (isStaleSuspended(s)) return false;
-    if (isSalePaidOrDeleted(s)) return false;
-    if (!s.items || !Array.isArray(s.items) || s.items.length === 0) return false;
-    return true;
-  });
-  
-  // Unificar ventas en espera dando absoluta prioridad a posSales (fuente de verdad sincronizada)
-  const combinedSalesMap = new Map();
-  suspendedSales.forEach(s => {
-    if (s?.id) combinedSalesMap.set(s.id, s);
-  });
-  (heldSales || []).forEach(h => {
-    if (h?.id && !combinedSalesMap.has(h.id) && (!h.originalOlaClickId || !combinedSalesMap.has(h.originalOlaClickId))) {
-      combinedSalesMap.set(h.id, h);
-    }
-  });
-  const combinedSales = Array.from(combinedSalesMap.values());
+  // 🛡️ Memoizado: con miles de ventas históricas en posSales, recalcular todo esto
+  // en cada render (cada tecla, cada tick del polling de OlaClick) es costoso y
+  // congelaba la UI. Ahora solo se recalcula cuando cambian los datos reales.
+  const { heldSales, allHeldAndSuspended } = useMemo(() => {
+    const deletedSaleSet = new Set(deletedPosSaleIds);
 
-  const allHeldAndSuspended = combinedSales.map(s => {
-    const cust = (customers || []).find(c => c.id === s.customerId);
-    return {
-      id: s.id,
-      customerName: s.customerName || cust?.name || (s.isLuckyWinner ? 'Cliente Ganador Raspa y Gana' : (s.customerId ? 'Cliente' : 'Venta Pausada')),
-      customerId: s.customerId || '',
-      customerPhone: s.customerPhone || cust?.phone || '',
-      deliveryAddress: s.deliveryAddress || cust?.address || '',
-      serviceType: s.serviceType || 'DELIVERY',
-      items: s.items || [],
-      subtotal: s.subtotal || 0,
-      discountPercent: s.discountPercent || 0,
-      discountAmount: s.discountAmount || 0,
-      total: s.total || 0,
-      heldAt: s.heldAt || s.timestamp || new Date().toISOString(),
-      isOlaClick: !!s.isOlaClick,
-      isLuckyWinner: !!s.isLuckyWinner,
-      prizeType: s.prizeType || 'RASPA_Y_GANA',
-      discountPercentage: s.discountPercentage || 10,
-      publicId: s.publicId || (s.id ? s.id.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').replace('HELD-LUCKY-', '').slice(-6) : 'N/A')
+    // Conjuntos de ventas ya PAGADAS para no mostrar jamás una venta suspendida que ya fue cobrada
+    const paidSaleIds = new Set();
+    const paidOlaClickIds = new Set();
+    const paidPublicIds = new Set();
+    const paidSalesList = [];
+
+    (posSales || []).forEach(s => {
+      if (s && s.status === 'PAID') {
+        paidSalesList.push(s);
+        if (s.id) {
+          paidSaleIds.add(s.id);
+          if (typeof s.id === 'string' && s.id.startsWith('HELD-OLA-')) {
+            paidOlaClickIds.add(s.id.replace('HELD-OLA-', ''));
+          }
+        }
+        if (s.originalHeldId) paidSaleIds.add(s.originalHeldId);
+        if (s.originalOlaClickId) {
+          paidOlaClickIds.add(s.originalOlaClickId);
+          paidSaleIds.add(`HELD-OLA-${s.originalOlaClickId}`);
+        }
+        if (s.publicId) paidPublicIds.add(s.publicId);
+      }
+    });
+
+    // Pedidos OlaClick en estado terminal (rechazados, cancelados, entregados)
+    const terminalOlaClickIds = new Set();
+    (olaclickOrders || []).forEach(o => {
+      const st = String(o?.status || '').trim().toUpperCase();
+      if (['REJECTED', 'CANCELLED', 'CANCELED', 'DELIVERED', 'COMPLETED'].includes(st)) {
+        if (o.id) terminalOlaClickIds.add(String(o.id));
+      }
+    });
+
+    const isStaleSuspended = (sale) => {
+      if (!sale) return true;
+      const saleTime = new Date(sale.heldAt || sale.timestamp || sale.createdAt || 0).getTime();
+      if (isNaN(saleTime) || saleTime === 0) return true;
+      // Ventas suspendidas de más de 12 horas son obsoletas
+      const maxAgeMs = 12 * 60 * 60 * 1000;
+      return (Date.now() - saleTime) > maxAgeMs;
     };
-  }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
+
+    const isSalePaidOrDeleted = (s) => {
+      if (!s) return true;
+      const sId = String(s.id || '');
+      if (deletedSaleSet.has(sId)) return true;
+      if (s.originalOlaClickId && deletedSaleSet.has(s.originalOlaClickId)) return true;
+      if (s.publicId && deletedSaleSet.has(s.publicId)) return true;
+      if (s.originalHeldId && deletedSaleSet.has(s.originalHeldId)) return true;
+
+      if (paidSaleIds.has(sId)) return true;
+      if (s.originalHeldId && paidSaleIds.has(s.originalHeldId)) return true;
+      if (s.originalOlaClickId && (paidOlaClickIds.has(s.originalOlaClickId) || paidSaleIds.has(`HELD-OLA-${s.originalOlaClickId}`))) return true;
+      if (s.publicId && paidPublicIds.has(s.publicId)) return true;
+      if (sId.startsWith('HELD-OLA-') && paidOlaClickIds.has(sId.replace('HELD-OLA-', ''))) return true;
+
+      // 🛡️ Si proviene de un pedido OlaClick que ya fue cobrado o está en estado terminal
+      const olaId = s.originalOlaClickId || (sId.startsWith('HELD-OLA-') ? sId.replace('HELD-OLA-', '') : null);
+      if (olaId && (paidOlaClickIds.has(olaId) || terminalOlaClickIds.has(olaId))) return true;
+
+      // 🛡️ Detección de coincidencia inteligente para EVITAR ventas fantasma:
+      // NUNCA aplicar esta heurística a pedidos de OlaClick (tienen ID único originalOlaClickId).
+      // Para ventas suspendidas manuales, SOLO coincide si la venta pagada ocurrió DESPUÉS de pausar la venta (psTime >= sTime - 5000)
+      // y dentro de un margen máximo de 2 horas.
+      const isOlaClickSale = !!s.isOlaClick || !!s.originalOlaClickId || sId.startsWith('HELD-OLA-');
+      if (!isOlaClickSale && s.items && Array.isArray(s.items) && s.items.length > 0 && s.total > 0) {
+        const sItemKeys = s.items.map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
+        const hasMatchingPaid = paidSalesList.some(ps => {
+          if (ps.total !== s.total) return false;
+          const pItemKeys = (ps.items || []).map(i => `${i.productId || i.id}:${i.qty}`).sort().join('|');
+          if (sItemKeys !== pItemKeys) return false;
+          const psTime = new Date(ps.timestamp || ps.createdAt || 0).getTime();
+          const sTime = new Date(s.heldAt || s.timestamp || s.createdAt || 0).getTime();
+          return psTime >= (sTime - 5000) && (psTime - sTime) < (2 * 60 * 60 * 1000);
+        });
+        if (hasMatchingPaid) return true;
+      }
+
+      return false;
+    };
+
+    const filteredHeld = (heldSalesRaw || []).filter(h => {
+      if (!h || h.status !== 'SUSPENDED') return false;
+      if (isStaleSuspended(h)) return false;
+      if (isSalePaidOrDeleted(h)) return false;
+      if (!h.items || !Array.isArray(h.items) || h.items.length === 0) return false;
+      return true;
+    });
+
+    const suspendedSales = (posSales || []).filter(s => {
+      if (!s || s.status !== 'SUSPENDED') return false;
+      if (isStaleSuspended(s)) return false;
+      if (isSalePaidOrDeleted(s)) return false;
+      if (!s.items || !Array.isArray(s.items) || s.items.length === 0) return false;
+      return true;
+    });
+
+    // Unificar ventas en espera dando absoluta prioridad a posSales (fuente de verdad sincronizada)
+    const combinedSalesMap = new Map();
+    suspendedSales.forEach(s => {
+      if (s?.id) combinedSalesMap.set(s.id, s);
+    });
+    (filteredHeld || []).forEach(h => {
+      if (h?.id && !combinedSalesMap.has(h.id) && (!h.originalOlaClickId || !combinedSalesMap.has(h.originalOlaClickId))) {
+        combinedSalesMap.set(h.id, h);
+      }
+    });
+    const combinedSales = Array.from(combinedSalesMap.values());
+
+    const mapped = combinedSales.map(s => {
+      const cust = (customers || []).find(c => c.id === s.customerId);
+      return {
+        id: s.id,
+        customerName: s.customerName || cust?.name || (s.isLuckyWinner ? 'Cliente Ganador Raspa y Gana' : (s.customerId ? 'Cliente' : 'Venta Pausada')),
+        customerId: s.customerId || '',
+        customerPhone: s.customerPhone || cust?.phone || '',
+        deliveryAddress: s.deliveryAddress || cust?.address || '',
+        serviceType: s.serviceType || 'DELIVERY',
+        items: s.items || [],
+        subtotal: s.subtotal || 0,
+        discountPercent: s.discountPercent || 0,
+        discountAmount: s.discountAmount || 0,
+        total: s.total || 0,
+        heldAt: s.heldAt || s.timestamp || new Date().toISOString(),
+        isOlaClick: !!s.isOlaClick,
+        isLuckyWinner: !!s.isLuckyWinner,
+        prizeType: s.prizeType || 'RASPA_Y_GANA',
+        discountPercentage: s.discountPercentage || 10,
+        publicId: s.publicId || (s.id ? s.id.replace('SALE-', '').replace('HELD-MANUAL-', '').replace('HELD-OLA-', '').replace('HELD-LUCKY-', '').slice(-6) : 'N/A')
+      };
+    }).sort((a, b) => new Date(b.heldAt).getTime() - new Date(a.heldAt).getTime());
+
+    return { heldSales: filteredHeld, allHeldAndSuspended: mapped };
+  }, [posSales, heldSalesRaw, deletedPosSaleIds, olaclickOrders, customers]);
 
   // Suscribirse al conteo de pedidos en línea de OlaClick en tiempo real
   const notifiedOlaClickIdsRef = useRef(new Set());
