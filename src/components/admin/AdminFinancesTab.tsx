@@ -31,6 +31,27 @@ import { formatMoney as fmt } from '../../utils/formatUtils';
 import { getProductAbbreviation } from '../../utils/formatUtils';
 import { matchVehicleId } from '../../utils/vehicleUtils';
 
+// Un registro (venta/retiro/descargue) pertenece a un turno POS. En turnos cerrados con ventana
+// completa manda la caja + la ventana de tiempo (el shiftId puede estar desactualizado por cajas
+// que re-suben datos viejos); en turnos abiertos se mantiene shiftId o ventana con tolerancia.
+const belongsToPosShift = (item: any, shift: any, itemTimeRaw: any): boolean => {
+  if (!item || !shift) return false;
+  const t = new Date(itemTimeRaw || 0).getTime();
+  const openMs = new Date(shift.openedAt || shift.createdAt || 0).getTime();
+  const sameRegister = !!(item.registerId && shift.registerId && item.registerId === shift.registerId);
+  if (shift.closedAt && shift.openedAt && shift.registerId) {
+    if (!item.registerId) return !!(item.shiftId && shift.id && item.shiftId === shift.id);
+    if (!sameRegister) return false;
+    return t >= openMs && t <= new Date(shift.closedAt).getTime();
+  }
+  if (item.shiftId && shift.id && item.shiftId === shift.id) return true;
+  if (sameRegister) {
+    const closeMs = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
+    return t >= (openMs - 60000) && t <= (closeMs + 60000);
+  }
+  return false;
+};
+
 // ─── ResumenOperativoTab ─────────────────────────────────────────────
 // Consolida por vehículo: carga inicial + surtidos + sobrantes + cierre vendedor
 export const ResumenOperativoTab = () => {
@@ -825,38 +846,17 @@ export const AdminFinancesTab = ({
          // POS Shift
          const isShiftSale = (sale: any) => {
            if (!sale || sale.status !== 'PAID') return false;
-           if (sale.shiftId && s.id && sale.shiftId === s.id) return true;
-           if (sale.registerId && s.registerId && sale.registerId === s.registerId) {
-             const saleTime = new Date(sale.timestamp || sale.createdAt || 0).getTime();
-             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
-             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
-             return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
-           }
-           return false;
+           return belongsToPosShift(sale, s, sale.timestamp || sale.createdAt);
          };
 
          const isShiftExpense = (exp: any) => {
            if (!exp) return false;
-           if (exp.shiftId && s.id && exp.shiftId === s.id) return true;
-           if (exp.registerId && s.registerId && exp.registerId === s.registerId) {
-             const expTime = new Date(exp.timestamp || exp.date || exp.createdAt || 0).getTime();
-             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
-             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
-             return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
-           }
-           return false;
+           return belongsToPosShift(exp, s, exp.timestamp || exp.date || exp.createdAt);
          };
 
          const isShiftDescargue = (d: any) => {
            if (!d) return false;
-           if (d.shiftId && s.id && d.shiftId === s.id) return true;
-           if (d.registerId && s.registerId && d.registerId === s.registerId) {
-             const dTime = new Date(d.timestamp || d.createdAt || 0).getTime();
-             const openTime = new Date(s.openedAt || s.createdAt || 0).getTime();
-             const closeTime = s.closedAt ? new Date(s.closedAt).getTime() : (Date.now() + 60000);
-             return dTime >= (openTime - 60000) && dTime <= (closeTime + 60000);
-           }
-           return false;
+           return belongsToPosShift(d, s, d.timestamp || d.createdAt);
          };
 
          const shiftSales = (posSales || []).filter(isShiftSale);
@@ -1270,26 +1270,12 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
 
                     const isMatch = (s: any) => {
                       if (!s || s.status !== 'PAID') return false;
-                      if (s.shiftId && shift.id && s.shiftId === shift.id) return true;
-                      if (s.registerId && shift.registerId && s.registerId === shift.registerId) {
-                        const saleTime = new Date(s.timestamp || s.createdAt || 0).getTime();
-                        const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
-                        const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
-                        return saleTime >= (openTime - 60000) && saleTime <= (closeTime + 60000);
-                      }
-                      return false;
+                      return belongsToPosShift(s, shift, s.timestamp || s.createdAt);
                     };
 
                     const isExpMatch = (e: any) => {
                       if (!e) return false;
-                      if (e.shiftId && shift.id && e.shiftId === shift.id) return true;
-                      if (e.registerId && shift.registerId && e.registerId === shift.registerId) {
-                        const expTime = new Date(e.timestamp || e.date || e.createdAt || 0).getTime();
-                        const openTime = new Date(shift.openedAt || shift.createdAt || 0).getTime();
-                        const closeTime = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
-                        return expTime >= (openTime - 60000) && expTime <= (closeTime + 60000);
-                      }
-                      return false;
+                      return belongsToPosShift(e, shift, e.timestamp || e.date || e.createdAt);
                     };
 
                     const shiftSales = (posSales || []).filter(isMatch);
