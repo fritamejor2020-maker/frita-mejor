@@ -199,12 +199,19 @@ export function PosView() {
 
   // Shift logic (find active shift FOR THIS REGISTER)
   // 🛡️ NUNCA emparejar con turnos de logística (DEJADOR) ni de triciclos (VENDEDOR)
-  const activeShift = (posShifts || []).find(s => 
-    !s.closedAt && 
-    s.type !== 'DEJADOR' && 
-    s.type !== 'VENDEDOR' && 
-    (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001'))
-  );
+  // Si por sincronización hay varios turnos abiertos en la misma caja, todos los dispositivos
+  // deben coincidir en el mismo: el abierto más recientemente.
+  const activeShift = (posShifts || [])
+    .filter(s =>
+      !s.closedAt &&
+      s.type !== 'DEJADOR' &&
+      s.type !== 'VENDEDOR' &&
+      (s.registerId === selectedRegisterId || (!s.registerId && selectedRegisterId === 'REG-001'))
+    )
+    .sort((a, b) => new Date(b.openedAt || 0).getTime() - new Date(a.openedAt || 0).getTime())[0];
+  // Un turno abierto en un día anterior (hora Colombia) debe cerrarse con Cierre Z antes de vender.
+  const colombiaDay = (ts) => new Date(ts).toLocaleDateString('en-CA', { timeZone: 'America/Bogota' });
+  const isActiveShiftStale = !!(activeShift?.openedAt && colombiaDay(activeShift.openedAt) < colombiaDay(Date.now()));
   const activeShiftDescargues = activeShift ? (posDescargues || []).filter(d => d.shiftId === activeShift.id) : [];
   const activeShiftDescarguesTotal = activeShiftDescargues.reduce((acc, d) => acc + (Number(d.amount) || 0), 0);
 
@@ -1088,6 +1095,11 @@ export function PosView() {
       setShowShiftModal(true);
       return;
     }
+    if (isActiveShiftStale) {
+      alert("🚫 El turno de esta caja se abrió en un día anterior y sigue abierto.\n\nHaz el Cierre Z para cerrarlo y abre un turno nuevo antes de vender.");
+      handleAttemptShiftClose();
+      return;
+    }
 
     // Si el producto es de precio variable (flag explícito) o precio 0, abrimos modal
     if (overridePrice === null && (item.variablePrice === true || !item.price || item.price <= 0)) {
@@ -1377,6 +1389,11 @@ export function PosView() {
   };
 
   const handleProcessPayment = (methodName, amountProvided, isCredit = false) => {
+    if (isActiveShiftStale) {
+      alert("🚫 El turno de esta caja se abrió en un día anterior y sigue abierto.\n\nHaz el Cierre Z para cerrarlo y abre un turno nuevo antes de cobrar.");
+      handleAttemptShiftClose();
+      return;
+    }
     // Find the method config
     const methods = posSettings?.paymentMethods || [
       { id: '1', name: 'EFECTIVO', openDrawer: true, printReceipt: false }

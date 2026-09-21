@@ -862,14 +862,24 @@ export const AdminFinancesTab = ({
          const shiftSales = (posSales || []).filter(isShiftSale);
          const shiftExpenses = (posExpenses || []).filter(isShiftExpense);
          // Check embedded descargues on the shift first, or combine them
-         const embeddedDescargues = Array.isArray(s.descargues) && s.descargues.length > 0 ? s.descargues : [];
+         const embeddedAll = Array.isArray(s.descargues) && s.descargues.length > 0 ? s.descargues : [];
+         // En turnos cerrados con ventana completa, un descargue incrustado con hora fuera de la ventana
+         // (copia vieja del turno) no cuenta; los que no traen hora se conservan.
+         const isWindowedShift = !!(s.closedAt && s.openedAt && s.registerId);
+         const embeddedDescargues = embeddedAll.filter((d: any) => {
+           const ts = d?.timestamp || d?.createdAt;
+           if (!isWindowedShift || !ts) return true;
+           const t = new Date(ts).getTime();
+           return t >= new Date(s.openedAt).getTime() && t <= new Date(s.closedAt).getTime();
+         });
+         const droppedStaleDescargues = embeddedDescargues.length < embeddedAll.length;
          const matchedDescargues = (posDescargues || []).filter(isShiftDescargue);
          const descMap = new Map<string, any>();
          embeddedDescargues.forEach((d: any) => { if (d) descMap.set(d.id || JSON.stringify(d), d); });
          matchedDescargues.forEach((d: any) => { if (d) descMap.set(d.id || JSON.stringify(d), d); });
          const shiftDescargues = Array.from(descMap.values());
-         
-         const totalDescargues = s.totalDescargues !== undefined && Number(s.totalDescargues) > 0
+
+         const totalDescargues = (!droppedStaleDescargues && s.totalDescargues !== undefined && Number(s.totalDescargues) > 0)
            ? Number(s.totalDescargues)
            : shiftDescargues.reduce((acc: number, d: any) => acc + (Number(d.amount) || 0), 0);
          theoretical = shiftSales.reduce((acc: number, sale: any) => acc + sale.total, 0);
@@ -1290,7 +1300,8 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                       posSettings.ticketConfig || {},
                       posSettings.cashDrawerCode || '',
                       posSettings.paymentMethods || [],
-                      c.shiftDescargues || []
+                      c.shiftDescargues || [],
+                      true
                     );
 
                     const win = window.open('', '_blank', 'width=450,height=850');

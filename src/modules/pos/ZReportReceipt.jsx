@@ -5,7 +5,7 @@ import { useInventoryStore } from '../../store/useInventoryStore';
 
 const formatMoney = (val) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(val || 0);
 
-export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '', paymentMethods = [], descargues = null) => {
+export const generateZReportHTML = (shift, sales, expenses, customers, customerTypes, ticketConfig = {}, cashDrawerCode = '', paymentMethods = [], descargues = null, strictDescargues = false) => {
   if (!shift) return '';
 
   const tc = {
@@ -186,7 +186,7 @@ export const generateZReportHTML = (shift, sales, expenses, customers, customerT
 
   // ── Descargues del Turno ──────────────────────────────────────────────────────
   let shiftDescargues = [];
-  if (Array.isArray(descargues) && descargues.length > 0) {
+  if (Array.isArray(descargues) && (descargues.length > 0 || strictDescargues)) {
     shiftDescargues = descargues;
   } else if (Array.isArray(shift.descargues) && shift.descargues.length > 0) {
     shiftDescargues = shift.descargues;
