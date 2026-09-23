@@ -1766,6 +1766,20 @@ export const useInventoryStore = create(
           return existingOpenShift;
         }
 
+        // 🛡️ NUNCA abrir un segundo turno POS en la misma caja mientras otro siga abierto
+        // (aunque tenga otra jornada): dos turnos abiertos a la vez en la misma caja hacen que
+        // cada uno reclame las mismas ventas por ventana de tiempo, y el Z impreso las mezcla.
+        if (shift.type !== 'VENDEDOR' && shift.type !== 'DEJADOR') {
+          const anyOpenOnRegister = current.find(
+            s => !s.closedAt && s.type !== 'VENDEDOR' && s.type !== 'DEJADOR' &&
+                 s.branchId === branch && s.registerId === reg
+          );
+          if (anyOpenOnRegister) {
+            console.log(`[Shift] Ya hay un turno abierto en esta caja (${anyOpenOnRegister.id}) — reusando en vez de crear uno nuevo`);
+            return anyOpenOnRegister;
+          }
+        }
+
         const newShift = { 
           ...shift, 
           id: deterministicId, 
