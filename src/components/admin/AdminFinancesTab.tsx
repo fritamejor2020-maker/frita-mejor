@@ -31,26 +31,38 @@ import { formatMoney as fmt } from '../../utils/formatUtils';
 import { getProductAbbreviation } from '../../utils/formatUtils';
 import { matchVehicleId } from '../../utils/vehicleUtils';
 
-// Un registro (venta/retiro/descargue) pertenece a un turno POS. En turnos cerrados con ventana
-// completa manda la caja + la ventana de tiempo (el shiftId puede estar desactualizado por cajas
-// que re-suben datos viejos); en turnos abiertos se mantiene shiftId o ventana con tolerancia.
-const belongsToPosShift = (item: any, shift: any, itemTimeRaw: any): boolean => {
-  if (!item || !shift) return false;
-  const t = new Date(itemTimeRaw || 0).getTime();
-  const openMs = new Date(shift.openedAt || shift.createdAt || 0).getTime();
-  const sameRegister = !!(item.registerId && shift.registerId && item.registerId === shift.registerId);
-  if (shift.closedAt && shift.openedAt && shift.registerId) {
-    if (!item.registerId) return !!(item.shiftId && shift.id && item.shiftId === shift.id);
-    if (!sameRegister) return false;
-    return t >= openMs && t <= new Date(shift.closedAt).getTime();
-  }
-  if (item.shiftId && shift.id && item.shiftId === shift.id) return true;
-  if (sameRegister) {
-    const closeMs = shift.closedAt ? new Date(shift.closedAt).getTime() : (Date.now() + 60000);
-    return t >= (openMs - 60000) && t <= (closeMs + 60000);
-  }
-  return false;
+// Cada registro (venta/retiro/descargue) pertenece a UN solo turno POS: el turno de su misma caja
+// cuya ventana [apertura, cierre] contiene la hora del registro (si hay varios abiertos a la vez,
+// gana el abierto más recientemente). Si ninguna ventana lo cubre (turno reabierto/reescrito) se
+// usa su shiftId. Así el shiftId desactualizado no mezcla turnos y ninguna venta se cuenta dos
+// veces ni queda sin cierre.
+const makePosShiftOwnerResolver = (allShifts: any[]) => {
+  const candidates = (allShifts || [])
+    .filter((s: any) => s && s.openedAt && s.registerId && s.type !== 'DEJADOR' && s.type !== 'VENDEDOR')
+    .map((s: any) => ({
+      id: s.id,
+      registerId: s.registerId,
+      open: new Date(s.openedAt).getTime(),
+      close: s.closedAt ? new Date(s.closedAt).getTime() : Date.now() + 60000,
+    }))
+    .sort((a: any, b: any) => b.open - a.open);
+  const cache = new WeakMap<object, string | null>();
+  return (item: any, itemTimeRaw: any): string | null => {
+    if (!item) return null;
+    const hit = cache.get(item);
+    if (hit !== undefined) return hit;
+    let owner: string | null = item.shiftId || null;
+    if (item.registerId) {
+      const t = new Date(itemTimeRaw || 0).getTime();
+      const c = candidates.find((k: any) => k.registerId === item.registerId && t >= k.open && t <= k.close);
+      if (c) owner = c.id;
+    }
+    cache.set(item, owner);
+    return owner;
+  };
 };
+const belongsToPosShift = (resolveOwner: (i: any, t: any) => string | null, item: any, shift: any, itemTimeRaw: any): boolean =>
+  !!item && !!shift && resolveOwner(item, itemTimeRaw) === shift.id;
 
 // ─── ResumenOperativoTab ─────────────────────────────────────────────
 // Consolida por vehículo: carga inicial + surtidos + sobrantes + cierre vendedor
@@ -640,6 +652,7 @@ export const AdminFinancesTab = ({
   // re-renderiza con cualquier cambio del store). Ahora solo se recalcula cuando
   // cambian los datos reales de los que depende — mismo resultado, no se toca la lógica.
   const mappedShifts = useMemo(() => {
+  const resolvePosOwner = makePosShiftOwnerResolver(posShifts || []);
   // Pre-computar ventanas de tiempo por vehículo+fecha para separar turnos del mismo día
   // Ej: AM cierra a las 14h, MD cierra a las 20h → cada uno solo ve su logística
   const shiftsByVehicleDate: Record<string, any[]> = {};
@@ -846,17 +859,17 @@ export const AdminFinancesTab = ({
          // POS Shift
          const isShiftSale = (sale: any) => {
            if (!sale || sale.status !== 'PAID') return false;
-           return belongsToPosShift(sale, s, sale.timestamp || sale.createdAt);
+           return belongsToPosShift(resolvePosOwner, sale, s, sale.timestamp || sale.createdAt);
          };
 
          const isShiftExpense = (exp: any) => {
            if (!exp) return false;
-           return belongsToPosShift(exp, s, exp.timestamp || exp.date || exp.createdAt);
+           return belongsToPosShift(resolvePosOwner, exp, s, exp.timestamp || exp.date || exp.createdAt);
          };
 
          const isShiftDescargue = (d: any) => {
            if (!d) return false;
-           return belongsToPosShift(d, s, d.timestamp || d.createdAt);
+           return belongsToPosShift(resolvePosOwner, d, s, d.timestamp || d.createdAt);
          };
 
          const shiftSales = (posSales || []).filter(isShiftSale);
@@ -1278,14 +1291,15 @@ style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.o
                     const customerTypes = storeState.customerTypes || [];
                     const posSettings = storeState.posSettings || {};
 
+                    const resolveOwner = makePosShiftOwnerResolver(storeState.posShifts || []);
                     const isMatch = (s: any) => {
                       if (!s || s.status !== 'PAID') return false;
-                      return belongsToPosShift(s, shift, s.timestamp || s.createdAt);
+                      return belongsToPosShift(resolveOwner, s, shift, s.timestamp || s.createdAt);
                     };
 
                     const isExpMatch = (e: any) => {
                       if (!e) return false;
-                      return belongsToPosShift(e, shift, e.timestamp || e.date || e.createdAt);
+                      return belongsToPosShift(resolveOwner, e, shift, e.timestamp || e.date || e.createdAt);
                     };
 
                     const shiftSales = (posSales || []).filter(isMatch);
